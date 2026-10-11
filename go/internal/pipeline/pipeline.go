@@ -233,7 +233,7 @@ func (e *Engine) Run(ctx context.Context, vadEvents <-chan vad.Event, textIn <-c
 			// attention changed outside the loop: re-evaluate the queue
 
 		case text := <-e.announceCh:
-			e.pending = append(e.pending, announcement{text, time.Now()})
+			e.park(announcement{text, time.Now()})
 			// dispatched by tryAnnounce at the top of the loop
 
 		case t := <-e.taskCh:
@@ -381,7 +381,21 @@ func (e *Engine) onTask(t Task) {
 		text = "Late news: " + strings.TrimSpace(text)
 	}
 	log.Printf("[task] %s %s (%s) → %q", t.ID, t.Result, it.Name, text)
-	e.pending = append(e.pending, announcement{text, t.At})
+	e.park(announcement{text, t.At})
+}
+
+// park queues a system utterance for the next free floor, in EVENT-time
+// order: task outcomes and announcements arrive on different channels and
+// the select drains them in arbitrary order, so what is spoken first is
+// decided by when it happened, not by which channel won.
+func (e *Engine) park(a announcement) {
+	i := len(e.pending)
+	for i > 0 && e.pending[i-1].at.After(a.at) {
+		i--
+	}
+	e.pending = append(e.pending, announcement{})
+	copy(e.pending[i+1:], e.pending[i:])
+	e.pending[i] = a
 }
 
 // narrate turns the typed event into one sentence: the LLM when it can
