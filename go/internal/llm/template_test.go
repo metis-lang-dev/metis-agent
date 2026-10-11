@@ -106,8 +106,8 @@ func TestNarrateProducesASentence(t *testing.T) {
 	if err != nil {
 		t.Skip("prompt not present")
 	}
-	l, err := Load(Config{ModelPath: gemmaPath, NCtx: 4096, NBatch: 512, NThreads: 6,
-		NGpuLayers: 99})
+	// CPU: the GPU belongs to a running harness or a bench
+	l, err := Load(Config{ModelPath: gemmaPath, NCtx: 2048, NBatch: 512, NThreads: 8})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -398,62 +398,113 @@ func (e *Engine) park(a announcement) {
 	e.pending[i] = a
 }
 
-// narrate turns the typed event into one sentence: the LLM when it can
-// (single pass, the same prefix), the template otherwise or when the model
-// produced nothing speakable.
+// narrate turns the typed event into one sentence. done and expired are
+// facts with a fixed shape: the template says them (past tense, step-4 F9 —
+// the model's "Stopping." for a finished STOP read as still going). failed
+// and refused carry the host's reason, which wants phrasing: the LLM says
+// those when it can, behind taskVoiceOK; the template otherwise.
 func (e *Engine) narrate(it wire.Item, t Task) string {
 	fallback := narrateTemplate(it, t)
 	n, ok := e.LLM.(Narrator)
-	if !ok {
+	if !ok || (t.Result != "failed" && t.Result != "refused") {
 		return fallback
 	}
-	ev := fmt.Sprintf("Task feedback: the command %s%s %s.", it.Name,
-		argsBrief(it.Args), t.Result)
-	if t.Detail != "" {
-		ev += " Detail: " + t.Detail + "."
-	}
-	out, err := n.Narrate(e.cfg.SystemPrompt, ev)
+	out, err := n.Narrate(e.cfg.SystemPrompt, taskCue(it, t))
 	if err != nil {
 		log.Printf("[task] narration failed: %v", err)
 		return fallback
 	}
-	if s := sanitizeAck(out); s != "" && s != "Okay." {
+	if s := sanitizeAck(out); taskVoiceOK(s) {
 		return s
 	}
+	log.Printf("[task] narration %q rejected — template", out)
 	return fallback
 }
 
+// taskCue frames a task outcome for Narrate. It runs under the intent
+// prompt, so a bare line is read as something the person said and gets
+// CLASSIFIED (step-4 F8: detail "the robot is not armed" is one of the
+// prompt's UNKNOWN examples → the robot said "UNKNOWN"). The cue therefore
+// says who is speaking, names the command and the result, quotes the
+// host's reason as a reason, and asks for a sentence, not an intent.
+func taskCue(it wire.Item, t Task) string {
+	verb := map[string]string{"failed": "failed", "refused": "was refused by the robot"}[t.Result]
+	cue := fmt.Sprintf("[Robot status report — not something the person said; do not classify it.] "+
+		"Your command to %s %s.", commandPhrase(it), verb)
+	if d := strings.TrimSpace(t.Detail); d != "" {
+		cue += fmt.Sprintf(" The robot's reason, quoted: %q.", d)
+	}
+	return cue + " Tell the person in one short first-person sentence what happened and why; no JSON, no intent name."
+}
+
+// intentNames is the dog grammar's intent enum plus the wire-only kinds.
+var intentNames = []string{"LOCAL_ACTION", "QUERY", "NAVIGATE", "FIND", "FOLLOW", "STOP",
+	"CANCEL", "TIME", "DATE", "CHITCHAT", "UNKNOWN", "EXPLORE", "GOTO_TAG"}
+
+// taskVoiceOK guards a narrated task outcome like voiceOr guards an ack:
+// empty, the "Okay." of sanitizeAck, an intent name in any case or
+// spelling ("UNKNOWN", "Local action."), or a lone all-caps token is not a
+// sentence — the template speaks instead.
+func taskVoiceOK(s string) bool {
+	w := strings.TrimRight(strings.TrimSpace(s), ".!")
+	if w == "" || w == "Okay" {
+		return false
+	}
+	for _, n := range intentNames {
+		if strings.EqualFold(w, n) || strings.EqualFold(w, strings.ReplaceAll(n, "_", " ")) {
+			return false
+		}
+	}
+	if !strings.ContainsAny(w, " \t") && w == strings.ToUpper(w) {
+		return false
+	}
+	return true
+}
+
+// commandPhrase is the command in words: the action of a LOCAL_ACTION
+// ("stand up"), else the kind ("navigate", "go to the tag").
+func commandPhrase(it wire.Item) string {
+	if a, ok := it.Args["action"].(string); ok && a != "" {
+		return strings.ToLower(strings.ReplaceAll(a, "_", " "))
+	}
+	switch it.Name {
+	case "NAVIGATE":
+		return "go there"
+	case "GOTO_TAG":
+		return "go to the tag"
+	case "FIND":
+		return "find it"
+	}
+	return strings.ToLower(strings.ReplaceAll(it.Name, "_", " "))
+}
+
+// doneText is the past tense of a finished command.
+var doneText = map[string]string{"STOP": "Stopped.", "CANCEL": "Cancelled.",
+	"NAVIGATE": "I'm there.", "GOTO_TAG": "I'm at the tag.", "FIND": "Found it."}
+
 func narrateTemplate(it wire.Item, t Task) string {
-	what := strings.ToLower(strings.ReplaceAll(it.Name, "_", " "))
+	what := commandPhrase(it)
 	detail := strings.TrimSpace(t.Detail)
 	switch t.Result {
 	case "done":
+		if s, ok := doneText[it.Name]; ok {
+			return s
+		}
 		return "Done."
 	case "failed":
 		if detail != "" {
-			return "That didn't work: " + detail + "."
+			return "I couldn't " + what + ": " + detail + "."
 		}
-		return "That didn't work."
+		return "I couldn't " + what + "."
 	case "refused":
 		if detail != "" {
-			return "I can't do that: " + detail + "."
+			return "I can't " + what + ": " + detail + "."
 		}
-		return "I can't do that right now."
+		return "I can't " + what + " right now."
 	case "expired":
 		return "The " + what + " timed out."
 	}
 	return ""
-}
-
-func argsBrief(args map[string]any) string {
-	if len(args) == 0 {
-		return ""
-	}
-	parts := make([]string, 0, len(args))
-	for k, v := range args {
-		parts = append(parts, fmt.Sprintf("%s=%v", k, v))
-	}
-	return " (" + strings.Join(parts, ", ") + ")"
 }
 
 func (e *Engine) onVadEvent(ev vad.Event) {

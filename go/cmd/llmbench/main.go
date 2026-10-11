@@ -24,8 +24,9 @@
 //	                the single-pass narration path, timed and printed
 //	-vram           nvidia-smi before load, after prime and after the run
 //	                (whole GPU and this process)
-//	-prefix-check   the KV-prefix invariant on every row: tokens(prefix) ++
-//	                tokens(tail) must equal tokens(prefix+tail)
+//	-prefix-check   the KV-prefix invariant on every row: tokens(prefix) must
+//	                be a token-prefix of tokens(prefix+tail) (the tail is
+//	                tokenized in context, step-4 F10)
 //	-jsonl FILE     append one JSON record per turn and one summary record
 //	                (tools/bench-table.py renders the E1 table from them)
 package main
@@ -256,12 +257,14 @@ func main() {
 			if err != nil {
 				fail(err)
 			}
-			split := append(l.Tokens(prefix, true), l.Tokens(tail, false)...)
+			// the engine tokenizes the tail in context (F10): what must hold
+			// is that the cached prefix is a token-prefix of the whole prompt
+			pre := l.Tokens(prefix, true)
 			whole := l.Tokens(prefix+tail, true)
-			if !equalInt32(split, whole) {
+			if len(whole) <= len(pre) || !equalInt32(pre, whole[:len(pre)]) {
 				prefixOK = false
-				fmt.Printf("%-40q PREFIX-SPLIT MISMATCH: %d+%d tokens vs %d whole\n", r.utt,
-					len(split)-len(l.Tokens(tail, false)), len(l.Tokens(tail, false)), len(whole))
+				fmt.Printf("%-40q PREFIX-SPLIT MISMATCH: prefix %d tokens is not a token-prefix of the %d whole\n",
+					r.utt, len(pre), len(whole))
 			}
 		}
 		res, err := l.TwoPass(string(prompt), r.utt, string(gbnf))

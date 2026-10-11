@@ -61,6 +61,8 @@ type LLM struct {
 
 	tmpl    string // resolved chat template (built-in name or Jinja text)
 	tailFmt string // rendered user turn + assistant cue, with userSentinel
+	preText string // the rendered prefix the KV holds
+	preToks []C.llama_token
 	eotText string // end-of-turn marker text, stripped from decoded output
 	pass2   Pass2
 	stopIDs map[C.llama_token]bool // end-of-turn / end-of-sentence ids
@@ -288,6 +290,16 @@ func (l *LLM) tokenize(text string, addSpecial bool) []C.llama_token {
 	return buf[:n]
 }
 
+// pieces renders token ids one by one (diagnostics: where two
+// tokenizations of the same text part ways).
+func (l *LLM) pieces(ids []int32) []string {
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = l.detokenize([]C.llama_token{C.llama_token(id)})
+	}
+	return out
+}
+
 func (l *LLM) detokenize(toks []C.llama_token) string {
 	if len(toks) == 0 {
 		return ""
@@ -454,7 +466,59 @@ func (l *LLM) splitPrompt(system string) (prefix, tailFmt string, err error) {
 }
 
 func (l *LLM) tail(user string) string {
-	return strings.Replace(l.tailFmt, userSentinel, user, 1)
+	// leading/trailing newlines would merge with the prefix's last token
+	return strings.Replace(l.tailFmt, userSentinel, strings.Trim(user, "\r\n"), 1)
+}
+
+// tailTokens tokenizes the per-turn tail IN CONTEXT: tokenize(prefix+tail)
+// minus the cached prefix. A split tokenization is not the same thing
+// (step-4 F10, opus's E1): the SPM tokenizer of gemma3 puts a space-prefixed
+// piece at the start of every fresh text fragment, so tokens(tail) begins
+// "▁halt" where the whole prompt has "halt" after "\n\n" — and gemma3 folds
+// the system prompt into the user turn, so no cut inside that turn is
+// stable. The prefix itself IS stable (checked in primeLocked); if a turn
+// ever re-tokenizes it differently, the split tokenization is the fallback
+// and the miss is logged.
+func (l *LLM) tailTokens(user string) []C.llama_token {
+	t := l.tail(user)
+	whole := l.tokenize(l.preText+t, true)
+	if n := len(l.preToks); len(whole) > n && sameTokens(whole[:n], l.preToks) {
+		return whole[n:]
+	}
+	fmt.Fprintf(os.Stderr, "[llm] tail %q re-tokenizes the prefix — split tokenization for this turn\n", user)
+	return l.tokenize(t, false)
+}
+
+// cToken names the token type for the tests (test files cannot use cgo).
+type cToken = C.llama_token
+
+func sameTokens(a, b []C.llama_token) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// prefixProbes are turns the prime-time invariant check renders: plain,
+// capitalized, punctuated, a number, leading space (whisper's habit).
+var prefixProbes = []string{"halt", "What time is it?", "go to tag 5", " the robot is not armed"}
+
+// checkPrefix asserts the KV-prefix invariant for the in-context tail:
+// tokens(prefix) ++ tailTokens(u) == tokens(prefix+tail(u)) for the probes.
+func (l *LLM) checkPrefix() error {
+	for _, u := range prefixProbes {
+		whole := l.tokenize(l.preText+l.tail(u), true)
+		n := len(l.preToks)
+		if len(whole) <= n || !sameTokens(whole[:n], l.preToks) {
+			return fmt.Errorf("llm: prefix is not tokenization-stable before %q", u)
+		}
+	}
+	return nil
 }
 
 // ── decode ────────────────────────────────────────────────────────────────────
@@ -499,6 +563,12 @@ func (l *LLM) primeLocked(systemPrompt string) (int, error) {
 	}
 	l.tailFmt = tailFmt
 	toks := l.tokenize(prefixText, true)
+	l.preText, l.preToks = prefixText, toks
+	if err := l.checkPrefix(); err != nil {
+		fmt.Fprintf(os.Stderr, "[llm] %v — turns fall back to split tokenization\n", err)
+	} else {
+		fmt.Fprintf(os.Stderr, "[llm] prefix %d tok: tokenization-stable, tail tokenized in context\n", len(toks))
+	}
 	mem := C.llama_get_memory(l.ctx)
 	C.llama_memory_clear(mem, C.bool(true))
 	l.nPast = 0
@@ -555,7 +625,7 @@ func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
 	if err := l.rewind(systemPrompt, nPrefix); err != nil {
 		return nil, err
 	}
-	if err := l.decodeTokens(l.tokenize(l.tail(userText), false)); err != nil {
+	if err := l.decodeTokens(l.tailTokens(userText)); err != nil {
 		return nil, err
 	}
 	tEval := time.Since(tEval0)
@@ -723,7 +793,7 @@ func (l *LLM) Narrate(systemPrompt, event string) (string, error) {
 		// the cue rides in the user turn (Config.Pass2Cue), no model-side cue
 		user, cue = event+"\n\n"+l.pass2Cue, ""
 	}
-	if err := l.decodeTokens(l.tokenize(l.tail(user), false)); err != nil {
+	if err := l.decodeTokens(l.tailTokens(user)); err != nil {
 		return "", err
 	}
 	// thinking on: let the thought channel close before the cue

@@ -56,7 +56,7 @@ func TestTwoBeatsCommandThenTaskNarration(t *testing.T) {
 	// the host refuses: beat 2 is a separate system turn, narrated
 	e.TaskEvent(Task{ID: em.ids[0], Result: "refused", Detail: "the robot is not armed"})
 	waitFor(t, func() bool { return len(spk.said()) == 2 }, "beat 2 (the outcome)")
-	if got := spk.said()[1]; !strings.Contains(got, "can't do that") || !strings.Contains(got, "not armed") {
+	if got := spk.said()[1]; got != "I can't stand up: the robot is not armed." {
 		t.Errorf("beat 2 = %q", got)
 	}
 	if e.Tasks.Len() != 0 {
@@ -109,7 +109,7 @@ func TestTaskForUnknownCommandIsSilentButExpiredIsLate(t *testing.T) {
 	e.Tasks.Add(wire.Item{ID: "c-old", Name: "STOP", At: time.Now().Add(-2 * time.Minute)})
 	e.TaskEvent(Task{ID: "c-old", Result: "done"})
 	waitFor(t, func() bool { return len(spk.said()) == 1 }, "the late outcome")
-	if got := spk.said()[0]; got != "Late news: Done." {
+	if got := spk.said()[0]; got != "Late news: Stopped." {
 		t.Errorf("late outcome = %q", got)
 	}
 }
@@ -135,7 +135,7 @@ func TestTaskWhileAsleepIsNotSpoken(t *testing.T) {
 	// outcome first (it came first), then the announcement
 	e.ForceAttention(true)
 	waitFor(t, func() bool { return len(spk.said()) == 2 }, "parked outcome + announcement after wake")
-	if said := spk.said(); said[0] != "Done." || said[1] != "Battery low." {
+	if said := spk.said(); said[0] != "Stopped." || said[1] != "Battery low." {
 		t.Errorf("said %v", said)
 	}
 }
@@ -190,5 +190,55 @@ func TestChatInputTakesTheFloorLikeATranscript(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	if len(spk.said()) != 3 {
 		t.Errorf("empty chat spoke: %v", spk.said())
+	}
+}
+
+// fakeNarrator is an IntentGen that also narrates, with a canned answer.
+type fakeNarrator struct {
+	fakeLLM
+	out  string
+	cues *[]string
+}
+
+func (f fakeNarrator) Narrate(_, event string) (string, error) {
+	*f.cues = append(*f.cues, event)
+	return f.out, nil
+}
+
+// Step-4 F8: under the intent prompt the model classified the host's
+// reason ("UNKNOWN") instead of narrating it. The cue frames the outcome
+// as a status report with the reason quoted, and an intent-shaped answer
+// falls back to the template. F9: done is the template's past tense, the
+// model is not asked.
+func TestTaskNarrationIsFramedAndGuarded(t *testing.T) {
+	it := wire.Item{ID: "c-1", Name: "LOCAL_ACTION", Args: map[string]any{"action": "STAND_UP"}}
+	refused := Task{ID: "c-1", Result: "refused", Detail: "the robot is not armed"}
+	for _, bad := range []string{"UNKNOWN", "Unknown.", "LOCAL_ACTION", "local action", "STOP", "NAK", "", "{\"intent\":\"UNKNOWN\"}"} {
+		cues := []string{}
+		e := New(Config{SystemPrompt: "p"}, fakeNarrator{out: bad, cues: &cues}, fakeSTT{}, newFakeSpeaker(0))
+		if got := e.narrate(it, refused); got != "I can't stand up: the robot is not armed." {
+			t.Errorf("model said %q → spoken %q, want the template", bad, got)
+		}
+		if len(cues) != 1 {
+			t.Fatalf("narrator asked %d times", len(cues))
+		}
+		c := cues[0]
+		if !strings.Contains(c, "not something the person said") || !strings.Contains(c, "stand up") ||
+			!strings.Contains(c, "refused") || !strings.Contains(c, `"the robot is not armed"`) {
+			t.Errorf("cue %q", c)
+		}
+	}
+	cues := []string{}
+	e := New(Config{SystemPrompt: "p"}, fakeNarrator{out: "I can't stand up, I'm not armed.", cues: &cues}, fakeSTT{}, newFakeSpeaker(0))
+	if got := e.narrate(it, refused); got != "I can't stand up, I'm not armed." {
+		t.Errorf("a real sentence was replaced: %q", got)
+	}
+	e = New(Config{SystemPrompt: "p"}, fakeNarrator{out: "Stopping.", cues: &cues}, fakeSTT{}, newFakeSpeaker(0))
+	n := len(cues)
+	if got := e.narrate(wire.Item{ID: "c-2", Name: "STOP"}, Task{ID: "c-2", Result: "done"}); got != "Stopped." {
+		t.Errorf("done STOP = %q", got)
+	}
+	if len(cues) != n {
+		t.Error("the model was asked to narrate a done")
 	}
 }
