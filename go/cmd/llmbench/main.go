@@ -48,6 +48,8 @@ import (
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/intent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
+	"github.com/metis-lang-dev/metis-agent/go/internal/pipeline"
+	"github.com/metis-lang-dev/metis-agent/go/internal/wire"
 )
 
 type row struct{ utt, want, src, wav string }
@@ -146,6 +148,7 @@ func main() {
 	pass2Cue := flag.String("pass2-cue", "", "with -pass2-turn: the user-turn cue text (default \"Spoken response:\")")
 	mmproj := flag.String("mmproj", "", "E3: multimodal projector GGUF with an audio encoder (build with GOFLAGS=-tags=mtmd)")
 	audioF := flag.String("audio", "", "E3: WAV manifest (wav<TAB>utterance<TAB>intent<TAB>source); every turn is HEARD through -mmproj")
+	eventsF := flag.String("events", "", "narrate corpus (intent<TAB>args JSON<TAB>result<TAB>detail): each task outcome through the harness's taskCue + Narrate + guard")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
 	flag.Parse()
 	if *model == "" {
@@ -185,8 +188,8 @@ func main() {
 	for _, u := range flag.Args() {
 		rows = append(rows, row{utt: u})
 	}
-	if len(rows) == 0 {
-		fail(fmt.Errorf("nothing to run: -corpus or utterances"))
+	if len(rows) == 0 && *eventsF == "" {
+		fail(fmt.Errorf("nothing to run: -corpus, -audio, -events or utterances"))
 	}
 	// a held-out row the prompt now teaches verbatim is no longer held out
 	for i, r := range rows {
@@ -245,6 +248,10 @@ func main() {
 	}
 	sum.MsLoad, sum.NPrefix, sum.MsPrime = tLoad.Milliseconds(), n, time.Since(t0).Milliseconds()
 	sum.Template, sum.EOT = l.Template(), l.EOT()
+	if *eventsF != "" {
+		runEvents(l, string(prompt), *eventsF, *tag, sum.VRAM, emit)
+		return
+	}
 	fmt.Fprintf(os.Stderr, "model %s  template=%s eot=%q ngl=%d n_ctx=%d think=%v\nload %dms  prime %d tok in %dms\n",
 		*model, l.Template(), l.EOT(), *ngl, *nctx, l.Thinking(), tLoad.Milliseconds(), n,
 		time.Since(t0).Milliseconds())
@@ -557,6 +564,93 @@ func voiceBad(voice, utt string) string {
 }
 
 var bareIntent = regexp.MustCompile(`^"?[A-Z_]+"?$`)
+
+// narrRec is the -events record: one task outcome narrated the harness's way.
+type narrRec struct {
+	Kind     string `json:"kind"` // "narrate"
+	Tag      string `json:"tag"`
+	Intent   string `json:"intent"`
+	Result   string `json:"result"`
+	Detail   string `json:"detail"`
+	Cue      string `json:"cue"`
+	Raw      string `json:"raw"`      // what Narrate returned
+	Spoken   string `json:"spoken"`   // after sanitizeAck + taskVoiceOK, else the template
+	ModelOK  bool   `json:"model_ok"` // the model's sentence passed the harness guard
+	Leak     bool   `json:"leak"`     // raw unspeakable (JSON, markup, intent name, empty)
+	Template string `json:"template"`
+	Ms       int64  `json:"ms"`
+}
+
+// runEvents is the step-4 narrate corpus: each failed/refused task outcome
+// is framed by pipeline.TaskCue (the harness's own framing, a5d22c0 F8 —
+// never re-framed here), narrated by l.Narrate under the same prompt, and
+// passed through the harness's sanitizeAck + taskVoiceOK; a rejected
+// sentence falls back to the template, as onTask does.
+func runEvents(l *llm.LLM, prompt, path, tag string, vram map[string]int, emit func(any)) {
+	f, err := os.Open(path)
+	if err != nil {
+		fail(err)
+	}
+	defer f.Close()
+	var lat []time.Duration
+	n, ok, leak := 0, 0, 0
+	distinct := map[string]bool{}
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		ln := sc.Text()
+		if strings.TrimSpace(ln) == "" || strings.HasPrefix(ln, "#") {
+			continue
+		}
+		p := strings.SplitN(ln, "\t", 4)
+		if len(p) < 3 {
+			fail(fmt.Errorf("%s: bad row %q", path, ln))
+		}
+		args := map[string]any{}
+		if err := json.Unmarshal([]byte(p[1]), &args); err != nil {
+			fail(fmt.Errorf("%s: args %q: %v", path, p[1], err))
+		}
+		detail := ""
+		if len(p) > 3 {
+			detail = p[3]
+		}
+		it := wire.Item{ID: fmt.Sprintf("ev%d", n), Name: p[0], Args: args}
+		tk := pipeline.Task{ID: it.ID, Result: p[2], Detail: detail}
+		cue := pipeline.TaskCue(it, tk)
+		t0 := time.Now()
+		out, err := l.Narrate(prompt, cue)
+		d := time.Since(t0)
+		if err != nil {
+			out = ""
+		}
+		rec := narrRec{Kind: "narrate", Tag: tag, Intent: p[0], Result: p[2], Detail: detail, Cue: cue,
+			Raw: out, Template: pipeline.NarrateTemplate(it, tk), Ms: d.Milliseconds()}
+		s := pipeline.SanitizeAck(out)
+		rec.ModelOK = pipeline.TaskVoiceOK(s)
+		rec.Leak = voiceBad(out, "\x00") == "unspeakable"
+		rec.Spoken = rec.Template
+		if rec.ModelOK {
+			rec.Spoken = s
+			ok++
+			distinct[strings.ToLower(s)] = true
+		}
+		if rec.Leak {
+			leak++
+		}
+		n++
+		lat = append(lat, d)
+		mark := map[bool]string{true: "model", false: "TEMPLATE"}[rec.ModelOK]
+		fmt.Printf("%-12s %-8s %-44q %5dms %-8s %q\n", p[0], p[2], head(detail, 44), d.Milliseconds(), mark, rec.Spoken)
+		emit(rec)
+	}
+	if n == 0 {
+		fail(fmt.Errorf("%s: no events", path))
+	}
+	fmt.Printf("\n== narrate events %s: n=%d model ok=%d (distinct %d) leak=%d template=%d | ms mean=%d p50=%d p90=%d\n",
+		tag, n, ok, len(distinct), leak, n-ok, mean(lat), pct(lat, 50), pct(lat, 90))
+	emit(map[string]any{"kind": "narrate_summary", "tag": tag, "n": n, "model_ok": ok, "distinct": len(distinct),
+		"leak": leak, "template": n - ok, "ms_mean": mean(lat), "ms_p50": pct(lat, 50), "ms_p90": pct(lat, 90),
+		"vram_mib": vram})
+}
 
 // readManifest reads an E2/E3 WAV manifest: wav<TAB>utterance<TAB>intent[<TAB>source],
 // wav paths relative to the manifest. The utterance is the reference text

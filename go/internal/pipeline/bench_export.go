@@ -1,0 +1,12 @@
+package pipeline
+
+import "github.com/metis-lang-dev/metis-agent/go/internal/wire"
+
+// Bench hooks (cmd/llmbench -events, MODEL-EXPERIMENTS.md step 4): the
+// harness's own task-narration framing and guards, exported unchanged so the
+// narrate bench never re-frames an event.
+
+func TaskCue(it wire.Item, t Task) string         { return taskCue(it, t) }
+func TaskVoiceOK(s string) bool                   { return taskVoiceOK(s) }
+func SanitizeAck(s string) string                 { return sanitizeAck(s) }
+func NarrateTemplate(it wire.Item, t Task) string { return narrateTemplate(it, t) }
