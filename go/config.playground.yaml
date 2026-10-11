@@ -1,0 +1,33 @@
+# The harness on taycann: the gemma3:4b GGUF ollama holds, loaded in-process
+# by the llama.cpp adapter with the whole model on the GPU; whisper ASR;
+# RHVoice TTS; events as jsonl on stdout. `-headless` types turns on stdin.
+llm:
+    # ollama tag gemma3:4b (a2af6cc3eb7f): its `model` blob repacked text-only
+    # for stock llama.cpp by tools/gguf-text-only.py (vision tensors dropped,
+    # the two hparams ollama defaults written) — same quantized weights
+    model: models/gemma3-4b-it-Q4_K_M.ollama-a2af6cc3.gguf
+    n_ctx: 4096               # gemma's window is 128k; 4k holds prompt + turn
+    n_batch: 512
+    n_threads: 6
+    n_gpu_layers: 99          # whole model on the GPU (0 = CPU)
+    template: auto            # GGUF chat template, else llama.cpp's built-in by architecture (gemma)
+    pass2: {temperature: 0.4, top_k: 40, max_tokens: 50}   # spoken-ack sampling
+stt:
+    model: /home/axadmin/archive/vox/FSTTM/models/ggml-base.en-q5_1.bin
+    language: en
+    parasites: ["thank you", "thanks", "thanks for watching", "you"]
+tts:
+    engine: librhvoice        # in-process: exact progress + mid-synthesis cut | subprocess
+    voice: SLT
+    rate: 0.3
+    volume: -0.1
+    player: "aplay -q"        # subprocess engine only
+vad: {aggressiveness: 3, padding_ms: 700}
+aec: {enabled: false}
+voice_id: {gate: "off"}       # model/profile: see fsttm-imprint
+attention: {enabled: false}
+transport: jsonl              # jsonl (stdout events, stdin say) | ws (step 2)
+mic: local                    # local | remote (ws, step 2)
+prompt:  grammar/dog-prompt.txt
+grammar: grammar/dog.gbnf
+barge_in: "off"               # off | vad | confirm
