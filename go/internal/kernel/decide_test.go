@@ -81,6 +81,8 @@ func TestFragmentsByteExact(t *testing.T) {
 			"⟪metis seq=27 beat=30 kitchen: quiescent after 51 moves; episode over⟫"},
 		{`{"signal": "result", "seq": 10, "path": "kitchen", "beat": 8, "intent": 1, "verb": "reset", "status": "admitted", "reason": "the reading is set aside as noise", "record": 0}`,
 			"⟪metis seq=10 beat=8 kitchen: reset #0 admitted: the reading is set aside as noise⟫"},
+		{`{"signal": "result", "seq": 18, "path": "kitchen", "beat": 15, "intent": 2, "verb": "explain", "status": "admitted+notice", "reason": "kitchen_shared explains the reading", "record": 1, "witness": ["load", "partner_load"], "notice": {"card": "kitchen_shared", "move": "partner_load", "orders": 2}}`,
+			"⟪metis seq=18 beat=15 kitchen: explain #1 admitted+notice: kitchen_shared explains the reading; witness load partner_load; notice kitchen_shared (partner_load) explained it 2 orders running⟫"},
 	} {
 		var f map[string]any
 		if err := json.Unmarshal([]byte(c.line), &f); err != nil {

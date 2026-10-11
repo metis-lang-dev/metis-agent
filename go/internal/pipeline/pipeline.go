@@ -837,9 +837,18 @@ var identifier = regexp.MustCompile(`^[A-Z][A-Z0-9_]{2,}$`)
 // braces/brackets/angles (JSON, markup), an intent name in any case or
 // spelling, or a lone all-caps identifier; quotes and end punctuation are
 // ignored. A single real word ("Okay.", "Woof!", "Stopping.") is speech.
+// forgedFact: the runtime's fact syntax in the model's own output (opus's
+// E6: E2B forges ⟪metis …⟫ spans with invented facts in up to 19% of
+// answers and echoes spliced ones). A fact is the runtime's to write, so
+// such a sentence is never spoken — refused, not stripped: what is left
+// around a forged span may lean on it.
+func forgedFact(t string) bool {
+	return strings.ContainsAny(t, "⟪⟫") || strings.Contains(strings.ToLower(t), "metis seq=")
+}
+
 func unspeakable(text string) bool {
 	t := strings.TrimSpace(text)
-	if strings.ContainsAny(t, "{}[]<>") {
+	if strings.ContainsAny(t, "{}[]<>") || forgedFact(t) {
 		return true
 	}
 	w := strings.TrimSpace(strings.TrimRight(strings.Trim(t, "\"“”‘’' "), ".!?"))
@@ -878,7 +887,7 @@ func sanitizeAck(text string) string {
 	if t == "" {
 		return ""
 	}
-	if strings.ContainsAny(t, "{}[]<>") || len(t) > 200 {
+	if strings.ContainsAny(t, "{}[]<>") || forgedFact(t) || len(t) > 200 {
 		return "Okay."
 	}
 	return t

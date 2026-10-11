@@ -67,7 +67,13 @@ type Host struct {
 	settled  map[int]bool // records whose reading came back consistent
 	inTriage atomic.Int64 // surprises queued or being closed
 	Noticed  atomic.Int64 // results that came back admitted+notice
-	noticed  map[string]bool
+	Wakes    atomic.Int64 // surprises handed to the model (each closes with ≥1 call)
+	// WakeOnReading (eval arm A, `watch arm=blind`): the runtime checks
+	// nothing, so the model is woken by the first inconsistent reading of
+	// the open record instead of a surprise signal
+	WakeOnReading bool
+	woke          map[int]bool
+	noticed       map[string]bool
 }
 
 // WaitTriage waits until every queued surprise is closed (or the timeout).
@@ -93,7 +99,8 @@ func NewHost(cfg Config, pend *wire.Pending) *Host {
 	}
 	h := &Host{Pend: pend, narrate: map[string]bool{}, byIntent: map[int]string{}, early: map[int]Signal{},
 		waiters: map[string]chan [2]string{}, MaxTries: 3, Beat: watchEvery(cfg.Watch),
-		settled: map[int]bool{}, keep: cfg.KeepEpisodes, lastRec: -1, noticed: map[string]bool{}}
+		settled: map[int]bool{}, keep: cfg.KeepEpisodes, lastRec: -1, noticed: map[string]bool{},
+		woke: map[int]bool{}}
 	sb := cfg.SettleBeats
 	if sb <= 0 {
 		sb = 2.5
@@ -142,7 +149,16 @@ func (h *Host) Signal(s Signal) {
 			h.compact()
 		}
 	}
-	if s.Kind == "surprise" && h.Dec != nil && h.LLM != nil {
+	wake := s.Kind == "surprise"
+	if h.WakeOnReading && s.Kind == "event" && s.F["kind"] == "reading" && s.F["consistent"] == false && s.F["observed"] != nil {
+		r := int(num(s.F["record"]))
+		h.mu.Lock()
+		wake = !h.woke[r]
+		h.woke[r] = true
+		h.mu.Unlock()
+	}
+	if wake && h.Dec != nil && h.LLM != nil {
+		h.Wakes.Add(1)
 		h.startTriage()
 		h.inTriage.Add(1)
 		select {
@@ -401,6 +417,9 @@ func Translate(s Signal) Event {
 		status, _ := s.F["status"].(string)
 		reason, _ := s.F["reason"].(string)
 		ev.Fact = fmt.Sprintf("%s intent %d (%s) %s: %s", where, int(num(s.F["intent"])), verb, status, reason)
+		if n := noticeOf(s.F); n != "" {
+			ev.Fact += "; notice: " + n
+		}
 	default:
 		ev.Fact = fmt.Sprintf("%s: %s.", where, s.Kind)
 	}
@@ -456,4 +475,16 @@ var idSeq atomic.Int64
 
 func newID() string {
 	return fmt.Sprintf("k-%x-%d", time.Now().UnixNano()&0xffffff, idSeq.Add(1))
+}
+
+// noticeOf renders an admitted+notice result's notice (metispy d725507):
+// the card, the move and how many orders running it explained the reading.
+func noticeOf(f map[string]any) string {
+	nt, ok := f["notice"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	card, _ := nt["card"].(string)
+	move, _ := nt["move"].(string)
+	return fmt.Sprintf("%s (%s) explained it %d orders running", card, move, int(num(nt["orders"])))
 }

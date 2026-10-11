@@ -345,6 +345,9 @@ func Fragment(s Signal) string {
 		if w := witness(f); w != "" {
 			body += "; witness " + w
 		}
+		if n := noticeOf(f); n != "" {
+			body += "; notice " + n
+		}
 	default:
 		body = s.Kind
 	}
