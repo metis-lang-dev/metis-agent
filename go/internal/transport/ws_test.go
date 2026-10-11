@@ -305,3 +305,33 @@ func TestPCMChunkStartingWithBraceStaysBinary(t *testing.T) {
 	}
 	c.next("tts_end")
 }
+
+// The rack pane (rack step 2): the last pane is replayed to a late joiner,
+// and the pane's switches come back as rack_mount{text: path, state}.
+func TestRackPaneAndMount(t *testing.T) {
+	s, h := newSrv(t)
+	type mount struct {
+		path string
+		on   bool
+	}
+	got := make(chan mount, 2)
+	s.OnRackMount = func(p string, on bool) { got <- mount{p, on} }
+	s.Rack([]map[string]any{{"path": "kitchen", "mounted": true}}, "event(kitchen): 3 records, 90 tok")
+	c := dial(t, h, "/ws")
+	if m := c.next("rack"); m["last"] != "event(kitchen): 3 records, 90 tok" || len(m["paths"].([]any)) != 1 {
+		t.Errorf("late joiner's rack pane %v", m)
+	}
+	c.send(map[string]any{"ev": "rack_mount", "text": "kitchen_shared", "state": "off"})
+	c.send(map[string]any{"ev": "rack_mount", "text": "kitchen", "state": "maybe"})
+	if m := c.next("denied"); m["what"] != "rack_mount" {
+		t.Errorf("a bad state was not denied: %v", m)
+	}
+	select {
+	case m := <-got:
+		if m != (mount{"kitchen_shared", false}) {
+			t.Errorf("mount %v", m)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("no rack_mount")
+	}
+}

@@ -48,6 +48,69 @@ type Config struct {
 	// asks the model (beats; the first re-read lands up to two beats after
 	// the surprise). Unset = 2.5.
 	SettleBeats float64 `yaml:"settle_beats"`
+	// Path names the runtime's domain (rack: the tape it feeds); unset =
+	// the watch answer's path.
+	Path string `yaml:"path"`
+	// Runtimes (rack phase 1b, docs/RACK.md §5): N runtimes attached to the
+	// one narrator, each its own process and watch. An entry's set fields
+	// override this config's; empty = this config is the one runtime.
+	Runtimes []Config `yaml:"runtimes"`
+	// Rack: the per-domain tapes and the structural retriever (RACK §2–4).
+	Rack RackConfig `yaml:"rack"`
+}
+
+// RackConfig turns the rack on: narration and the person's questions are
+// answered from the retriever's insertion instead of the bare pieces.
+type RackConfig struct {
+	Enabled bool  `yaml:"enabled"`
+	Budget  int   `yaml:"budget"` // tokens per insertion (default 2500)
+	Wrap    *bool `yaml:"wrap"`   // ⟪path: text⟫ fragments (default true, RACK §4)
+	Ask     *bool `yaml:"ask"`    // the person's chitchat/unknown turns answered from ask() (default true)
+}
+
+// Each returns the runtimes to attach: the entries merged over this
+// config (set fields win), or this config alone.
+func (c Config) Each() []Config {
+	if len(c.Runtimes) == 0 {
+		one := c
+		one.Runtimes = nil
+		return []Config{one}
+	}
+	var out []Config
+	for _, r := range c.Runtimes {
+		m := c
+		m.Runtimes = nil
+		if r.Cmd != nil {
+			m.Cmd = r.Cmd
+		}
+		if r.Dir != "" {
+			m.Dir = r.Dir
+		}
+		if r.Env != nil {
+			m.Env = r.Env
+		}
+		if r.Host != "" {
+			m.Host = r.Host
+		}
+		if r.Catalog != "" {
+			m.Catalog = r.Catalog
+		}
+		if r.Watch != "" {
+			m.Watch = r.Watch
+		}
+		if r.Narrate != nil {
+			m.Narrate = r.Narrate
+		}
+		if r.Triage != nil {
+			m.Triage = r.Triage
+		}
+		if r.SettleBeats != 0 {
+			m.SettleBeats = r.SettleBeats
+		}
+		m.Path = r.Path
+		out = append(out, m)
+	}
+	return out
 }
 
 // Signal is one pushed line: its kind, sequence number and the whole object.

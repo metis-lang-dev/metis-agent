@@ -125,3 +125,51 @@ func TestRuntimeResultNumbersGuard(t *testing.T) {
 		}
 	}
 }
+
+// fakeRack records the triggers it is asked for and what was said.
+type fakeRack struct {
+	mu    sync.Mutex
+	trigs []string
+	said  []string
+}
+
+func (r *fakeRack) Insert(kind, path string) (string, int, int) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.trigs = append(r.trigs, kind+"("+path+")")
+	return "⟪kitchen: The kitchen now: running, surprise 0 open⟫\n⟪kitchen shared: In the kitchen shared: partner load; now hand free 1⟫", 2, 40
+}
+
+func (r *fakeRack) Said(path, text string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.said = append(r.said, path+": "+text)
+}
+
+// Rack step 2 (RACK §3–4): with a rack, the narration is cued on the
+// retriever's insertion for the trigger, closed by the trigger's own pieces
+// as its focus; what was said goes on the domain's tape as kind=said.
+func TestRackNarrationIsCuedOnTheInsertion(t *testing.T) {
+	n := &fakeNarr{outs: []string{"The second cook dropped an onion into the first cook's pot."}}
+	e := New(Config{SystemPrompt: "p"}, n, fakeSTT{}, newFakeSpeaker(0))
+	rk := &fakeRack{}
+	e.Rack = rk
+	ev := RuntimeEvent{Kind: "surprise", Path: "kitchen", Fact: surprisePiece, Class: "surprise", Rec: 0, Narrate: true}
+	got, turn := e.narratePieces([]RuntimeEvent{ev}, true)
+	if got != "The second cook dropped an onion into the first cook's pot." {
+		t.Errorf("said %q", got)
+	}
+	if rk.trigs[0] != "surprise(kitchen)" || !strings.HasPrefix(turn, "⟪kitchen: The kitchen now") ||
+		!strings.Contains(turn, "Just now: "+surprisePiece) || !strings.Contains(turn, "where it came from") {
+		t.Errorf("trigger %v, turn %q", rk.trigs, turn)
+	}
+	if len(rk.said) != 1 || rk.said[0] != "kitchen: "+got {
+		t.Errorf("said on the tape: %v", rk.said)
+	}
+	// a quiescence piece asks for the quiescence scope, a progress batch for the event scope
+	e.narratePieces([]RuntimeEvent{{Kind: "quiescence", Path: "kitchen_shared", Fact: "The kitchen shared is quiet after 12 moves.", Class: "progress", Rec: -1}}, false)
+	e.narratePieces([]RuntimeEvent{{Kind: "event", Path: "kitchen", Fact: "In the kitchen: load; now pot onion 1.", Class: "progress", Rec: -1}}, false)
+	if strings.Join(rk.trigs[1:], " ") != "quiescence(kitchen_shared) event(kitchen)" {
+		t.Errorf("triggers %v", rk.trigs)
+	}
+}

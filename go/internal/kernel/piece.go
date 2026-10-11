@@ -21,6 +21,31 @@ type Piece struct {
 	Text  string
 }
 
+// PiecesNow renders one signal with the counts it leaves (RACK.md §2): the
+// counts follow the signal first, and a piece that changed atoms ends with
+// their counts now ("In the kitchen: serve; now held soup 0, hand free 1,
+// served 2."), a clause event in place of its signed changes. With nil
+// counts it is Pieces.
+func PiecesNow(s Signal, cards []Card, c *Counts) []Piece {
+	touched := c.Apply(s)
+	ps := Pieces(s, cards)
+	if len(touched) == 0 || len(ps) == 0 || s.Kind == "surprise" {
+		return ps
+	}
+	now := c.Now(touched)
+	if s.Kind == "event" && s.F["kind"] == "clause" {
+		name, _ := s.F["name"].(string)
+		where := words(s.Path)
+		if where == "" {
+			where = "runtime"
+		}
+		ps[0].Text = PlainWords(fmt.Sprintf("In the %s: %s; now %s.", where, name, now), cards)
+		return ps
+	}
+	ps[0].Text = strings.TrimSuffix(ps[0].Text, ".") + "; now " + now + "."
+	return ps
+}
+
 // Pieces renders one signal (a result with a notice gives two pieces).
 func Pieces(s Signal, cards []Card) []Piece {
 	f := s.F

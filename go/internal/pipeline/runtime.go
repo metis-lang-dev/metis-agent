@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -133,17 +134,85 @@ const (
 		"Tell the person in one short sentence, in your own words, what happened in the %s and what it means. Use only numbers that are above."
 )
 
+// Rack is the narrator's rack (internal/rack, wired in main): the
+// structural insertion for a trigger — kind event | surprise | quiescence
+// | ask, the raising path — and the record of what was said about a path.
+type Rack interface {
+	Insert(kind, path string) (text string, records, tok int)
+	Said(path, text string)
+}
+
+const (
+	cueRackSurprise = "[The lines above are the robot's runtime report, not something the person said; do not classify them.] " +
+		"Tell the person in one short sentence, in your own words, what happened in the %s, what it means, and where it came from if the lines say. Use only numbers that are above."
+	cueRackAsk = "[The lines above are the robot's runtime report. The person asks the question below.] " +
+		"Answer the person in one short sentence from the lines above, naming which kitchen when it matters. Use only numbers that are above; if the lines do not say, say you do not know."
+)
+
+// rackTrigger is the retriever's trigger for a narration batch (RACK §3).
+func rackTrigger(batch []RuntimeEvent, think bool) string {
+	switch last := batch[len(batch)-1].Kind; {
+	case think && last == "surprise":
+		return "surprise"
+	case last == "quiescence":
+		return "quiescence"
+	}
+	return "event"
+}
+
+// answerFromRack answers the person's turn from the ask() insertion: every
+// mounted domain's mirror line and its open surprise (RACK §3), guarded
+// like a narration. "" = no answer (the dog's own reply stands).
+func (e *Engine) answerFromRack(text string) string {
+	sp, ok := e.LLM.(Speaker)
+	if !ok {
+		return ""
+	}
+	ins, n, tok := e.Rack.Insert("ask", "")
+	if ins == "" {
+		return ""
+	}
+	user := ins + "\n" + cueRackAsk + "\nThe person asks: " + strconv.Quote(text)
+	out, ttft, _, err := sp.Speak(e.cfg.SystemPrompt, user, false)
+	if err != nil {
+		log.Printf("[rack] ask failed: %v", err)
+		return ""
+	}
+	s := sanitizeAck(out)
+	if !taskVoiceOK(s) {
+		log.Printf("[rack] ask %q → %q rejected", text, out)
+		return ""
+	}
+	if bad := inventedNumbers(s, ins+" "+text); bad != "" {
+		log.Printf("[rack] ask %q → %q says %s, not in the insertion — the dog's reply", text, out, bad)
+		return ""
+	}
+	log.Printf("[rack] ask %q (%d records, %d tok) → %q (first token %d ms)", text, n, tok, s, ttft.Milliseconds())
+	return s
+}
+
 // narratePieces is the cued narration: the pieces, then the cue, then one
 // sentence from the model — guarded (unspeakable, forged fact syntax, a
 // number the pieces do not hold), else the last piece itself is said.
 // Returns the sentence and the turn's text (pieces + cue) for the tape.
 func (e *Engine) narratePieces(batch []RuntimeEvent, think bool) (string, string) {
+	said, user := e.narrateCued(batch, think)
+	if e.Rack != nil && said != "" && e.Attn.Awake() {
+		// kind=said is what the person heard (asleep, it is parked unsaid)
+		e.Rack.Said(batch[len(batch)-1].Path, said)
+	}
+	return said, user
+}
+
+func (e *Engine) narrateCued(batch []RuntimeEvent, think bool) (string, string) {
 	var lines []string
 	for _, p := range batch {
 		lines = append(lines, cleanText(p.Fact, factCap)+".")
 	}
 	pieces := strings.Join(lines, "\n")
-	where := strings.ReplaceAll(batch[0].Path, "_", " ")
+	fallback := lines[len(lines)-1]
+	path := batch[len(batch)-1].Path
+	where := strings.ReplaceAll(path, "_", " ")
 	if where == "" {
 		where = "runtime"
 	}
@@ -151,8 +220,22 @@ func (e *Engine) narratePieces(batch []RuntimeEvent, think bool) (string, string
 	if think {
 		cue = fmt.Sprintf(cueSurprise, where)
 	}
+	if e.Rack != nil {
+		// the rack: the retriever's insertion for this trigger stands in
+		// for the bare pieces (they are on the domain's tape already)
+		trig := rackTrigger(batch, think)
+		if ins, n, tok := e.Rack.Insert(trig, path); ins != "" {
+			log.Printf("[rack] %s(%s): %d records, %d tok", trig, path, n, tok)
+			// the trigger's own pieces close the insertion as its focus (the
+			// rack smoke: a surprise among seven records and two mirror
+			// lines was narrated as "the kitchen is running")
+			pieces = ins + "\nJust now: " + strings.Join(lines, " ")
+			if trig == "surprise" {
+				cue = fmt.Sprintf(cueRackSurprise, where)
+			}
+		}
+	}
 	user := pieces + "\n" + cue
-	fallback := lines[len(lines)-1]
 	sp, ok := e.LLM.(Speaker)
 	if !ok {
 		return fallback, user

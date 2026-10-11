@@ -404,3 +404,63 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
 
   It writes `{episode, arm, ledger}` and `{episode, arm, wakes, tokens,
   noticed}` for the eval's scorer.
+
+## 10. The rack (rack step 2, docs/RACK.md)
+
+- **N runtimes, one narrator.** `kernel.runtimes` lists runtimes. Each
+  entry overrides the kernel config's fields and runs as its own
+  `metis --json --host` process with its own watch.
+  - Their cards are merged into one Decider: the first card of a name
+    wins. The one prefix holds every runtime's cards.
+  - Every host is on one standing region and one tape ledger
+    (`Host.Share`). Mirror lines and open surprises are kept per path.
+  - A UI runtime intent names its runtime as `@path intent`. Without a
+    path it goes to the first runtime.
+- **Counts (RACK §2, step-1 finding 3).** `kernel.Counts` follows each
+  runtime's model counts.
+  - It starts from the watch answer's `counts` and is updated by clause
+    consume/produce, exogenous ops, an admitted explain's `adopted`, and
+    an operator resume (the reading).
+  - `kernel.PiecesNow` ends a piece with the counts it leaves: "In the
+    kitchen: serve; now hand free 1, held soup 0, served 2." A clause
+    event says this in place of its signed changes.
+  - The mirror line also carries the `now` counts and the `last` move
+    (metispy 03d57ba).
+- **The store (`internal/rack`).** Each domain has a tape of records:
+  path, seq, beat, kind, text, tok and `t`. `t` is one arrival clock
+  across runtimes.
+  - The records are the pieces (`rack.FromSignal`) plus `said`, what the
+    person heard (only when awake).
+  - At a domain's quiescence its tape is compacted: older events go,
+    surprises, results and notices stay, and `said` stays only for the
+    last order.
+  - Unmount freezes a tape: its records stay, new ones are counted as
+    dropped, and the retriever skips it.
+- **The retriever** is RACK §3 verbatim: mount filter, scope by trigger,
+  rank by kind weight then recency, budget, and mirror lines first.
+  - The scopes are `event(path)`, `surprise(path)` (plus the siblings'
+    mirror lines, cards and event records), `quiescence(path)` and
+    `ask`.
+  - Fed opus's E7 pair run through the harness renderer, it selects the
+    reference S arm's records, mirror lines and cards for all 24
+    questions (`TestRetrieverMatchesTheE7Reference`).
+- **Insertion and cue (RACK §4).** The insertion is ⟪path: text⟫
+  fragments grouped by path: the trigger's path first, each path's mirror
+  line first (from `ctx --mirror` on demand).
+  - Then comes `Just now: <the trigger's pieces>`, the focus. In the
+    smoke, without it a surprise among seven records was narrated as "the
+    kitchen is running".
+  - The step-4 cue follows; a surprise asks also "where it came from if
+    the lines say".
+  - Guards and fallback are as in step 4.
+- **The person's questions.** A CHITCHAT/UNKNOWN turn is answered from
+  the `ask()` insertion: every mounted domain's mirror line and its open
+  surprise. So is a QUERY whose target is not on the dog's map ("which
+  cook got the extra onion" parses as QUERY PERSON cook). The answer is
+  one guarded sentence; otherwise the dog's reply stands.
+- **UI.** nina-web's rack pane shows one row per domain: the mount switch
+  (`rack_mount{text: path, state: on|off}`), records, tokens, open
+  surprises, dropped-while-frozen, the last sentence said, and the last
+  insertion's trigger, size and time. A late joiner gets the last pane.
+- Config `kernel.rack: {enabled, budget, wrap, ask}`. Off by default, so
+  the dog and step 4 are unchanged.

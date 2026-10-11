@@ -146,6 +146,12 @@ type Engine struct {
 	// Tasks holds the commands awaiting a task event (set with a wire
 	// Dispatcher); nil → every task event is unknown and dropped.
 	Tasks *wire.Pending
+	// Rack (docs/RACK.md, rack step 2): with it, a runtime narration is
+	// cued on the retriever's insertion for its trigger instead of the bare
+	// pieces, and (RackAsk) a chitchat/unknown turn is answered from the
+	// ask() insertion. nil → step 4's narration.
+	Rack    Rack
+	RackAsk bool
 	// Events, when set, receives engine happenings for external consumers
 	// (the nina relay → /nina/intent, /nina/dialog_state):
 	//   kind "intent":  payload = *llm.Result (after a completed turn)
@@ -797,7 +803,21 @@ func (e *Engine) handleUtterance(text string) {
 		spoken = "It's " + time.Now().Format("Monday, January 2") + "."
 	case "CHITCHAT", "UNKNOWN":
 		spoken = voiceOr(r.Voice, cmd.Intent)
+		if e.Rack != nil && e.RackAsk {
+			if a := e.answerFromRack(text); a != "" {
+				spoken = a
+			}
+		}
 	default:
+		if cmd.Intent == "QUERY" && e.Rack != nil && e.RackAsk && e.Dsp.Memory != nil &&
+			len(e.Dsp.Memory.Query(cmd.Target, cmd.Constraints)) == 0 {
+			// not on the dog's map: a question about the runtimes ("which
+			// cook got the extra onion") — answered from the rack's ask()
+			if a := e.answerFromRack(text); a != "" {
+				e.say(a)
+				return
+			}
+		}
 		spoken = e.Dsp.Handle(cmd) // deterministic QUERY answer, or ""
 		if spoken == "" {
 			spoken = voiceOr(r.Voice, cmd.Intent)

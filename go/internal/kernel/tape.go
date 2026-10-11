@@ -51,10 +51,17 @@ func (l *TapeLedger) Snapshot() (appends, appendTok int, appendDur time.Duration
 // deleted, never appended over). Everything else is the stream: a piece
 // lives only in the turn whose cue speaks about it, at distance 0.
 type standing struct {
-	mirror  string
-	open    map[int]string // record → its surprise piece, while open or escalated
-	notices []string       // the last three
-	text    string         // what the tape holds now
+	mu      sync.Mutex
+	mirror  map[string]string // path → its mirror line
+	open    map[string]string // path#record → its surprise piece, while open or escalated
+	notices []string          // the last three
+	text    string            // what the tape holds now
+}
+
+// Share puts h on o's tape: one standing region and one ledger for every
+// runtime attached to the one narrator (rack phase 1b).
+func (h *Host) Share(o *Host) {
+	h.Tape, h.stand, h.Ledger = o.Tape, o.stand, o.Ledger
 }
 
 const standingHead = "[Runtime standing facts — the runtime's own, kept up to date; not something the person said.]"
@@ -65,28 +72,31 @@ func (h *Host) Stand(s Signal, pieces []Piece) {
 	if h.Tape == nil {
 		return
 	}
-	h.tapeMu.Lock()
-	defer h.tapeMu.Unlock()
-	st := &h.stand
+	st := h.stand
+	st.mu.Lock()
+	defer st.mu.Unlock()
 	if st.open == nil {
-		st.open = map[int]string{}
+		st.open = map[string]string{}
 	}
+	key := func(rec int) string { return fmt.Sprintf("%s#%d", s.Path, rec) }
 	for _, p := range pieces {
 		switch p.Kind {
 		case "surprise":
-			st.open[p.Rec] = p.Text
+			st.open[key(p.Rec)] = p.Text
 		case "result":
 			verb, _ := s.F["verb"].(string)
 			status, _ := s.F["status"].(string)
 			switch {
 			case strings.HasPrefix(status, "admitted") && (verb == "reset" || verb == "explain"):
-				delete(st.open, p.Rec)
+				delete(st.open, key(p.Rec))
 			case strings.HasPrefix(status, "admitted") && verb == "escalate":
-				st.open[p.Rec] = p.Text // escalated: no new orders until the operator
+				st.open[key(p.Rec)] = p.Text // escalated: no new orders until the operator
 			}
 		case "operator":
 			for r := range st.open {
-				delete(st.open, r)
+				if strings.HasPrefix(r, s.Path+"#") {
+					delete(st.open, r)
+				}
 			}
 		case "notice":
 			st.notices = append(st.notices, p.Text)
@@ -98,28 +108,39 @@ func (h *Host) Stand(s Signal, pieces []Piece) {
 	h.rewriteLocked()
 }
 
-// SetMirror replaces the mirror line (from ctx --mirror) and rewrites.
-func (h *Host) SetMirror(line string) {
+// SetMirror replaces a path's mirror line (from ctx --mirror) and rewrites.
+func (h *Host) SetMirror(path, line string) {
 	if h.Tape == nil {
 		return
 	}
-	h.tapeMu.Lock()
-	defer h.tapeMu.Unlock()
-	h.stand.mirror = line
+	st := h.stand
+	st.mu.Lock()
+	defer st.mu.Unlock()
+	if st.mirror == nil {
+		st.mirror = map[string]string{}
+	}
+	st.mirror[path] = line
 	h.rewriteLocked()
 }
 
 func (h *Host) rewriteLocked() {
-	st := &h.stand
+	st := h.stand
 	lines := []string{standingHead}
-	if st.mirror != "" {
-		lines = append(lines, st.mirror)
+	paths := make([]string, 0, len(st.mirror))
+	for p, m := range st.mirror {
+		if m != "" {
+			paths = append(paths, p)
+		}
 	}
-	recs := make([]int, 0, len(st.open))
+	sort.Strings(paths)
+	for _, p := range paths {
+		lines = append(lines, st.mirror[p])
+	}
+	recs := make([]string, 0, len(st.open))
 	for r := range st.open {
 		recs = append(recs, r)
 	}
-	sort.Ints(recs)
+	sort.Strings(recs)
 	for _, r := range recs {
 		lines = append(lines, st.open[r])
 	}
@@ -150,7 +171,7 @@ func (h *Host) rewriteLocked() {
 		h.Ledger.MaxTape = total
 	}
 	h.Ledger.mu.Unlock()
-	log.Printf("[tape] standing: %d tok (mirror %v, open %v, notices %d), %d ms", total, st.mirror != "", recs, len(st.notices), dur.Milliseconds())
+	log.Printf("[tape] standing: %d tok (mirror %v, open %v, notices %d), %d ms", total, len(paths) > 0, recs, len(st.notices), dur.Milliseconds())
 }
 
 // MirrorLine renders the ctx --mirror answer's first row in plain words.
@@ -160,23 +181,54 @@ func MirrorLine(ans map[string]any, cards []Card) string {
 		return ""
 	}
 	r, _ := rows[0].(map[string]any)
+	return MirrorRow(r, cards)
+}
+
+// MirrorRows renders every row of a ctx --mirror answer, by path.
+func MirrorRows(ans map[string]any, cards []Card) map[string]string {
+	out := map[string]string{}
+	rows, _ := ans["mirror"].([]any)
+	for _, x := range rows {
+		if r, ok := x.(map[string]any); ok {
+			p, _ := r["path"].(string)
+			out[p] = MirrorRow(r, cards)
+		}
+	}
+	return out
+}
+
+// MirrorRow is one mirror row in plain words: stage status, the open
+// surprise, the #query atoms' counts now and the last event (metispy
+// 03d57ba, RACK v2 finding 1), and the horizon's beliefs.
+func MirrorRow(r map[string]any, cards []Card) string {
 	path, _ := r["path"].(string)
 	status, _ := r["status"].(string)
 	open := "no open surprise"
 	if sp, ok := r["surprise"].(map[string]any); ok && sp != nil {
 		open = fmt.Sprintf("surprise %d open", int(num(sp["record"])))
 	}
-	var bel []string
-	if b, ok := r["beliefs"].(map[string]any); ok {
-		keys := make([]string, 0, len(b))
-		for k := range b {
+	sorted := func(m map[string]any, f func(k string, v any) string) string {
+		keys := make([]string, 0, len(m))
+		for k := range m {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
+		var out []string
 		for _, k := range keys {
-			bel = append(bel, fmt.Sprintf("%s %.2f", k, num(b[k])))
+			out = append(out, f(k, m[k]))
 		}
+		return strings.Join(out, ", ")
 	}
-	return PlainWords(fmt.Sprintf("The %s now: %s, %s; likely within %d beats: %s.", path, status, open,
-		int(num(r["horizon"])), strings.Join(bel, ", ")), cards)
+	line := fmt.Sprintf("The %s now: %s, %s", words(path), status, open)
+	if now, ok := r["now"].(map[string]any); ok && len(now) > 0 {
+		line += "; " + sorted(now, func(k string, v any) string { return fmt.Sprintf("%s %d", k, int(num(v))) })
+	}
+	if last, ok := r["last"].(string); ok && last != "" {
+		line += "; last move " + last
+	}
+	if b, ok := r["beliefs"].(map[string]any); ok && len(b) > 0 {
+		line += fmt.Sprintf("; likely within %d beats: %s", int(num(r["horizon"])),
+			sorted(b, func(k string, v any) string { return fmt.Sprintf("%s %.2f", k, num(v)) }))
+	}
+	return PlainWords(line+".", cards)
 }

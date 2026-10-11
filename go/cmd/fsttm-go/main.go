@@ -27,6 +27,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -37,6 +38,7 @@ import (
 	"github.com/metis-lang-dev/metis-agent/go/internal/kernel"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
 	"github.com/metis-lang-dev/metis-agent/go/internal/pipeline"
+	"github.com/metis-lang-dev/metis-agent/go/internal/rack"
 	"github.com/metis-lang-dev/metis-agent/go/internal/stt"
 	"github.com/metis-lang-dev/metis-agent/go/internal/transport"
 	"github.com/metis-lang-dev/metis-agent/go/internal/tts"
@@ -415,121 +417,263 @@ func main() {
 		if ws == nil {
 			log.Fatal("kernel: needs transport: ws (the runtime's events go to the UI)")
 		}
-		kc := startKernel(ctx, cfg.Kernel, eng, ws, l, string(prompt))
-		defer kc.Close()
+		for _, kc := range startKernel(ctx, cfg.Kernel, eng, ws, l, string(prompt)) {
+			defer kc.Close()
+		}
 	}
 
 	eng.Run(ctx, vadEvents, textIn)
 	fmt.Fprintln(os.Stderr, "\nbye.")
 }
 
-// startKernel attaches the runtime (internal/kernel): every signal to the
-// UI's events pane, the narrated ones to the dialog, runtime intents from
-// the UI down as wire ops whose result answers a pending RUNTIME command.
-// The quiet-cost ledger is logged every ten minutes and at exit.
-func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, ws *transport.Server, l *llm.LLM, dogPrompt string) *kernel.Client {
+// startKernel attaches the runtimes (internal/kernel; rack phase 1b,
+// docs/RACK.md §5: N of them, each its own process and watch, one
+// narrator): every signal to the UI's events pane, every piece to the
+// dialog, runtime intents from the UI down as wire ops whose result answers
+// a pending RUNTIME command ("@path intent" names the runtime; the first
+// otherwise). With kernel.rack on, every piece also goes on its domain's
+// tape in the rack and the dialog narrates from the retriever's insertion.
+func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, ws *transport.Server, l *llm.LLM, dogPrompt string) []*kernel.Client {
 	if kernel.RuntimeCommand != pipeline.RuntimeCommand {
 		log.Fatal("kernel: RuntimeCommand names disagree")
 	}
-	h := kernel.NewHost(kcfg, eng.Tasks)
-	var kc *kernel.Client
-	h.OnEvent = func(ev kernel.Event) {
-		ws.Runtime(ev.Kind, ev.Path, ev.Fact, len(ev.Pieces) > 0, ev.Raw)
-		if ev.Kind == "episode_over" && kc != nil {
-			// the runtime's own account of the run, once the surprises
-			// are closed (opus: one ledger line per fixture run)
-			go func() {
-				h.WaitTriage(90 * time.Second)
-				if ans, err := kc.Op("ledger", "", 30*time.Second); err == nil {
-					b, _ := json.Marshal(ans)
-					log.Printf("[kernel] ledger %s", b)
+	type runtime struct {
+		cfg   kernel.Config
+		h     *kernel.Host
+		c     *kernel.Client
+		path  string
+		cards []kernel.Card
+	}
+	var (
+		rts   []*runtime
+		cards []kernel.Card // the union, first one wins: the one prefix's
+		rk    *rack.Store
+		rkMu  sync.Mutex
+		last  string
+	)
+	if kcfg.Rack.Enabled {
+		rk = rack.New()
+		rk.Tok = func(s string) int { return len(l.Tokens(s, false)) }
+		if kcfg.Rack.Budget > 0 {
+			rk.Budget = kcfg.Rack.Budget
+		}
+		if kcfg.Rack.Wrap != nil {
+			rk.Wrap = *kcfg.Rack.Wrap
+		}
+	}
+	cardText := func(path string) string {
+		for _, c := range cards {
+			if c.Name == path {
+				return kernel.PlainWords(c.Text, nil)
+			}
+		}
+		return ""
+	}
+	pushRack := func() {
+		if rk != nil {
+			rkMu.Lock()
+			l := last
+			rkMu.Unlock()
+			ws.Rack(rk.Snapshot(), l)
+		}
+	}
+	for _, c := range kcfg.Each() {
+		r := &runtime{cfg: c, path: c.Path}
+		h := kernel.NewHost(c, eng.Tasks)
+		r.h = h
+		h.OnEvent = func(ev kernel.Event) {
+			ws.Runtime(ev.Kind, ev.Path, ev.Fact, len(ev.Pieces) > 0, ev.Raw)
+			if ev.Kind == "episode_over" && r.c != nil {
+				// the runtime's own account of the run, once the surprises
+				// are closed (opus: one ledger line per fixture run)
+				go func() {
+					h.WaitTriage(90 * time.Second)
+					if ans, err := r.c.Op("ledger", "", 30*time.Second); err == nil {
+						b, _ := json.Marshal(ans)
+						log.Printf("[kernel] %s ledger %s", ev.Path, b)
+					}
+				}()
+			}
+			if rk != nil && ev.Path != "" {
+				// the domain's tape (RACK §2): the pieces as records, on the
+				// adapter's one arrival clock
+				var f map[string]any
+				if json.Unmarshal(ev.Raw, &f) == nil {
+					kind, _ := f["signal"].(string)
+					seq, _ := f["seq"].(float64)
+					rk.Attach(ev.Path, cardText(ev.Path))
+					for _, rec := range rack.FromSignal(kernel.Signal{Kind: kind, Seq: int(seq), Path: ev.Path, F: f}, ev.Pieces) {
+						rk.Add(rec)
+					}
+					pushRack()
 				}
-			}()
+			}
+			// step 4 (CML.md §7): every piece is narrated unsolicited, floor
+			// permitting — progress waits for a free floor, a surprise takes it
+			for _, p := range ev.Pieces {
+				eng.RuntimeEvent(pipeline.RuntimeEvent{Kind: p.Kind, Path: ev.Path, Fact: p.Text,
+					Class: p.Class, Rec: p.Rec, Narrate: true, At: ev.At})
+			}
 		}
-		// step 4 (CML.md §7): every piece is narrated unsolicited, floor
-		// permitting — progress waits for a free floor, a surprise takes it
-		for _, p := range ev.Pieces {
-			eng.RuntimeEvent(pipeline.RuntimeEvent{Kind: p.Kind, Path: ev.Path, Fact: p.Text,
-				Class: p.Class, Rec: p.Rec, Narrate: true, At: ev.At})
+		h.OnTask = func(id, result, detail string) {
+			eng.TaskEvent(pipeline.Task{ID: id, Result: result, Detail: detail})
+		}
+		kc, err := kernel.Start(ctx, c, h.Signal)
+		if err != nil {
+			log.Fatal(err)
+		}
+		h.C, r.c = kc, kc
+		rts = append(rts, r)
+		// the cards at attach time (triage's tool declarations and call
+		// grammar; the rack's card texts)
+		if c.Triage == nil || *c.Triage || rk != nil {
+			ans, err := kc.Op("cards", "", 30*time.Second)
+			if err != nil {
+				log.Fatal(err)
+			}
+			var cs struct {
+				Cards []kernel.Card `json:"cards"`
+			}
+			b, _ := json.Marshal(ans)
+			_ = json.Unmarshal(b, &cs)
+			r.cards = cs.Cards
+		have:
+			for _, nc := range cs.Cards {
+				for _, oc := range cards {
+					if oc.Name == nc.Name {
+						continue have
+					}
+				}
+				cards = append(cards, nc)
+			}
 		}
 	}
-	h.OnTask = func(id, result, detail string) {
-		eng.TaskEvent(pipeline.Task{ID: id, Result: result, Detail: detail})
+	byPath := func(text string) (*runtime, string) {
+		if strings.HasPrefix(text, "@") {
+			p, rest, _ := strings.Cut(text[1:], " ")
+			for _, r := range rts {
+				if r.path == p {
+					return r, strings.TrimSpace(rest)
+				}
+			}
+		}
+		return rts[0], text
 	}
-	var err error
-	kc, err = kernel.Start(ctx, kcfg, h.Signal)
-	if err != nil {
-		log.Fatal(err)
-	}
-	h.C = kc
 	ws.OnRuntimeIntent = func(text string) {
+		r, it := byPath(text)
 		go func() {
-			if _, err := h.Intent(text); err != nil {
+			if _, err := r.h.Intent(it); err != nil {
 				log.Printf("[kernel] intent %q: %v", text, err)
 			}
 		}()
 	}
-	// triage (runtime-wire step 3): the cards at attach time → the tool
-	// declarations and the call grammar; every surprise is then closed by
-	// the model with one call, bounded by the runtime's refusals
-	if kcfg.Triage == nil || *kcfg.Triage {
-		ans, err := kc.Op("cards", "", 30*time.Second)
+	// triage (runtime-wire step 3) and step 4's ONE prefix for every seat:
+	// the dog prompt + the runtime section (fact syntax, rules, the cards of
+	// every runtime, tool declarations); one standing region on one tape
+	var first *kernel.Host
+	for _, r := range rts {
+		if r.cfg.Triage != nil && !*r.cfg.Triage {
+			continue
+		}
+		if first == nil {
+			dec := kernel.NewDecider(cards)
+			first = r.h
+			first.Dec, first.LLM = dec, l
+			first.Prompt = dogPrompt + dec.System
+			eng.SetSystemPrompt(first.Prompt)
+			n, err := l.PrimePrefix(first.Prompt)
+			if err != nil {
+				log.Fatal(err)
+			}
+			first.Tape = tapeAdapter{l, first.Prompt}
+			log.Printf("[kernel] triage on: %d cards over %d runtime(s), call grammar %d B; one prefix %d tok (dog prompt + runtime section %d B); settle %s",
+				len(cards), len(rts), len(dec.GBNF), n, len(dec.System), first.Settle)
+			continue
+		}
+		r.h.Dec, r.h.LLM, r.h.Prompt = first.Dec, l, first.Prompt
+		r.h.Share(first)
+	}
+	if rk != nil {
+		mirror := func(path string) string {
+			for _, r := range rts {
+				if r.path == path {
+					if ans, err := r.c.Op("ctx", "--mirror", 3*time.Second); err == nil {
+						return kernel.MirrorRows(ans, cards)[path]
+					}
+				}
+			}
+			return ""
+		}
+		eng.Rack = rackAdapter{s: rk, mirror: mirror, onInsert: func(in rack.Insertion) {
+			rkMu.Lock()
+			last = fmt.Sprintf("%s(%s): %d records, %d tok, %d ms", in.Trigger.Kind, in.Trigger.Path, len(in.Records), in.Tok, in.Dur.Milliseconds())
+			rkMu.Unlock()
+			log.Printf("[rack] insertion %s(%s): %d records + %d mirror lines + %d cards, %d tok, %s (mirror ops included)",
+				in.Trigger.Kind, in.Trigger.Path, len(in.Records), len(in.Mirrors), len(in.Cards), in.Tok, in.Dur.Round(time.Millisecond))
+			pushRack()
+		}, onSaid: pushRack}
+		eng.RackAsk = kcfg.Rack.Ask == nil || *kcfg.Rack.Ask
+		ws.OnRackMount = func(path string, on bool) {
+			ok := rk.Mount(path, on)
+			log.Printf("[rack] mount %s %v (known %v); active %v", path, on, ok, rk.Active())
+			pushRack()
+		}
+		log.Printf("[rack] on: budget %d tok, wrap %v, ask %v", rk.Budget, rk.Wrap, eng.RackAsk)
+	}
+	for _, r := range rts {
+		w := r.cfg.Watch
+		if w == "" {
+			w = "every=0.5"
+		}
+		ans, err := r.c.Op("watch", w, 30*time.Second)
 		if err != nil {
 			log.Fatal(err)
 		}
-		var cards struct {
-			Cards []kernel.Card `json:"cards"`
+		if init, ok := ans["counts"].(map[string]any); ok {
+			r.h.Counts.Seed(init)
+		}
+		if p, ok := ans["path"].(string); ok && r.path == "" {
+			r.path = p
+		}
+		if rk != nil {
+			rk.Attach(r.path, cardText(r.path))
 		}
 		b, _ := json.Marshal(ans)
-		_ = json.Unmarshal(b, &cards)
-		h.Dec, h.LLM = kernel.NewDecider(cards.Cards), l
-		// step 4: ONE prefix for every seat — the dog prompt + the runtime
-		// section (fact syntax, rules, cards, tool declarations); the
-		// runtime's facts and what was said about them go on the tape
-		h.Prompt = dogPrompt + h.Dec.System
-		eng.SetSystemPrompt(h.Prompt)
-		n, err := l.PrimePrefix(h.Prompt)
-		if err != nil {
-			log.Fatal(err)
-		}
-		h.Tape = tapeAdapter{l, h.Prompt}
-		log.Printf("[kernel] triage on: %d cards, call grammar %d B; one prefix %d tok (dog prompt + runtime section %d B); settle %s",
-			len(cards.Cards), len(h.Dec.GBNF), n, len(h.Dec.System), h.Settle)
+		log.Printf("[kernel] %s watch %s → %s", r.path, w, b)
 	}
-	w := kcfg.Watch
-	if w == "" {
-		w = "every=0.5"
-	}
-	ans, err := kc.Op("watch", w, 30*time.Second)
-	if err != nil {
-		log.Fatal(err)
-	}
-	b, _ := json.Marshal(ans)
-	log.Printf("[kernel] watch %s → %s", w, b)
+	pushRack()
 	ledger := func() {
-		n, bytes, by, up := kc.Stats.Snapshot()
-		log.Printf("[kernel] quiet cost: %d lines, %d B in %s (%.0f lines/h); by kind %v; narrated %d",
-			n, bytes, up.Round(time.Second), float64(n)/up.Hours(), by, h.Narrated())
-		if h.Tape != nil {
-			ap, tok, dur, comp, maxT, tape, ttft := h.Ledger.Snapshot()
+		for _, r := range rts {
+			n, bytes, by, up := r.c.Stats.Snapshot()
+			log.Printf("[kernel] %s quiet cost: %d lines, %d B in %s (%.0f lines/h); by kind %v; narrated %d",
+				r.path, n, bytes, up.Round(time.Second), float64(n)/up.Hours(), by, r.h.Narrated())
+		}
+		if first != nil {
+			ap, tok, dur, comp, maxT, tape, ttft := first.Ledger.Snapshot()
 			log.Printf("[tape] ledger: %d appends, %d tok decoded in %s; %d compactions; tape now %d tok, max %d; decide first token %v",
 				ap, tok, dur.Round(time.Millisecond), comp, tape, maxT, ttft)
 		}
+		if rk != nil {
+			b, _ := json.Marshal(rk.Snapshot())
+			log.Printf("[rack] ledger: %s", b)
+		}
 	}
-	// SIGUSR2 ends the watch and logs the runtime's ledger (a watch that
+	// SIGUSR2 ends the watches and logs the runtimes' ledgers (a watch that
 	// never ends by itself, e.g. make_hour): kill -USR2 $(pidof fsttm-go)
 	usr2 := make(chan os.Signal, 1)
 	signal.Notify(usr2, syscall.SIGUSR2)
 	go func() {
 		for range usr2 {
-			h.WaitTriage(90 * time.Second)
-			if ans, err := kc.Op("watch", "off", 30*time.Second); err == nil {
-				b, _ := json.Marshal(ans)
-				log.Printf("[kernel] watch off → %s", b)
-			}
-			if ans, err := kc.Op("ledger", "", 30*time.Second); err == nil {
-				b, _ := json.Marshal(ans)
-				log.Printf("[kernel] ledger %s", b)
+			for _, r := range rts {
+				r.h.WaitTriage(90 * time.Second)
+				if ans, err := r.c.Op("watch", "off", 30*time.Second); err == nil {
+					b, _ := json.Marshal(ans)
+					log.Printf("[kernel] %s watch off → %s", r.path, b)
+				}
+				if ans, err := r.c.Op("ledger", "", 30*time.Second); err == nil {
+					b, _ := json.Marshal(ans)
+					log.Printf("[kernel] %s ledger %s", r.path, b)
+				}
 			}
 			ledger()
 		}
@@ -547,7 +691,32 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 			}
 		}
 	}()
-	return kc
+	var out []*kernel.Client
+	for _, r := range rts {
+		out = append(out, r.c)
+	}
+	return out
+}
+
+// rackAdapter is the dialog's pipeline.Rack over the rack store: the
+// structural insertion for a trigger, with each path's mirror line from
+// its runtime on demand (ctx --mirror).
+type rackAdapter struct {
+	s        *rack.Store
+	mirror   func(path string) string
+	onInsert func(rack.Insertion)
+	onSaid   func()
+}
+
+func (a rackAdapter) Insert(kind, path string) (string, int, int) {
+	in := a.s.Retrieve(rack.Trigger{Kind: kind, Path: path}, a.mirror)
+	a.onInsert(in)
+	return in.Text, len(in.Records), in.Tok
+}
+
+func (a rackAdapter) Said(path, text string) {
+	a.s.Said(path, text)
+	a.onSaid()
 }
 
 // tapeAdapter is the kernel's TapeWriter over the llm adapter's tape, under

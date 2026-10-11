@@ -66,3 +66,16 @@ kernel:
     watch: every=0.5
     narrate: [surprise, consistent, episode_over]
     settle_beats: 2.5            # triage waits this many beats for the next reading before it asks the model
+    # Rack phase 1b (docs/RACK.md §5): N runtimes on the one narrator, each its
+    # own process; an entry's fields override the ones above. The kitchen pair
+    # shares one env through METIS_PAIR_DIR (clear its kitchen-pair.json first).
+    # runtimes:
+    #   - {path: kitchen, host: "metis.domains.kitchen.pair:make_pair_kitchen",
+    #      catalog: metis/domains/kitchen/catalogs/kitchen_host.llp, env: [METIS_PAIR_DIR=/tmp/pair]}
+    #   - {path: kitchen_shared, host: "metis.domains.kitchen.pair:make_pair_shared",
+    #      catalog: metis/domains/kitchen/catalogs/shared/kitchen_shared.llp, env: [METIS_PAIR_DIR=/tmp/pair]}
+    rack:                        # per-domain tapes + the structural retriever (RACK §2–4)
+        enabled: false
+        budget: 2500             # tokens per insertion, mirror lines included
+        wrap: true               # ⟪path: text⟫ fragments (false: "path: text.")
+        ask: true                # the person's chitchat / off-map questions answered from ask()

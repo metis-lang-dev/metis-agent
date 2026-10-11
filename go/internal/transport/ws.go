@@ -75,6 +75,7 @@ type Server struct {
 	micTok  string
 	mics    map[*websocket.Conn]string
 	dialog  string // cached for late joiners
+	rack    []byte // the last rack pane, likewise
 	acks    map[string]chan ttsAck
 	mic     chan []byte
 	dropped int
@@ -85,7 +86,8 @@ type Server struct {
 	OnSayText       func(text string)
 	OnAttention     func(awake bool)
 	OnTask          func(t Task)
-	OnRuntimeIntent func(text string) // runtime_intent{text}: a runtime intent down to the kernel
+	OnRuntimeIntent func(text string)          // runtime_intent{text}: a runtime intent down to the kernel
+	OnRackMount     func(path string, on bool) // rack_mount{text: path, state: on|off}: the rack pane's switches
 	OnSay           func(text string)
 	OnMaster        func(claimed bool)
 }
@@ -168,6 +170,16 @@ func (s *Server) Pending(id, state string) {
 func (s *Server) Runtime(kind, path, fact string, narrated bool, sig json.RawMessage) {
 	s.broadcast(jmsg(map[string]any{"ev": "runtime", "kind": kind, "path": path, "fact": fact,
 		"narrated": narrated, "sig": sig, "t": now()}))
+}
+
+// Rack shows the rack pane: per domain, mounted, records, open surprises,
+// last said (internal/rack Snapshot), and the last insertion's trigger.
+func (s *Server) Rack(paths any, last string) {
+	b := jmsg(map[string]any{"ev": "rack", "paths": paths, "last": last, "t": now()})
+	s.mu.Lock()
+	s.rack = b
+	s.mu.Unlock()
+	s.broadcast(b)
 }
 
 // Command is the wire.Emitter: the typed command the host would execute.
@@ -274,13 +286,16 @@ func (s *Server) wsCtrl(rw http.ResponseWriter, r *http.Request) {
 	c := &client{conn: conn, send: make(chan frame, 256)}
 	s.mu.Lock()
 	s.clients[c] = true
-	dialog, claimed := s.dialog, s.master != nil
+	dialog, claimed, rack := s.dialog, s.master != nil, s.rack
 	s.mu.Unlock()
 	log.Printf("[ws] viewer connected: %s", conn.RemoteAddr())
 	go s.serveConn(c)
 	c.push(jmsg(map[string]any{"ev": "role", "master": false, "claimed": claimed}))
 	if dialog != "" {
 		c.push(jmsg(map[string]any{"ev": "state", "dialog": dialog}))
+	}
+	if rack != nil {
+		c.push(rack)
 	}
 	conn.SetReadLimit(1 << 20)
 	for {
@@ -374,6 +389,12 @@ func (s *Server) onText(c *client, data []byte) {
 	case "runtime_intent":
 		if m.Text != "" && s.OnRuntimeIntent != nil {
 			s.OnRuntimeIntent(m.Text)
+		} else {
+			c.push(jmsg(map[string]any{"ev": "denied", "what": m.Ev}))
+		}
+	case "rack_mount":
+		if m.Text != "" && s.OnRackMount != nil && (m.State == "on" || m.State == "off") {
+			s.OnRackMount(m.Text, m.State == "on")
 		} else {
 			c.push(jmsg(map[string]any{"ev": "denied", "what": m.Ev}))
 		}

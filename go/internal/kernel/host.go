@@ -59,15 +59,16 @@ type Host struct {
 	// said about the runtime, appended after the prefix; compacted at
 	// quiescence, deterministically
 	Tape     TapeWriter
-	tapeMu   sync.Mutex
-	stand    standing
-	lastRec  int
-	Ledger   TapeLedger
+	stand    *standing   // shared by every runtime on the one tape (Share)
+	Ledger   *TapeLedger // shared likewise
 	triageQ  chan Signal
 	settled  map[int]bool // records whose reading came back consistent
 	inTriage atomic.Int64 // surprises queued or being closed
 	Noticed  atomic.Int64 // results that came back admitted+notice
 	Wakes    atomic.Int64 // surprises handed to the model (each closes with ≥1 call)
+	// Counts follows the model's counts from the signals, so the pieces
+	// state counts (RACK §2); seeded from the watch answer (SeedCounts)
+	Counts *Counts
 	// WakeOnReading (eval arm A, `watch arm=blind`): the runtime checks
 	// nothing, so the model is woken by the first inconsistent reading of
 	// the open record instead of a surprise signal
@@ -99,8 +100,8 @@ func NewHost(cfg Config, pend *wire.Pending) *Host {
 	}
 	h := &Host{Pend: pend, narrate: map[string]bool{}, byIntent: map[int]string{}, early: map[int]Signal{},
 		waiters: map[string]chan [2]string{}, MaxTries: 3, Beat: watchEvery(cfg.Watch),
-		settled: map[int]bool{}, lastRec: -1, noticed: map[string]bool{},
-		woke: map[int]bool{}}
+		settled: map[int]bool{}, stand: &standing{}, Ledger: &TapeLedger{}, noticed: map[string]bool{},
+		woke: map[int]bool{}, Counts: NewCounts(nil)}
 	sb := cfg.SettleBeats
 	if sb <= 0 {
 		sb = 2.5
@@ -127,7 +128,7 @@ func (h *Host) Signal(s Signal) {
 	if h.Dec != nil {
 		cards = h.Dec.Cards
 	}
-	ev.Pieces = Pieces(s, cards)
+	ev.Pieces = PiecesNow(s, cards, h.Counts)
 	ev.Narrate = ev.Narrate && h.narrate[ev.Kind]
 	if ev.Narrate {
 		h.narrated.Add(1)
@@ -138,18 +139,13 @@ func (h *Host) Signal(s Signal) {
 	}
 	if h.Tape != nil {
 		// the standing region: what stays true, overwritten in place
-		if s.Kind == "surprise" {
-			h.tapeMu.Lock()
-			h.lastRec = int(num(s.F["record"]))
-			h.tapeMu.Unlock()
-		}
 		h.Stand(s, ev.Pieces)
 		if (s.Kind == "quiescence" || s.Kind == "result") && h.C != nil {
 			// the mirror line, refreshed off the reader goroutine (an op's
 			// answer comes through it)
 			go func() {
 				if ans, err := h.C.Op("ctx", "--mirror", 10*time.Second); err == nil {
-					h.SetMirror(MirrorLine(ans, cards))
+					h.SetMirror(s.Path, MirrorLine(ans, cards))
 				}
 			}()
 		}
