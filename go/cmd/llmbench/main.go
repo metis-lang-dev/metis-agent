@@ -153,6 +153,8 @@ func main() {
 	spliceF := flag.String("splice", "", "E6 splice corpus (JSONL, tools/splice-corpus.py): each runtime fact × renderer T/Z/R × form inline/system/user × distance 0/2/6, + conflict and continuation probes")
 	spliceDialog := flag.String("splice-dialog", "grammar/splice-dialog.json", "E6: persona, transcript, distractor turns, Z-narration prompt")
 	spliceOnly := flag.String("splice-only", "", "E6: fact ids (comma) or kind:<kind> (e.g. kind:surprise)")
+	spliceCards := flag.String("splice-cards", "grammar/splice-cards.json", "E6b: the cards op's JSON, for the plain-word renderer T2")
+	spliceRnd := flag.String("splice-renderers", "T,Z,R", "E6: pieces to run (T, Z, R; E6b: T2)")
 	spliceGrid := flag.Bool("splice-grid-only", false, "E6: the fact-question grid only (no conflict/continuation)")
 	eventsF := flag.String("events", "", "narrate corpus (intent<TAB>args JSON<TAB>result<TAB>detail): each task outcome through the harness's taskCue + Narrate + guard")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
@@ -274,7 +276,7 @@ func main() {
 			g, _ := gpuMiB()
 			fmt.Fprintf(os.Stderr, "vram after load: gpu %d MiB\n", g)
 		}
-		runSplice(l, *spliceF, *spliceDialog, *spliceOnly, *tag, *spliceGrid, emit)
+		runSplice(l, *spliceF, *spliceDialog, *spliceCards, *spliceRnd, *spliceOnly, *tag, *spliceGrid, emit)
 		return
 	}
 	fmt.Fprintf(os.Stderr, "model %s  template=%s eot=%q ngl=%d n_ctx=%d think=%v\nload %dms  prime %d tok in %dms\n",

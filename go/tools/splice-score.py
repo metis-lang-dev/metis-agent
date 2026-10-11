@@ -74,7 +74,7 @@ def main():
            "| model | renderer | form | used d0 | d2 | d6 | invented | ignored | echo | forged | n |",
            "|---|---|---|---|---|---|---|---|---|---|---|"]
     for t in tags:
-        for rnd in "TZR":
+        for rnd in ("T", "T2", "Z", "R"):
             for form in ("inline", "system", "user"):
                 g = [x for x in rows if x["tag"] == t and x["probe"] == "q"
                      and x["renderer"] == rnd and x["form"] == form]
@@ -89,7 +89,7 @@ def main():
             "| model | renderer | conflict: newer wins | older kept | continuation carries the fact | continuation echoes | ms to first token p50 | ms answer p50 | piece tok (splice ms) p50 |",
             "|---|---|---|---|---|---|---|---|---|"]
     for t in tags:
-        for rnd in "TZR":
+        for rnd in ("T", "T2", "Z", "R"):
             c = [x for x in rows if x["tag"] == t and x["renderer"] == rnd
                  and x["probe"] == "conflict"]
             k = [x for x in rows if x["tag"] == t and x["renderer"] == rnd

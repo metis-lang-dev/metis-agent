@@ -222,3 +222,16 @@ func TestMetispyKitchenTransient(t *testing.T) {
 		t.Errorf("second reset → %q", s.tasks[1])
 	}
 }
+
+func TestPlainWordsSaysTheCardsWords(t *testing.T) {
+	cards := []Card{{Name: "kitchen", Relation: "served", Text: "a one-cook kitchen"},
+		{Name: "kitchen_shared", Relation: "sibling",
+			Text: "a shared kitchen: a second cook also loads onions into the pot",
+			Effects: []Move{{Name: "partner_load", Consume: map[string]int{"pot_space": 1},
+				Produce: map[string]int{"pot_onion": 1}}}}}
+	got := PlainWords("kitchen intent 1 (explain) admitted: kitchen_shared explains the reading: partner_load load — held_soup", cards)
+	want := "kitchen intent 1 (explain) admitted: the kitchen shared card (a shared kitchen: a second cook also loads onions into the pot) explains the reading: partner load (pot onion +1, pot space -1) load — held soup"
+	if got != want {
+		t.Fatalf("got  %q\nwant %q", got, want)
+	}
+}

@@ -29,6 +29,9 @@ for r in $ROWS; do
     e2b)       run E2B-Q4 gemma-4-E2B-it-Q4_K_M.gguf ;;
     e2b-think) run E2B-Q4+think gemma-4-E2B-it-Q4_K_M.gguf -think -splice-only kind:surprise ;;
     e4b)       run E4B-Q5 gemma-4-E4B-it-Q5_K_M.gguf ;;
+    # E6b: the plain-word template T2 beside T, think off and on, all 12
+    e6b)       run E2B-Q4 gemma-4-E2B-it-Q4_K_M.gguf -splice-renderers T2 ;;
+    e6b-think) run E2B-Q4+think gemma-4-E2B-it-Q4_K_M.gguf -think -splice-renderers T,T2 ;;
   esac
 done
 python3 tools/splice-score.py grammar/splice-corpus.jsonl grammar/splice-dialog.json "$REC" | tee "$OUT/table.md"

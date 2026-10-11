@@ -138,11 +138,22 @@ func keepFact(f spliceFact, keep string) bool {
 	return false
 }
 
-func runSplice(l *llm.LLM, corpus, dialog, keep, tag string, gridOnly bool, emit func(any)) {
+func runSplice(l *llm.LLM, corpus, dialog, cardsF, renderers, keep, tag string, gridOnly bool, emit func(any)) {
 	facts, d, err := readSplice(corpus, dialog)
 	if err != nil {
 		fail(err)
 	}
+	var cards []kernel.Card
+	if cardsF != "" {
+		b, err := os.ReadFile(cardsF)
+		if err != nil {
+			fail(err)
+		}
+		if err := json.Unmarshal(b, &cards); err != nil {
+			fail(err)
+		}
+	}
+	rnds := strings.Split(renderers, ",")
 	turns := func(ts [][2]string) string {
 		var b strings.Builder
 		for _, t := range ts {
@@ -155,13 +166,16 @@ func runSplice(l *llm.LLM, corpus, dialog, keep, tag string, gridOnly bool, emit
 		if !keepFact(f, keep) {
 			continue
 		}
-		pieces := map[string]string{"T": templatePiece(f), "R": f.Raw}
-		z, _, _, err := l.Answer(d.ZNarrate, f.Raw, 80)
-		if err != nil {
-			fail(err)
+		pieces := map[string]string{"T": templatePiece(f), "R": f.Raw,
+			"T2": kernel.PlainWords(withNotice(templatePiece(f), f.Raw), cards)}
+		if strings.Contains(renderers, "Z") {
+			z, _, _, err := l.Answer(d.ZNarrate, f.Raw, 80)
+			if err != nil {
+				fail(err)
+			}
+			pieces["Z"] = strings.SplitN(strings.TrimSpace(z), "\n", 2)[0]
+			fmt.Fprintf(os.Stderr, "== %s Z: %s\n", f.ID, pieces["Z"])
 		}
-		pieces["Z"] = strings.SplitN(strings.TrimSpace(z), "\n", 2)[0]
-		fmt.Fprintf(os.Stderr, "== %s Z: %s\n", f.ID, pieces["Z"])
 		run := func(rnd, form string, dist int, probe string) {
 			piece := pieces[rnd]
 			rec := spliceRec{Kind: "splice", Tag: tag, Fact: f.ID, FactKind: f.Kind, Renderer: rnd,
@@ -214,7 +228,7 @@ func runSplice(l *llm.LLM, corpus, dialog, keep, tag string, gridOnly bool, emit
 			emit(rec)
 			n++
 		}
-		for _, rnd := range []string{"T", "Z", "R"} {
+		for _, rnd := range rnds {
 			for _, form := range []string{"inline", "system", "user"} {
 				for _, dist := range []int{0, 2, 6} {
 					run(rnd, form, dist, "q")
@@ -228,4 +242,18 @@ func runSplice(l *llm.LLM, corpus, dialog, keep, tag string, gridOnly bool, emit
 		fmt.Fprintf(os.Stderr, "   %s done (%d probes, %s)\n", f.ID, n, time.Since(t0).Round(time.Second))
 	}
 	fmt.Printf("== splice %s: %d probes in %s\n", tag, n, time.Since(t0).Round(time.Second))
+}
+
+// withNotice: a result line with a notice keeps it (nina's 9eba55d makes
+// kernel.Translate do this; until it merges the bench appends it here).
+func withNotice(fact, raw string) string {
+	var m map[string]any
+	if json.Unmarshal([]byte(raw), &m) != nil || m["notice"] == nil || strings.Contains(fact, "; notice") {
+		return fact
+	}
+	mt, _ := m["mined_text"].(string)
+	if mt == "" {
+		return fact
+	}
+	return fact + "; notice: " + mt
 }

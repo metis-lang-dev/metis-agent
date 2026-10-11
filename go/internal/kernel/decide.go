@@ -388,3 +388,38 @@ func witness(f map[string]any) string {
 	}
 	return strings.Join(p, " ")
 }
+
+// PlainWords is the E6b renderer T2: a fact line with the runtime's atom
+// names said in the cards' own words — a card's name becomes its
+// provenance text, a move's name its words plus its clause effect
+// ("partner load (pot onion +1, pot space -1)"), and any remaining
+// snake_case name its words. Deterministic: the words are the catalog's,
+// generated, never authored.
+func PlainWords(fact string, cards []Card) string {
+	out := fact
+	for _, c := range cards {
+		for _, e := range c.Effects {
+			if e.Name == "" {
+				continue
+			}
+			net := map[string]int{}
+			for k, v := range e.Consume {
+				net[k] -= v
+			}
+			for k, v := range e.Produce {
+				net[k] += v
+			}
+			phrase := words(e.Name)
+			if len(net) > 0 {
+				phrase += " (" + signed(net) + ")"
+			}
+			out = strings.ReplaceAll(out, e.Name, phrase)
+		}
+		if c.Text != "" && c.Relation != "served" {
+			out = strings.ReplaceAll(out, c.Name, fmt.Sprintf("the %s card (%s)", words(c.Name), c.Text))
+		}
+	}
+	return snakeWords.ReplaceAllStringFunc(out, words)
+}
+
+var snakeWords = regexp.MustCompile(`\b[a-z]+(?:_[a-z]+)+\b`)

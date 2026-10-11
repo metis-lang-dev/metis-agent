@@ -20,6 +20,7 @@ from metis.loop.wire import dispatch
 from metis.domains.kitchen.model import CATALOG
 
 SCENE = CATALOG.parent / "kitchen_host.llp"
+CARDS_OUT = "grammar/splice-cards.json"
 
 
 def run(fixture, intents=(), mirror_at=None):
@@ -148,6 +149,11 @@ def main():
     for f in facts:
         f["raw"] = json.dumps(f["raw"])
         print(json.dumps(f))
+    # the cards op's answer, for the E6b plain-word renderer (T2)
+    sh = Repl(SCENE, plugin="metis.domains.kitchen.host:make", host=True,
+              stdout=io.StringIO())
+    with open(CARDS_OUT, "w") as fh:
+        json.dump(dispatch(sh, "cards", "")["cards"], fh, indent=1)
 
 
 if __name__ == "__main__":
