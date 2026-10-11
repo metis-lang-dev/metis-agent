@@ -9,7 +9,9 @@ turn latency mean/p50/p90, pass-1 (json) / pass-2 (voice) / thought ms,
 intent class total and held-out (rows the prompt teaches verbatim count
 apart as "in prompt"), pass-2 voice leak/echo as llmbench counted it,
 voice ok = spoken sentences (also no bare intent name) and how many are
-distinct — a cue that collapses to "I am ready." shows here, the -narrate column when
+distinct — a cue that collapses to "I am ready." shows here; +guard =
+the same with the harness's unspeakable-voice guard (template line per
+intent) applied, so the model column is not the guard's, the -narrate column when
 present, prefix invariant.
 --voices adds the narration table (the same sentences across models);
 --misses lists every missed row per run.
@@ -69,10 +71,17 @@ def main():
 
     hdr = ["run", "template", "think", "VRAM resident", "load ms", "turn mean/p50/p90 ms",
            "pass-1 json", "pass-2", "pass-2 voice", "thought ms/tok", "intent class", "held-out",
-           "voice leak/echo", "voice ok (distinct)", "narrate ms leak/echo", "prefix"]
+           "voice leak/echo", "voice ok (distinct)", "+guard", "narrate ms leak/echo", "prefix"]
     def ok_col(ts):
         ok = [t["voice"].strip().strip('"') for t in ts if voice_ok(t)]
         return f"{len(ok)}/{len(ts)} ({len(set(ok))})"
+
+    def guard_col(ts):
+        # the harness voiceOr guard (F11): an unspeakable voice is replaced
+        # by the intent's template line; an echo still gets through
+        n = lambda x: x.strip().strip("\"' ").rstrip(".!?").lower()
+        ok = sum(1 for t in ts if n(t.get("voice") or "") != n(t["utt"]))
+        return f"{ok}/{len(ts)}"
 
     rows = []
     for tag, r in runs.items():
@@ -89,7 +98,7 @@ def main():
                      f"{r['ms_mean']}/{r['ms_p50']}/{r['ms_p90']}", f"{r['ms_json_mean']} ms",
                      "turn" if r.get("pass2_turn") else "cue", f"{r['ms_tts_mean']} ms", th,
                      f"{r['hit']}/{r['scored']}", held,
-                     f"{r.get('unspeakable', 0)}/{r.get('echo', '-')}", ok_col(turns.get(tag, [])), narr, pre])
+                     f"{r.get('unspeakable', 0)}/{r.get('echo', '-')}", ok_col(turns.get(tag, [])), guard_col(turns.get(tag, [])), narr, pre])
     print("| " + " | ".join(hdr) + " |")
     print("|" + "---|" * len(hdr))
     for row in rows:
