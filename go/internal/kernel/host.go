@@ -208,9 +208,9 @@ func (h *Host) triage(s Signal) {
 	// difference: with only "close #r" E2B reset a persisting partner diff
 	// it had explained twice before (live, make_partner order 3)
 	user := fmt.Sprintf("Close SURPRISE #%d in %s with exactly one tool call.\n%s\n%s", r, s.Path, SurpriseText(s), next)
-	sys := h.Prompt
-	if h.Tape == nil || sys == "" {
-		user, sys = SurpriseText(s)+"\n"+next, h.Dec.System
+	sys := h.Prompt // the one prefix, tape or no tape (the eval's arms B and C differ only in the tape)
+	if sys == "" {
+		sys = h.Dec.System
 	}
 	cont := ""
 	for try := 1; try <= h.MaxTries; try++ {
@@ -326,7 +326,10 @@ func (h *Host) result(s Signal) {
 	status, _ := s.F["status"].(string)
 	reason, _ := s.F["reason"].(string)
 	res := "refused"
-	if strings.HasPrefix(status, "admitted") { // admitted | admitted+notice (metispy d725507)
+	// admitted | admitted+notice (metispy d725507) | applied (the eval's
+	// blind arm: every intent applied, the verdict only as `shadow` — the
+	// model alone gets no refusal to steer by)
+	if strings.HasPrefix(status, "admitted") || status == "applied" {
 		res = "done"
 	}
 	if nt, ok := s.F["notice"].(map[string]any); ok {

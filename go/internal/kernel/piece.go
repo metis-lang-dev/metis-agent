@@ -93,6 +93,8 @@ func Pieces(s Signal, cards []Card) []Piece {
 		// the consequence, not only the state (E6b: facts that must be
 		// applied are used less than facts read back)
 		switch {
+		case status == "applied":
+			out = append(out, p("result", "progress", fmt.Sprintf("Your %s of surprise %d was applied.", verb, rec)))
 		case strings.HasPrefix(status, "admitted") && verb == "reset":
 			out = append(out, p("result", "progress", fmt.Sprintf("Your reset of surprise %d was accepted: the odd reading is set aside as a misread, and the runtime takes orders again.", rec)))
 		case strings.HasPrefix(status, "admitted") && verb == "explain":

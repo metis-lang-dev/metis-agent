@@ -353,3 +353,40 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
     logged once per run, at the end of the episode.
   - Switching between the dog prompt and the tool prompt re-primes the
     cached prefix once each way.
+- **One prefix and the tape (step 4).**
+  - **One prefix.** With a kernel attached, the system prompt is the dog
+    prompt followed by the runtime section (`kernel.Decider.System`: the
+    `⟪metis …⟫` fact syntax, the rules, the cards with their moves'
+    effects, the tool declarations). TwoPass, Narrate and Decide share it as
+    one cached prefix: 2136 tok on E2B, and a surprise re-primes nothing.
+    The dog corpus stays at 54/54 under it (`llmbench -kernel-cards`).
+  - **The tape** is whole turns kept in the KV after the prefix
+    (`llm.AppendTape` / `SetTape` / `TapeTurn`, tokenized in the context of
+    prefix+tape like F10's tail).
+    - It holds every signal as a fragment (`kernel.Fragment`: one line,
+      atom names and numbers verbatim, the witness on an admitted
+      explain), in a user turn.
+    - It holds every sentence said about the runtime as the model's turn.
+    - A turn (TwoPass, Narrate, Decide) evaluates only its own tail and
+      rolls back to prefix+tape.
+  - **Compaction** runs at quiescence and is deterministic. The events and
+    quiescences of the past go. A surprise episode (its fact, readings,
+    results, what was said) stays: the last `keep_episodes` of them (3),
+    and the open one always.
+  - **Triage's turn** restates the surprise's difference ("Close SURPRISE
+    #r" alone let E2B reset a persisting partner diff it had explained
+    twice). `settle_beats` (2.5) is the wait for the next reading.
+    `admitted+notice` (metispy d725507) counts as admitted, and the notice
+    is narrated once per card+move.
+  - **Results** are narrated through a per-verb cue (`runtimeResultCue`).
+  - **SIGUSR2** ends a watch and logs the ledger.
+- **The episode loop (step 5):** `go/cmd/episodes` runs seeded episodes
+  (`python -m metis.domains.kitchen.eval episodes`), one fresh runtime per
+  episode, in three arms:
+  - A: `arm=blind`, the model woken by the first inconsistent reading, no
+    tape;
+  - B: the runtime checks, no tape;
+  - C: the runtime checks, with the tape.
+
+  It writes `{episode, arm, ledger}` and `{episode, arm, wakes, tokens,
+  noticed}` for the eval's scorer.
