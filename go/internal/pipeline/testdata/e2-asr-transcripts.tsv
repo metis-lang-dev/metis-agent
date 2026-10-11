@@ -1,0 +1,325 @@
+# opus E2 (2026-10-11) ASR transcripts of models/corpus-wav: asr<TAB>transcript<TAB>expected_intent<TAB>source
+whisper	Stand up.	LOCAL_ACTION	prompt
+whisper	Sit.	LOCAL_ACTION	prompt
+whisper	Lie down.	LOCAL_ACTION	prompt
+whisper	Lay down.	LOCAL_ACTION	prompt
+whisper	Turn left 90 degrees.	LOCAL_ACTION	prompt
+whisper	Turn around.	LOCAL_ACTION	prompt
+whisper	Take a step forward.	LOCAL_ACTION	prompt
+whisper	Go 1 meter forward.	LOCAL_ACTION	prompt
+whisper	back up half a meter.	LOCAL_ACTION	prompt
+whisper	Take a step back.	LOCAL_ACTION	prompt
+whisper	Give me your paw.	LOCAL_ACTION	prompt
+whisper	wave at me.	LOCAL_ACTION	prompt
+whisper	Where is the chair?	QUERY	prompt
+whisper	What is next to the table?	QUERY	prompt
+whisper	Go to the door.	NAVIGATE	prompt
+whisper	Go to the chair next to the window.	NAVIGATE	prompt
+whisper	Go to the kitchen.	NAVIGATE	prompt
+whisper	Go to tag 5.	NAVIGATE	prompt
+whisper	Walk to April tag 3.	NAVIGATE	prompt
+whisper	Go to the tab.	NAVIGATE	prompt
+whisper	Find a fire extinguisher.	FIND	prompt
+whisper	Go find the red chair near the window.	FIND	prompt
+whisper	Follow me.	FOLLOW	prompt
+whisper	Stop.	STOP	prompt
+whisper	Never mind.	CANCEL	prompt
+whisper	What time is it?	TIME	prompt
+whisper	Good boy.	CHITCHAT	prompt
+whisper	order me a pizza.	UNKNOWN	prompt
+whisper	Do a front flip.	UNKNOWN	prompt
+whisper	Do a backflip.	UNKNOWN	prompt
+whisper	Roll over.	UNKNOWN	prompt
+whisper	Dance.	UNKNOWN	prompt
+whisper	Jump.	UNKNOWN	prompt
+whisper	pounds.	UNKNOWN	prompt
+whisper	Could you sit down please?	LOCAL_ACTION	heldout
+whisper	Get up.	LOCAL_ACTION	heldout
+whisper	Turn right.	LOCAL_ACTION	heldout
+whisper	Move forward 2 meters.	LOCAL_ACTION	heldout
+whisper	Shake hands.	LOCAL_ACTION	heldout
+whisper	Is there a chair around here?	QUERY	heldout
+whisper	What do you see near the window?	QUERY	heldout
+whisper	Head over to the kitchen.	NAVIGATE	heldout
+whisper	Go to Apriltag 7.	NAVIGATE	heldout
+whisper	Walk to the sofa.	NAVIGATE	heldout
+whisper	Look for my keys.	FIND	heldout
+whisper	Search for a blue bottle.	FIND	heldout
+whisper	Come with me.	FOLLOW	heldout
+whisper	Health.	STOP	heldout
+whisper	Forget it.	CANCEL	heldout
+whisper	What's the date today?	DATE	heldout
+whisper	Hi there buddy.	CHITCHAT	heldout
+whisper	Make me a coffee.	UNKNOWN	heldout
+whisper	Do a somersal.	UNKNOWN	heldout
+whisper	Play dead.	UNKNOWN	heldout
+nemotron-gpu	stand up	LOCAL_ACTION	prompt
+nemotron-gpu	(silence)	LOCAL_ACTION	prompt
+nemotron-gpu	lie do	LOCAL_ACTION	prompt
+nemotron-gpu	lay down	LOCAL_ACTION	prompt
+nemotron-gpu	turn left ninety degrees	LOCAL_ACTION	prompt
+nemotron-gpu	turn around	LOCAL_ACTION	prompt
+nemotron-gpu	take a step forward	LOCAL_ACTION	prompt
+nemotron-gpu	one meter forward	LOCAL_ACTION	prompt
+nemotron-gpu	back a half a meter	LOCAL_ACTION	prompt
+nemotron-gpu	take a step back	LOCAL_ACTION	prompt
+nemotron-gpu	give me your pa	LOCAL_ACTION	prompt
+nemotron-gpu	wave at	LOCAL_ACTION	prompt
+nemotron-gpu	where is the chair	QUERY	prompt
+nemotron-gpu	what is next to the table	QUERY	prompt
+nemotron-gpu	go to the door	NAVIGATE	prompt
+nemotron-gpu	go to the chair next to the window	NAVIGATE	prompt
+nemotron-gpu	go to the kitchen	NAVIGATE	prompt
+nemotron-gpu	go to tag five	NAVIGATE	prompt
+nemotron-gpu	walk to april tag three	NAVIGATE	prompt
+nemotron-gpu	go to the tab	NAVIGATE	prompt
+nemotron-gpu	find a fire extinguisher	FIND	prompt
+nemotron-gpu	go find the red cher near the window	FIND	prompt
+nemotron-gpu	follow me	FOLLOW	prompt
+nemotron-gpu	stop	STOP	prompt
+nemotron-gpu	never mind	CANCEL	prompt
+nemotron-gpu	what time is it	TIME	prompt
+nemotron-gpu	(silence)	CHITCHAT	prompt
+nemotron-gpu	lord armi a pizza	UNKNOWN	prompt
+nemotron-gpu	do a front flip	UNKNOWN	prompt
+nemotron-gpu	do a backflip	UNKNOWN	prompt
+nemotron-gpu	roll over	UNKNOWN	prompt
+nemotron-gpu	(silence)	UNKNOWN	prompt
+nemotron-gpu	(silence)	UNKNOWN	prompt
+nemotron-gpu	po	UNKNOWN	prompt
+nemotron-gpu	can you sit down please	LOCAL_ACTION	heldout
+nemotron-gpu	(silence)	LOCAL_ACTION	heldout
+nemotron-gpu	turn right	LOCAL_ACTION	heldout
+nemotron-gpu	move forward two meters	LOCAL_ACTION	heldout
+nemotron-gpu	shake	LOCAL_ACTION	heldout
+nemotron-gpu	is there a chair around here	QUERY	heldout
+nemotron-gpu	what do you see near the window	QUERY	heldout
+nemotron-gpu	head over to the kitchen	NAVIGATE	heldout
+nemotron-gpu	go to april tag seven	NAVIGATE	heldout
+nemotron-gpu	walk to the sofa	NAVIGATE	heldout
+nemotron-gpu	look for my keys	FIND	heldout
+nemotron-gpu	search for a blue bottle	FIND	heldout
+nemotron-gpu	come with me	FOLLOW	heldout
+nemotron-gpu	(silence)	STOP	heldout
+nemotron-gpu	forget it	CANCEL	heldout
+nemotron-gpu	what's the date today	DATE	heldout
+nemotron-gpu	hi there buddy	CHITCHAT	heldout
+nemotron-gpu	make me a coffee	UNKNOWN	heldout
+nemotron-gpu	do a summer sol	UNKNOWN	heldout
+nemotron-gpu	play de	UNKNOWN	heldout
+nemotron-cpu	stand up	LOCAL_ACTION	prompt
+nemotron-cpu	(silence)	LOCAL_ACTION	prompt
+nemotron-cpu	lie do	LOCAL_ACTION	prompt
+nemotron-cpu	lay down	LOCAL_ACTION	prompt
+nemotron-cpu	turn left ninety degrees	LOCAL_ACTION	prompt
+nemotron-cpu	turn around	LOCAL_ACTION	prompt
+nemotron-cpu	take a step forward	LOCAL_ACTION	prompt
+nemotron-cpu	one meter forward	LOCAL_ACTION	prompt
+nemotron-cpu	back a half a meter	LOCAL_ACTION	prompt
+nemotron-cpu	take a step back	LOCAL_ACTION	prompt
+nemotron-cpu	give me your pa	LOCAL_ACTION	prompt
+nemotron-cpu	wave at	LOCAL_ACTION	prompt
+nemotron-cpu	where is the chair	QUERY	prompt
+nemotron-cpu	what is next to the table	QUERY	prompt
+nemotron-cpu	go to the door	NAVIGATE	prompt
+nemotron-cpu	go to the chair next to the window	NAVIGATE	prompt
+nemotron-cpu	go to the kitchen	NAVIGATE	prompt
+nemotron-cpu	go to tag five	NAVIGATE	prompt
+nemotron-cpu	walk to april tag three	NAVIGATE	prompt
+nemotron-cpu	go to the tab	NAVIGATE	prompt
+nemotron-cpu	find a fire extinguisher	FIND	prompt
+nemotron-cpu	go find the red cher near the window	FIND	prompt
+nemotron-cpu	follow me	FOLLOW	prompt
+nemotron-cpu	stop	STOP	prompt
+nemotron-cpu	never mind	CANCEL	prompt
+nemotron-cpu	what time is it	TIME	prompt
+nemotron-cpu	(silence)	CHITCHAT	prompt
+nemotron-cpu	lord armi a pizza	UNKNOWN	prompt
+nemotron-cpu	do a front flip	UNKNOWN	prompt
+nemotron-cpu	do a backflip	UNKNOWN	prompt
+nemotron-cpu	roll over	UNKNOWN	prompt
+nemotron-cpu	(silence)	UNKNOWN	prompt
+nemotron-cpu	(silence)	UNKNOWN	prompt
+nemotron-cpu	po	UNKNOWN	prompt
+nemotron-cpu	can you sit down please	LOCAL_ACTION	heldout
+nemotron-cpu	(silence)	LOCAL_ACTION	heldout
+nemotron-cpu	turn right	LOCAL_ACTION	heldout
+nemotron-cpu	move forward two meters	LOCAL_ACTION	heldout
+nemotron-cpu	shake	LOCAL_ACTION	heldout
+nemotron-cpu	is there a chair around here	QUERY	heldout
+nemotron-cpu	what do you see near the window	QUERY	heldout
+nemotron-cpu	head over to the kitchen	NAVIGATE	heldout
+nemotron-cpu	go to april tag seven	NAVIGATE	heldout
+nemotron-cpu	walk to the sofa	NAVIGATE	heldout
+nemotron-cpu	look for my keys	FIND	heldout
+nemotron-cpu	search for a blue bottle	FIND	heldout
+nemotron-cpu	come with me	FOLLOW	heldout
+nemotron-cpu	(silence)	STOP	heldout
+nemotron-cpu	forget it	CANCEL	heldout
+nemotron-cpu	what's the date today	DATE	heldout
+nemotron-cpu	hi there buddy	CHITCHAT	heldout
+nemotron-cpu	make me a coffee	UNKNOWN	heldout
+nemotron-cpu	do a summer sol	UNKNOWN	heldout
+nemotron-cpu	play de	UNKNOWN	heldout
+nemotron-cpu-vad	stand up	LOCAL_ACTION	prompt
+nemotron-cpu-vad	(silence)	LOCAL_ACTION	prompt
+nemotron-cpu-vad	lie down	LOCAL_ACTION	prompt
+nemotron-cpu-vad	lay down	LOCAL_ACTION	prompt
+nemotron-cpu-vad	turn left ninety degrees	LOCAL_ACTION	prompt
+nemotron-cpu-vad	turn around	LOCAL_ACTION	prompt
+nemotron-cpu-vad	take a step forward	LOCAL_ACTION	prompt
+nemotron-cpu-vad	go one meter forward	LOCAL_ACTION	prompt
+nemotron-cpu-vad	back up half a meter	LOCAL_ACTION	prompt
+nemotron-cpu-vad	take a step back	LOCAL_ACTION	prompt
+nemotron-cpu-vad	give me your paw	LOCAL_ACTION	prompt
+nemotron-cpu-vad	wave at me	LOCAL_ACTION	prompt
+nemotron-cpu-vad	whereas the chair	QUERY	prompt
+nemotron-cpu-vad	what is next to the table	QUERY	prompt
+nemotron-cpu-vad	go to the door	NAVIGATE	prompt
+nemotron-cpu-vad	go to the chair next to the window	NAVIGATE	prompt
+nemotron-cpu-vad	go to the kitchen	NAVIGATE	prompt
+nemotron-cpu-vad	go to tag five	NAVIGATE	prompt
+nemotron-cpu-vad	walk to april tag three	NAVIGATE	prompt
+nemotron-cpu-vad	go to the tag	NAVIGATE	prompt
+nemotron-cpu-vad	find a fire extinguisher	FIND	prompt
+nemotron-cpu-vad	go find the red chair near the window	FIND	prompt
+nemotron-cpu-vad	follow me	FOLLOW	prompt
+nemotron-cpu-vad	stop	STOP	prompt
+nemotron-cpu-vad	never mind	CANCEL	prompt
+nemotron-cpu-vad	what time is it	TIME	prompt
+nemotron-cpu-vad	good boy	CHITCHAT	prompt
+nemotron-cpu-vad	order me a pizza	UNKNOWN	prompt
+nemotron-cpu-vad	do a front flip	UNKNOWN	prompt
+nemotron-cpu-vad	do a backflip	UNKNOWN	prompt
+nemotron-cpu-vad	roll over	UNKNOWN	prompt
+nemotron-cpu-vad	dance	UNKNOWN	prompt
+nemotron-cpu-vad	jump	UNKNOWN	prompt
+nemotron-cpu-vad	pounds	UNKNOWN	prompt
+nemotron-cpu-vad	could you sit down please	LOCAL_ACTION	heldout
+nemotron-cpu-vad	(silence)	LOCAL_ACTION	heldout
+nemotron-cpu-vad	turn right	LOCAL_ACTION	heldout
+nemotron-cpu-vad	move forward two meters	LOCAL_ACTION	heldout
+nemotron-cpu-vad	shake hands	LOCAL_ACTION	heldout
+nemotron-cpu-vad	is there a chair around here	QUERY	heldout
+nemotron-cpu-vad	what do you see near the window	QUERY	heldout
+nemotron-cpu-vad	head over to the kitchen	NAVIGATE	heldout
+nemotron-cpu-vad	go to april tag seven	NAVIGATE	heldout
+nemotron-cpu-vad	walk to the sofa	NAVIGATE	heldout
+nemotron-cpu-vad	look for my keys	FIND	heldout
+nemotron-cpu-vad	search for a blue bottle	FIND	heldout
+nemotron-cpu-vad	come with me	FOLLOW	heldout
+nemotron-cpu-vad	(silence)	STOP	heldout
+nemotron-cpu-vad	forget it	CANCEL	heldout
+nemotron-cpu-vad	what's the date today	DATE	heldout
+nemotron-cpu-vad	hi there buddy	CHITCHAT	heldout
+nemotron-cpu-vad	make me a coffee	UNKNOWN	heldout
+nemotron-cpu-vad	do a summer soul	UNKNOWN	heldout
+nemotron-cpu-vad	play dead	UNKNOWN	heldout
+nemotron-cpu-pad600	stand up	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	(silence)	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	lie down	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	lay down	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	turn left ninety degrees	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	turn around	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	take a step forward	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	one meter forward	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	back a half a meter	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	take a step back	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	give me your paw	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	wave at me	LOCAL_ACTION	prompt
+nemotron-cpu-pad600	where is the chair	QUERY	prompt
+nemotron-cpu-pad600	what is next to the table	QUERY	prompt
+nemotron-cpu-pad600	go to the door	NAVIGATE	prompt
+nemotron-cpu-pad600	go to the chair next to the window	NAVIGATE	prompt
+nemotron-cpu-pad600	go to the kitchen	NAVIGATE	prompt
+nemotron-cpu-pad600	go to tag five	NAVIGATE	prompt
+nemotron-cpu-pad600	walk to april tag three	NAVIGATE	prompt
+nemotron-cpu-pad600	go to the tab	NAVIGATE	prompt
+nemotron-cpu-pad600	find a fire extinguisher	FIND	prompt
+nemotron-cpu-pad600	go find the red cher near the window	FIND	prompt
+nemotron-cpu-pad600	follow me	FOLLOW	prompt
+nemotron-cpu-pad600	stop	STOP	prompt
+nemotron-cpu-pad600	never mind	CANCEL	prompt
+nemotron-cpu-pad600	what time is it	TIME	prompt
+nemotron-cpu-pad600	(silence)	CHITCHAT	prompt
+nemotron-cpu-pad600	lord armi a pizza	UNKNOWN	prompt
+nemotron-cpu-pad600	do a front flip	UNKNOWN	prompt
+nemotron-cpu-pad600	do a backflip	UNKNOWN	prompt
+nemotron-cpu-pad600	roll over	UNKNOWN	prompt
+nemotron-cpu-pad600	(silence)	UNKNOWN	prompt
+nemotron-cpu-pad600	(silence)	UNKNOWN	prompt
+nemotron-cpu-pad600	pounds	UNKNOWN	prompt
+nemotron-cpu-pad600	can you sit down please	LOCAL_ACTION	heldout
+nemotron-cpu-pad600	(silence)	LOCAL_ACTION	heldout
+nemotron-cpu-pad600	turn right	LOCAL_ACTION	heldout
+nemotron-cpu-pad600	move forward two meters	LOCAL_ACTION	heldout
+nemotron-cpu-pad600	shake hands	LOCAL_ACTION	heldout
+nemotron-cpu-pad600	is there a chair around here	QUERY	heldout
+nemotron-cpu-pad600	what do you see near the window	QUERY	heldout
+nemotron-cpu-pad600	head over to the kitchen	NAVIGATE	heldout
+nemotron-cpu-pad600	go to april tag seven	NAVIGATE	heldout
+nemotron-cpu-pad600	walk to the sofa	NAVIGATE	heldout
+nemotron-cpu-pad600	look for my keys	FIND	heldout
+nemotron-cpu-pad600	search for a blue bottle	FIND	heldout
+nemotron-cpu-pad600	come with me	FOLLOW	heldout
+nemotron-cpu-pad600	(silence)	STOP	heldout
+nemotron-cpu-pad600	forget it	CANCEL	heldout
+nemotron-cpu-pad600	what's the date today	DATE	heldout
+nemotron-cpu-pad600	hi there buddy	CHITCHAT	heldout
+nemotron-cpu-pad600	make me a coffee	UNKNOWN	heldout
+nemotron-cpu-pad600	do a summer sol	UNKNOWN	heldout
+nemotron-cpu-pad600	play dead	UNKNOWN	heldout
+coresident-nemotron	stand up	LOCAL_ACTION	prompt
+coresident-nemotron	(silence)	LOCAL_ACTION	prompt
+coresident-nemotron	lie do	LOCAL_ACTION	prompt
+coresident-nemotron	lay down	LOCAL_ACTION	prompt
+coresident-nemotron	turn left ninety degrees	LOCAL_ACTION	prompt
+coresident-nemotron	turn around	LOCAL_ACTION	prompt
+coresident-nemotron	take a step forward	LOCAL_ACTION	prompt
+coresident-nemotron	one meter forward	LOCAL_ACTION	prompt
+coresident-nemotron	back a half a meter	LOCAL_ACTION	prompt
+coresident-nemotron	take a step back	LOCAL_ACTION	prompt
+coresident-nemotron	give me your pa	LOCAL_ACTION	prompt
+coresident-nemotron	wave at	LOCAL_ACTION	prompt
+coresident-nemotron	where is the chair	QUERY	prompt
+coresident-nemotron	what is next to the table	QUERY	prompt
+coresident-nemotron	go to the door	NAVIGATE	prompt
+coresident-nemotron	go to the chair next to the window	NAVIGATE	prompt
+coresident-nemotron	go to the kitchen	NAVIGATE	prompt
+coresident-nemotron	go to tag five	NAVIGATE	prompt
+coresident-nemotron	walk to april tag three	NAVIGATE	prompt
+coresident-nemotron	go to the tab	NAVIGATE	prompt
+coresident-nemotron	find a fire extinguisher	FIND	prompt
+coresident-nemotron	go find the red cher near the window	FIND	prompt
+coresident-nemotron	follow me	FOLLOW	prompt
+coresident-nemotron	stop	STOP	prompt
+coresident-nemotron	never mind	CANCEL	prompt
+coresident-nemotron	what time is it	TIME	prompt
+coresident-nemotron	(silence)	CHITCHAT	prompt
+coresident-nemotron	lord armi a pizza	UNKNOWN	prompt
+coresident-nemotron	do a front flip	UNKNOWN	prompt
+coresident-nemotron	do a backflip	UNKNOWN	prompt
+coresident-nemotron	roll over	UNKNOWN	prompt
+coresident-nemotron	(silence)	UNKNOWN	prompt
+coresident-nemotron	(silence)	UNKNOWN	prompt
+coresident-nemotron	po	UNKNOWN	prompt
+coresident-nemotron	can you sit down please	LOCAL_ACTION	heldout
+coresident-nemotron	(silence)	LOCAL_ACTION	heldout
+coresident-nemotron	turn right	LOCAL_ACTION	heldout
+coresident-nemotron	move forward two meters	LOCAL_ACTION	heldout
+coresident-nemotron	shake	LOCAL_ACTION	heldout
+coresident-nemotron	is there a chair around here	QUERY	heldout
+coresident-nemotron	what do you see near the window	QUERY	heldout
+coresident-nemotron	head over to the kitchen	NAVIGATE	heldout
+coresident-nemotron	go to april tag seven	NAVIGATE	heldout
+coresident-nemotron	walk to the sofa	NAVIGATE	heldout
+coresident-nemotron	look for my keys	FIND	heldout
+coresident-nemotron	search for a blue bottle	FIND	heldout
+coresident-nemotron	come with me	FOLLOW	heldout
+coresident-nemotron	(silence)	STOP	heldout
+coresident-nemotron	forget it	CANCEL	heldout
+coresident-nemotron	what's the date today	DATE	heldout
+coresident-nemotron	hi there buddy	CHITCHAT	heldout
+coresident-nemotron	make me a coffee	UNKNOWN	heldout
+coresident-nemotron	do a summer sol	UNKNOWN	heldout
+coresident-nemotron	play de	UNKNOWN	heldout

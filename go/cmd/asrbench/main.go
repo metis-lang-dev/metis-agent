@@ -67,6 +67,7 @@ func main() {
 	outF := flag.String("out", "", "write transcript TSV for llmbench -corpus")
 	jsonlF := flag.String("jsonl", "", "append JSON records")
 	tag := flag.String("tag", "", "run label (default: whisper:<model> or cmd)")
+	initPrompt := flag.String("initial-prompt", "", "whisper initial_prompt; \"default\" = stt.DefaultPrompt (the harness's)")
 	flag.Parse()
 
 	items, err := readManifest(*manifest)
@@ -96,6 +97,10 @@ func main() {
 			fail(err)
 		}
 		defer s.Close()
+		if *initPrompt == "default" {
+			*initPrompt = stt.DefaultPrompt
+		}
+		s.SetInitialPrompt(*initPrompt)
 		fmt.Fprintf(os.Stderr, "whisper %s loaded+warmed in %dms\n", *model, time.Since(t0).Milliseconds())
 		transcribe = func(wav string) (string, error) {
 			pcm, err := readWav16k(wav)

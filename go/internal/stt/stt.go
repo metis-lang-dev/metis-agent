@@ -30,6 +30,24 @@ type STT struct {
 	threads int
 	// Parasite phrases — whole-string hallucinations on silence.
 	parasites map[string]bool
+	// prompt is whisper's initial_prompt: the command vocabulary biases the
+	// decoder toward the words the robot acts on (step-4 F12: base.en hears
+	// a lone "halt" as "Health").
+	prompt string
+}
+
+// DefaultPrompt is the command vocabulary the harness primes whisper with
+// unless stt.initial_prompt says otherwise (config: "" = off).
+const DefaultPrompt = "Nina, stop. Halt. Freeze. Never mind, forget it. Stand up, sit, lie down, " +
+	"turn left, turn around, take a step back. Go to the kitchen. Go to April tag 5. " +
+	"Find the red chair. Follow me. What time is it?"
+
+// SetInitialPrompt sets whisper's initial_prompt for every later
+// transcription ("" = none).
+func (s *STT) SetInitialPrompt(p string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.prompt = p
 }
 
 func New(modelPath, lang string, parasites []string, threads int) (*STT, error) {
@@ -86,6 +104,9 @@ func (s *STT) transcribe(samples []float32) (string, error) {
 	}
 	_ = ctx.SetLanguage(s.lang)
 	ctx.SetThreads(uint(s.threads))
+	if s.prompt != "" {
+		ctx.SetInitialPrompt(s.prompt)
+	}
 	if err := ctx.Process(samples, nil, nil, nil); err != nil {
 		return "", err
 	}

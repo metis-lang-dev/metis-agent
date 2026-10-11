@@ -103,6 +103,34 @@ type Config struct {
 	// AnnounceMaxAge: a deferred announcement (or task narration) older than
 	// this is dropped instead of spoken late (default 30 s).
 	AnnounceMaxAge time.Duration
+
+	// StopWords: a final transcript of at most three words holding one of
+	// these is a STOP without asking the LLM (step-4 F12). nil/empty = off.
+	StopWords []string
+}
+
+// DefaultStopWords: "health" is how whisper base.en hears a lone "halt"
+// (opus's E2); a false STOP is the safe error.
+var DefaultStopWords = []string{"stop", "halt", "freeze", "health"}
+
+// keywordStop: a short utterance carrying a stop word is a STOP before (and
+// without) the LLM — the ASR may mangle "halt", the model may misread it,
+// and stopping must not depend on either.
+func keywordStop(text string, words []string) bool {
+	f := strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '\'')
+	})
+	if len(f) == 0 || len(f) > 3 {
+		return false
+	}
+	for _, w := range f {
+		for _, s := range words {
+			if w == s {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type Engine struct {
@@ -654,14 +682,20 @@ func (e *Engine) handleUtterance(text string) {
 		return
 	}
 
-	r, err := e.LLM.TwoPass(e.cfg.SystemPrompt, text, e.cfg.GBNF)
-	if err != nil {
-		log.Printf("[llm] %v", err)
-		_ = e.Turn.SystemAction('R')
-		return
+	var r *llm.Result
+	if keywordStop(text, e.cfg.StopWords) {
+		log.Printf("[intent] keyword stop: %q — STOP without the LLM", text)
+		r = &llm.Result{JSON: `{"intent":"STOP"}`, Voice: ackTemplate["STOP"]}
+	} else {
+		var err error
+		if r, err = e.LLM.TwoPass(e.cfg.SystemPrompt, text, e.cfg.GBNF); err != nil {
+			log.Printf("[llm] %v", err)
+			_ = e.Turn.SystemAction('R')
+			return
+		}
+		log.Printf("[intent] %s (json=%dms tts=%dms)", r.JSON,
+			r.TJSON.Milliseconds(), r.TTTS.Milliseconds())
 	}
-	log.Printf("[intent] %s (json=%dms tts=%dms)", r.JSON,
-		r.TJSON.Milliseconds(), r.TTTS.Milliseconds())
 	if e.Events != nil {
 		e.Events("intent", r)
 	}

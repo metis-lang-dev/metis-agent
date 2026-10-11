@@ -63,6 +63,9 @@ type config struct {
 		Language  string   `yaml:"language"`
 		Parasites []string `yaml:"parasites"`
 		NThreads  int      `yaml:"n_threads"` // 0 = 6 (legacy)
+		// InitialPrompt: whisper's initial_prompt (the command vocabulary);
+		// unset = stt.DefaultPrompt, "" = off (step-4 F12)
+		InitialPrompt *string `yaml:"initial_prompt"`
 	} `yaml:"stt"`
 	TTS struct {
 		Engine string  `yaml:"engine"` // librhvoice (default) | subprocess | ws (browser plays)
@@ -115,9 +118,16 @@ type config struct {
 	// Keys: default, LOCAL_ACTION, STOP, CANCEL, NAVIGATE, EXPLORE, FOLLOW,
 	// GOTO_TAG. Unset keys take the built-in defaults (90/30/30/600 s).
 	TaskMaxAgeS map[string]float64 `yaml:"task_max_age_s"`
-	Prompt      string             `yaml:"prompt"`   // system prompt file
-	Grammar     string             `yaml:"grammar"`  // GBNF file (token-exact intent grammar)
-	BargeIn     string             `yaml:"barge_in"` // off | vad | confirm
+	Prompt      string             `yaml:"prompt"` // system prompt file
+	// PromptExtra: files appended to the prompt byte for byte (the bench's
+	// `cat prompt p2ex`), e.g. grammar/pass2-examples-gemma4.txt
+	PromptExtra []string `yaml:"prompt_extra"`
+	// StopWords: a final transcript of at most three words holding one of
+	// these is a STOP without the LLM (step-4 F12); unset = the defaults
+	// in pipeline.DefaultStopWords, [] = off
+	StopWords *[]string `yaml:"stop_words"`
+	Grammar   string    `yaml:"grammar"`  // GBNF file (token-exact intent grammar)
+	BargeIn   string    `yaml:"barge_in"` // off | vad | confirm
 }
 
 func main() {
@@ -168,6 +178,13 @@ func main() {
 	prompt, err := os.ReadFile(cfg.Prompt)
 	if err != nil {
 		log.Fatal(err)
+	}
+	for _, f := range cfg.PromptExtra {
+		b, err := os.ReadFile(f)
+		if err != nil {
+			log.Fatal(err)
+		}
+		prompt = append(prompt, b...)
 	}
 	gbnf, err := os.ReadFile(cfg.Grammar)
 	if err != nil {
@@ -228,7 +245,16 @@ func main() {
 		log.Fatal(err)
 	}
 	defer s.Close()
-	log.Print("[stt] whisper ready (warmed)")
+	vocab := stt.DefaultPrompt
+	if cfg.STT.InitialPrompt != nil {
+		vocab = *cfg.STT.InitialPrompt
+	}
+	s.SetInitialPrompt(vocab) // after the warm-up: the warm-up decodes silence
+	log.Printf("[stt] whisper ready (warmed); initial_prompt %d chars", len(vocab))
+	stopWords := pipeline.DefaultStopWords
+	if cfg.StopWords != nil {
+		stopWords = *cfg.StopWords
+	}
 
 	// ── transport + speaker ──────────────────────────────────────────────
 	// ws: one process serves the UI, takes the mic and chat, plays TTS in the
@@ -267,6 +293,7 @@ func main() {
 		BargeIn:        cfg.BargeIn,
 		OwnerGate:      cfg.VoiceID.Gate,
 		AnnounceMaxAge: time.Duration(cfg.AnnounceMaxAgeS * float64(time.Second)),
+		StopWords:      stopWords,
 	}, l, s, t)
 	eng.Owner = owner
 	if ws != nil {

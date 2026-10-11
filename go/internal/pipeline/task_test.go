@@ -5,6 +5,7 @@ package pipeline
 // through the floor; chat input takes the floor like a transcript.
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -240,5 +241,73 @@ func TestTaskNarrationIsFramedAndGuarded(t *testing.T) {
 	}
 	if len(cues) != n {
 		t.Error("the model was asked to narrate a done")
+	}
+}
+
+// Step-4 F12: a short utterance carrying a stop word is a STOP before the
+// LLM. Fixture: opus's E2 transcripts of the RHVoice corpus by whisper
+// base.en and Nemotron (GPU, CPU, VAD, pad, co-resident) — every STOP row
+// that has words is caught, no other row is.
+func TestKeywordStopOnE2Transcripts(t *testing.T) {
+	b, err := os.ReadFile("testdata/e2-asr-transcripts.tsv")
+	if err != nil {
+		t.Fatal(err)
+	}
+	caught, silent := 0, 0
+	for _, ln := range strings.Split(strings.TrimSpace(string(b)), "\n") {
+		if strings.HasPrefix(ln, "#") {
+			continue
+		}
+		c := strings.Split(ln, "\t")
+		asr, text, want := c[0], c[1], c[2]
+		got := keywordStop(text, DefaultStopWords)
+		switch {
+		case want == "STOP" && text == "(silence)":
+			silent++ // the ASR dropped the word: nothing to catch here
+		case want == "STOP" && !got:
+			t.Errorf("%s %q: STOP missed", asr, text)
+		case want == "STOP":
+			caught++
+		case got:
+			t.Errorf("%s %q (%s): false keyword stop", asr, text, want)
+		}
+	}
+	t.Logf("keyword stop: %d STOP rows caught, %d dropped by the ASR (silence)", caught, silent)
+	for _, s := range []string{"halt!", "Nina, stop.", "stop it now", "Freeze."} {
+		if !keywordStop(s, DefaultStopWords) {
+			t.Errorf("%q not a keyword stop", s)
+		}
+	}
+	for _, s := range []string{"where is the bus stop over there", "stopwatch", "", "stop"} {
+		if s == "stop" {
+			if keywordStop(s, nil) {
+				t.Error("stop words off still stops")
+			}
+			continue
+		}
+		if keywordStop(s, DefaultStopWords) {
+			t.Errorf("%q is a keyword stop", s)
+		}
+	}
+}
+
+func TestKeywordStopSkipsTheLLM(t *testing.T) {
+	spk := newFakeSpeaker(30 * time.Millisecond)
+	// the model would say SIT_DOWN: a keyword stop must never ask it
+	e := New(Config{SystemPrompt: "p", GBNF: "g", StopWords: DefaultStopWords},
+		fakeLLM{json: `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`, voice: "Sitting."}, fakeSTT{}, spk)
+	em := &recEmitter{}
+	e.Tasks = wire.NewPending(8, wire.DefaultAges())
+	e.Dsp = wire.NewDispatcher(em, e.Tasks)
+	events, cancel, wg := run(t, e)
+	defer func() { cancel(); wg.Wait() }()
+	events <- vad.Event{SpeechStart: true}
+	events <- utter("Health.")
+	waitFor(t, func() bool { return len(spk.said()) == 1 }, "the stop ack")
+	if spk.said()[0] != "Stopping." || len(em.ids) != 1 {
+		t.Fatalf("said %v, commands %v", spk.said(), em.ids)
+	}
+	if it, ok := e.Tasks.Take(em.ids[0]); !ok || it.Name != "STOP" {
+		t.Errorf("command %+v", it)
 	}
 }
