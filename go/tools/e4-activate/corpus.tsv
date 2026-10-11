@@ -1,0 +1,13 @@
+# outside-context change (narrated)	expected call	source   — E4: the model may only pick a catalog domain to activate/deactivate (or keep)
+the robot rolled into the kitchen and the stove is on	activate:kitchen	e4
+we are done cooking, leave the kitchen	deactivate:kitchen	e4
+a server in the rack just went down	activate:sysadmin	e4
+the network is stable again, stop watching the servers	deactivate:sysadmin	e4
+the traffic light at the crossing turned red and cars are queueing	activate:xtraffic	e4
+the intersection is closed for the night	deactivate:xtraffic	e4
+the guests started gossiping about each other	activate:social	e4
+the ballot count is starting in the hall	activate:votes	e4
+the election is over and the results are posted	deactivate:votes	e4
+the floor map of the building has loaded	activate:nav	e4
+it started raining outside	keep	e4
+someone sneezed	keep	e4

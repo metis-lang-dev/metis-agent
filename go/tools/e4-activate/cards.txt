@@ -1,0 +1,6 @@
+kitchen: a cooking scene — stove, pots, ingredients, a cook moving between stations (Overcooked-style)
+nav: moving a robot through a grid of rooms and corridors on a floor map
+xtraffic: a road intersection — traffic lights, lanes, queued cars
+sysadmin: a computer network — servers that go up and down and get rebooted
+social: people in a room — who talks to whom, gossip spreading
+votes: an election — ballots, counting, a winner declared

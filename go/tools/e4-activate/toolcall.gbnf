@@ -1,0 +1,6 @@
+# E4: Gemma 4 native tool call, pinned to exactly one call of exactly one of
+# the orchestrator's two verbs over the catalog card list (or keep).
+root ::= "<|tool_call>call:" call "<tool_call|>"
+call ::= verb "{domain:<|\"|>" domain "<|\"|>}" | "keep{}"
+verb ::= "activate" | "deactivate"
+domain ::= "kitchen" | "nav" | "xtraffic" | "sysadmin" | "social" | "votes"

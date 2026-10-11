@@ -64,6 +64,15 @@ type LLM struct {
 	eotText string // end-of-turn marker text, stripped from decoded output
 	pass2   Pass2
 	stopIDs map[C.llama_token]bool // end-of-turn / end-of-sentence ids
+
+	// Gemma 4 thinking (MODEL-EXPERIMENTS.md E1): <|think|> in the system
+	// turn, the model answers <|channel>thought…<channel|> first. Off unless
+	// Config.Think; chanOpen/chanClose are -1 when the vocab has no channel.
+	think     bool
+	thinkMax  int
+	chanOpen  C.llama_token
+	chanClose C.llama_token
+	pass2Turn bool
 }
 
 type Config struct {
@@ -75,9 +84,30 @@ type Config struct {
 	// Template: "" or "auto" → the GGUF's tokenizer.chat_template, else
 	// llama.cpp's built-in template for the architecture (gemma3 → gemma,
 	// phi3 → phi3, …); or a built-in name / Jinja text to force one.
+	// "gemma4" is rendered here (TemplateGemma4): the Gemma 4 turn tokens
+	// are not known to llama_chat_apply_template on this checkout.
 	Template string
 	Pass2    Pass2 // spoken-ack sampling; zero fields take the defaults
+	// Think switches Gemma 4 thinking on (a <|think|> token opens the
+	// system turn); pass 1 then runs the thought channel unconstrained
+	// before the grammar. ThinkMaxTokens caps the thought (0 = 512).
+	// Ignored by models without <|channel> tokens. Experiments only.
+	Think          bool
+	ThinkMaxTokens int
+	// Pass2Turn renders the spoken-ack cue as its own chat turn (close the
+	// model turn, a user turn "Spoken response:", a new model turn) instead
+	// of the bare "\nSpoken response:" continuation Phi-3/Gemma 3 follow.
+	// Gemma 4 echoes the JSON after the bare cue (E1). Experiments only.
+	Pass2Turn bool
 }
+
+// TemplateGemma4 names the Go-side renderer of the Gemma 4 format
+// (ai.google.dev/gemma/docs/core/prompt-formatting-gemma4):
+//
+//	<|turn>system\n{system}<turn|>\n<|turn>user\n{user}<turn|>\n<|turn>model\n
+//
+// Native system role: the KV-cached prefix is exactly the system turn.
+const TemplateGemma4 = "gemma4"
 
 // Pass2 sampling for the spoken acknowledgment (pass 1 is always greedy
 // under the grammar). Defaults are the Phi-3 tuning: temp 0.4, top_k 40,
@@ -113,6 +143,11 @@ type Result struct {
 	TJSON time.Duration // pass-1 generation time
 	TTTS  time.Duration // pass-2 generation time
 	TEval time.Duration // tail eval time (prefix reuse path)
+	// Thinking (Config.Think): the thought channel text and its time;
+	// empty / 0 when the model opened no channel.
+	Thought string
+	TThink  time.Duration
+	NThink  int // thought tokens
 }
 
 func Load(cfg Config) (*LLM, error) {
@@ -151,11 +186,56 @@ func Load(cfg Config) (*LLM, error) {
 		pass2:  cfg.Pass2.withDefaults(),
 	}
 	l.stopIDs = l.stopTokens()
+	l.chanOpen, l.chanClose = l.singleToken("<|channel>"), l.singleToken("<channel|>")
+	l.think = cfg.Think && l.chanOpen >= 0 && l.chanClose >= 0
+	l.thinkMax = cfg.ThinkMaxTokens
+	if l.thinkMax <= 0 {
+		l.thinkMax = 512
+	}
+	l.pass2Turn = cfg.Pass2Turn
 	if err := l.resolveTemplate(cfg.Template); err != nil {
 		l.Close()
 		return nil, err
 	}
 	return l, nil
+}
+
+// Thinking reports whether the thought channel is on for this model.
+func (l *LLM) Thinking() bool { return l.think }
+
+// singleToken returns the id of a special token by its text, -1 when the
+// vocabulary has no such single token.
+func (l *LLM) singleToken(text string) C.llama_token {
+	toks := l.tokenize(text, false)
+	if len(toks) != 1 {
+		return -1
+	}
+	return toks[0]
+}
+
+// Tokens exposes the tokenizer (ids) for boundary checks: the cached prefix
+// is only valid if tokenize(prefix)+tokenize(tail) == tokenize(prefix+tail).
+func (l *LLM) Tokens(text string, addSpecial bool) []int32 {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	toks := l.tokenize(text, addSpecial)
+	out := make([]int32, len(toks))
+	for i, t := range toks {
+		out[i] = int32(t)
+	}
+	return out
+}
+
+// Split renders a system prompt + user text the way PrimePrefix/TwoPass
+// will: the KV-cached prefix and the per-turn tail.
+func (l *LLM) Split(system, user string) (prefix, tail string, err error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	prefix, tailFmt, err := l.splitPrompt(system)
+	if err != nil {
+		return "", "", err
+	}
+	return prefix, strings.Replace(tailFmt, userSentinel, user, 1), nil
 }
 
 // Template reports the resolved chat template (a built-in name, or
@@ -225,6 +305,9 @@ func (l *LLM) stopTokens() map[C.llama_token]bool {
 	}
 	if eot := C.llama_vocab_eot(l.vocab); eot >= 0 {
 		l.eotText = C.GoString(C.llama_vocab_get_text(l.vocab, eot))
+	} else if eos := C.llama_vocab_eos(l.vocab); eos >= 0 {
+		// gemma4 declares only eos (<turn|>), no separate eot
+		l.eotText = C.GoString(C.llama_vocab_get_text(l.vocab, eos))
 	}
 	return stops
 }
@@ -243,7 +326,12 @@ var builtinTemplate = map[string]string{
 func (l *LLM) resolveTemplate(want string) error {
 	switch want {
 	case "", "auto":
-		if t := C.llama_model_chat_template(l.model, nil); t != nil {
+		if arch := l.meta("general.architecture"); arch == "gemma4" {
+			// the GGUF's Jinja template uses <|turn>/<turn|>, which
+			// llama_chat_apply_template (May 2026) does not detect — the
+			// built-in "gemma" would render Gemma 3 tokens instead
+			l.tmpl = TemplateGemma4
+		} else if t := C.llama_model_chat_template(l.model, nil); t != nil {
 			l.tmpl = C.GoString(t)
 		} else {
 			arch := l.meta("general.architecture")
@@ -282,6 +370,9 @@ type chatMsg struct{ role, content string }
 // applyTemplate renders msgs through llama_chat_apply_template (built-in
 // templates by name, or Jinja text the library recognizes).
 func (l *LLM) applyTemplate(msgs []chatMsg, addAss bool) (string, error) {
+	if l.tmpl == TemplateGemma4 {
+		return l.renderGemma4(msgs, addAss), nil
+	}
 	cTmpl := C.CString(l.tmpl)
 	defer C.free(unsafe.Pointer(cTmpl))
 	n := len(msgs)
@@ -305,6 +396,28 @@ func (l *LLM) applyTemplate(msgs []chatMsg, addAss bool) (string, error) {
 		return "", errors.New("llama_chat_apply_template failed (unknown template?)")
 	}
 	return C.GoStringN(&buf[0], r), nil
+}
+
+// renderGemma4 is the Gemma 4 turn format (TemplateGemma4). "assistant" is
+// "model"; with thinking on, <|think|> opens the system turn (the toggle is
+// per conversation and lives in the system instruction, per Google's
+// prompt-formatting guide).
+func (l *LLM) renderGemma4(msgs []chatMsg, addAss bool) string {
+	var b strings.Builder
+	for _, m := range msgs {
+		role, content := m.role, m.content
+		if role == "assistant" {
+			role = "model"
+		}
+		if role == "system" && l.think {
+			content = "<|think|>\n" + content
+		}
+		b.WriteString("<|turn>" + role + "\n" + content + "<turn|>\n")
+	}
+	if addAss {
+		b.WriteString("<|turn>model\n")
+	}
+	return b.String()
 }
 
 // splitPrompt renders [system, user] and splits it into the constant
@@ -390,9 +503,8 @@ func (l *LLM) primeLocked(systemPrompt string) (int, error) {
 
 // rewind drops every token after the cached prefix (N09-1071 invariant 2:
 // no earlier turn, finished or discarded, leaves a trace). If the memory
-// refuses the partial removal, or the sequence is not where the prefix ends
-// afterwards, the cache is cleared and the prefix re-evaluated instead of
-// continuing on a contaminated context.
+// refuses the partial removal, the cache is cleared and the prefix
+// re-evaluated instead of continuing on a contaminated context.
 func (l *LLM) rewind(systemPrompt string, nPrefix int) error {
 	mem := C.llama_get_memory(l.ctx)
 	ok := bool(C.llama_memory_seq_rm(mem, 0, C.llama_pos(nPrefix), -1))
@@ -439,6 +551,13 @@ func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
 	}
 	tEval := time.Since(tEval0)
 
+	// Thinking (Gemma 4, Config.Think): the thought channel runs
+	// unconstrained before the grammar is switched on.
+	thought, nThink, tThink, err := l.thinkLocked()
+	if err != nil {
+		return nil, err
+	}
+
 	// Pass 1: grammar-constrained JSON, greedy (production json_temp=0).
 	cGbnf, cRoot := C.CString(gbnf), C.CString("root")
 	defer C.free(unsafe.Pointer(cGbnf))
@@ -462,7 +581,16 @@ func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
 
 	// Pass 2: TTS continuation — the JSON stays in context; append the cue and
 	// keep generating.
-	if err := l.decodeTokens(l.tokenize("\nSpoken response:", false)); err != nil {
+	cue := "\nSpoken response:"
+	if l.pass2Turn {
+		// close the model turn and ask in a user turn (Config.Pass2Turn)
+		turn, err := l.applyTemplate([]chatMsg{{"user", "Spoken response:"}}, true)
+		if err != nil {
+			return nil, err
+		}
+		cue = l.eotText + "\n" + turn
+	}
+	if err := l.decodeTokens(l.tokenize(cue, false)); err != nil {
 		return nil, err
 	}
 	chain2 := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
@@ -485,7 +613,56 @@ func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
 	voice = l.clean(voice)
 
 	return &Result{JSON: jsonText, Voice: voice,
-		TJSON: tJSON, TTTS: tTTS, TEval: tEval}, nil
+		TJSON: tJSON, TTTS: tTTS, TEval: tEval,
+		Thought: thought, NThink: nThink, TThink: tThink}, nil
+}
+
+// thinkLocked runs the Gemma 4 thought channel when thinking is on: the
+// first sampled token decides — <|channel> opens a thought that is decoded
+// greedily until <channel|> (or thinkMax tokens, then the close token is
+// fed to end it); anything else means no thought, nothing is decoded and
+// the logits stay for the grammar pass. Returns the thought text.
+func (l *LLM) thinkLocked() (string, int, time.Duration, error) {
+	if !l.think {
+		return "", 0, 0, nil
+	}
+	t0 := time.Now()
+	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
+	C.llama_sampler_chain_add(chain, C.llama_sampler_init_greedy())
+	defer C.llama_sampler_free(chain)
+	if tok := C.llama_sampler_sample(chain, l.ctx, -1); tok != l.chanOpen {
+		return "", 0, time.Since(t0), nil
+	}
+	if rc := C.decode_one(l.ctx, l.chanOpen); rc != 0 {
+		return "", 0, 0, fmt.Errorf("llama_decode returned %d opening the thought", rc)
+	}
+	l.nPast++
+	var out []C.llama_token
+	closed := false
+	for len(out) < l.thinkMax {
+		tok := C.llama_sampler_sample(chain, l.ctx, -1)
+		if tok == l.chanClose {
+			closed = true
+			break
+		}
+		if bool(C.llama_vocab_is_eog(l.vocab, tok)) || l.stopIDs[tok] {
+			break
+		}
+		out = append(out, tok)
+		if rc := C.decode_one(l.ctx, tok); rc != 0 {
+			return "", 0, 0, fmt.Errorf("llama_decode returned %d mid-thought", rc)
+		}
+		l.nPast++
+	}
+	// close the channel (the model's own close, or ours when cut) so the
+	// answer tokens follow in the trained position
+	_ = closed
+	if rc := C.decode_one(l.ctx, l.chanClose); rc != 0 {
+		return "", 0, 0, fmt.Errorf("llama_decode returned %d closing the thought", rc)
+	}
+	l.nPast++
+	text := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(l.detokenize(out)), "thought"))
+	return text, len(out) + 2, time.Since(t0), nil
 }
 
 // clean trims decoded text and strips a trailing end-of-turn marker.
@@ -512,6 +689,10 @@ func (l *LLM) Narrate(systemPrompt, event string) (string, error) {
 		return "", err
 	}
 	if err := l.decodeTokens(l.tokenize(l.tail(event), false)); err != nil {
+		return "", err
+	}
+	// thinking on: let the thought channel close before the cue
+	if _, _, _, err := l.thinkLocked(); err != nil {
 		return "", err
 	}
 	if err := l.decodeTokens(l.tokenize("Spoken response:", false)); err != nil {

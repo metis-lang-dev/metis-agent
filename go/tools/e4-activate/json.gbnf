@@ -1,0 +1,5 @@
+# E4 control: the same choice as a JSON intent (our grammar-constrained shape).
+root ::= "{\"intent\":\"" call "}"
+call ::= verb "\",\"domain\":\"" domain "\"" | "KEEP\""
+verb ::= "ACTIVATE" | "DEACTIVATE"
+domain ::= "kitchen" | "nav" | "xtraffic" | "sysadmin" | "social" | "votes"
