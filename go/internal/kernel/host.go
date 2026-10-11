@@ -66,6 +66,8 @@ type Host struct {
 	triageQ  chan Signal
 	settled  map[int]bool // records whose reading came back consistent
 	inTriage atomic.Int64 // surprises queued or being closed
+	Noticed  atomic.Int64 // results that came back admitted+notice
+	noticed  map[string]bool
 }
 
 // WaitTriage waits until every queued surprise is closed (or the timeout).
@@ -91,7 +93,7 @@ func NewHost(cfg Config, pend *wire.Pending) *Host {
 	}
 	h := &Host{Pend: pend, narrate: map[string]bool{}, byIntent: map[int]string{}, early: map[int]Signal{},
 		waiters: map[string]chan [2]string{}, MaxTries: 3, Beat: watchEvery(cfg.Watch),
-		settled: map[int]bool{}, keep: cfg.KeepEpisodes, lastRec: -1}
+		settled: map[int]bool{}, keep: cfg.KeepEpisodes, lastRec: -1, noticed: map[string]bool{}}
 	sb := cfg.SettleBeats
 	if sb <= 0 {
 		sb = 2.5
@@ -181,8 +183,10 @@ func (h *Host) triage(s Signal) {
 	if settled {
 		next = "Next reading: it matches the model again."
 	}
-	// with the tape the facts are already in the context: the turn only asks
-	user := fmt.Sprintf("Close SURPRISE #%d in %s with exactly one tool call.\n%s", r, s.Path, next)
+	// the facts are on the tape too, but the turn restates this surprise's
+	// difference: with only "close #r" E2B reset a persisting partner diff
+	// it had explained twice before (live, make_partner order 3)
+	user := fmt.Sprintf("Close SURPRISE #%d in %s with exactly one tool call.\n%s\n%s", r, s.Path, SurpriseText(s), next)
 	sys := h.Prompt
 	if h.Tape == nil || sys == "" {
 		user, sys = SurpriseText(s)+"\n"+next, h.Dec.System
@@ -301,8 +305,27 @@ func (h *Host) result(s Signal) {
 	status, _ := s.F["status"].(string)
 	reason, _ := s.F["reason"].(string)
 	res := "refused"
-	if status == "admitted" {
+	if strings.HasPrefix(status, "admitted") { // admitted | admitted+notice (metispy d725507)
 		res = "done"
+	}
+	if nt, ok := s.F["notice"].(map[string]any); ok {
+		card, _ := nt["card"].(string)
+		move, _ := nt["move"].(string)
+		orders := int(num(nt["orders"]))
+		h.Noticed.Add(1)
+		fact := fmt.Sprintf("%s: %s (%s) explained the reading in %d orders running: the %s model lacks it.",
+			s.Path, card, move, orders, s.Path)
+		if h.OnEvent != nil {
+			h.OnEvent(Event{Kind: "notice", Path: s.Path, Fact: fact, Raw: s.Raw, At: time.Now()})
+		}
+		h.mu.Lock()
+		first := !h.noticed[card+" "+move]
+		h.noticed[card+" "+move] = true
+		h.mu.Unlock()
+		if first { // narrated once per card+move: the per-verb cue reads this prefix
+			reason = fmt.Sprintf("notice: %s keeps explaining the reading (%d orders running); the %s model lacks it. %s",
+				card, orders, s.Path, reason)
+		}
 	}
 	h.answer(id, res, reason)
 }

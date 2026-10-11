@@ -92,6 +92,11 @@ func runtimeResultCue(it wire.Item, t Task) string {
 	switch {
 	case t.Result == "done" && verb == "reset":
 		what = "You set an odd reading aside as a one-off misread, and the runtime is acting again."
+	case t.Result == "done" && verb == "explain" && strings.HasPrefix(reason, "notice: ") && len(f) >= 3:
+		what = fmt.Sprintf("You explained the odd reading again with %s (%s), and the runtime noticed it keeps happening: "+
+			"its model of the kitchen lacks that, so the people who revise it are told; it carries on.",
+			strings.ReplaceAll(f[1], "_", " "), strings.ReplaceAll(f[2], "_", " "))
+		reason = strings.TrimPrefix(reason, "notice: ")
 	case t.Result == "done" && verb == "explain" && len(f) >= 3:
 		what = fmt.Sprintf("You explained the odd reading: %s (%s) accounts for it, and the runtime carries on.",
 			strings.ReplaceAll(f[1], "_", " "), strings.ReplaceAll(f[2], "_", " "))
