@@ -118,7 +118,9 @@ func sameSet(a, b []string) bool {
 // TestRetrieverMatchesTheE7Reference: the Go retriever, fed the pair run
 // through the harness's own renderer, selects for every one of the 24 E7
 // questions exactly the records, mirror lines and cards the reference
-// retriever (tools/e7-corpus.py, RACK §3 verbatim) wrote as arm S.
+// retriever (tools/e7-corpus.py, RAG §3 verbatim) wrote as arm S — up to
+// the RAG §8 amendments made after the corpus (no mirror line in the
+// event scope; ask adds the resolved surprise of the current order).
 func TestRetrieverMatchesTheE7Reference(t *testing.T) {
 	p := loadPair(t)
 	cards := loadCards(t)
@@ -136,10 +138,41 @@ func TestRetrieverMatchesTheE7Reference(t *testing.T) {
 		in := s.Retrieve(tr, mirrorAt(p, cards, at))
 		want := q["insert"].(map[string]any)["S"].(map[string]any)
 		id := q["id"].(string)
-		if got, w := in.Refs(), strs(want["records"]); !sameSet(got, w) {
+		got, w := in.Refs(), strs(want["records"])
+		if tr.Kind == "ask" {
+			// RAG §8.2 (after the corpus): ask also takes each path's last
+			// resolved surprise of the current order with its closing result
+			extra := map[string]bool{}
+			for _, r := range in.Records {
+				if r.Kind == "surprise" || r.Closes {
+					extra[r.Ref()] = true
+				}
+			}
+			var rest []string
+			for _, g := range got {
+				if !extra[g] {
+					rest = append(rest, g)
+				}
+			}
+			for _, x := range w {
+				if extra[x] {
+					rest = append(rest, x)
+				}
+			}
+			if !sameSet(rest, w) {
+				t.Errorf("%s ask: records %v, want the reference %v plus resolved surprises", id, got, w)
+			}
+			if len(got) > len(w) {
+				t.Logf("%s ask (§8.2): + %v", id, got)
+			}
+		} else if !sameSet(got, w) {
 			t.Errorf("%s %v: records\n got  %v\n want %v", id, tr, got, w)
 		}
-		if got, w := in.Mirrors, strs(want["mirrors"]); !sameSet(got, w) {
+		wm := strs(want["mirrors"])
+		if tr.Kind == "event" {
+			wm = nil // RAG §8.3: records only in the event scope
+		}
+		if got, w := in.Mirrors, wm; !sameSet(got, w) {
 			t.Errorf("%s: mirrors %v, want %v", id, got, w)
 		}
 		if w := want["cards"]; w != nil && !sameSet(in.Cards, strs(w)) {
@@ -168,7 +201,7 @@ func TestCompactionAndMount(t *testing.T) {
 	for _, r := range s.tapes["a"].Recs {
 		kinds = append(kinds, r.Kind)
 	}
-	if got := strings.Join(kinds, " "); got != "surprise result said quiescence" {
+	if got := strings.Join(kinds, " "); got != "quiescence surprise result said quiescence" {
 		t.Errorf("after compaction: %s", got)
 	}
 	add("surprise", 1, false)
@@ -177,7 +210,7 @@ func TestCompactionAndMount(t *testing.T) {
 	}
 	s.Mount("a", false)
 	add("event", -1, false)
-	if st := s.Snapshot()[0]; st.Mounted || st.Dropped != 1 || st.Records != 5 {
+	if st := s.Snapshot()[0]; st.Mounted || st.Dropped != 1 || st.Records != 6 {
 		t.Errorf("frozen: %+v", st)
 	}
 	if in := s.Retrieve(Trigger{Kind: "ask"}, nil); len(in.Records)+len(in.Mirrors) != 0 {
@@ -185,7 +218,7 @@ func TestCompactionAndMount(t *testing.T) {
 	}
 	s.Mount("a", true)
 	add("event", -1, false)
-	if st := s.Snapshot()[0]; st.Records != 6 || st.Open != 1 {
+	if st := s.Snapshot()[0]; st.Records != 7 || st.Open != 1 {
 		t.Errorf("thawed: %+v", st)
 	}
 }

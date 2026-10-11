@@ -27,7 +27,7 @@ func TestPiecesPlainWords(t *testing.T) {
 	}
 }
 
-// RACK §2 / rack step-1 finding 3: a piece states counts, not signed
+// RAG §2 / rack step-1 finding 3: a piece states counts, not signed
 // changes for the model to add up (the step-4 hour: "pot onion has
 // decreased by three" for a cook's "pot onion -3").
 func TestPiecesNowCarryCounts(t *testing.T) {

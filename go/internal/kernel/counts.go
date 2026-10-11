@@ -8,7 +8,7 @@ import (
 )
 
 // Counts is a runtime's model state as the adapter follows it from the
-// signals (RACK.md §2, rack step-1 finding 3: a template states counts, not
+// signals (RAG.md §2, rack step-1 finding 3: a template states counts, not
 // only signed changes — "served now 2", never "+1" for the model to add up).
 // It starts from the watch answer's counts; a clause event applies its
 // consume/produce, an exogenous op its change, an admitted explain the

@@ -75,6 +75,12 @@ func TestProgressWaitsSurpriseTakesTheFloor(t *testing.T) {
 	defer func() { cancel(); wg.Wait() }()
 	e.RuntimeEvent(RuntimeEvent{Kind: "event", Path: "kitchen", Fact: "In the kitchen: fetch onion (held onion +1)", Class: "progress", Rec: -1, Narrate: true})
 	e.RuntimeEvent(RuntimeEvent{Kind: "event", Path: "kitchen", Fact: "In the kitchen: load (pot onion +1)", Class: "progress", Rec: -1, Narrate: true})
+	time.Sleep(50 * time.Millisecond)
+	if len(spk.said()) != 0 {
+		t.Fatalf("a clause event was spoken (RAG §8.4): %v", spk.said())
+	}
+	// the order's quiescence says the order, with its events, as one sentence
+	e.RuntimeEvent(RuntimeEvent{Kind: "quiescence", Path: "kitchen", Fact: "The kitchen is quiet after 2 moves: the order is done", Class: "progress", Rec: -1, Narrate: true})
 	waitFor(t, func() bool { return len(spk.said()) == 1 }, "the progress sentence")
 	e.RuntimeEvent(RuntimeEvent{Kind: "surprise", Path: "kitchen", Fact: surprisePiece, Class: "surprise", Rec: 0, Narrate: true})
 	waitFor(t, func() bool { return len(spk.said()) == 2 }, "the surprise")
@@ -83,12 +89,12 @@ func TestProgressWaitsSurpriseTakesTheFloor(t *testing.T) {
 		t.Errorf("said %v", said)
 	}
 	n.mu.Lock()
-	if len(n.turns) != 2 || strings.Count(n.turns[0], "In the kitchen:") < 1 || n.thinks[0] || !n.thinks[1] {
+	if len(n.turns) != 2 || strings.Count(n.turns[0], "In the kitchen:") != 2 || !strings.Contains(n.turns[0], "quiet after 2 moves") || n.thinks[0] || !n.thinks[1] {
 		t.Errorf("turns %q thinks %v", n.turns, n.thinks)
 	}
 	n.mu.Unlock()
 	mu.Lock()
-	if len(taped) != 2 || !strings.HasPrefix(taped[1], "surprise|Something is off") {
+	if len(taped) != 4 || taped[0] != "event|" || !strings.HasPrefix(taped[3], "surprise|Something is off") {
 		t.Errorf("tape %v", taped)
 	}
 	mu.Unlock()
@@ -146,7 +152,7 @@ func (r *fakeRack) Said(path, text string) {
 	r.said = append(r.said, path+": "+text)
 }
 
-// Rack step 2 (RACK §3–4): with a rack, the narration is cued on the
+// Rack step 2 (RAG §3–4): with a rack, the narration is cued on the
 // retriever's insertion for the trigger, closed by the trigger's own pieces
 // as its focus; what was said goes on the domain's tape as kind=said.
 func TestRackNarrationIsCuedOnTheInsertion(t *testing.T) {
@@ -171,5 +177,37 @@ func TestRackNarrationIsCuedOnTheInsertion(t *testing.T) {
 	e.narratePieces([]RuntimeEvent{{Kind: "event", Path: "kitchen", Fact: "In the kitchen: load; now pot onion 1.", Class: "progress", Rec: -1}}, false)
 	if strings.Join(rk.trigs[1:], " ") != "quiescence(kitchen_shared) event(kitchen)" {
 		t.Errorf("triggers %v", rk.trigs)
+	}
+}
+
+// RAG §8.5: a notice is said as its piece, with no model call.
+func TestNoticeSaidAsItsPiece(t *testing.T) {
+	spk := newFakeSpeaker(10 * time.Millisecond)
+	n := &fakeNarr{outs: []string{"Two orders are currently running in the kitchen."}}
+	e := New(Config{SystemPrompt: "p", GBNF: "g"}, n, fakeSTT{}, spk)
+	_, cancel, wg := run(t, e)
+	defer func() { cancel(); wg.Wait() }()
+	piece := "Notice: the kitchen shared card with partner load explained the reading 2 orders running: the kitchen model lacks it, so the people who revise the model are told; orders go on"
+	e.RuntimeEvent(RuntimeEvent{Kind: "notice", Path: "kitchen", Fact: piece, Class: "surprise", Rec: 4, Narrate: true})
+	waitFor(t, func() bool { return len(spk.said()) == 1 }, "the notice")
+	if spk.said()[0] != piece+"." || len(n.turns) != 0 {
+		t.Errorf("said %v, model turns %d", spk.said(), len(n.turns))
+	}
+}
+
+// RAG §8.7: ids are not values — "surprise 0" in the fact does not license
+// a 0 count, and naming the surprise by its id is not an invented number.
+func TestNumberGuardOnValuesOnly(t *testing.T) {
+	fact := "The kitchen is paused and takes no new orders until surprise 0 is closed: pot onion is 3 where the model expects 2."
+	for s, want := range map[string]string{
+		"The pot has 3 onions where 2 were expected.":         "",
+		"Surprise 0 paused the kitchen: the pot has 3 onions.": "",
+		"The kitchen is cooking at 0.":                         "0",
+		"Surprise 4 paused the kitchen.":                       "4",
+		"The pot has three onions, two more than none.":        "",
+	} {
+		if got := inventedNumbers(s, fact); got != want {
+			t.Errorf("%q → %q, want %q", s, got, want)
+		}
 	}
 }

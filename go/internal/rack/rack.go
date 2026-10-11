@@ -1,4 +1,4 @@
-// Package rack is the main narrator's rack (docs/RACK.md): one tape of
+// Package rack is the main narrator's rack (docs/RAG.md): one tape of
 // rendered records per runtime domain, a STRUCTURAL retriever keyed by the
 // orchestrator's active set and the trigger's path (no embeddings), and the
 // insertion — inline fragments grouped by path, mirror line first — that
@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-// Record is one piece on a domain's tape (RACK §2).
+// Record is one piece on a domain's tape (RAG §2).
 type Record struct {
 	Path string  `json:"path"`
 	Seq  int     `json:"seq"` // the runtime's signal seq (0 for said)
@@ -32,7 +32,7 @@ type Record struct {
 // Ref is the record's id, path#seq (the E7 corpus's evidence refs).
 func (r Record) Ref() string { return fmt.Sprintf("%s#%d", r.Path, r.Seq) }
 
-// Weights rank records within a scope (RACK §3: surprise, notice, refused
+// Weights rank records within a scope (RAG §3: surprise, notice, refused
 // result > reading > event > said); the E7 reference retriever's.
 var Weights = map[string]int{"surprise": 5, "notice": 5, "refused": 5, "reading": 3,
 	"result": 3, "event": 2, "quiescence": 1, "said": 1}
@@ -54,12 +54,12 @@ type Store struct {
 	t     float64
 	// Tok counts a text's tokens (llm.Tokens); nil = len/4.
 	Tok func(string) int
-	// Budget for one insertion, mirror lines included (RACK §3: ~2.5k on E2B).
+	// Budget for one insertion, mirror lines included (RAG §3: ~2.5k on E2B).
 	Budget int
-	// Compact per domain at its quiescence (RACK §2). Off for a bench that
+	// Compact per domain at its quiescence (RAG §2). Off for a bench that
 	// wants the whole tape.
 	Compact bool
-	// Wrap renders a fragment as ⟪path: text⟫ (RACK §4); off = "path: text".
+	// Wrap renders a fragment as ⟪path: text⟫ (RAG §4); off = "path: text".
 	Wrap bool
 	// Clock overrides the arrival clock (a bench's own t).
 	Clock func() float64
@@ -166,8 +166,9 @@ func (s *Store) Said(path, text string) bool {
 	return s.Add(Record{Path: path, Kind: "said", Text: text, Rec: -1})
 }
 
-// compact (RACK §2, at the domain's quiescence): events, readings and
-// earlier quiescences older than this quiescence go; surprises, results
+// compact (RAG §2, at the domain's quiescence): events, readings and
+// earlier quiescences older than this quiescence go (the one before it
+// stays: it starts the order that just ended); surprises, results
 // and notices stay; `said` stays only for the last order (since the
 // quiescence before this one).
 func compact(t *Tape) {
@@ -182,10 +183,16 @@ func compact(t *Tape) {
 	if len(qs) > 1 {
 		prevT = t.Recs[qs[len(qs)-2]].T
 	}
+	prev := -1
+	if len(qs) > 1 {
+		prev = qs[len(qs)-2]
+	}
 	var keep []Record
 	for i, r := range t.Recs {
 		switch {
 		case i >= last:
+			keep = append(keep, r)
+		case i == prev: // the current order's start (ask's resolved surprise, RAG §8.2)
 			keep = append(keep, r)
 		case r.Kind == "surprise" || r.Kind == "result" || r.Kind == "refused" || r.Kind == "notice":
 			keep = append(keep, r)
@@ -196,7 +203,7 @@ func compact(t *Tape) {
 	t.Recs = keep
 }
 
-// Trigger is what asks for an insertion (RACK §3).
+// Trigger is what asks for an insertion (RAG §3).
 type Trigger struct {
 	Kind string // event | surprise | quiescence | ask
 	Path string // the raising path (none for ask)
@@ -231,6 +238,37 @@ func sinceQuiescence(recs []Record) []Record {
 	return recs
 }
 
+// currentOrder is the records of the domain's current order: since its
+// last quiescence, or — when the domain is quiet now (its last record a
+// quiescence, `said` aside) — the order that quiescence ended.
+func currentOrder(recs []Record) []Record {
+	end := len(recs)
+	for end > 0 && recs[end-1].Kind == "said" {
+		end--
+	}
+	if end > 0 && recs[end-1].Kind == "quiescence" {
+		return sinceQuiescence(recs[:end-1])
+	}
+	return sinceQuiescence(recs)
+}
+
+// resolved is the last surprise among recs that a record closed, with the
+// closing record (nil when none).
+func resolved(recs []Record) []Record {
+	for i := len(recs) - 1; i >= 0; i-- {
+		c := recs[i]
+		if !c.Closes {
+			continue
+		}
+		for j := i - 1; j >= 0; j-- {
+			if recs[j].Kind == "surprise" && (c.Rec < 0 || recs[j].Rec == c.Rec) {
+				return []Record{recs[j], c}
+			}
+		}
+	}
+	return nil
+}
+
 // open is the domain's open surprises: a surprise no reset, explain or
 // operator resume has closed (an escalated one stays open).
 func open(recs []Record) []Record {
@@ -257,7 +295,7 @@ func open(recs []Record) []Record {
 	return still
 }
 
-// Retrieve is the structural retriever (RACK §3): mount filter, scope by
+// Retrieve is the structural retriever (RAG §3): mount filter, scope by
 // trigger, rank (kind weight, then latest first), budget (mirror lines
 // first and always; never a truncated record), then the insertion in time
 // order, grouped by path. mirror renders a path's mirror line on demand
@@ -280,8 +318,9 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 	switch tr.Kind {
 	case "event":
 		if mounted {
+			// records only (RAG §8.3: the model echoed the mirror line
+			// instead of the event)
 			recs = sinceQuiescence(tapes[tr.Path])
-			in.Mirrors = []string{tr.Path}
 		}
 	case "surprise":
 		if mounted {
@@ -294,7 +333,7 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 			}
 			in.Mirrors = append(in.Mirrors, p)
 			in.Cards = append(in.Cards, p)
-			// RACK v2: the siblings' EVENT records since their last
+			// RAG v2: the siblings' EVENT records since their last
 			// quiescence — the fact, not only the card's hypothesis
 			for _, r := range sinceQuiescence(tapes[p]) {
 				if r.Kind == "event" {
@@ -317,7 +356,11 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 		for _, p := range active {
 			if o := open(tapes[p]); len(o) > 0 {
 				recs = append(recs, o[len(o)-1])
+				continue
 			}
+			// RAG §8.2: else the last RESOLVED surprise with the result
+			// that closed it, while it belongs to the current order
+			recs = append(recs, resolved(currentOrder(tapes[p]))...)
 		}
 	}
 	sort.SliceStable(recs, func(i, j int) bool {

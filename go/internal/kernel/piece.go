@@ -21,7 +21,7 @@ type Piece struct {
 	Text  string
 }
 
-// PiecesNow renders one signal with the counts it leaves (RACK.md §2): the
+// PiecesNow renders one signal with the counts it leaves (RAG.md §2): the
 // counts follow the signal first, and a piece that changed atoms ends with
 // their counts now ("In the kitchen: serve; now held soup 0, hand free 1,
 // served 2."), a clause event in place of its signed changes. With nil
@@ -105,9 +105,10 @@ func Pieces(s Signal, cards []Card) []Piece {
 		for _, k := range keys {
 			parts = append(parts, fmt.Sprintf("%s is %d where the model expects %d", k, int(num(obs[k])), int(num(mod[k]))))
 		}
+		// consequence first (RAG §8.6: E2B keeps the first clause)
 		t := fmt.Sprintf("Surprise %d in the %s: %s.", rec, where, strings.Join(parts, "; "))
 		if f["observe_only"] == true {
-			t += " The runtime stopped acting: it takes no new orders until the surprise is closed."
+			t = fmt.Sprintf("The %s is paused and takes no new orders until surprise %d is closed: %s.", where, rec, strings.Join(parts, "; "))
 		}
 		return []Piece{p("surprise", "surprise", t)}
 	case "result":

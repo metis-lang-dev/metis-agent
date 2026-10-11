@@ -51,11 +51,11 @@ type Config struct {
 	// Path names the runtime's domain (rack: the tape it feeds); unset =
 	// the watch answer's path.
 	Path string `yaml:"path"`
-	// Runtimes (rack phase 1b, docs/RACK.md §5): N runtimes attached to the
+	// Runtimes (rack phase 1b, docs/RAG.md §5): N runtimes attached to the
 	// one narrator, each its own process and watch. An entry's set fields
 	// override this config's; empty = this config is the one runtime.
 	Runtimes []Config `yaml:"runtimes"`
-	// Rack: the per-domain tapes and the structural retriever (RACK §2–4).
+	// Rack: the per-domain tapes and the structural retriever (RAG §2–4).
 	Rack RackConfig `yaml:"rack"`
 }
 
@@ -64,7 +64,7 @@ type Config struct {
 type RackConfig struct {
 	Enabled bool  `yaml:"enabled"`
 	Budget  int   `yaml:"budget"` // tokens per insertion (default 2500)
-	Wrap    *bool `yaml:"wrap"`   // ⟪path: text⟫ fragments (default true, RACK §4)
+	Wrap    *bool `yaml:"wrap"`   // ⟪path: text⟫ fragments (default true, RAG §4)
 	Ask     *bool `yaml:"ask"`    // the person's chitchat/unknown turns answered from ask() (default true)
 }
 

@@ -464,3 +464,24 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
   insertion's trigger, size and time. A late joiner gets the last pane.
 - Config `kernel.rack: {enabled, budget, wrap, ask}`. Off by default, so
   the dog and step 4 are unchanged.
+- **RAG §8 amendments (after the step-2 review).** Item 1, the focus line,
+  was already built.
+  - **2.** `ask` also takes each path's last resolved surprise and the
+    result that closed it, while it belongs to the current order. If the
+    domain is quiet, that is the order its last quiescence ended.
+    Compaction keeps the quiescence before the last one, as that order's
+    start.
+  - **3.** The event scope inserts records only, with no mirror line.
+  - **4.** Clause events are recorded (tape, rack) but not spoken. At the
+    order's quiescence, one sentence is said: from the quiescence scope
+    with the rack, or else from the order's last events (with their
+    counts) plus the quiescence piece. A surprise, a result and an
+    operator resume keep their own cue.
+  - **5.** A notice is said as its piece, with no model call.
+  - **6.** The surprise template puts the consequence first: "The kitchen
+    is paused and takes no new orders until surprise 0 is closed: pot
+    onion is 3 where the model expects 2."
+  - **7.** The number guard allows only value numbers. An id (surprise,
+    record, intent, seq, beat N) neither licenses a value nor counts as
+    one; an id named in the sentence must be in the fact.
+  - Triage is untouched.

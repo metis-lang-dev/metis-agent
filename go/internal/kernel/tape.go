@@ -199,7 +199,7 @@ func MirrorRows(ans map[string]any, cards []Card) map[string]string {
 
 // MirrorRow is one mirror row in plain words: stage status, the open
 // surprise, the #query atoms' counts now and the last event (metispy
-// 03d57ba, RACK v2 finding 1), and the horizon's beliefs.
+// 03d57ba, RAG v2 finding 1), and the horizon's beliefs.
 func MirrorRow(r map[string]any, cards []Card) string {
 	path, _ := r["path"].(string)
 	status, _ := r["status"].(string)

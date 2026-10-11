@@ -67,7 +67,7 @@ type Host struct {
 	Noticed  atomic.Int64 // results that came back admitted+notice
 	Wakes    atomic.Int64 // surprises handed to the model (each closes with ≥1 call)
 	// Counts follows the model's counts from the signals, so the pieces
-	// state counts (RACK §2); seeded from the watch answer (SeedCounts)
+	// state counts (RAG §2); seeded from the watch answer (SeedCounts)
 	Counts *Counts
 	// WakeOnReading (eval arm A, `watch arm=blind`): the runtime checks
 	// nothing, so the model is woken by the first inconsistent reading of

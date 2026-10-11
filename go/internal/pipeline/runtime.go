@@ -63,6 +63,26 @@ func (e *Engine) onRuntime(ev RuntimeEvent) {
 	if !ev.Narrate {
 		return
 	}
+	if ev.Kind == "notice" {
+		// RAG §8.5: a notice is short and complete — said as its piece, no
+		// model (E2B dropped its point both times in the step-4 hour)
+		text := cleanText(ev.Fact, factCap) + "."
+		e.tape(ev.Kind, ev.Rec, ev.Fact, text)
+		if !e.Attn.Awake() {
+			log.Printf("[runtime] notice: asleep — parked")
+		} else {
+			if e.Rack != nil {
+				e.Rack.Said(ev.Path, text)
+			}
+			if e.speaking && e.speakingProg {
+				e.TTS.Cancel()
+			}
+		}
+		log.Printf("[runtime] notice said as its piece: %q", text)
+		e.pending = append([]announcement{{text, ev.At}}, e.pending...)
+		e.tryAnnounce()
+		return
+	}
 	if ev.Class == "surprise" {
 		text, user := e.narratePieces([]RuntimeEvent{ev}, true)
 		e.tape(ev.Kind, ev.Rec, user, text)
@@ -80,9 +100,32 @@ func (e *Engine) onRuntime(ev RuntimeEvent) {
 		e.tryAnnounce()
 		return
 	}
+	if ev.Kind == "event" {
+		// RAG §8.4: progress is narrated per order, at its quiescence; a
+		// clause event is recorded, not spoken (294 sentences an hour,
+		// some wrong, was the cost of per-clause talk)
+		if e.orderQ == nil {
+			e.orderQ = map[string][]RuntimeEvent{}
+		}
+		e.orderQ[ev.Path] = append(e.orderQ[ev.Path], ev)
+		e.tape(ev.Kind, ev.Rec, ev.Fact, "")
+		return
+	}
+	order := e.orderQ[ev.Path]
+	if ev.Kind == "quiescence" {
+		delete(e.orderQ, ev.Path)
+	}
 	if !e.Attn.Awake() {
 		e.tape(ev.Kind, ev.Rec, ev.Fact, "") // the fact still goes on, unsaid
 		return
+	}
+	if ev.Kind == "quiescence" && e.Rack == nil && len(order) > 0 {
+		// without a rack, the order's last events (their counts) go with
+		// its quiescence into the one sentence
+		if len(order) > maxProgress-1 {
+			order = order[len(order)-(maxProgress-1):]
+		}
+		e.progressQ = append(e.progressQ, order...)
 	}
 	e.progressQ = append(e.progressQ, ev)
 	if n := len(e.progressQ) - maxProgress; n > 0 {
@@ -149,7 +192,7 @@ const (
 		"Answer the person in one short sentence from the lines above, naming which kitchen when it matters. Use only numbers that are above; if the lines do not say, say you do not know."
 )
 
-// rackTrigger is the retriever's trigger for a narration batch (RACK §3).
+// rackTrigger is the retriever's trigger for a narration batch (RAG §3).
 func rackTrigger(batch []RuntimeEvent, think bool) string {
 	switch last := batch[len(batch)-1].Kind; {
 	case think && last == "surprise":
@@ -161,7 +204,7 @@ func rackTrigger(batch []RuntimeEvent, think bool) string {
 }
 
 // answerFromRack answers the person's turn from the ask() insertion: every
-// mounted domain's mirror line and its open surprise (RACK §3), guarded
+// mounted domain's mirror line and its open surprise (RAG §3), guarded
 // like a narration. "" = no answer (the dog's own reply stands).
 func (e *Engine) answerFromRack(text string) string {
 	sp, ok := e.LLM.(Speaker)
@@ -302,6 +345,7 @@ func runtimeResultCue(it wire.Item, t Task) string {
 }
 
 var (
+	idNumber    = regexp.MustCompile(`(?i)\b(surprise|record|intent|seq|beat)\s*#?\s*(\d+)`)
 	digits      = regexp.MustCompile(`\d+`)
 	numberWords = map[string]string{"zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
 		"five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10"}
@@ -312,6 +356,20 @@ var (
 // number in s (digits or a number word)
 // that the fact does not contain, or "".
 func inventedNumbers(s, fact string) string {
+	// RAG §8.7: only VALUE numbers are allowed — an id (surprise 0, record
+	// 3, intent 2, seq 17, beat 31, #4) is not a value. An id the sentence
+	// names must be one the fact names; it then says nothing about values.
+	ids := map[string]bool{}
+	for _, m := range idNumber.FindAllStringSubmatch(fact, -1) {
+		ids[strings.ToLower(m[1])+" "+m[2]] = true
+	}
+	for _, m := range idNumber.FindAllStringSubmatch(s, -1) {
+		if !ids[strings.ToLower(m[1])+" "+m[2]] {
+			return m[2]
+		}
+	}
+	fact = idNumber.ReplaceAllString(fact, "$1")
+	s = idNumber.ReplaceAllString(s, "$1")
 	have := map[string]bool{}
 	for _, d := range digits.FindAllString(fact, -1) {
 		have[d] = true

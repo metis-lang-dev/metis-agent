@@ -146,7 +146,7 @@ type Engine struct {
 	// Tasks holds the commands awaiting a task event (set with a wire
 	// Dispatcher); nil → every task event is unknown and dropped.
 	Tasks *wire.Pending
-	// Rack (docs/RACK.md, rack step 2): with it, a runtime narration is
+	// Rack (docs/RAG.md, rack step 2): with it, a runtime narration is
 	// cued on the retriever's insertion for its trigger instead of the bare
 	// pieces, and (RackAsk) a chitchat/unknown turn is answered from the
 	// ask() insertion. nil → step 4's narration.
@@ -173,11 +173,12 @@ type Engine struct {
 	// and the sentence said — "" when nothing was): the kernel puts them on
 	// the tape (runtime-wire step 4, CML.md §7)
 	OnRuntimeTape func(kind string, rec int, pieces, spoken string)
-	progressQ     []RuntimeEvent // progress pieces waiting for a free floor
-	speakingProg  bool           // the current utterance is a progress narration (a surprise cuts it)
-	chatCh        chan string    // typed utterances (say_text)
-	chatQueue     []string       // typed utterances waiting for the floor
-	kick          chan struct{}  // wakes the loop when something outside it changed (attention)
+	progressQ     []RuntimeEvent            // progress pieces waiting for a free floor
+	orderQ        map[string][]RuntimeEvent // per path: the current order's clause events, said at its quiescence
+	speakingProg  bool                      // the current utterance is a progress narration (a surprise cuts it)
+	chatCh        chan string               // typed utterances (say_text)
+	chatQueue     []string                  // typed utterances waiting for the floor
+	kick          chan struct{}             // wakes the loop when something outside it changed (attention)
 }
 
 type announcement struct {

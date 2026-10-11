@@ -427,7 +427,7 @@ func main() {
 }
 
 // startKernel attaches the runtimes (internal/kernel; rack phase 1b,
-// docs/RACK.md §5: N of them, each its own process and watch, one
+// docs/RAG.md §5: N of them, each its own process and watch, one
 // narrator): every signal to the UI's events pane, every piece to the
 // dialog, runtime intents from the UI down as wire ops whose result answers
 // a pending RUNTIME command ("@path intent" names the runtime; the first
@@ -495,7 +495,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 				}()
 			}
 			if rk != nil && ev.Path != "" {
-				// the domain's tape (RACK §2): the pieces as records, on the
+				// the domain's tape (RAG §2): the pieces as records, on the
 				// adapter's one arrival clock
 				var f map[string]any
 				if json.Unmarshal(ev.Raw, &f) == nil {
