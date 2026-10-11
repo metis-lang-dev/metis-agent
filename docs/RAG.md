@@ -56,7 +56,7 @@ One record per piece, append-only per domain:
      and siblings + their cards (the explanation candidates) + the
      siblings' EVENT records since their last quiescence (one window):
      the sibling's `partner_load` is a fact on its tape, not a
-     hypothesis on the card — that is the rack's value (finding 2);
+     hypothesis on the card — that is the RAG's value (finding 2);
    - `quiescence(path)` with a pending goal → the mirror lines of the
      whole active set + each set member's last `said`;
    - `ask(question)` (the person asks) → every active path's mirror line
@@ -105,7 +105,7 @@ second tape, not a surprise on the first.
 
 ## 6. E7 — the experiment (gate for the architecture)
 
-Question: does structural retrieval from a rack beat flat mixing, and
+Question: does structural retrieval from a RAG beat flat mixing, and
 can the model attribute facts to the right domain?
 
 Arms, same questions, same two tapes, E2B think per CML §7:
@@ -120,7 +120,7 @@ narration), plus `ask` from the person.
 
 Measures: fact-used, right-domain attribution, invented, ms to first
 token, tokens inserted. Reads: S ≥ F on attribution by a clear margin
-and S ≤ F on tokens → the rack stands; S ≈ F → flat mixing suffices
+and S ≤ F on tokens → the RAG stands; S ≈ F → flat mixing suffices
 until the tree exists; attribution < 0.8 in every arm → fragments need
 the domain name in every line (then re-run).
 
