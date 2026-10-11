@@ -61,7 +61,7 @@ Text frames are JSON with `ev`; names are the jsonl vocabulary.
 | → browser | `state{dialog}` · `transcript{text,t}` · `reply{text,t}` · `intent{intent,voice,t}` |
 | → browser | `command{id,name,args}` — what the host would execute; answer it with `task` |
 | → browser | `tts{id,rate,channels,format,samples}` + binary s16le chunks + `tts_end{id}` · `tts_stop{id}` |
-| → browser | `role{master,mic_tok}` · `role{claimed}` · `denied{what}` |
+| → browser | `pending{id,state}` (expired · progress · answered · late) · `role{master,mic_tok}` · `role{claimed}` · `denied{what}` |
 | → server | `say_text{text}` (chat: a finished utterance through the floor) · `attention{AWAKE\|ASLEEP}` |
 | → server | `task{id,result,detail}` with result `done\|failed\|refused\|expired` · `say{text}` (external announce) |
 | → server | `tts_done{id,played_ms}` when playback truly ends · `grab_master` / `release_master` (mic token) |

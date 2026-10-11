@@ -23,7 +23,7 @@ func newTaskEngine(t *testing.T, llmJSON string) (*Engine, *fakeSpeaker, *recEmi
 	e := New(Config{SystemPrompt: "p", GBNF: "g"},
 		fakeLLM{json: llmJSON, voice: "On it."}, fakeSTT{}, spk)
 	em := &recEmitter{}
-	e.Tasks = wire.NewPending(8, time.Minute)
+	e.Tasks = wire.NewPending(8, wire.DefaultAges())
 	e.Dsp = wire.NewDispatcher(em, e.Tasks)
 	events := &[]string{}
 	e.Events = func(kind string, payload any) {
@@ -70,26 +70,55 @@ func TestTwoBeatsCommandThenTaskNarration(t *testing.T) {
 	}
 }
 
-func TestTaskForUnknownOrStaleCommandIsSilent(t *testing.T) {
+func TestProgressRearmsAndLateOutcomeIsSaidLate(t *testing.T) {
 	e, spk, _, _ := newTaskEngine(t, `{"intent":"STOP"}`)
-	events, cancel, wg := run(t, e)
+	_, cancel, wg := run(t, e)
+	defer func() { cancel(); wg.Wait() }()
+	// an old NAVIGATE that would have expired: progress keeps it alive
+	e.Tasks.Add(wire.Item{ID: "c-nav", Name: "NAVIGATE", At: time.Now().Add(-9 * time.Minute)})
+	e.TaskEvent(Task{ID: "c-nav", Result: "progress", Detail: "halfway"})
+	time.Sleep(100 * time.Millisecond)
+	if len(spk.said()) != 0 {
+		t.Fatalf("progress must not be spoken: %v", spk.said())
+	}
+	if e.Tasks.Len() != 1 {
+		t.Fatalf("progress must keep the command pending")
+	}
+	e.TaskEvent(Task{ID: "c-nav", Result: "done"})
+	waitFor(t, func() bool { return len(spk.said()) == 1 }, "the outcome after progress")
+	// a command that expired is remembered: its outcome is said, as late
+	e.Tasks.Add(wire.Item{ID: "c-old", Name: "LOCAL_ACTION", At: time.Now().Add(-time.Hour), MaxAge: time.Second})
+	_ = e.Tasks.Sweep()
+	e.TaskEvent(Task{ID: "c-old", Result: "failed", Detail: "motor fault"})
+	waitFor(t, func() bool { return len(spk.said()) == 2 }, "the late outcome")
+	if got := spk.said()[1]; !strings.HasPrefix(got, "Late news:") || !strings.Contains(got, "motor fault") {
+		t.Errorf("late outcome = %q", got)
+	}
+}
+
+func TestTaskForUnknownCommandIsSilentButExpiredIsLate(t *testing.T) {
+	e, spk, _, _ := newTaskEngine(t, `{"intent":"STOP"}`)
+	_, cancel, wg := run(t, e)
 	defer func() { cancel(); wg.Wait() }()
 	e.TaskEvent(Task{ID: "c-never-emitted", Result: "done"})
-	// a command that expired before its answer came
+	time.Sleep(150 * time.Millisecond)
+	if n := len(spk.said()); n != 0 {
+		t.Fatalf("spoke %v for an unknown task", spk.said())
+	}
+	// a command that expired before its answer came is information, said late
 	e.Tasks.Add(wire.Item{ID: "c-old", Name: "STOP", At: time.Now().Add(-2 * time.Minute)})
 	e.TaskEvent(Task{ID: "c-old", Result: "done"})
-	time.Sleep(200 * time.Millisecond)
-	if n := len(spk.said()); n != 0 {
-		t.Errorf("spoke %v for unknown/stale tasks", spk.said())
+	waitFor(t, func() bool { return len(spk.said()) == 1 }, "the late outcome")
+	if got := spk.said()[0]; got != "Late news: Done." {
+		t.Errorf("late outcome = %q", got)
 	}
-	_ = events
 }
 
 func TestTaskWhileAsleepIsNotSpoken(t *testing.T) {
 	spk := newFakeSpeaker(30 * time.Millisecond)
 	e := New(Config{SystemPrompt: "p", GBNF: "g", Attention: true, WakeWords: []string{"nina"}},
 		fakeLLM{json: `{"intent":"STOP"}`, voice: "Stopping."}, fakeSTT{}, spk)
-	e.Tasks = wire.NewPending(8, time.Minute)
+	e.Tasks = wire.NewPending(8, wire.DefaultAges())
 	e.Tasks.Add(wire.Item{ID: "c-1", Name: "STOP", At: time.Now()})
 	_, cancel, wg := run(t, e)
 	defer func() { cancel(); wg.Wait() }()
@@ -102,11 +131,12 @@ func TestTaskWhileAsleepIsNotSpoken(t *testing.T) {
 	if len(spk.said()) != 0 {
 		t.Fatalf("spoke while ASLEEP: %v", spk.said())
 	}
-	// waking releases the held announcement (still fresh)
+	// waking releases what was parked while asleep (still fresh): the task
+	// outcome first (it came first), then the announcement
 	e.ForceAttention(true)
-	waitFor(t, func() bool { return len(spk.said()) == 1 }, "announcement after wake")
-	if spk.said()[0] != "Battery low." {
-		t.Errorf("said %v", spk.said())
+	waitFor(t, func() bool { return len(spk.said()) == 2 }, "parked outcome + announcement after wake")
+	if said := spk.said(); said[0] != "Done." || said[1] != "Battery low." {
+		t.Errorf("said %v", said)
 	}
 }
 

@@ -110,10 +110,14 @@ type config struct {
 		TLSSAN     string  `yaml:"tls_san"`      // extra names/IPs, comma-separated
 	} `yaml:"ws"`
 	AnnounceMaxAgeS float64 `yaml:"announce_max_age_s"` // deferred announcements older than this are dropped (30)
-	TaskMaxAgeS     float64 `yaml:"task_max_age_s"`     // a command unanswered this long is forgotten (60)
-	Prompt          string  `yaml:"prompt"`             // system prompt file
-	Grammar         string  `yaml:"grammar"`            // GBNF file (token-exact intent grammar)
-	BargeIn         string  `yaml:"barge_in"`           // off | vad | confirm
+	// TaskMaxAgeS: how long a command waits for its task outcome before the
+	// harness stops expecting one, by kind; task{progress} re-arms it.
+	// Keys: default, LOCAL_ACTION, STOP, CANCEL, NAVIGATE, EXPLORE, FOLLOW,
+	// GOTO_TAG. Unset keys take the built-in defaults (90/30/30/600 s).
+	TaskMaxAgeS map[string]float64 `yaml:"task_max_age_s"`
+	Prompt      string             `yaml:"prompt"`   // system prompt file
+	Grammar     string             `yaml:"grammar"`  // GBNF file (token-exact intent grammar)
+	BargeIn     string             `yaml:"barge_in"` // off | vad | confirm
 }
 
 func main() {
@@ -268,7 +272,17 @@ func main() {
 	if ws != nil {
 		// commands go to the host as typed events and are remembered until
 		// its task event comes back to the dialog agent (HARNESS.md §4)
-		eng.Tasks = wire.NewPending(16, time.Duration(cfg.TaskMaxAgeS*float64(time.Second)))
+		ages := wire.DefaultAges()
+		for k, v := range cfg.TaskMaxAgeS {
+			d := time.Duration(v * float64(time.Second))
+			if k == "default" {
+				ages.Default = d
+			} else {
+				ages.ByKind[k] = d
+			}
+		}
+		eng.Tasks = wire.NewPending(16, ages)
+		eng.Tasks.OnChange = ws.Pending // expired / progress / answered / late → the UI
 		eng.Dsp = wire.NewDispatcher(ws, eng.Tasks)
 		ws.OnSayText = eng.SayText
 		ws.OnSay = eng.Announce

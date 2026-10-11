@@ -297,7 +297,7 @@ func TestPCMChunkStartingWithBraceStaysBinary(t *testing.T) {
 	c := dial(t, h, "/ws")
 	c.next("role")
 	pcm := make([]int16, 2400) // one 100 ms chunk at 24 kHz
-	pcm[0] = 0x007b             // low byte '{' — the old first-byte heuristic sent this as text
+	pcm[0] = 0x007b            // low byte '{' — the old first-byte heuristic sent this as text
 	go s.SendTTS("u-1", 24000, pcm)
 	c.next("tts")
 	if b := c.next("_bin"); b["_bin"] != 4800 {

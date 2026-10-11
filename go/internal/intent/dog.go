@@ -79,9 +79,13 @@ type SemanticMemory interface {
 
 type NavigationBackend interface {
 	Navigate(pos [3]float64, instanceID int) // resolved PoseGoal (§17)
-	Explore(target SemanticTarget)           // §15 frontier fallback
-	Follow(target SemanticTarget)            // §13 tracker path
-	GotoTag(id int)                          // enrolled AprilTag; -1 = nearest/any
+	// NavigateTo: the goal is NOT in this side's memory — the host resolves
+	// it (its own scene graph, a named region, …). Without it a NAVIGATE
+	// whose goal is unknown here acked "going" and did nothing (step-4 F1).
+	NavigateTo(goal SemanticTarget, constraints []Relation)
+	Explore(target SemanticTarget) // §15 frontier fallback
+	Follow(target SemanticTarget)  // §13 tracker path
+	GotoTag(id int)                // enrolled AprilTag; -1 = nearest/any
 	Cancel()
 }
 
@@ -99,13 +103,21 @@ func NewLogging() *Dispatcher {
 // Handle executes one parsed command's side effects. Returns a deterministic
 // spoken answer for QUERY (never LLM-invented observations), else "".
 func (d *Dispatcher) Handle(c *Command) string {
+	// one host behind every seam (the wire backend) gets ONE command for
+	// STOP / CANCEL; separate backends (the logging stubs, a real robot
+	// with distinct action and nav stacks) each get theirs (step-4 F4)
+	oneHost := any(d.Actions) == any(d.Nav)
 	switch c.Intent {
 	case "STOP":
 		d.Actions.Stop()
-		d.Nav.Cancel()
+		if !oneHost {
+			d.Nav.Cancel()
+		}
 	case "CANCEL":
 		d.Actions.Cancel()
-		d.Nav.Cancel()
+		if !oneHost {
+			d.Nav.Cancel()
+		}
 	case "LOCAL_ACTION":
 		d.Actions.Execute(c)
 	case "QUERY":
@@ -135,7 +147,7 @@ func (d *Dispatcher) Handle(c *Command) string {
 		if hits := d.Memory.Query(goal, c.Constraints); len(hits) > 0 {
 			d.Nav.Navigate(hits[0].Position, hits[0].InstanceID)
 		} else {
-			log.Printf("[dog] NAVIGATE: %q not in the semantic map", goal.Description)
+			d.Nav.NavigateTo(goal, c.Constraints) // the host resolves the goal
 		}
 	case "FIND":
 		target := c.Target
@@ -175,6 +187,9 @@ type logNav struct{}
 
 func (logNav) Navigate(pos [3]float64, id int) {
 	log.Printf("[nav] NAVIGATE to %v (instance %d)", pos, id)
+}
+func (logNav) NavigateTo(g SemanticTarget, r []Relation) {
+	log.Printf("[nav] NAVIGATE to %q (%d constraints; host resolves)", g.Description, len(r))
 }
 func (logNav) Explore(t SemanticTarget) { log.Printf("[nav] EXPLORE for %q", t.Description) }
 func (logNav) Follow(t SemanticTarget)  { log.Printf("[nav] FOLLOW %q", t.Description) }

@@ -52,10 +52,11 @@ type Narrator interface {
 
 // Task is the host's answer to a command the harness emitted (HARNESS.md
 // §4): correlated by the id the wire backend assigned, delivered to the
-// dialog agent — never to Announce.
+// dialog agent — never to Announce. "progress" is a beat, not an outcome:
+// it re-arms the command's window and is not spoken.
 type Task struct {
 	ID     string
-	Result string // done | failed | refused | expired
+	Result string // done | failed | refused | expired | progress
 	Detail string
 	At     time.Time
 }
@@ -198,11 +199,21 @@ func (e *Engine) Run(ctx context.Context, vadEvents <-chan vad.Event, textIn <-c
 	for {
 		e.tryAnnounce() // deferred announcements go out once the floor frees
 
-		// while announcements wait, wake up when the oldest ages out so it is
-		// dropped (or spoken) without any other event; idle otherwise
+		// while announcements or commands wait, wake up when the oldest ages
+		// out so it is dropped / expired (and the UI told) without any other
+		// event; idle otherwise
 		var ageC <-chan time.Time
+		var next time.Time
 		if len(e.pending) > 0 {
-			d := time.Until(e.pending[0].at.Add(e.cfg.AnnounceMaxAge)) + time.Millisecond
+			next = e.pending[0].at.Add(e.cfg.AnnounceMaxAge)
+		}
+		if e.Tasks != nil {
+			if n := e.Tasks.Sweep(); !n.IsZero() && (next.IsZero() || n.Before(next)) {
+				next = n
+			}
+		}
+		if !next.IsZero() {
+			d := time.Until(next) + time.Millisecond
 			if d < time.Millisecond {
 				d = time.Millisecond
 			}
@@ -339,18 +350,35 @@ func (e *Engine) onTask(t Task) {
 		log.Printf("[task] %s %s: no pending-command store — dropped", t.ID, t.Result)
 		return
 	}
-	it, ok := e.Tasks.Take(t.ID)
-	if !ok {
-		log.Printf("[task] %s %s: unknown or expired command — not narrated", t.ID, t.Result)
+	if t.Result == "progress" {
+		if it, ok := e.Tasks.Touch(t.ID); ok {
+			log.Printf("[task] %s progress (%s): window re-armed%s", t.ID, it.Name,
+				map[bool]string{true: " — " + t.Detail, false: ""}[t.Detail != ""])
+		} else {
+			log.Printf("[task] %s progress: unknown or expired command", t.ID)
+		}
 		return
 	}
+	it, ok := e.Tasks.Take(t.ID)
+	late := false
+	if !ok {
+		if it, late = e.Tasks.Late(t.ID); !late {
+			log.Printf("[task] %s %s: unknown command — not narrated", t.ID, t.Result)
+			return
+		}
+		log.Printf("[task] %s %s (%s): LATE — the command had expired", t.ID, t.Result, it.Name)
+	}
 	if !e.Attn.Awake() {
-		log.Printf("[task] %s %s (%s): asleep — not narrated", t.ID, t.Result, it.Name)
-		return
+		// parked as an announcement: a wake within AnnounceMaxAge still hears
+		// it, later it ages out (architect's step-2 note)
+		log.Printf("[task] %s %s (%s): asleep — parked", t.ID, t.Result, it.Name)
 	}
 	text := e.narrate(it, t)
 	if text == "" {
 		return
+	}
+	if late {
+		text = "Late news: " + strings.TrimSpace(text)
 	}
 	log.Printf("[task] %s %s (%s) → %q", t.ID, t.Result, it.Name, text)
 	e.pending = append(e.pending, announcement{text, t.At})
@@ -603,14 +631,32 @@ func (e *Engine) handleUtterance(text string) {
 	case "DATE":
 		spoken = "It's " + time.Now().Format("Monday, January 2") + "."
 	case "CHITCHAT", "UNKNOWN":
-		spoken = r.Voice
+		spoken = voiceOr(r.Voice, cmd.Intent)
 	default:
 		spoken = e.Dsp.Handle(cmd) // deterministic QUERY answer, or ""
 		if spoken == "" {
-			spoken = r.Voice
+			spoken = voiceOr(r.Voice, cmd.Intent)
 		}
 	}
 	e.say(spoken)
+}
+
+// voiceOr replaces a spoken ack that merely names the intent ("Unknown",
+// "Chitchat") with a sentence a person would say (step-4 F5).
+func voiceOr(voice, intentName string) string {
+	v := sanitizeAck(voice)
+	if v == "" || strings.EqualFold(strings.TrimRight(v, "."), intentName) ||
+		strings.EqualFold(strings.TrimRight(v, "."), strings.ReplaceAll(intentName, "_", " ")) {
+		switch intentName {
+		case "UNKNOWN":
+			return "I can't do that."
+		case "CHITCHAT":
+			return "Hello! I'm listening."
+		default:
+			return "Okay."
+		}
+	}
+	return v
 }
 
 // say hands the narration to the speaker goroutine; the FSM floor is

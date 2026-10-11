@@ -31,6 +31,9 @@ type Transport interface {
 	Transcript(text string)
 	Reply(text string)
 	DialogState(state string)
+	// Pending reports a command's lifecycle: expired | progress | answered |
+	// late — the UI greys an expired row and marks late outcomes.
+	Pending(id, state string)
 }
 
 // Jsonl writes events as JSON lines — the SIL / headless transport.
@@ -65,6 +68,9 @@ func (l *Jsonl) Transcript(text string) { l.emit(map[string]any{"ev": "transcrip
 func (l *Jsonl) Reply(text string)      { l.emit(map[string]any{"ev": "reply", "text": text}) }
 func (l *Jsonl) DialogState(state string) {
 	l.emit(map[string]any{"ev": "state", "dialog": state})
+}
+func (l *Jsonl) Pending(id, state string) {
+	l.emit(map[string]any{"ev": "pending", "id": id, "state": state})
 }
 
 // ReadSay consumes `say` events from r; each text goes to announce

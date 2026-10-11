@@ -17,3 +17,19 @@ func TestSanitizeAck(t *testing.T) {
 		}
 	}
 }
+
+func TestVoiceOrReplacesIntentNameAcks(t *testing.T) {
+	cases := []struct{ voice, intent, want string }{
+		{`"Unknown"`, "UNKNOWN", "I can't do that."},
+		{"unknown.", "UNKNOWN", "I can't do that."},
+		{"Chitchat", "CHITCHAT", "Hello! I'm listening."},
+		{"Local action", "LOCAL_ACTION", "Okay."},
+		{"Sorry, I can't do flips.", "UNKNOWN", "Sorry, I can't do flips."},
+		{"", "STOP", "Okay."},
+	}
+	for _, c := range cases {
+		if got := voiceOr(c.voice, c.intent); got != c.want {
+			t.Errorf("voiceOr(%q, %s) = %q want %q", c.voice, c.intent, got, c.want)
+		}
+	}
+}

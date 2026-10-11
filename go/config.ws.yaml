@@ -34,7 +34,15 @@ ws:
     tts_margin_s: 2             # tts_done wait beyond the audio length
     # tls_ca_cert / tls_ca_key / tls_addr / tls_leaf_dir / tls_san: https off localhost
 announce_max_age_s: 30
-task_max_age_s: 60
+task_max_age_s:                 # per command kind; task{progress} re-arms the window
+    default: 60
+    LOCAL_ACTION: 90
+    STOP: 30
+    CANCEL: 30
+    NAVIGATE: 600
+    EXPLORE: 600
+    FOLLOW: 600
+    GOTO_TAG: 600
 prompt:  grammar/dog-prompt.txt
 grammar: grammar/dog.gbnf
 barge_in: vad                   # the remote mic is echo-cancelled by Chrome: a VAD onset cuts TTS

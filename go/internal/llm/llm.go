@@ -37,6 +37,7 @@ import "C"
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -130,6 +131,9 @@ func Load(cfg Config) (*LLM, error) {
 
 	cp := C.llama_context_default_params()
 	cp.n_ctx = C.uint32_t(cfg.NCtx)
+	// sliding-window models (gemma3): a reduced SWA cache cannot remove a
+	// partial sequence, and the per-turn rewind below IS a partial removal
+	cp.swa_full = C.bool(true)
 	cp.n_batch = C.uint32_t(cfg.NBatch)
 	cp.n_threads = C.int32_t(cfg.NThreads)
 	cp.n_threads_batch = C.int32_t(cfg.NThreads)
@@ -384,6 +388,33 @@ func (l *LLM) primeLocked(systemPrompt string) (int, error) {
 	return l.nPrefix, nil
 }
 
+// rewind drops every token after the cached prefix (N09-1071 invariant 2:
+// no earlier turn, finished or discarded, leaves a trace). If the memory
+// refuses the partial removal, or the sequence is not where the prefix ends
+// afterwards, the cache is cleared and the prefix re-evaluated instead of
+// continuing on a contaminated context.
+func (l *LLM) rewind(systemPrompt string, nPrefix int) error {
+	mem := C.llama_get_memory(l.ctx)
+	ok := bool(C.llama_memory_seq_rm(mem, 0, C.llama_pos(nPrefix), -1))
+	if ok && int(C.llama_memory_seq_pos_max(mem, 0)) != nPrefix-1 {
+		// the call said yes but the sequence is not where the prefix ends:
+		// treat as a failed rewind (step-4 F3 watch)
+		fmt.Fprintf(os.Stderr, "[llm] rewind: seq_pos_max=%d after seq_rm, want %d — clearing\n",
+			int(C.llama_memory_seq_pos_max(mem, 0)), nPrefix-1)
+		ok = false
+	}
+	if !ok {
+		C.llama_memory_clear(mem, C.bool(true))
+		l.nPast, l.nPrefix, l.prefix = 0, 0, ""
+		if _, err := l.primeLocked(systemPrompt); err != nil {
+			return fmt.Errorf("llm: rewind failed and re-prime failed: %w", err)
+		}
+		return nil
+	}
+	l.nPast = nPrefix
+	return nil
+}
+
 // ── two-pass generation (two_pass.approach_a) ────────────────────────────────
 
 // TwoPass runs one intent turn: reuse the cached prefix, eval the user tail,
@@ -400,9 +431,9 @@ func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
 		return nil, err
 	}
 	// Drop everything after the prefix, rewind, eval only the user tail.
-	mem := C.llama_get_memory(l.ctx)
-	C.llama_memory_seq_rm(mem, 0, C.llama_pos(nPrefix), -1)
-	l.nPast = nPrefix
+	if err := l.rewind(systemPrompt, nPrefix); err != nil {
+		return nil, err
+	}
 	if err := l.decodeTokens(l.tokenize(l.tail(userText), false)); err != nil {
 		return nil, err
 	}
@@ -477,9 +508,9 @@ func (l *LLM) Narrate(systemPrompt, event string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	mem := C.llama_get_memory(l.ctx)
-	C.llama_memory_seq_rm(mem, 0, C.llama_pos(nPrefix), -1)
-	l.nPast = nPrefix
+	if err := l.rewind(systemPrompt, nPrefix); err != nil {
+		return "", err
+	}
 	if err := l.decodeTokens(l.tokenize(l.tail(event), false)); err != nil {
 		return "", err
 	}

@@ -22,36 +22,74 @@ type Emitter interface {
 	Command(id, name string, args map[string]any)
 }
 
-// Item is one pending command.
+// Item is one pending command. At is the last sign of life: issue time,
+// re-armed by every task{progress} from the host.
 type Item struct {
-	ID   string
-	Name string
-	Args map[string]any
-	At   time.Time
+	ID     string
+	Name   string
+	Args   map[string]any
+	At     time.Time
+	MaxAge time.Duration // this command's window (by kind)
+}
+
+// Until is the instant the item expires unless re-armed.
+func (it Item) Until() time.Time { return it.At.Add(it.MaxAge) }
+
+// Ages: how long each command kind may wait for its outcome before the
+// harness stops expecting one. One constant was wrong for a robot (step-4
+// F2): a body action answers in seconds, navigation and exploration take
+// minutes. Default applies to kinds not listed.
+type Ages struct {
+	Default time.Duration
+	ByKind  map[string]time.Duration
+}
+
+func (a Ages) For(kind string) time.Duration {
+	if d, ok := a.ByKind[kind]; ok && d > 0 {
+		return d
+	}
+	if a.Default > 0 {
+		return a.Default
+	}
+	return 60 * time.Second
+}
+
+// DefaultAges: body actions 90 s, stop/cancel 30 s, navigation kinds 10 min.
+func DefaultAges() Ages {
+	return Ages{Default: 60 * time.Second, ByKind: map[string]time.Duration{
+		"LOCAL_ACTION": 90 * time.Second, "STOP": 30 * time.Second,
+		"CANCEL": 30 * time.Second, "NAVIGATE": 10 * time.Minute,
+		"EXPLORE": 10 * time.Minute, "FOLLOW": 10 * time.Minute,
+		"GOTO_TAG": 10 * time.Minute}}
 }
 
 // Pending is the bounded, expiring set of commands awaiting their task
 // event. Bounded (the old action-ack list grew without limit) and
-// expiring (a result for a command the user has long moved past is not
-// narrated).
+// expiring per kind, re-armed by progress. Expired items are remembered
+// (a small ring) so a late outcome is recognized and said to be late
+// instead of vanishing. OnChange, when set, hears every lifecycle step —
+// the transport tells the UI (greyed rows, late marks).
 type Pending struct {
-	mu     sync.Mutex
-	items  map[string]Item
-	order  []string
-	max    int
-	maxAge time.Duration
-	now    func() time.Time
+	mu      sync.Mutex
+	items   map[string]Item
+	order   []string
+	expired []Item // ring of the last 32 expired, for "late" outcomes
+	max     int
+	ages    Ages
+	now     func() time.Time
+	// OnChange(id, state): "expired" (aged out), "progress" (re-armed),
+	// "answered" (taken), "late" (an outcome for an expired command).
+	OnChange func(id, state string)
 }
 
-func NewPending(max int, maxAge time.Duration) *Pending {
+func NewPending(max int, ages Ages) *Pending {
 	if max <= 0 {
 		max = 16
 	}
-	if maxAge <= 0 {
-		maxAge = 60 * time.Second
+	if ages.Default <= 0 && len(ages.ByKind) == 0 {
+		ages = DefaultAges()
 	}
-	return &Pending{items: map[string]Item{}, max: max, maxAge: maxAge,
-		now: time.Now}
+	return &Pending{items: map[string]Item{}, max: max, ages: ages, now: time.Now}
 }
 
 func (p *Pending) Add(it Item) {
@@ -60,10 +98,12 @@ func (p *Pending) Add(it Item) {
 	if it.At.IsZero() {
 		it.At = p.now()
 	}
+	if it.MaxAge <= 0 {
+		it.MaxAge = p.ages.For(it.Name)
+	}
 	p.prune()
 	for len(p.order) >= p.max { // oldest out
-		delete(p.items, p.order[0])
-		p.order = p.order[1:]
+		p.expire(p.order[0])
 	}
 	p.items[it.ID] = it
 	p.order = append(p.order, it.ID)
@@ -79,14 +119,63 @@ func (p *Pending) Take(id string) (Item, bool) {
 	if !ok {
 		return Item{}, false
 	}
-	delete(p.items, id)
-	for i, x := range p.order {
-		if x == id {
-			p.order = append(p.order[:i], p.order[i+1:]...)
-			break
-		}
+	p.remove(id)
+	if p.OnChange != nil {
+		p.OnChange(id, "answered")
 	}
 	return it, true
+}
+
+// Touch re-arms a pending command (a task{progress} beat from the host):
+// its window starts again now. False when unknown or already expired.
+func (p *Pending) Touch(id string) (Item, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.prune()
+	it, ok := p.items[id]
+	if !ok {
+		return Item{}, false
+	}
+	it.At = p.now()
+	p.items[id] = it
+	if p.OnChange != nil {
+		p.OnChange(id, "progress")
+	}
+	return it, true
+}
+
+// Late reports a command that expired recently (and forgets it): a result
+// for it is information, said as late rather than dropped.
+func (p *Pending) Late(id string) (Item, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for i, it := range p.expired {
+		if it.ID == id {
+			p.expired = append(p.expired[:i], p.expired[i+1:]...)
+			if p.OnChange != nil {
+				p.OnChange(id, "late")
+			}
+			return it, true
+		}
+	}
+	return Item{}, false
+}
+
+// Sweep expires what aged out (announcing each) and returns when the next
+// item expires — zero time when nothing is pending. The engine arms one
+// timer on it.
+func (p *Pending) Sweep() time.Time {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.prune()
+	var next time.Time
+	for _, id := range p.order {
+		u := p.items[id].Until()
+		if next.IsZero() || u.Before(next) {
+			next = u
+		}
+	}
+	return next
 }
 
 func (p *Pending) Len() int {
@@ -97,16 +186,34 @@ func (p *Pending) Len() int {
 }
 
 func (p *Pending) prune() {
-	cut := p.now().Add(-p.maxAge)
-	kept := p.order[:0]
-	for _, id := range p.order {
-		if p.items[id].At.Before(cut) {
-			delete(p.items, id)
-			continue
+	now := p.now()
+	for _, id := range append([]string(nil), p.order...) {
+		if !p.items[id].Until().After(now) {
+			p.expire(id)
 		}
-		kept = append(kept, id)
 	}
-	p.order = kept
+}
+
+func (p *Pending) expire(id string) {
+	it := p.items[id]
+	p.remove(id)
+	p.expired = append(p.expired, it)
+	if len(p.expired) > 32 {
+		p.expired = p.expired[1:]
+	}
+	if p.OnChange != nil {
+		p.OnChange(id, "expired")
+	}
+}
+
+func (p *Pending) remove(id string) {
+	delete(p.items, id)
+	for i, x := range p.order {
+		if x == id {
+			p.order = append(p.order[:i], p.order[i+1:]...)
+			return
+		}
+	}
 }
 
 func newID() string {
@@ -175,6 +282,14 @@ func (b *Backend) Query(intent.SemanticTarget, []intent.Relation) []intent.Candi
 
 func (b *Backend) Navigate(pos [3]float64, instanceID int) {
 	b.emit("NAVIGATE", map[string]any{"position": pos, "instance_id": instanceID})
+}
+
+func (b *Backend) NavigateTo(g intent.SemanticTarget, c []intent.Relation) {
+	args := map[string]any{"goal": g}
+	if len(c) > 0 {
+		args["constraints"] = c
+	}
+	b.emit("NAVIGATE", args)
 }
 
 func (b *Backend) Explore(t intent.SemanticTarget) {

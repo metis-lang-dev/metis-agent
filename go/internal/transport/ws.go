@@ -8,9 +8,10 @@
 // Wire (text frames are JSON with "ev"; names = the jsonl vocabulary):
 //
 //	→ browser  state{dialog} · transcript{text,t} · reply{text,t} · intent{intent,voice,t}
-//	           command{id,name,args} · tts{id,rate,channels,format} + binary PCM
+//	           command{id,name,args} · pending{id,state} · tts{id,rate,channels,format} + binary PCM
 //	           chunks + tts_end{id} · tts_stop{id} · role{master,mic_tok} · denied{what}
-//	→ server   say_text{text} · attention{state} · task{id,result,detail} · say{text}
+//	→ server   say_text{text} · attention{state} · task{id,result,detail} (result also
+//	           "progress": re-arms the command's window) · say{text}
 //	           tts_done{id,played_ms} · grab_master · release_master
 //	/ws_mic?tok=…   binary 640-byte s16le 16 kHz frames (multiples accepted, re-cut)
 package transport
@@ -152,6 +153,11 @@ func (s *Server) DialogState(state string) {
 	s.dialog = state
 	s.mu.Unlock()
 	s.broadcast(jmsg(map[string]any{"ev": "state", "dialog": state}))
+}
+
+// Pending tells the UI where a command stands (expired rows go grey).
+func (s *Server) Pending(id, state string) {
+	s.broadcast(jmsg(map[string]any{"ev": "pending", "id": id, "state": state, "t": now()}))
 }
 
 // Command is the wire.Emitter: the typed command the host would execute.
