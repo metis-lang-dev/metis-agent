@@ -187,3 +187,34 @@ kitchen at step-1 rates after the quiet-tick fix).
 
 These land in runtime-wire step 4 (nina). E6b (plain-word renderer,
 think-on ceiling) runs as a check, not as a gate.
+
+## 8. The rack (brainstorm, 2026-10-12, user)
+
+Per-agent tapes: each metis runtime (domain) keeps its own tape —
+shared stable prefix, then that domain's pieces, mirror line and what
+the model said about it. The main orchestrator narrator has its own
+tape and is fed slices of the domain tapes. The user's link: **the
+orchestrator's activation decision IS the retrieval decision.** If the
+orchestrator knows when a domain is enabled, it knows when that
+domain's tape may be retrieved from. So the domain tapes form a RACK
+for the main narrator, and retrieval is STRUCTURAL — keyed by the
+orchestrator's state (the active set, the signal's path, the expanded
+path on a surprise) — never semantic (no embeddings, no model choice).
+
+Consequences, if we go this way:
+- the rack is on the certified side: tapes are written by the
+  runtime's renderer (facts) and by the model's spoken sentences
+  (heard text), indexed by domain path;
+- retrieval triggers = the signals: event → that domain's last pieces;
+  surprise → the raising domain's expanded path (ancestors' and
+  siblings' mirror lines + cards); quiescence with a goal → the active
+  set's mirror lines;
+- activate / deactivate = mount / unmount a tape; a deactivated
+  domain's tape is frozen and kept, so re-activation resumes with its
+  history (flat context per domain, bounded by the tree, not time);
+- the model never chooses what to retrieve; the orchestrator does —
+  the authority split holds for context as it does for action;
+- this is phase 2's orchestrator catalog (G-G) seen from the context
+  side: intents as linear tokens + the rack as orchestrator state.
+  E7 (if run) = rack retrieval keyed by path vs. flat mixing, on two
+  runtimes.
