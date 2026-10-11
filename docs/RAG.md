@@ -1,7 +1,9 @@
-# RACK — per-agent tapes and structural retrieval for the main narrator
+# RAG — per-agent tapes and structural retrieval for the main narrator
 
-Status: design proposal, 2026-10-12 (architect; from the user's "rack"
-and "RAG mechanism" framing, docs/CML.md §8). Experiment first (E7),
+Status: design proposal, 2026-10-12 (architect; from the user's "RAG
+mechanism" framing, docs/CML.md §8). The name "rack" in earlier notes,
+the subject and the Go package is an ASR mishearing of "RAG"; code
+identifiers keep it until E7's read. Experiment first (E7),
 architecture only if E7 says so. Marked **(user)** where the user set it.
 
 ## 1. What it is **(user)**
@@ -9,7 +11,7 @@ architecture only if E7 says so. Marked **(user)** where the user set it.
 Each metis runtime (domain) has its own LLM tape. The main orchestrator
 narrator mixes those tapes into its own context. The orchestrator's
 activation decision IS the retrieval decision: a domain's tape is
-retrievable exactly when the domain is mounted. So the tapes are a RACK
+retrievable exactly when the domain is mounted. So the tapes are a RAG
 for the main narrator and retrieval is structural — keyed by the
 orchestrator's state — never semantic. The mechanism is RAG-shaped
 (store, retriever, insertion) with a structural retriever.

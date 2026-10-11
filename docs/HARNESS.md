@@ -405,7 +405,7 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
   It writes `{episode, arm, ledger}` and `{episode, arm, wakes, tokens,
   noticed}` for the eval's scorer.
 
-## 10. The rack (rack step 2, docs/RACK.md)
+## 10. The rack (rack step 2, docs/RAG.md)
 
 - **N runtimes, one narrator.** `kernel.runtimes` lists runtimes. Each
   entry overrides the kernel config's fields and runs as its own
@@ -416,7 +416,7 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
     (`Host.Share`). Mirror lines and open surprises are kept per path.
   - A UI runtime intent names its runtime as `@path intent`. Without a
     path it goes to the first runtime.
-- **Counts (RACK §2, step-1 finding 3).** `kernel.Counts` follows each
+- **Counts (RAG §2, step-1 finding 3).** `kernel.Counts` follows each
   runtime's model counts.
   - It starts from the watch answer's `counts` and is updated by clause
     consume/produce, exogenous ops, an admitted explain's `adopted`, and
@@ -436,7 +436,7 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
     last order.
   - Unmount freezes a tape: its records stay, new ones are counted as
     dropped, and the retriever skips it.
-- **The retriever** is RACK §3 verbatim: mount filter, scope by trigger,
+- **The retriever** is RAG §3 verbatim: mount filter, scope by trigger,
   rank by kind weight then recency, budget, and mirror lines first.
   - The scopes are `event(path)`, `surprise(path)` (plus the siblings'
     mirror lines, cards and event records), `quiescence(path)` and
@@ -444,7 +444,7 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
   - Fed opus's E7 pair run through the harness renderer, it selects the
     reference S arm's records, mirror lines and cards for all 24
     questions (`TestRetrieverMatchesTheE7Reference`).
-- **Insertion and cue (RACK §4).** The insertion is ⟪path: text⟫
+- **Insertion and cue (RAG §4).** The insertion is ⟪path: text⟫
   fragments grouped by path: the trigger's path first, each path's mirror
   line first (from `ctx --mirror` on demand).
   - Then comes `Just now: <the trigger's pieces>`, the focus. In the

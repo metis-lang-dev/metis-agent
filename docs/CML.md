@@ -196,7 +196,7 @@ the model said about it. The main orchestrator narrator has its own
 tape and is fed slices of the domain tapes. The user's link: **the
 orchestrator's activation decision IS the retrieval decision.** If the
 orchestrator knows when a domain is enabled, it knows when that
-domain's tape may be retrieved from. So the domain tapes form a RACK
+domain's tape may be retrieved from. So the domain tapes form a RAG
 for the main narrator, and retrieval is STRUCTURAL — keyed by the
 orchestrator's state (the active set, the signal's path, the expanded
 path on a surprise) — never semantic (no embeddings, no model choice).
