@@ -294,7 +294,13 @@ func (e *Engine) Run(ctx context.Context, vadEvents <-chan vad.Event, textIn <-c
 			_ = ok
 			// Response finished (or was cut): release the floor.
 			_ = e.Turn.SystemAction('R')
-			e.event("dialog", "LISTENING")
+			// after "go to sleep" the last words were "Voice controls
+			// disabled.": the room is asleep, not listening (step-4 F16)
+			if e.Attn.Awake() {
+				e.event("dialog", "LISTENING")
+			} else {
+				e.event("dialog", "ASLEEP")
+			}
 			if len(e.chatQueue) > 0 {
 				text := e.chatQueue[0]
 				e.chatQueue = e.chatQueue[1:]

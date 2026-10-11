@@ -434,3 +434,35 @@ func TestImprintedWakeGate(t *testing.T) {
 	events <- utter("owner:hey rex sit down")
 	waitFor(t, func() bool { return len(spk.said()) == 1 }, "owner wake+command")
 }
+
+// Step-4 F16: after "nina go to sleep" the floor is released when "Voice
+// controls disabled." ends — the dialog state then is ASLEEP, not LISTENING.
+func TestSleepEndsAsleepNotListening(t *testing.T) {
+	spk := newFakeSpeaker(10 * time.Millisecond)
+	e := New(Config{SystemPrompt: "p", GBNF: "g", Attention: true,
+		WakeWords: []string{"nina"}, SleepPhrases: []string{"go to sleep"}},
+		fakeLLM{json: `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`, voice: "Sitting."},
+		fakeSTT{}, spk)
+	var mu sync.Mutex
+	states := []string{}
+	e.Events = func(kind string, payload any) {
+		if s, ok := payload.(string); ok && kind == "dialog" {
+			mu.Lock()
+			states = append(states, s)
+			mu.Unlock()
+		}
+	}
+	events, cancel, wg := run(t, e)
+	defer func() { cancel(); wg.Wait() }()
+	events <- utter("nina sit down")
+	waitFor(t, func() bool { return len(spk.said()) == 1 }, "awake reply")
+	time.Sleep(300 * time.Millisecond) // past the echo tail
+	events <- utter("nina go to sleep")
+	waitFor(t, func() bool { return len(spk.said()) == 2 }, "sleep reply")
+	time.Sleep(100 * time.Millisecond)
+	mu.Lock()
+	defer mu.Unlock()
+	if last := states[len(states)-1]; last != "ASLEEP" {
+		t.Errorf("dialog states %v: last %q, want ASLEEP", states, last)
+	}
+}
