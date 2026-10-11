@@ -336,3 +336,59 @@ margin, facts belong in the prefix zone, not the stream; if Z (zero-
 context narration) loses to T, the renderer stays deterministic; if the
 conflict probe keeps the older value, recency cannot be relied on and
 compaction must delete the stale fact, not just append the new one.
+
+### E6 / E6b results (2026-10-12, opus; `tools/splice-bench.sh`, results/e6)
+
+E2B Q4 on taycann's GPU, in nina's windows:
+- E6: thinking off on all 12 facts, plus thinking on for the 4 surprise facts.
+- E6b: the plain-word template T2, thinking off and on, all 12 facts.
+- The E4B reference row was cancelled by the user's decision (E2B stays).
+
+Setup:
+- 12 facts, each a real runtime line from the metispy fixtures (`tools/splice-corpus.py`).
+- The context is the persona prefix + a 6-turn dog chat on the harness's tape. The piece is spliced as a whole turn (`AppendTape`), then N distractor turns, then the probe (`llm.Answer`, greedy).
+- "Used" is scored on the answer with `⟪…⟫` spans stripped. Echo and forged spans are counted apart (`tools/splice-score.py`).
+
+**Fact used, by piece and form, at distance 0 / 2 / 6** (12 facts per cell):
+
+| piece | think | inline ⟪metis⟫ | system note | user turn |
+|---|---|---|---|---|
+| T: the harness template (`kernel.Translate`) | off | 0.75 / 0.67 / 0.67 | 0.50 / 0.67 / 0.58 | 0.58 / 0.58 / 0.50 |
+| **T2: plain words** (`kernel.PlainWords`: card and move names in the cards' own words, + the notice) | off | **0.92** / 0.75 / 0.75 | 0.67 / **0.83 / 0.75** | 0.75 / 0.67 / 0.58 |
+| T2 | on | **1.00** / 0.67 / 0.42 | 0.83 / 0.75 / 0.75 | 0.92 / 0.75 / 0.58 |
+| Z: the model narrates the raw line alone | off | 0.42 / 0.25 / 0.42 | 0.25 / 0.33 / 0.33 | 0.33 / 0.33 / 0.25 |
+| R: the raw JSON line | off | 0.75 / 0.67 / 0.58 | 0.50 / 0.50 / 0.50 | 0.58 / 0.42 / 0.50 |
+
+**Other measures** (conflict and continuation: inline, distance 2):
+
+| piece, think | invented | echo | forged | conflict: newer wins / older kept | continuation restates / echoes | piece tok, splice ms | answer ms p50 |
+|---|---|---|---|---|---|---|---|
+| T, off | 0.03–0.08 | 0.31–0.36 | 0.00–0.08 | 0.67 / 0.08 | 0.00 / 0.83 | 47, 16 | 120 |
+| T2, off | 0.03–0.08 | 0.31–0.42 | 0.00–0.08 | 0.75 / 0.08 | 0.00 / 0.75 | 48, 17 | 114 |
+| T2, on | 0.08 | 0.28–0.44 | 0.06–0.08 | 0.58 / 0.17 | 0.08 / 0.83 | 48, 17 | 268 |
+| Z, off | 0.03–0.08 | 0.17–0.33 | 0.00–0.14 | 0.33 / 0.42 | 0.08 / 0.83 | 63, 17 | 129 |
+| R, off | 0.03–0.08 | 0.08–0.22 | 0.00–0.19 | 0.50 / 0.17 | 0.00 / 0.50 | 144, 17 | 112 |
+
+**Reads, against the brief:**
+1. **Inline at distance 0: yes, with plain words.** T2 reaches 0.92 (think off) and 1.00 (think on). The template as the harness had it (T) is 0.75: the gap is atom names. Per fact, T2 fixes exactly the two the names broke: f05 "who put the extra onion in?" 0.00 → 0.56 (0.67 think), and f10 "how many orders in a row?" 0.00 → 1.00.
+2. **The system note does not win at distance 0, but it holds at distance.** T2 system: 0.83 / 0.75 at distance 2 / 6, against inline 0.75 / 0.75 (think off) and 0.67 / 0.42 (think on). A fact that must persist across turns belongs in a standing region (the mirror / prefix zone). The stream is right for the fact the very next turn needs.
+3. **Z loses to T everywhere** (0.25–0.42). The renderer stays deterministic, as CML §1.1 already says.
+4. **Recency cannot be relied on.** With the newer value inline two turns after the older one, T2 has the newer win 0.75 and the older kept 0.08 (think off). Thinking makes it worse (0.58 / 0.17), and Z keeps the older value 0.42. Compaction must DELETE the stale fact, not append the new one.
+
+**Three effects the brief did not anticipate:**
+- **Echo.** A third of all answers open by copying the spliced `⟪metis …⟫` line back. With thinking on, about a fifth are ONLY the copy, with no answer: that is most of think-on's decay with distance. The continuation probe ("go on with your status report") never restates the fact in words (0.00–0.08); it copies the line (0.75–0.94). Harness rule (nina, 9eba55d): any output with `⟪⟫` or "metis seq=" is unspeakable; the template speaks instead.
+- **Forged facts.** Up to 0.19 of answers (R or Z pieces as a user turn) write their own `⟪metis …⟫` span with a fact the runtime never sent, e.g. "⟪metis: The kitchen can act on a new order right now⟫. Yes, it can…" (wrong: it was observe-only). The model imitates the runtime's syntax to invent facts. Covered by the same rule: refused, not stripped.
+- **Thinking hurts at distance.** It helps at distance 0 (T2 inline 0.92 → 1.00) and costs +150 ms per answer. At distance 6 it halves inline use (0.75 → 0.42) and lowers newer-wins. Think-on is not worth it for spliced facts.
+
+**Facts that stay weak even with T2** (inline + system + user, all distances):
+- f04 "how much pot space does the reading show?" 0.22 (think 0.44): the diff sentence lists two atoms, and the model answers for the onion count or echoes.
+- f07 "can the kitchen act on a new order?" 0.44 (think 0.78): the piece says "it only watches now and acts on nothing", and the model doesn't infer "no new orders".
+- f11 "why was the second reset refused?" 0.56 (think 0.22, mostly echo-only).
+
+These are inference distance, not wording: a fact that must be *applied* to a question is used less than one that only has to be *read back*.
+
+**What this says for the stream idea (CML):** splicing a fact works when the piece is in plain words, deterministic, and right before the turn that needs it (0.92–1.00). It does not carry a fact across turns reliably (0.42–0.75 at 6 turns), it does not override an older value reliably, and the model's own output must never be allowed to contain the fragment syntax. So:
+1. T2 should become the harness's fact renderer for the tape.
+2. Standing facts go in the mirror region, overwritten in place, never appended.
+3. Compaction deletes superseded facts.
+4. ⟪⟫ in model output is refused (done, 9eba55d).
