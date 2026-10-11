@@ -362,3 +362,18 @@ func TestTaskDetailIsCleanedBeforeNarration(t *testing.T) {
 		t.Errorf("cue %q", cues)
 	}
 }
+
+// A FIND intent goes out on the wire as EXPLORE; its done is "Found it.",
+// not the generic "Done." (switch rehearsal: both models said "Done.").
+func TestFindDoneIsFoundIt(t *testing.T) {
+	e, spk, em, _ := newTaskEngine(t, `{"intent":"FIND","target":{"type":"OBJECT","description":"red ball"}}`)
+	_, cancel, wg := run(t, e)
+	defer func() { cancel(); wg.Wait() }()
+	e.SayText("find the red ball")
+	waitFor(t, func() bool { return len(em.ids) == 1 && len(spk.said()) == 1 }, "FIND dispatched and acked")
+	e.TaskEvent(Task{ID: em.ids[0], Result: "done"})
+	waitFor(t, func() bool { return len(spk.said()) == 2 }, "done narration")
+	if got := spk.said()[1]; got != "Found it." {
+		t.Errorf("FIND done = %q", got)
+	}
+}

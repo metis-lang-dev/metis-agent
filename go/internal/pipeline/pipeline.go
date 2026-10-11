@@ -490,15 +490,16 @@ func commandPhrase(it wire.Item) string {
 		return "go there"
 	case "GOTO_TAG":
 		return "go to the tag"
-	case "FIND":
+	case "EXPLORE": // the wire command a FIND intent dispatches as
 		return "find it"
 	}
 	return strings.ToLower(strings.ReplaceAll(it.Name, "_", " "))
 }
 
-// doneText is the past tense of a finished command.
+// doneText is the past tense of a finished command, keyed by the wire
+// command name (FIND goes out as EXPLORE).
 var doneText = map[string]string{"STOP": "Stopped.", "CANCEL": "Cancelled.",
-	"NAVIGATE": "I'm there.", "GOTO_TAG": "I'm at the tag.", "FIND": "Found it."}
+	"NAVIGATE": "I'm there.", "GOTO_TAG": "I'm at the tag.", "EXPLORE": "Found it."}
 
 func narrateTemplate(it wire.Item, t Task) string {
 	what := commandPhrase(it)
