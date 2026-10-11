@@ -23,7 +23,12 @@ domain named, the other one named). The arms (RACK §6):
      at least 6), no mirror lines, no scoping;
   1  single-domain: the asked path's tape only (needs[0]), last K.
 `covered[arm]` says whether the arm inserts every evidence item — the
-contract check: an S miss is a property of RACK §3, not of the model."""
+contract check: an S miss is a property of RACK §3, not of the model.
+The contract is RACK.md v2 (findings 1-4 folded in): the mirror line
+carries progress counts and the last event (metispy mirror `now`/`last`),
+surprise(path) also takes the siblings' event records since their last
+quiescence, event templates carry counts (so a serve record says the
+count), and `t` is the harness's arrival order."""
 import argparse
 import json
 import sys
@@ -74,9 +79,15 @@ def retrieve_S(sigs, t, trigger, active=tuple(SCENES)):
     elif k == "surprise":
         own = since_quiescence(tapes[path])
         # the surprise itself and what answered it are part of the work
-        recs = own
-        mirrors = [path] + [p for p in active if p != path]
-        cards = [p for p in active if p != path]
+        recs = list(own)
+        sibs = [p for p in active if p != path]
+        mirrors = [path] + sibs
+        cards = sibs
+        # RACK v2 (finding 2): the siblings' EVENT records since their
+        # last quiescence — the fact, not only the card's hypothesis
+        for p in sibs:
+            recs += [s for s in since_quiescence(tapes[p])
+                     if kind(s) == "event"]
     elif k == "quiescence":
         mirrors = list(active)
         # each set member's last `said` (none on a bench tape)
@@ -180,8 +191,9 @@ def questions():
           NO, ["mirror:kitchen_shared"], probe="ask"),
         Q("q11", "one", 128, ev(B), [B], "What did the second cook just do?",
           r"serv\w*", ["kitchen_shared#27"]),
-        Q("q12", "one", 94, qu(B), [B], "Is the second cook idle now?",
-          YES, ["mirror:kitchen_shared"]),
+        Q("q12", "one", 249, ask, [B],
+          "How many soups has the second cook served?",
+          r"\b2\b|\btwo\b", ["mirror:kitchen_shared"], probe="ask"),
         # both domains (8)
         Q("q13", "both", 91, su(A), [A, B],
           "Where did the extra onion in the first cook's pot come from?",
@@ -199,9 +211,10 @@ def questions():
           "Did the second cook do anything to the first cook's pot?",
           r"^(?!.*\b(no|not|didn't|did not)\b).*\b(yes|onion|loaded|put|dropped|added)\b",
           ["kitchen#19", "card:kitchen_shared"]),
-        Q("q19", "both", 105, qu(A), [A, B],
-          "Is either cook still working right now?",
-          NO, ["mirror:kitchen", "mirror:kitchen_shared"]),
+        Q("q19", "both", 249, ask, [A, B],
+          "How many soups have the two cooks served together?",
+          r"\b5\b|\bfive\b", ["mirror:kitchen", "mirror:kitchen_shared"],
+          probe="ask"),
         Q("q20", "both", 91, su(A), [A, B], CUE, r"surpris\w*|unexpected|extra",
           ["kitchen#18", "kitchen#19"], probe="cue"),
         # attribution among similar facts (4)
@@ -227,12 +240,14 @@ def questions():
     alt = {"q04": [[MA], ["kitchen#26"]], "q05": [[MA], ["kitchen#19"]],
            "q09": [[MB], ["kitchen_shared#37"]],
            "q10": [[MB], ["kitchen_shared#38"]],
-           "q12": [[MB], ["kitchen_shared#17"]],
+           # counts: the mirror's progress (v2) or the last serve event's
+           # count (v2 templates carry counts)
+           "q12": [[MB], ["kitchen_shared#27"]],
            "q13": origin, "q14": origin, "q18": origin,
            "q15": [[MA, MB], ["kitchen#39", "kitchen_shared#38"]],
            "q16": [[MA, MB], ["kitchen#14", "kitchen_shared#14"]],
            "q17": [[MA, MB], ["kitchen#26", "kitchen_shared#19"]],
-           "q19": [[MA, MB], ["kitchen#26", "kitchen_shared#17"]],
+           "q19": [[MA, MB], ["kitchen#36", "kitchen_shared#27"]],
            "q24": [[MB], ["kitchen_shared#36", "kitchen_shared#37"]]}
     for q in qs:
         q["evidence"] = alt.get(q["id"], q["evidence"])
