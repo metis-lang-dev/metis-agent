@@ -160,3 +160,30 @@ kitchen at step-1 rates after the quiet-tick fix).
 3. Cards as tools: the E4 rendering (native tool call under GBNF) vs the
    JSON intent at the grammar point — same choice as E4, measured again
    on the tape.
+
+## 7. Decisions 2026-10-12 (user, after E6)
+
+1. **Model: E2B stays.** The E6 level is a success; no E4B reference needed.
+2. **Templates per event kind.** The piece is always a deterministic
+   template, one per signal kind (event / reading / quiescence / surprise
+   / result / notice), in plain words (atom names → the card's provenance
+   words), inserted inline at the tail.
+3. **The middle ground = cued streaming.** Every inserted piece is
+   followed by a short cue that asks the model to speak about it (the
+   harness's framed narration), so the piece is both the subconscious
+   fact on the tape and the thing the model interprets. "Ask, don't
+   flow" (E6): the cue is what turns a copied line into a sentence.
+   Direct interpretation of the template is allowed and expected; the
+   number guard and the fragment-syntax strip stay.
+4. **Thinking on for surprise-class pieces** (surprise, notice, refused
+   result): 1.00 at distance 0 for +270 ms, which the person cannot
+   observe. Off for progress pieces.
+5. **Unsolicited narration of events.** The robot speaks about runtime
+   events on its own — the cue is solicited by the runtime, not by the
+   person; the floor decides when (an event waits for a free floor, a
+   surprise takes it). Quiet beats still say nothing.
+6. **Hygiene:** strip `⟪…⟫` from model output, refuse forged spans;
+   compaction deletes stale facts at quiescence.
+
+These land in runtime-wire step 4 (nina). E6b (plain-word renderer,
+think-on ceiling) runs as a check, not as a gate.
