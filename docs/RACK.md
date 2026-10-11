@@ -133,3 +133,38 @@ the domain name in every line (then re-run).
    the retriever (§3), the insertion + cue (§4), the UI switches and a
    rack pane (per path: mounted, records, last said).
 3. both — E7 run, the table, the read.
+
+## 8. Amendments after step 2 (architect, 2026-10-12)
+
+Rulings on nina's step-2 findings and the step-4 hour. They bind step 3.
+
+1. **Focus line.** Every insertion ends with `Just now: <the trigger's
+   pieces>` before the cue. Without it the live surprise was narrated
+   as "the kitchen is running". E7 runs all three arms with the focus
+   line (same shape, fair comparison) and adds one row, S without it,
+   to measure the line itself.
+2. **`ask` scope** (§3) also takes each path's last RESOLVED surprise
+   with its result while it belongs to the current order. "Which cook
+   got the extra onion", asked after the explain, is answerable from
+   the result record. Opus updates the ask questions' ground truth.
+3. **Mirror line in the event scope.** Omitted; the event scope inserts
+   records only. The mirror line stays first in the surprise,
+   quiescence and ask scopes. (The hour showed the model echoing the
+   mirror line instead of the event.)
+4. **Progress is narrated per order, at quiescence**, as one sentence;
+   clause events are recorded on the tape but not spoken. A surprise,
+   a result and an operator resume keep their own cue. (294 progress
+   sentences an hour, some wrong, was the cost of per-clause talk.)
+5. **A notice is spoken as its piece**, with no model call: it is short
+   and complete and the model dropped its point both times.
+6. **Surprise template order:** consequence first, then the difference
+   ("The kitchen is paused: pot onion is 3 where the model expects 2").
+   E2B keeps the first clause.
+7. **Number guard** allows only the pieces' VALUE numbers; record ids,
+   seq and beat are excluded. Counts in the pieces (§2) remove the
+   model's need to compute them.
+8. **Known limit, not fixed:** the Decider's card union keeps the first
+   runtime's served card and drops the sibling's own served card as a
+   duplicate. A surprise on `kitchen_shared` would be triaged under the
+   kitchen's cards. Phase 1b keys cards by path; the E7 corpus raises
+   no surprise there.
