@@ -1,14 +1,21 @@
+# DEFAULT since 2026-10-11 (the user's switch decision, nina-harness step 4):
+# gemma4 E2B Q4 as the intent model, the same as opus's E1 row
+# "gemma-4-E2B-it-Q4_K_M" + p2ex: template gemma4, thinking off, the pass-2
+# examples appended to the prompt (54/54 intents, 0 voice leaks); E2B +
+# whisper base.en co-resident 2.37 GB on taycann. Switch rehearsal: the
+# step-4 wsprobe list, no intent regression against gemma3. The gemma3:4b
+# config is kept as the fallback, config.ws.gemma3.yaml.
 # The harness behind the web UI (HARNESS.md §5-§6): the browser captures the
 # mic (AudioWorklet → /ws_mic) and plays TTS (binary frames → tts_done); the
 # dialog, VAD, ASR, intent and synthesis stay here. Events + chat + task
 # feedback on /ws. Start with -ui-dir <metis-loop/apps/nina-web>.
 llm:
-    model: models/gemma3-4b-it-Q4_K_M.ollama-a2af6cc3.gguf
+    model: models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf
     n_ctx: 4096
     n_batch: 512
     n_threads: 6
     n_gpu_layers: 99
-    template: auto
+    template: gemma4            # rendered by the adapter (TemplateGemma4); thinking stays off
     pass2: {temperature: 0.4, top_k: 40, max_tokens: 50}
 stt:
     model: /home/axadmin/archive/vox/FSTTM/models/ggml-base.en-q5_1.bin
@@ -44,5 +51,6 @@ task_max_age_s:                 # per command kind; task{progress} re-arms the w
     FOLLOW: 600
     GOTO_TAG: 600
 prompt:  grammar/dog-prompt.txt
+prompt_extra: [grammar/pass2-examples-gemma4.txt]   # gemma4 leaked JSON on CANCEL/UNKNOWN without them (E1)
 grammar: grammar/dog.gbnf
 barge_in: vad                   # the remote mic is echo-cancelled by Chrome: a VAD onset cuts TTS

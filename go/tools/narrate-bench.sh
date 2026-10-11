@@ -4,8 +4,8 @@
 # harness's own framing (pipeline.TaskCue, a5d22c0 F8), Narrate, and the
 # harness guard (sanitizeAck + taskVoiceOK → template on reject), for each
 # model under the prompt its harness config uses:
-#   gemma3  config.ws.yaml         grammar/dog-prompt.txt
-#   gemma4  config.ws.gemma4.yaml  grammar/dog-prompt.txt + pass2-examples-gemma4.txt
+#   gemma3  config.ws.gemma3.yaml  grammar/dog-prompt.txt
+#   gemma4  config.ws.yaml         grammar/dog-prompt.txt + pass2-examples-gemma4.txt
 #
 #   tools/narrate-bench.sh [-o results/narrate] [model.gguf ...]
 set -euo pipefail
