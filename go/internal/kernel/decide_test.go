@@ -66,3 +66,28 @@ func TestMovesBareOrWithEffects(t *testing.T) {
 		t.Errorf("effects not rendered:\n%s", d.System)
 	}
 }
+
+// The renderer is a template: signal in, fragment out, byte-exact (opus's
+// step-1 lines verbatim).
+func TestFragmentsByteExact(t *testing.T) {
+	for _, c := range []struct{ line, want string }{
+		{`{"signal": "event", "seq": 4, "path": "kitchen", "beat": 1, "kind": "clause", "name": "load", "fired": 3, "stage": "task", "consume": {"held_onion": 1, "pot_space": 1}, "produce": {"hand_free": 1, "pot_onion": 1}}`,
+			"⟪metis seq=4 beat=1 kitchen: load fired; hand_free +1, held_onion -1, pot_onion +1, pot_space -1⟫"},
+		{`{"signal": "surprise", "seq": 5, "path": "kitchen", "beat": 1, "record": 0, "kind": "unmodeled", "likelihood": 0, "steps": 1, "observed": {"hand_free": 1, "pot_space": 1, "pot_onion": 2}, "model": {"hand_free": 1, "pot_space": 2, "pot_onion": 1}, "diff": {"pot_space": -1, "pot_onion": 1}, "observe_only": true}`,
+			"⟪metis seq=5 beat=1 kitchen: SURPRISE #0 unmodeled; reading pot_onion 2, pot_space 1; model pot_onion 1, pot_space 2; difference pot_onion +1, pot_space -1; observe-only⟫"},
+		{`{"signal": "event", "seq": 8, "path": "kitchen", "beat": 2, "kind": "reading", "consistent": true, "diff": {}, "record": 0}`,
+			"⟪metis seq=8 beat=2 kitchen: reading #0 consistent again⟫"},
+		{`{"signal": "quiescence", "seq": 27, "path": "kitchen", "beat": 30, "stage": "task", "fired": 51, "episode_over": true, "observe_only": false}`,
+			"⟪metis seq=27 beat=30 kitchen: quiescent after 51 moves; episode over⟫"},
+		{`{"signal": "result", "seq": 10, "path": "kitchen", "beat": 8, "intent": 1, "verb": "reset", "status": "admitted", "reason": "the reading is set aside as noise", "record": 0}`,
+			"⟪metis seq=10 beat=8 kitchen: reset #0 admitted: the reading is set aside as noise⟫"},
+	} {
+		var f map[string]any
+		if err := json.Unmarshal([]byte(c.line), &f); err != nil {
+			t.Fatal(err)
+		}
+		if got := Fragment(Signal{Kind: f["signal"].(string), Seq: int(f["seq"].(float64)), Path: "kitchen", F: f}); got != c.want {
+			t.Errorf("\n got %s\nwant %s", got, c.want)
+		}
+	}
+}

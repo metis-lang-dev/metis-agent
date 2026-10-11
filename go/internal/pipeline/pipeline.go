@@ -162,9 +162,13 @@ type Engine struct {
 	pending    []announcement    // deferred while the floor is busy / asleep
 	taskCh     chan Task         // host outcomes for emitted commands
 	runtimeCh  chan RuntimeEvent // runtime signals the dialog narrates (internal/kernel)
-	chatCh     chan string       // typed utterances (say_text)
-	chatQueue  []string          // typed utterances waiting for the floor
-	kick       chan struct{}     // wakes the loop when something outside it changed (attention)
+
+	// OnRuntimeSpoken hears every sentence said about the runtime (its
+	// facts and its intents' results): the kernel puts them on the tape
+	OnRuntimeSpoken func(text string)
+	chatCh          chan string   // typed utterances (say_text)
+	chatQueue       []string      // typed utterances waiting for the floor
+	kick            chan struct{} // wakes the loop when something outside it changed (attention)
 }
 
 type announcement struct {
@@ -427,6 +431,9 @@ func (e *Engine) onTask(t Task) {
 		text = "Late news: " + strings.TrimSpace(text)
 	}
 	log.Printf("[task] %s %s (%s) → %q", t.ID, t.Result, it.Name, text)
+	if it.Name == RuntimeCommand && e.OnRuntimeSpoken != nil {
+		e.OnRuntimeSpoken(text)
+	}
 	e.park(announcement{text, t.At})
 }
 
@@ -456,7 +463,11 @@ func (e *Engine) narrate(it wire.Item, t Task) string {
 	if !ok || (t.Result != "failed" && t.Result != "refused" && !runtimeDone) {
 		return fallback
 	}
-	out, err := n.Narrate(e.cfg.SystemPrompt, taskCue(it, t))
+	cue := taskCue(it, t)
+	if it.Name == RuntimeCommand {
+		cue = runtimeResultCue(it, t)
+	}
+	out, err := n.Narrate(e.cfg.SystemPrompt, cue)
 	if err != nil {
 		log.Printf("[task] narration failed: %v", err)
 		return fallback

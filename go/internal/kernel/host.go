@@ -39,9 +39,9 @@ type Host struct {
 	narrate map[string]bool
 
 	mu       sync.Mutex
-	byIntent map[int]string // runtime intent number → pending command id
-	early    map[int]Signal // results that beat their op's answer
-	narrated atomic.Int64   // signals handed to the dialog to speak (quiet cost)
+	byIntent map[int]string            // runtime intent number → pending command id
+	early    map[int]Signal            // results that beat their op's answer
+	narrated atomic.Int64              // signals handed to the dialog to speak (quiet cost)
 	waiters  map[string]chan [2]string // command id → its outcome, for triage
 
 	// Triage (runtime-wire step 3): with Dec and LLM set, every surprise is
@@ -50,7 +50,19 @@ type Host struct {
 	Dec      *Decider
 	LLM      LLM
 	MaxTries int
-	Beat     time.Duration // the watch's beat: triage waits one for the next reading
+	Beat     time.Duration // the watch's beat
+	Settle   time.Duration // triage waits this long for the next reading (settle_beats × beat)
+	Prompt   string        // the one system prompt (dog prompt + Dec.System): every seat's cached prefix
+
+	// the tape (step 4): every signal as a ⟪metis …⟫ fragment, and what was
+	// said about the runtime, appended after the prefix; compacted at
+	// quiescence, deterministically
+	Tape     TapeWriter
+	keep     int
+	tapeMu   sync.Mutex
+	entries  []tapeEntry
+	lastRec  int
+	Ledger   TapeLedger
 	triageQ  chan Signal
 	settled  map[int]bool // records whose reading came back consistent
 	inTriage atomic.Int64 // surprises queued or being closed
@@ -79,7 +91,15 @@ func NewHost(cfg Config, pend *wire.Pending) *Host {
 	}
 	h := &Host{Pend: pend, narrate: map[string]bool{}, byIntent: map[int]string{}, early: map[int]Signal{},
 		waiters: map[string]chan [2]string{}, MaxTries: 3, Beat: watchEvery(cfg.Watch),
-		settled: map[int]bool{}}
+		settled: map[int]bool{}, keep: cfg.KeepEpisodes, lastRec: -1}
+	sb := cfg.SettleBeats
+	if sb <= 0 {
+		sb = 2.5
+	}
+	h.Settle = time.Duration(sb * float64(h.Beat))
+	if h.keep <= 0 {
+		h.keep = 3
+	}
 	for _, k := range kinds {
 		h.narrate[k] = true
 	}
@@ -104,6 +124,21 @@ func (h *Host) Signal(s Signal) {
 	log.Printf("[kernel] #%d %s %s%s", s.Seq, ev.Kind, ev.Fact, map[bool]string{true: " (narrated)"}[ev.Narrate])
 	if h.OnEvent != nil {
 		h.OnEvent(ev)
+	}
+	if h.Tape != nil {
+		rec := -1
+		if r, ok := s.F["record"].(float64); ok {
+			rec = int(r)
+		}
+		if s.Kind == "surprise" {
+			h.tapeMu.Lock()
+			h.lastRec = rec
+			h.tapeMu.Unlock()
+		}
+		h.tapeAdd(s.Kind, rec, h.Tape.Turn("user", Fragment(s)))
+		if s.Kind == "quiescence" {
+			h.compact()
+		}
 	}
 	if s.Kind == "surprise" && h.Dec != nil && h.LLM != nil {
 		h.startTriage()
@@ -140,16 +175,22 @@ func (h *Host) triage(s Signal) {
 	// the runtime reads again every beat and says so only when the reading
 	// changes; the first re-read lands up to two beats after the surprise
 	// (live: +1.0 s at every=0.5), so 2.5 beats tell a misread from a gap
-	time.Sleep(2*h.Beat + h.Beat/2)
+	time.Sleep(h.Settle)
 	settled := h.isSettled(r)
 	next := "Next reading: the difference persists."
 	if settled {
 		next = "Next reading: it matches the model again."
 	}
-	user := SurpriseText(s) + "\n" + next
+	// with the tape the facts are already in the context: the turn only asks
+	user := fmt.Sprintf("Close SURPRISE #%d in %s with exactly one tool call.\n%s", r, s.Path, next)
+	sys := h.Prompt
+	if h.Tape == nil || sys == "" {
+		user, sys = SurpriseText(s)+"\n"+next, h.Dec.System
+	}
 	cont := ""
 	for try := 1; try <= h.MaxTries; try++ {
-		out, err := h.LLM.Decide(h.Dec.System, user, cont, h.Dec.GBNF, 120)
+		out, ttft, err := h.LLM.DecideTimed(sys, user, cont, h.Dec.GBNF, 120)
+		h.Ledger.decide(ttft)
 		if err != nil {
 			log.Printf("[kernel] decide record %d: %v", r, err)
 			break
@@ -160,7 +201,7 @@ func (h *Host) triage(s Signal) {
 			break
 		}
 		line := call.Intent(r)
-		h.note("decide", s.Path, fmt.Sprintf("record %d, call %d: %s", r, try, line))
+		h.note("decide", s.Path, fmt.Sprintf("record %d, call %d: %s (first token %d ms)", r, try, line, ttft.Milliseconds()))
 		res, reason := h.intentWait(line)
 		if res == "done" {
 			return

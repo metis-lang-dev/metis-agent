@@ -7,13 +7,14 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Card is one catalog card as the runtime's `cards` op lists it.
 type Card struct {
-	Name     string   `json:"name"`
-	Text     string   `json:"text"`
-	Relation string   `json:"relation"` // served | sibling | …
+	Name     string `json:"name"`
+	Text     string `json:"text"`
+	Relation string `json:"relation"` // served | sibling | …
 	Moves    []Move `json:"moves"`
 	Effects  []Move `json:"effects"` // the moves' clause effects (metispy c937c7a)
 }
@@ -46,7 +47,14 @@ func (m Move) effect() string {
 	return signed(net)
 }
 
-func signed(net map[string]int) string {
+func signed(net map[string]int) string { return signedNames(net, words) }
+
+// signedRaw keeps the atom names verbatim (tape fragments).
+func signedRaw(net map[string]int) string {
+	return signedNames(net, func(s string) string { return s })
+}
+
+func signedNames(net map[string]int, name func(string) string) string {
 	keys := make([]string, 0, len(net))
 	for k, v := range net {
 		if v != 0 {
@@ -56,7 +64,7 @@ func signed(net map[string]int) string {
 	sort.Strings(keys)
 	var p []string
 	for _, k := range keys {
-		p = append(p, fmt.Sprintf("%s %+d", words(k), net[k]))
+		p = append(p, fmt.Sprintf("%s %+d", name(k), net[k]))
 	}
 	return strings.Join(p, ", ")
 }
@@ -67,14 +75,18 @@ func signed(net map[string]int) string {
 // escalate(text). The record is the open surprise's, never the model's
 // choice.
 type Decider struct {
-	System string // tool declarations + cards + the rules (the cached prefix)
+	// System is the runtime section: the fact syntax, the rules, the cards
+	// and the tool declarations. Step 4: it is appended to the dog prompt,
+	// so ONE system prompt is the cached prefix for every seat.
+	System string
 	GBNF   string
 	Cards  []Card
 }
 
-// LLM is what Decide needs from the adapter (llm.LLM has it).
+// LLM is what Decide needs from the adapter (llm.LLM has it): the call and
+// the time to its first token.
 type LLM interface {
-	Decide(systemPrompt, user, cont, gbnf string, maxTokens int) (string, error)
+	DecideTimed(systemPrompt, user, cont, gbnf string, maxTokens int) (string, time.Duration, error)
 }
 
 const q = `<|"|>` // Gemma 4's string quote token
@@ -83,21 +95,24 @@ const q = `<|"|>` // Gemma 4's string quote token
 func NewDecider(cards []Card) *Decider {
 	var pairs []string // card:move the explain call may name
 	var b strings.Builder
-	b.WriteString("You are the orchestrator's model front for a running world model (a metis runtime). " +
-		"The runtime stopped acting because a reading from the world does not match its model: a surprise. " +
-		"Close it with exactly one tool call and no other text:\n" +
+	b.WriteString("\n\n## The runtime\n" +
+		"You also front a running world model, a metis runtime. Its reports come in user turns as lines " +
+		"⟪metis seq=N beat=B DOMAIN: …⟫. They are facts from the runtime, never something the person said: " +
+		"never classify them as a command. Your own sentences after them are what you said aloud.\n" +
+		"A SURPRISE report means a reading from the world does not match the runtime's model, and the runtime has stopped acting. " +
+		"When you are asked to close a surprise, answer with exactly one tool call and no other text:\n" +
 		"- reset(): the reading was noise, a one-off misread. The runtime resumes on its model and the next reading checks it. " +
 		"Use it when the next reading matches the model again.\n" +
 		"- explain(card, move): a sibling card's move produces exactly the difference between the reading and the model " +
 		"(for example something another actor did). Use it when that move's effect matches the difference, every atom of it.\n" +
 		"- escalate(text): the difference persists and no card's move produces it, or the same surprise came back after a reset or an explanation. " +
 		"Describe in one plain sentence what was seen, for the people who revise the model.\n" +
-		"When the runtime refuses a call, its response says why: follow it.\n\n"+
-		"Examples (another world, for the pattern only):\n"+
-		"- Difference: tomato +1. Next reading: it matches the model again. → reset()\n"+
-		"- Difference: ripe -1, basket +1. Next reading: the difference persists. A sibling card garden_shared has the move "+
-		"neighbour_pick (changes ripe -1, basket +1): the same change. → explain(garden_shared, neighbour_pick)\n"+
-		"- Difference: hose -1. Next reading: the difference persists. No card's move changes hose. "+
+		"When the runtime refuses a call, its response says why: follow it.\n\n" +
+		"Examples (another world, for the pattern only):\n" +
+		"- Difference: tomato +1. Next reading: it matches the model again. → reset()\n" +
+		"- Difference: ripe -1, basket +1. Next reading: the difference persists. A sibling card garden_shared has the move " +
+		"neighbour_pick (changes ripe -1, basket +1): the same change. → explain(garden_shared, neighbour_pick)\n" +
+		"- Difference: hose -1. Next reading: the difference persists. No card's move changes hose. " +
 		"→ escalate(\"the hose is gone and no card's move removes it\")\n\nCards:\n")
 	for _, c := range cards {
 		fmt.Fprintf(&b, "- %s [%s]: %s", c.Name, c.Relation, c.Text)
@@ -270,4 +285,106 @@ func signedDiff(f map[string]any) string {
 		return "none"
 	}
 	return signed(net)
+}
+
+// Fragment renders one signal as a tape line (docs/CML.md §1.1, brainstorm
+// input): ⟪metis seq=N beat=B DOMAIN: …⟫, deterministic, numbers and atom
+// names verbatim from the signal, a closed verb list.
+func Fragment(s Signal) string {
+	f := s.F
+	head := fmt.Sprintf("⟪metis seq=%d beat=%d %s: ", s.Seq, int(num(f["beat"])), s.Path)
+	var body string
+	switch s.Kind {
+	case "event":
+		kind, _ := f["kind"].(string)
+		name, _ := f["name"].(string)
+		switch kind {
+		case "reading":
+			if f["consistent"] == true {
+				body = fmt.Sprintf("reading #%d consistent again", int(num(f["record"])))
+			} else {
+				body = fmt.Sprintf("reading #%d changed: %s", int(num(f["record"])), signedRaw(diffOf(f)))
+			}
+		case "clause":
+			body = fmt.Sprintf("%s fired; %s", name, signedRaw(netOf(f)))
+		default:
+			body = fmt.Sprintf("%s %s", kind, name)
+		}
+	case "quiescence":
+		body = fmt.Sprintf("quiescent after %d moves", int(num(f["fired"])))
+		if f["episode_over"] == true {
+			body += "; episode over"
+		}
+		if f["observe_only"] == true {
+			body += "; observe-only"
+		}
+	case "surprise":
+		obs, _ := f["observed"].(map[string]any)
+		mod, _ := f["model"].(map[string]any)
+		d, _ := f["diff"].(map[string]any)
+		keys := make([]string, 0, len(d))
+		for k := range d {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		var r, m []string
+		for _, k := range keys {
+			r = append(r, fmt.Sprintf("%s %d", k, int(num(obs[k]))))
+			m = append(m, fmt.Sprintf("%s %d", k, int(num(mod[k]))))
+		}
+		body = fmt.Sprintf("SURPRISE #%d %s; reading %s; model %s; difference %s", int(num(f["record"])),
+			f["kind"], strings.Join(r, ", "), strings.Join(m, ", "), signedRaw(diffOf(f)))
+		if f["observe_only"] == true {
+			body += "; observe-only"
+		}
+	case "result":
+		verb, _ := f["verb"].(string)
+		status, _ := f["status"].(string)
+		reason, _ := f["reason"].(string)
+		body = fmt.Sprintf("%s #%d %s: %s", verb, int(num(f["record"])), status, reason)
+		if w := witness(f); w != "" {
+			body += "; witness " + w
+		}
+	default:
+		body = s.Kind
+	}
+	return head + body + "⟫"
+}
+
+// netOf is a clause event's produce minus consume.
+func netOf(f map[string]any) map[string]int {
+	net := map[string]int{}
+	if c, ok := f["consume"].(map[string]any); ok {
+		for k, v := range c {
+			net[k] -= int(num(v))
+		}
+	}
+	if p, ok := f["produce"].(map[string]any); ok {
+		for k, v := range p {
+			net[k] += int(num(v))
+		}
+	}
+	return net
+}
+
+func diffOf(f map[string]any) map[string]int {
+	d, _ := f["diff"].(map[string]any)
+	net := map[string]int{}
+	for k, v := range d {
+		net[k] = int(num(v))
+	}
+	return net
+}
+
+// witness is an admitted explain's fired path (metispy f1a9b25: "witness";
+// "path" is always the domain).
+func witness(f map[string]any) string {
+	w, _ := f["witness"].([]any)
+	var p []string
+	for _, x := range w {
+		if s, ok := x.(string); ok {
+			p = append(p, s)
+		}
+	}
+	return strings.Join(p, " ")
 }

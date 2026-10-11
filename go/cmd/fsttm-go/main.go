@@ -415,7 +415,7 @@ func main() {
 		if ws == nil {
 			log.Fatal("kernel: needs transport: ws (the runtime's events go to the UI)")
 		}
-		kc := startKernel(ctx, cfg.Kernel, eng, ws, l)
+		kc := startKernel(ctx, cfg.Kernel, eng, ws, l, string(prompt))
 		defer kc.Close()
 	}
 
@@ -427,7 +427,7 @@ func main() {
 // UI's events pane, the narrated ones to the dialog, runtime intents from
 // the UI down as wire ops whose result answers a pending RUNTIME command.
 // The quiet-cost ledger is logged every ten minutes and at exit.
-func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, ws *transport.Server, dec kernel.LLM) *kernel.Client {
+func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, ws *transport.Server, l *llm.LLM, dogPrompt string) *kernel.Client {
 	if kernel.RuntimeCommand != pipeline.RuntimeCommand {
 		log.Fatal("kernel: RuntimeCommand names disagree")
 	}
@@ -480,9 +480,20 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		}
 		b, _ := json.Marshal(ans)
 		_ = json.Unmarshal(b, &cards)
-		h.Dec, h.LLM = kernel.NewDecider(cards.Cards), dec
-		log.Printf("[kernel] triage on: %d cards, call grammar %d B, tool prompt %d B",
-			len(cards.Cards), len(h.Dec.GBNF), len(h.Dec.System))
+		h.Dec, h.LLM = kernel.NewDecider(cards.Cards), l
+		// step 4: ONE prefix for every seat — the dog prompt + the runtime
+		// section (fact syntax, rules, cards, tool declarations); the
+		// runtime's facts and what was said about them go on the tape
+		h.Prompt = dogPrompt + h.Dec.System
+		eng.SetSystemPrompt(h.Prompt)
+		n, err := l.PrimePrefix(h.Prompt)
+		if err != nil {
+			log.Fatal(err)
+		}
+		h.Tape = tapeAdapter{l, h.Prompt}
+		eng.OnRuntimeSpoken = h.Spoken
+		log.Printf("[kernel] triage on: %d cards, call grammar %d B; one prefix %d tok (dog prompt + runtime section %d B); settle %s, keep %d episodes",
+			len(cards.Cards), len(h.Dec.GBNF), n, len(h.Dec.System), h.Settle, kcfg.KeepEpisodes)
 	}
 	w := kcfg.Watch
 	if w == "" {
@@ -498,7 +509,30 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		n, bytes, by, up := kc.Stats.Snapshot()
 		log.Printf("[kernel] quiet cost: %d lines, %d B in %s (%.0f lines/h); by kind %v; narrated %d",
 			n, bytes, up.Round(time.Second), float64(n)/up.Hours(), by, h.Narrated())
+		if h.Tape != nil {
+			ap, tok, dur, comp, maxT, tape, ttft := h.Ledger.Snapshot()
+			log.Printf("[tape] ledger: %d appends, %d tok decoded in %s; %d compactions; tape now %d tok, max %d; decide first token %v",
+				ap, tok, dur.Round(time.Millisecond), comp, tape, maxT, ttft)
+		}
 	}
+	// SIGUSR2 ends the watch and logs the runtime's ledger (a watch that
+	// never ends by itself, e.g. make_hour): kill -USR2 $(pidof fsttm-go)
+	usr2 := make(chan os.Signal, 1)
+	signal.Notify(usr2, syscall.SIGUSR2)
+	go func() {
+		for range usr2 {
+			h.WaitTriage(90 * time.Second)
+			if ans, err := kc.Op("watch", "off", 30*time.Second); err == nil {
+				b, _ := json.Marshal(ans)
+				log.Printf("[kernel] watch off → %s", b)
+			}
+			if ans, err := kc.Op("ledger", "", 30*time.Second); err == nil {
+				b, _ := json.Marshal(ans)
+				log.Printf("[kernel] ledger %s", b)
+			}
+			ledger()
+		}
+	}()
 	go func() {
 		t := time.NewTicker(10 * time.Minute)
 		defer t.Stop()
@@ -513,6 +547,25 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		}
 	}()
 	return kc
+}
+
+// tapeAdapter is the kernel's TapeWriter over the llm adapter's tape, under
+// the one system prompt.
+type tapeAdapter struct {
+	l   *llm.LLM
+	sys string
+}
+
+func (t tapeAdapter) Turn(role, text string) string { return t.l.TapeTurn(role, text) }
+
+func (t tapeAdapter) Append(text string) (int, int, time.Duration, error) {
+	sp, err := t.l.AppendTape(t.sys, text)
+	return sp.Tokens, sp.Tape, sp.Dur, err
+}
+
+func (t tapeAdapter) Set(text string) (int, time.Duration, error) {
+	sp, err := t.l.SetTape(t.sys, text)
+	return sp.Tape, sp.Dur, err
 }
 
 // serveWS runs the ws transport's HTTP server: plain http on ws.addr, or

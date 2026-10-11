@@ -63,6 +63,13 @@ type LLM struct {
 	tailFmt string // rendered user turn + assistant cue, with userSentinel
 	preText string // the rendered prefix the KV holds
 	preToks []C.llama_token
+	// the tape (runtime-wire step 4): whole turns appended after the prefix
+	// and kept in the KV between calls — runtime facts, results, spoken
+	// sentences. A turn rolls back to prefix+tape, never into it; only
+	// SetTape (compaction) rewrites it.
+	tapeText string
+	tapeToks []C.llama_token
+	firstTok time.Duration // generate(): time to the first sampled token
 	eotText string // end-of-turn marker text, stripped from decoded output
 	pass2   Pass2
 	stopIDs map[C.llama_token]bool // end-of-turn / end-of-sentence ids
@@ -494,12 +501,22 @@ func (l *LLM) tailTokens(user string) []C.llama_token { return l.tailTokensWith(
 // appended (Decide: earlier calls and their responses), tokenized in the
 // same context.
 func (l *LLM) tailTokensWith(user, cont string) []C.llama_token {
-	t := l.tail(user) + cont
-	whole := l.tokenize(l.preText+t, true)
-	if n := len(l.preToks); len(whole) > n && sameTokens(whole[:n], l.preToks) {
+	return l.afterBase(l.tail(user) + cont)
+}
+
+// afterBase tokenizes t in the context of prefix+tape and returns only its
+// own tokens; when the base would re-tokenize, the split tokenization is
+// the fallback and the miss is logged.
+func (l *LLM) afterBase(t string) []C.llama_token {
+	if t == "" {
+		return nil
+	}
+	base := append(append([]C.llama_token{}, l.preToks...), l.tapeToks...)
+	whole := l.tokenize(l.preText+l.tapeText+t, true)
+	if n := len(base); len(whole) > n && sameTokens(whole[:n], base) {
 		return whole[n:]
 	}
-	fmt.Fprintf(os.Stderr, "[llm] tail %q re-tokenizes the prefix — split tokenization for this turn\n", user)
+	fmt.Fprintf(os.Stderr, "[llm] tail %.60q re-tokenizes the prefix+tape — split tokenization\n", t)
 	return l.tokenize(t, false)
 }
 
@@ -568,8 +585,14 @@ func (l *LLM) PrimePrefix(systemPrompt string) (int, error) {
 }
 
 func (l *LLM) primeLocked(systemPrompt string) (int, error) {
-	if l.prefix == systemPrompt && l.nPast >= l.nPrefix && l.nPrefix > 0 {
-		return l.nPrefix, nil
+	if l.prefix == systemPrompt && l.nPrefix > 0 && l.nPast >= l.nPrefix+len(l.tapeToks) {
+		return l.nPrefix + len(l.tapeToks), nil
+	}
+	// the tape belongs to its prefix: kept across a re-prime of the same
+	// prompt (a failed rewind), dropped when the prompt changes
+	if l.prefix != systemPrompt && len(l.tapeToks) > 0 {
+		fmt.Fprintf(os.Stderr, "[llm] prompt changed — tape of %d tok dropped\n", len(l.tapeToks))
+		l.tapeText, l.tapeToks = "", nil
 	}
 	prefixText, tailFmt, err := l.splitPrompt(systemPrompt)
 	if err != nil {
@@ -591,7 +614,12 @@ func (l *LLM) primeLocked(systemPrompt string) (int, error) {
 	}
 	l.prefix = systemPrompt
 	l.nPrefix = len(toks)
-	return l.nPrefix, nil
+	if len(l.tapeToks) > 0 {
+		if err := l.decodeTokens(l.tapeToks); err != nil {
+			return 0, err
+		}
+	}
+	return l.nPrefix + len(l.tapeToks), nil
 }
 
 // rewind drops every token after the cached prefix (N09-1071 invariant 2:
@@ -610,7 +638,7 @@ func (l *LLM) rewind(systemPrompt string, nPrefix int) error {
 	}
 	if !ok {
 		C.llama_memory_clear(mem, C.bool(true))
-		l.nPast, l.nPrefix, l.prefix = 0, 0, ""
+		l.nPast, l.nPrefix = 0, 0 // re-prime the same prompt: the tape is decoded again
 		if _, err := l.primeLocked(systemPrompt); err != nil {
 			return fmt.Errorf("llm: rewind failed and re-prime failed: %w", err)
 		}
@@ -853,27 +881,35 @@ func (l *LLM) Narrate(systemPrompt, event string) (string, error) {
 // after the user text (earlier calls and the runtime's responses), so a
 // refusal steers the next call. Gemma 4 only (the native call markup).
 func (l *LLM) Decide(systemPrompt, user, cont, gbnf string, maxTokens int) (string, error) {
+	out, _, err := l.DecideTimed(systemPrompt, user, cont, gbnf, maxTokens)
+	return out, err
+}
+
+// DecideTimed is Decide plus the time from the call to its first token
+// (the tail's evaluation included): the splice-to-first-token measure.
+func (l *LLM) DecideTimed(systemPrompt, user, cont, gbnf string, maxTokens int) (string, time.Duration, error) {
 	if l.tmpl != TemplateGemma4 {
-		return "", errors.New("llm: Decide needs the gemma4 template (native tool calls)")
+		return "", 0, errors.New("llm: Decide needs the gemma4 template (native tool calls)")
 	}
+	t0 := time.Now()
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	nPrefix, err := l.primeLocked(systemPrompt)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	if err := l.rewind(systemPrompt, nPrefix); err != nil {
-		return "", err
+		return "", 0, err
 	}
 	if err := l.decodeTokens(l.tailTokensWith(user, cont)); err != nil {
-		return "", err
+		return "", 0, err
 	}
 	cGbnf, cRoot := C.CString(gbnf), C.CString("root")
 	defer C.free(unsafe.Pointer(cGbnf))
 	defer C.free(unsafe.Pointer(cRoot))
 	grammar := C.llama_sampler_init_grammar(l.vocab, cGbnf, cRoot)
 	if grammar == nil {
-		return "", errors.New("llm: decide grammar failed to compile")
+		return "", 0, errors.New("llm: decide grammar failed to compile")
 	}
 	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
 	C.llama_sampler_chain_add(chain, grammar)
@@ -882,12 +918,97 @@ func (l *LLM) Decide(systemPrompt, user, cont, gbnf string, maxTokens int) (stri
 	if maxTokens <= 0 {
 		maxTokens = 120
 	}
+	tGen := time.Now()
 	toks, err := l.generate(chain, maxTokens, "")
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
-	return strings.TrimSpace(l.detokenize(toks)), nil
+	ttft := tGen.Sub(t0) + l.firstTok
+	return strings.TrimSpace(l.detokenize(toks)), ttft, nil
 }
+
+// ── the tape (runtime-wire step 4) ───────────────────────────────────────────
+
+// Splice is what one tape write cost.
+type Splice struct {
+	Tokens int           // tokens decoded by this write
+	Tape   int           // tape tokens after it
+	Dur    time.Duration // the decode
+}
+
+// TapeTurn renders one tape entry as a whole turn of the model's template
+// (gemma4: "<|turn>user\n…<turn|>\n"), so entries append without editing.
+func (l *LLM) TapeTurn(role, text string) string {
+	if l.tmpl == TemplateGemma4 {
+		return l.renderGemma4([]chatMsg{{role, text}}, false)
+	}
+	r, err := l.applyTemplate([]chatMsg{{role, text}}, false)
+	if err != nil {
+		return text + "\n"
+	}
+	return r
+}
+
+// AppendTape adds whole turns at the end of the tape: tokenized in the
+// context of prefix+tape, decoded once, kept. A turn in flight is rolled
+// back first (the tape is written only between turns).
+func (l *LLM) AppendTape(systemPrompt, text string) (Splice, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	t0 := time.Now()
+	base, err := l.primeLocked(systemPrompt)
+	if err != nil {
+		return Splice{}, err
+	}
+	if err := l.rewind(systemPrompt, base); err != nil {
+		return Splice{}, err
+	}
+	toks := l.afterBase(text)
+	if l.nPrefix+len(l.tapeToks)+len(toks)+l.turnReserve() > l.nCtx {
+		return Splice{}, fmt.Errorf("llm: tape full (%d + %d tok, n_ctx %d) — compact first", len(l.tapeToks), len(toks), l.nCtx)
+	}
+	if err := l.decodeTokens(toks); err != nil {
+		return Splice{}, err
+	}
+	l.tapeText += text
+	l.tapeToks = append(l.tapeToks, toks...)
+	return Splice{Tokens: len(toks), Tape: len(l.tapeToks), Dur: time.Since(t0)}, nil
+}
+
+// SetTape replaces the whole tape (compaction): the KV is cut back to the
+// prefix and the new tape decoded once.
+func (l *LLM) SetTape(systemPrompt, text string) (Splice, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	t0 := time.Now()
+	if _, err := l.primeLocked(systemPrompt); err != nil {
+		return Splice{}, err
+	}
+	l.tapeText, l.tapeToks = "", nil
+	if err := l.rewind(systemPrompt, l.nPrefix); err != nil {
+		return Splice{}, err
+	}
+	toks := l.afterBase(text)
+	if l.nPrefix+len(toks)+l.turnReserve() > l.nCtx {
+		return Splice{}, fmt.Errorf("llm: compacted tape still too big (%d tok)", len(toks))
+	}
+	if err := l.decodeTokens(toks); err != nil {
+		return Splice{}, err
+	}
+	l.tapeText, l.tapeToks = text, toks
+	return Splice{Tokens: len(toks), Tape: len(toks), Dur: time.Since(t0)}, nil
+}
+
+// TapeTokens is the tape's size in tokens.
+func (l *LLM) TapeTokens() int {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	return len(l.tapeToks)
+}
+
+// turnReserve is the room a turn needs after prefix+tape (tail + pass 1 +
+// cue + pass 2, or a Decide with its retries).
+func (l *LLM) turnReserve() int { return 512 }
 
 // generate samples tokens with the given chain until EOG / the model's
 // end-of-turn / maxTokens (/ any rune of stopChars shows up in the decoded
@@ -895,8 +1016,13 @@ func (l *LLM) Decide(systemPrompt, user, cont, gbnf string, maxTokens int) (stri
 func (l *LLM) generate(chain *C.struct_llama_sampler, maxTokens int,
 	stopChars string) ([]C.llama_token, error) {
 	var out []C.llama_token
+	t0 := time.Now()
+	l.firstTok = 0
 	for len(out) < maxTokens {
 		tok := C.llama_sampler_sample(chain, l.ctx, -1) // applies + accepts
+		if l.firstTok == 0 {
+			l.firstTok = time.Since(t0)
+		}
 		if bool(C.llama_vocab_is_eog(l.vocab, tok)) || l.stopIDs[tok] {
 			break
 		}

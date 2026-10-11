@@ -47,6 +47,7 @@ import (
 	"time"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/intent"
+	"github.com/metis-lang-dev/metis-agent/go/internal/kernel"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
 	"github.com/metis-lang-dev/metis-agent/go/internal/pipeline"
 	"github.com/metis-lang-dev/metis-agent/go/internal/wire"
@@ -127,6 +128,7 @@ type summaryRec struct {
 func main() {
 	model := flag.String("model", "", "GGUF model path")
 	promptF := flag.String("prompt", "grammar/dog-prompt.txt", "system prompt file")
+	kernelCards := flag.String("kernel-cards", "", "runtime-wire step 4: append the runtime section rendered from these cards (the cards op's JSON) — the harness's one prefix")
 	gbnfF := flag.String("gbnf", "grammar/dog.gbnf", "GBNF grammar file")
 	corpusF := flag.String("corpus", "", "TSV: utterance<TAB>expected_intent[<TAB>source]")
 	tmpl := flag.String("template", "auto", "chat template: auto | gemma | gemma4 | phi3 | ...")
@@ -167,6 +169,17 @@ func main() {
 	prompt, err := os.ReadFile(*promptF)
 	if err != nil {
 		fail(err)
+	}
+	if *kernelCards != "" {
+		b, err := os.ReadFile(*kernelCards)
+		if err != nil {
+			fail(err)
+		}
+		var cards []kernel.Card
+		if err := json.Unmarshal(b, &cards); err != nil {
+			fail(err)
+		}
+		prompt = append(prompt, kernel.NewDecider(cards).System...)
 	}
 	gbnf, err := os.ReadFile(*gbnfF)
 	if err != nil {

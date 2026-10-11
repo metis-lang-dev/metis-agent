@@ -65,3 +65,5 @@ kernel:
     catalog: metis/domains/kitchen/catalogs/kitchen_host.llp
     watch: every=0.5
     narrate: [surprise, consistent, episode_over]
+    settle_beats: 2.5            # triage waits this many beats for the next reading before it asks the model
+    keep_episodes: 3             # compaction at quiescence keeps the last N surprise episodes on the tape

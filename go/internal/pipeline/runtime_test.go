@@ -69,7 +69,7 @@ func TestRuntimeIntentResultNarrated(t *testing.T) {
 	if got := spk.said()[0]; got != "Done: the reading is set aside as noise; resumed on the model." {
 		t.Errorf("said %q", got)
 	}
-	if len(cues) != 1 || !strings.Contains(cues[0], "set the surprising reading aside succeeded") {
+	if len(cues) != 1 || !strings.Contains(cues[0], "You set an odd reading aside as a one-off misread") || !strings.Contains(cues[0], "set aside as noise") {
 		t.Errorf("cue %q", cues)
 	}
 }
