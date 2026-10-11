@@ -135,6 +135,49 @@ the only listener.
   the prefix cleaner, it takes nothing away. The CLM API port
   (DESIGN.md roadmap 4) is unchanged by Gemma 4.
 
+### E4 findings: the tool-call surface (opus, 2026-10-11, measured)
+
+Probe: `go/tools/e4-activate/`, 12 outside-context changes, each a choice among `activate(domain)`, `deactivate(domain)` and `keep()` over six cards. Run: `results/e4/`. Decision (architect): proceed with tool-call proposals for domain activation; nothing changes in the harness.
+
+**Declaration.** The tool list is rendered from the catalog cards in Gemma 4's native format, the GGUF template's `format_function_declaration`, written out by hand. There is one `<|tool>declaration:…<tool|>` per verb. The domain parameter is an `enum` of the card names. Strings are quoted with the `<|"|>` token:
+
+    <|tool>declaration:activate{description:<|"|>attach a catalog domain …<|"|>,
+      parameters:{properties:{domain:{description:<|"|>…<|"|>,
+      enum:[<|"|>kitchen<|"|>,<|"|>nav<|"|>,…],type:<|"|>STRING<|"|>}},
+      required:[<|"|>domain<|"|>],type:<|"|>OBJECT<|"|>}}<tool|>
+    <|tool>declaration:deactivate{…same shape…}<tool|>
+    <|tool>declaration:keep{description:<|"|>change nothing …<|"|>}<tool|>
+
+**Call.** The model's turn is exactly one call, pinned by a GBNF over the native call markup. llama.cpp's JSON-schema tool path is not needed on this checkout (8ad8aef44):
+
+    root   ::= "<|tool_call>call:" call "<tool_call|>"
+    call   ::= verb "{domain:<|\"|>" domain "<|\"|>}" | "keep{}"
+    verb   ::= "activate" | "deactivate"
+    domain ::= "kitchen" | "nav" | …          # = the card names
+
+- The grammar admits only the orchestrator's verbs over the card list. Nothing else is callable: no code, no host API.
+- The surface stays token-exact, as the certified side requires.
+- G-F (DESIGN.md) would generate both the declarations and `domain ::=` from the catalog cards, in place of today's intent GBNF.
+
+**Measured** (n_ctx 4096, GPU; the JSON-intent control uses the same choice with our usual grammar-constrained JSON shape):
+
+| model | tool call | JSON intent | p50 tool / JSON | VRAM |
+|---|---|---|---|---|
+| E2B Q4_K_M | 12/12 | 11/12 | 379 / 334 ms | 2.1 GB |
+| E4B Q5_K_M | 12/12 | 12/12 | 541 / 505 ms | 4.3 GB |
+
+The tool-call format is at least as accurate as the JSON intent: the one JSON miss was "the election is over" → activate, where deactivate was wanted. It costs about 35–45 ms per call for the longer markup. Twelve rows show direction, not significance.
+
+**Back channel, not yet exercised.**
+- The runtime's admission or refusal would be the tool result. In Gemma 4 that is a `<|tool_response>` turn, which the GGUF also lists as an end-of-generation token.
+- The probe stops at the call. Rendering the result turn, and checking that a refusal steers the next proposal, is the next E4 step.
+- After the call, the probe's pass 2 produced a spoken line ("Activated kitchen domain."). For a narrated activation that line would come from the result, not from the call.
+
+**Open.**
+- The result-turn rendering and a refusal round-trip.
+- A larger corpus with ambiguous and no-op changes. `keep` was right on every row here, but there are few of them.
+- Whether `+think` helps on the multi-domain changes.
+
 ## Deliverable
 
 One report per experiment on the subject (E1, E2, E3 as
