@@ -73,6 +73,7 @@ type LLM struct {
 	chanOpen  C.llama_token
 	chanClose C.llama_token
 	pass2Turn bool
+	pass2Cue  string
 }
 
 type Config struct {
@@ -99,6 +100,11 @@ type Config struct {
 	// of the bare "\nSpoken response:" continuation Phi-3/Gemma 3 follow.
 	// Gemma 4 echoes the JSON after the bare cue (E1). Experiments only.
 	Pass2Turn bool
+	// Pass2Cue is the user-turn text of Pass2Turn ("" = "Spoken response:").
+	// Gemma 4 obeys the system role's "only the JSON" and answers a bare cue
+	// with more JSON, so its cue has to be an explicit instruction. With
+	// Pass2Turn, Narrate asks the same cue after the event in one user turn.
+	Pass2Cue string
 }
 
 // TemplateGemma4 names the Go-side renderer of the Gemma 4 format
@@ -192,7 +198,10 @@ func Load(cfg Config) (*LLM, error) {
 	if l.thinkMax <= 0 {
 		l.thinkMax = 512
 	}
-	l.pass2Turn = cfg.Pass2Turn
+	l.pass2Turn, l.pass2Cue = cfg.Pass2Turn, cfg.Pass2Cue
+	if l.pass2Cue == "" {
+		l.pass2Cue = "Spoken response:"
+	}
 	if err := l.resolveTemplate(cfg.Template); err != nil {
 		l.Close()
 		return nil, err
@@ -584,7 +593,7 @@ func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
 	cue := "\nSpoken response:"
 	if l.pass2Turn {
 		// close the model turn and ask in a user turn (Config.Pass2Turn)
-		turn, err := l.applyTemplate([]chatMsg{{"user", "Spoken response:"}}, true)
+		turn, err := l.applyTemplate([]chatMsg{{"user", l.pass2Cue}}, true)
 		if err != nil {
 			return nil, err
 		}
@@ -665,13 +674,34 @@ func (l *LLM) thinkLocked() (string, int, time.Duration, error) {
 	return text, len(out) + 2, time.Since(t0), nil
 }
 
-// clean trims decoded text and strips a trailing end-of-turn marker.
+// clean trims decoded text, drops Gemma 4 thought-channel markup and strips
+// a trailing end-of-turn marker.
 func (l *LLM) clean(text string) string {
-	t := strings.TrimSpace(text)
+	t := dropChannel(strings.TrimSpace(text))
 	if l.eotText != "" {
 		t = strings.TrimSpace(strings.TrimSuffix(t, l.eotText))
 	}
 	return strings.TrimSpace(strings.TrimSuffix(t, "<|end|>"))
+}
+
+// dropChannel removes Gemma 4 thought-channel markup so it never reaches
+// TTS: a leading <|channel>…<channel|> thought is dropped, and text from a
+// stray marker on is cut (`"I can't do that."<channel|>{"intent":…}`).
+func dropChannel(t string) string {
+	const open, close = "<|channel>", "<channel|>"
+	if strings.HasPrefix(t, open) {
+		i := strings.Index(t, close)
+		if i < 0 {
+			return ""
+		}
+		t = strings.TrimSpace(t[i+len(close):])
+	}
+	for _, m := range []string{open, close} {
+		if i := strings.Index(t, m); i >= 0 {
+			t = strings.TrimSpace(t[:i])
+		}
+	}
+	return t
 }
 
 // Narrate is the single-pass narration of a typed event (HARNESS.md §4,
@@ -688,15 +718,22 @@ func (l *LLM) Narrate(systemPrompt, event string) (string, error) {
 	if err := l.rewind(systemPrompt, nPrefix); err != nil {
 		return "", err
 	}
-	if err := l.decodeTokens(l.tokenize(l.tail(event), false)); err != nil {
+	user, cue := event, "Spoken response:"
+	if l.pass2Turn {
+		// the cue rides in the user turn (Config.Pass2Cue), no model-side cue
+		user, cue = event+"\n\n"+l.pass2Cue, ""
+	}
+	if err := l.decodeTokens(l.tokenize(l.tail(user), false)); err != nil {
 		return "", err
 	}
 	// thinking on: let the thought channel close before the cue
 	if _, _, _, err := l.thinkLocked(); err != nil {
 		return "", err
 	}
-	if err := l.decodeTokens(l.tokenize("Spoken response:", false)); err != nil {
-		return "", err
+	if cue != "" {
+		if err := l.decodeTokens(l.tokenize(cue, false)); err != nil {
+			return "", err
+		}
 	}
 	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
 	C.llama_sampler_chain_add(chain, C.llama_sampler_init_top_k(C.int32_t(l.pass2.TopK)))

@@ -62,6 +62,7 @@ type turnRec struct {
 	Voice     string `json:"voice"`
 	Hit       *bool  `json:"hit,omitempty"`
 	Unspeak   bool   `json:"unspeakable"`
+	Echo      bool   `json:"echo,omitempty"` // voice is the utterance repeated
 	MsEval    int64  `json:"ms_eval"`
 	MsThink   int64  `json:"ms_think"`
 	NThink    int    `json:"n_think"`
@@ -71,6 +72,7 @@ type turnRec struct {
 	MsTotal   int64  `json:"ms_total"`
 	Narrate   string `json:"narrate,omitempty"`
 	MsNarrate int64  `json:"ms_narrate,omitempty"`
+	NarrBad   string `json:"narrate_bad,omitempty"` // "unspeakable" | "echo"
 	Err       string `json:"err,omitempty"`
 }
 
@@ -83,6 +85,7 @@ type summaryRec struct {
 	Template    string         `json:"template"`
 	EOT         string         `json:"eot"`
 	Think       bool           `json:"think"`
+	Pass2Turn   bool           `json:"pass2_turn,omitempty"`
 	NGL         int            `json:"ngl"`
 	NCtx        int            `json:"n_ctx"`
 	MsLoad      int64          `json:"ms_load"`
@@ -103,6 +106,10 @@ type summaryRec struct {
 	BySrc       map[string]int `json:"by_src_hit"`
 	BySrcN      map[string]int `json:"by_src_n"`
 	Unspeak     int            `json:"unspeakable"`
+	Echo        int            `json:"echo"`
+	NarrN       int            `json:"narrate_n,omitempty"`
+	NarrUnspeak int            `json:"narrate_unspeakable,omitempty"`
+	NarrEcho    int            `json:"narrate_echo,omitempty"`
 	PrefixOK    *bool          `json:"prefix_ok,omitempty"`
 	Prefix      string         `json:"prefix,omitempty"`
 	Tail        string         `json:"tail,omitempty"`
@@ -131,6 +138,7 @@ func main() {
 	jsonlF := flag.String("jsonl", "", "append per-turn + summary JSON records to this file")
 	tag := flag.String("tag", "", "run label for -jsonl (default: model basename[+think])")
 	pass2Turn := flag.Bool("pass2-turn", false, "pass 2 as its own chat turn instead of the bare \"Spoken response:\" continuation")
+	pass2Cue := flag.String("pass2-cue", "", "with -pass2-turn: the user-turn cue text (default \"Spoken response:\")")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
 	flag.Parse()
 	if *model == "" {
@@ -166,6 +174,12 @@ func main() {
 	if len(rows) == 0 {
 		fail(fmt.Errorf("nothing to run: -corpus or utterances"))
 	}
+	// a held-out row the prompt now teaches verbatim is no longer held out
+	for i, r := range rows {
+		if r.src == "heldout" && strings.Contains(string(prompt), fmt.Sprintf("%q →", r.utt)) {
+			rows[i].src = "heldout-in-prompt"
+		}
+	}
 
 	var out *os.File
 	if *jsonlF != "" {
@@ -181,7 +195,7 @@ func main() {
 		}
 	}
 
-	sum := summaryRec{Kind: "summary", Tag: *tag, Model: *model, Think: *think, NGL: *ngl, NCtx: *nctx,
+	sum := summaryRec{Kind: "summary", Tag: *tag, Model: *model, Think: *think, Pass2Turn: *pass2Turn, NGL: *ngl, NCtx: *nctx,
 		BySrc: map[string]int{}, BySrcN: map[string]int{}}
 	if *vram {
 		sum.VRAM = map[string]int{}
@@ -196,7 +210,8 @@ func main() {
 		Pass2:          llm.Pass2{Temp: float32(*temp), TopK: *topk, MaxTokens: *maxtok},
 		Think:          *think,
 		ThinkMaxTokens: *thinkMax,
-		Pass2Turn:      *pass2Turn})
+		Pass2Turn:      *pass2Turn,
+		Pass2Cue:       *pass2Cue})
 	if err != nil {
 		fail(err)
 	}
@@ -276,10 +291,15 @@ func main() {
 		} else {
 			verdict = "  UNPARSABLE"
 		}
-		if strings.ContainsAny(res.Voice, "{}[]<>") || res.Voice == "" {
+		switch voiceBad(res.Voice, r.utt) {
+		case "unspeakable":
 			parrot++
 			rec.Unspeak = true
 			verdict += "  VOICE-UNSPEAKABLE"
+		case "echo":
+			sum.Echo++
+			rec.Echo = true
+			verdict += "  VOICE-ECHO"
 		}
 		if r.want != "" {
 			scored++
@@ -317,6 +337,13 @@ func main() {
 				voice = "ERROR " + err.Error()
 			}
 			rec.Narrate, rec.MsNarrate = voice, d.Milliseconds()
+			sum.NarrN++
+			switch rec.NarrBad = voiceBad(voice, r.utt); rec.NarrBad {
+			case "unspeakable":
+				sum.NarrUnspeak++
+			case "echo":
+				sum.NarrEcho++
+			}
 			fmt.Printf("%42s narrate(%4dms) → %q\n", "", d.Milliseconds(), voice)
 		}
 		emit(rec)
@@ -335,9 +362,13 @@ func main() {
 	}
 
 	fmt.Printf("\n== %s ngl=%d template=%s think=%v: n=%d  turn mean=%dms p50=%dms p90=%dms max=%dms  "+
-		"| json mean=%dms | tts mean=%dms | think mean=%dms | unspeakable voice=%d\n",
+		"| json mean=%dms | tts mean=%dms | think mean=%dms | unspeakable voice=%d echo=%d\n",
 		*model, *ngl, l.Template(), l.Thinking(), len(lat), mean(lat), pct(lat, 50), pct(lat, 90),
-		pct(lat, 100), mean(latJSON), mean(latTTS), mean(latThink), parrot)
+		pct(lat, 100), mean(latJSON), mean(latTTS), mean(latThink), parrot, sum.Echo)
+	if len(latNarr) > 0 {
+		fmt.Printf("== narrate: n=%d mean=%dms unspeakable=%d echo=%d\n",
+			sum.NarrN, mean(latNarr), sum.NarrUnspeak, sum.NarrEcho)
+	}
 	sum.N, sum.MsMean, sum.MsP50, sum.MsP90, sum.MsMax = len(lat), mean(lat), pct(lat, 50), pct(lat, 90), pct(lat, 100)
 	sum.MsJSONMean, sum.MsTTSMean, sum.MsThinkMean, sum.NThinkMean = mean(latJSON), mean(latTTS), mean(latThink), nThink/len(lat)
 	if len(latNarr) > 0 {
@@ -463,6 +494,21 @@ func readCorpus(path string) ([]row, error) {
 		out = append(out, r)
 	}
 	return out, sc.Err()
+}
+
+// voiceBad classifies a spoken line: "unspeakable" (empty, or JSON /
+// markup leaking into speech), "echo" (the utterance repeated back), or "".
+func voiceBad(voice, utt string) string {
+	if strings.ContainsAny(voice, "{}[]<>") || strings.TrimSpace(voice) == "" {
+		return "unspeakable"
+	}
+	norm := func(s string) string {
+		return strings.ToLower(strings.TrimRight(strings.Trim(strings.TrimSpace(s), `"' `), ".!?"))
+	}
+	if norm(voice) == norm(utt) {
+		return "echo"
+	}
+	return ""
 }
 
 func fail(err error) {

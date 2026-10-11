@@ -6,7 +6,9 @@
 
 Columns: resident VRAM (this process, model + KV at n_ctx, after prime),
 turn latency mean/p50/p90, pass-1 (json) / pass-2 (voice) / thought ms,
-intent class total and held-out, unspeakable voices, prefix invariant.
+intent class total and held-out (rows the prompt teaches verbatim count
+apart as "in prompt"), pass-2 voice leak/echo, the -narrate column when
+present, prefix invariant.
 --voices adds the narration table (the same sentences across models);
 --misses lists every missed row per run.
 """
@@ -52,18 +54,24 @@ def main():
         sys.exit("no summary records")
 
     hdr = ["run", "template", "think", "VRAM resident", "load ms", "turn mean/p50/p90 ms",
-           "pass-1 json", "pass-2 voice", "thought ms/tok", "intent class", "held-out",
-           "unspeakable", "prefix"]
+           "pass-1 json", "pass-2", "pass-2 voice", "thought ms/tok", "intent class", "held-out",
+           "voice leak/echo", "narrate ms leak/echo", "prefix"]
     rows = []
     for tag, r in runs.items():
-        held = f"{r['by_src_hit'].get('heldout', 0)}/{r['by_src_n'].get('heldout', 0)}" if r.get("by_src_n") else "-"
+        hit, n = r.get("by_src_hit") or {}, r.get("by_src_n") or {}
+        held = f"{hit.get('heldout', 0)}/{n.get('heldout', 0)}" if n else "-"
+        if n.get("heldout-in-prompt"):
+            held += f" (+{hit.get('heldout-in-prompt', 0)}/{n['heldout-in-prompt']} in prompt)"
+        narr = (f"{r.get('ms_narrate_mean', 0)} {r.get('narrate_unspeakable', 0)}/{r.get('narrate_echo', 0)}"
+                if r.get("narrate_n") else "-")
         think = "on" if r.get("think") else "off"
         th = f"{r.get('ms_think_mean', 0)}/{r.get('n_think_mean', 0)}" if r.get("think") else "-"
         pre = {None: "-", True: "ok", False: "MISMATCH"}[r.get("prefix_ok")]
         rows.append([tag, r.get("template", ""), think, fmt_vram(r), str(r.get("ms_load", "")),
                      f"{r['ms_mean']}/{r['ms_p50']}/{r['ms_p90']}", f"{r['ms_json_mean']} ms",
-                     f"{r['ms_tts_mean']} ms", th, f"{r['hit']}/{r['scored']}", held,
-                     str(r.get("unspeakable", 0)), pre])
+                     "turn" if r.get("pass2_turn") else "cue", f"{r['ms_tts_mean']} ms", th,
+                     f"{r['hit']}/{r['scored']}", held,
+                     f"{r.get('unspeakable', 0)}/{r.get('echo', '-')}", narr, pre])
     print("| " + " | ".join(hdr) + " |")
     print("|" + "---|" * len(hdr))
     for row in rows:
@@ -92,7 +100,8 @@ def main():
             cells = []
             for tag in tags:
                 t = by[tag].get(u)
-                cells.append("" if not t else t["voice"].replace("|", "\\|"))
+                v = "" if not t else t["voice"] + (f" ⟂ {t['narrate']}" if t.get("narrate") else "")
+                cells.append(v.replace("|", "\\|"))
             print(f"| {u} | " + " | ".join(cells) + " |")
 
 

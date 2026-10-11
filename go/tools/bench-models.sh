@@ -7,7 +7,8 @@
 #   tools/bench-models.sh                      # all models below, GPU
 #   tools/bench-models.sh -o results/e1 models/gemma4/*.gguf
 #   NGL=0 tools/bench-models.sh                # CPU
-#   PROMPT=results/step1-prompt.txt tools/bench-models.sh   # pin the prompt (default: grammar/dog-prompt.txt)
+#   PROMPT=results/step1-prompt.txt tools/bench-models.sh   # pin the prompt (default: the live grammar/dog-prompt.txt)
+#   EXTRA=-narrate P2TURN=1 tools/bench-models.sh            # + single-pass Narrate, + a pass-2-as-own-turn row
 #
 # Re-run on every model release; add the new GGUF to MODELS (or pass it).
 # Variants per model: twopass (the harness path) and, for models with a
@@ -41,6 +42,8 @@ CORPUS=${CORPUS:-grammar/dog-corpus.tsv}
 PROMPT=${PROMPT:-grammar/dog-prompt.txt}   # pin it: the prompt is tuned in the harness, the bench compares models
 GBNF=${GBNF:-grammar/dog.gbnf}
 THINK_MODELS=${THINK_MODELS:-gemma-4}   # substring: models that get a +think run
+P2TURN=${P2TURN:-}                      # 1: also a +p2turn row per model (pass 2 as its own chat turn)
+P2CUE=${P2CUE:-Now answer the person out loud: one short spoken sentence in the first person, no JSON.}
 EXTRA=${EXTRA:-}                        # e.g. EXTRA=-narrate
 
 [ -x bin/llmbench ] || ./build.sh llmbench
@@ -51,6 +54,7 @@ JSONL=$OUT/records.jsonl
   echo "# bench-models $(date -Is) host=$(hostname) ngl=$NGL n_ctx=$NCTX corpus=$CORPUS"
   echo "# prompt=$PROMPT sha256=$(sha256sum "$PROMPT" | cut -c1-12)  gbnf=$GBNF sha256=$(sha256sum "$GBNF" | cut -c1-12)"
   cp "$PROMPT" "$OUT/prompt.txt"; cp "$GBNF" "$OUT/grammar.gbnf"; cp "$CORPUS" "$OUT/corpus.tsv"
+  [ -n "$P2TURN" ] && echo "# p2turn cue: $P2CUE"
   echo "# llama.cpp: $(git -C "${LLAMA_DIR:-$HOME/archive/vox/llama.cpp}" log -1 --format='%h %ad' --date=short 2>/dev/null || echo '?')"
   nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader 2>/dev/null || true
 } | tee "$OUT/env.txt"
@@ -73,6 +77,7 @@ for m in "${MODELS[@]}"; do
   tag=$(basename "$m" .gguf)
   run "$m" "$tag"
   case "$tag" in *$THINK_MODELS*) run "$m" "$tag+think" -think ;; esac
+  if [ -n "$P2TURN" ]; then run "$m" "$tag+p2turn" -pass2-turn -pass2-cue "$P2CUE"; fi
 done
 
 echo
