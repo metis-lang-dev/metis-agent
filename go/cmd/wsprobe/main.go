@@ -6,6 +6,7 @@
 //	wsprobe -url ws://localhost:8392 -say "stand up" -task refused:not armed
 //	wsprobe -url ws://localhost:8392 -wav utterance.wav           # remote mic
 //	wsprobe -url ws://localhost:8392 -attention ASLEEP -say "sit"
+//	wsprobe -url ws://localhost:8392 -runtime-intent "reset 0"   # runtime{…} events print too
 //
 // It prints every event, plays TTS streams virtually (acks tts_done after
 // the audio length, or at once with -fast) and, with -task, answers the
@@ -31,6 +32,7 @@ func main() {
 	url := flag.String("url", "ws://localhost:8392", "harness base url (ws://host:port)")
 	say := flag.String("say", "", "chat text to send (say_text)")
 	announce := flag.String("announce", "", "external text to announce (say)")
+	rtIntent := flag.String("runtime-intent", "", "a runtime intent for the kernel, e.g. \"reset 0\" (runtime_intent)")
 	attention := flag.String("attention", "", "AWAKE | ASLEEP before anything else")
 	task := flag.String("task", "", "answer the first command: result[:detail] (done|failed|refused|expired)")
 	taskDelay := flag.Duration("task-delay", 500*time.Millisecond, "delay before the task answer")
@@ -93,6 +95,9 @@ func main() {
 	}
 	if *say != "" {
 		send(map[string]any{"ev": "say_text", "text": *say})
+	}
+	if *rtIntent != "" {
+		send(map[string]any{"ev": "runtime_intent", "text": *rtIntent})
 	}
 	if *announce != "" {
 		send(map[string]any{"ev": "say", "text": *announce})

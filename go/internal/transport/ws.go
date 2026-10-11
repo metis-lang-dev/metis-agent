@@ -10,9 +10,11 @@
 //	→ browser  state{dialog} · transcript{text,t} · reply{text,t} · intent{intent,voice,t}
 //	           command{id,name,args} · pending{id,state} · tts{id,rate,channels,format} + binary PCM
 //	           chunks + tts_end{id} · tts_stop{id} · role{master,mic_tok} · denied{what}
+//	           runtime{kind,path,fact,narrated,sig,t} (internal/kernel: every runtime signal)
 //	→ server   say_text{text} · attention{state} · task{id,result,detail} (result also
 //	           "progress": re-arms the command's window) · say{text}
 //	           tts_done{id,played_ms} · grab_master · release_master
+//	           runtime_intent{text} (a runtime intent, e.g. "reset 0", when a kernel is attached)
 //	/ws_mic?tok=…   binary 640-byte s16le 16 kHz frames (multiples accepted, re-cut)
 package transport
 
@@ -80,11 +82,12 @@ type Server struct {
 	uiDir string
 	up    websocket.Upgrader
 
-	OnSayText   func(text string)
-	OnAttention func(awake bool)
-	OnTask      func(t Task)
-	OnSay       func(text string)
-	OnMaster    func(claimed bool)
+	OnSayText       func(text string)
+	OnAttention     func(awake bool)
+	OnTask          func(t Task)
+	OnRuntimeIntent func(text string) // runtime_intent{text}: a runtime intent down to the kernel
+	OnSay           func(text string)
+	OnMaster        func(claimed bool)
 }
 
 var _ Transport = (*Server)(nil)
@@ -158,6 +161,13 @@ func (s *Server) DialogState(state string) {
 // Pending tells the UI where a command stands (expired rows go grey).
 func (s *Server) Pending(id, state string) {
 	s.broadcast(jmsg(map[string]any{"ev": "pending", "id": id, "state": state, "t": now()}))
+}
+
+// Runtime shows one runtime signal in the UI's events pane: the adapter's
+// fact sentence, whether the dialog narrates it, and the signal verbatim.
+func (s *Server) Runtime(kind, path, fact string, narrated bool, sig json.RawMessage) {
+	s.broadcast(jmsg(map[string]any{"ev": "runtime", "kind": kind, "path": path, "fact": fact,
+		"narrated": narrated, "sig": sig, "t": now()}))
 }
 
 // Command is the wire.Emitter: the typed command the host would execute.
@@ -360,6 +370,12 @@ func (s *Server) onText(c *client, data []byte) {
 	case "attention":
 		if s.OnAttention != nil && (m.State == "AWAKE" || m.State == "ASLEEP") {
 			s.OnAttention(m.State == "AWAKE")
+		}
+	case "runtime_intent":
+		if m.Text != "" && s.OnRuntimeIntent != nil {
+			s.OnRuntimeIntent(m.Text)
+		} else {
+			c.push(jmsg(map[string]any{"ev": "denied", "what": m.Ev}))
 		}
 	case "task":
 		if m.ID != "" && s.OnTask != nil {

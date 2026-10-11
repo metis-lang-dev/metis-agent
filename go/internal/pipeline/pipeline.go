@@ -158,12 +158,13 @@ type Engine struct {
 	speakEndT time.Time
 	speaking  bool
 
-	announceCh chan string    // system-initiated narration (warnings, status)
-	pending    []announcement // deferred while the floor is busy / asleep
-	taskCh     chan Task      // host outcomes for emitted commands
-	chatCh     chan string    // typed utterances (say_text)
-	chatQueue  []string       // typed utterances waiting for the floor
-	kick       chan struct{}  // wakes the loop when something outside it changed (attention)
+	announceCh chan string       // system-initiated narration (warnings, status)
+	pending    []announcement    // deferred while the floor is busy / asleep
+	taskCh     chan Task         // host outcomes for emitted commands
+	runtimeCh  chan RuntimeEvent // runtime signals the dialog narrates (internal/kernel)
+	chatCh     chan string       // typed utterances (say_text)
+	chatQueue  []string          // typed utterances waiting for the floor
+	kick       chan struct{}     // wakes the loop when something outside it changed (attention)
 }
 
 type announcement struct {
@@ -188,6 +189,7 @@ func New(cfg Config, l IntentGen, s Transcriber, t tts.Speaker) *Engine {
 		ttsDone:    make(chan bool),
 		announceCh: make(chan string, 8),
 		taskCh:     make(chan Task, 8),
+		runtimeCh:  make(chan RuntimeEvent, 16),
 		chatCh:     make(chan string, 8),
 		kick:       make(chan struct{}, 1),
 	}
@@ -268,6 +270,9 @@ func (e *Engine) Run(ctx context.Context, vadEvents <-chan vad.Event, textIn <-c
 
 		case t := <-e.taskCh:
 			e.onTask(t)
+
+		case ev := <-e.runtimeCh:
+			e.onRuntime(ev)
 
 		case text := <-e.chatCh:
 			// chat is a finished utterance: it takes the floor like a
@@ -447,7 +452,8 @@ func (e *Engine) park(a announcement) {
 func (e *Engine) narrate(it wire.Item, t Task) string {
 	fallback := narrateTemplate(it, t)
 	n, ok := e.LLM.(Narrator)
-	if !ok || (t.Result != "failed" && t.Result != "refused") {
+	runtimeDone := it.Name == RuntimeCommand && t.Result == "done" && strings.TrimSpace(t.Detail) != ""
+	if !ok || (t.Result != "failed" && t.Result != "refused" && !runtimeDone) {
 		return fallback
 	}
 	out, err := n.Narrate(e.cfg.SystemPrompt, taskCue(it, t))
@@ -469,7 +475,8 @@ func (e *Engine) narrate(it wire.Item, t Task) string {
 // says who is speaking, names the command and the result, quotes the
 // host's reason as a reason, and asks for a sentence, not an intent.
 func taskCue(it wire.Item, t Task) string {
-	verb := map[string]string{"failed": "failed", "refused": "was refused by the robot"}[t.Result]
+	verb := map[string]string{"failed": "failed", "refused": "was refused by the robot",
+		"done": "succeeded"}[t.Result]
 	cue := fmt.Sprintf("[Robot status report — not something the person said; do not classify it.] "+
 		"Your command to %s %s.", commandPhrase(it), verb)
 	if d := strings.TrimSpace(t.Detail); d != "" {
@@ -515,6 +522,9 @@ func narrateTemplate(it wire.Item, t Task) string {
 		if s, ok := doneText[it.Name]; ok {
 			return s
 		}
+		if it.Name == RuntimeCommand && detail != "" {
+			return "Done: " + detail + "."
+		}
 		return "Done."
 	case "failed":
 		if detail != "" {
@@ -547,7 +557,10 @@ var (
 // newlines and control characters become spaces, whitespace collapses, and
 // it is cut at a word boundary within detailCap runes, with trailing
 // punctuation dropped (the sentence adds its own). onTask logs the raw one.
-func cleanDetail(s string) string {
+func cleanDetail(s string) string { return cleanText(s, detailCap) }
+
+// cleanText is cleanDetail with its own cap (a runtime fact is longer).
+func cleanText(s string, limit int) string {
 	s = markupTag.ReplaceAllString(s, " ")
 	s = markupRune.Replace(s)
 	s = strings.Map(func(r rune) rune {
@@ -557,9 +570,9 @@ func cleanDetail(s string) string {
 		return r
 	}, s)
 	s = strings.Join(strings.Fields(s), " ")
-	if r := []rune(s); len(r) > detailCap {
-		s = string(r[:detailCap])
-		if i := strings.LastIndexByte(s, ' '); i > detailCap/2 {
+	if r := []rune(s); len(r) > limit {
+		s = string(r[:limit])
+		if i := strings.LastIndexByte(s, ' '); i > limit/2 {
 			s = s[:i]
 		}
 	}

@@ -296,3 +296,41 @@ in Chrome, and drive the dog intent corpus — voice (user) and chat
    player; events pane with task-injection buttons.
 4. Regression per §7, in Chrome; findings back into steps 1–3.
 5. Then DESIGN.md roadmap item 4: the CLM context API.
+
+## 9. The runtime adapter (runtime-wire step 2, INTEGRATION.md §2)
+
+`internal/kernel` attaches the runtime process, `metis --json --host SPEC
+CATALOG` (metispy), as a second host behind the `command`/`task` seam.
+Config `kernel:` (off for the dog), or `-kernel-host SPEC`:
+
+```
+fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.host:make_transient
+```
+
+- **Signals in, unpolled.** One `{"op":"watch","arg":"every=0.5"}` at
+  start; the reader goroutine takes every line in order. A line with
+  `signal` is a signal; any other line answers the oldest op in flight
+  (FIFO, answers come in op order between the signals).
+- **Signal → event.** `kernel.Translate` builds a fact sentence from the
+  signal's own fields (numbers copied: "pot onion is 3, the model says
+  2"). Every signal goes to the UI as `runtime{kind,path,fact,narrated,sig}`
+  (events pane). Three kinds are narrated (`kernel.narrate`): `surprise`,
+  `consistent` (a surprised reading agrees again) and `episode_over`.
+- **Narration** goes through the task path's discipline. It uses a framed
+  cue (`runtimeCue`: "Robot status report — not something the person said",
+  the fact quoted), `Narrate`, and the voice guard. One more check applies:
+  a number the model says that the fact does not hold sends the fact itself
+  to TTS instead. The result is parked like any system utterance (free
+  floor only, held while asleep).
+- **Intent → op → result.** A runtime intent (`reset 0`, `explain 0 CARD
+  MOVE`, `escalate 0 TEXT`; from the UI's runtime box or `wsprobe
+  -runtime-intent`) becomes a pending `RUNTIME` command in `wire.Pending`
+  and one `{"op":"intent"}`. The runtime's `result` signal answers that
+  command as `task{done|refused, detail = the runtime's reason}`. The
+  dialog agent hears it like any command outcome: refused through
+  `taskCue`, and admitted narrated too (the reason is the news). A result
+  that overtakes its op's answer is held until the answer names it.
+- **Quiet cost.** The ledger (lines, bytes, by kind, narrated) is logged
+  every ten minutes and at exit. A quiet kitchen pushes nothing: quiet
+  beats say nothing, and `quiescence` comes once per entry. The LLM is
+  called only for the narrated kinds.

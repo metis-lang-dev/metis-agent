@@ -54,3 +54,14 @@ prompt:  grammar/dog-prompt.txt
 prompt_extra: [grammar/pass2-examples-gemma4.txt]   # gemma4 leaked JSON on CANCEL/UNKNOWN without them (E1)
 grammar: grammar/dog.gbnf
 barge_in: vad                   # the remote mic is echo-cancelled by Chrome: a VAD onset cuts TTS
+# The runtime (runtime-wire step 2, internal/kernel): metis --json under a
+# PortPlugin host; its signals reach the UI's events pane and the narrated
+# ones the dialog. Off for the dog; `-kernel-host SPEC` turns it on.
+kernel:
+    enabled: false
+    cmd: [python3, -m, metis.lang.repl]
+    dir: ../../metispy
+    host: metis.domains.kitchen.host:make   # make | make_transient | make_wrong_domain | make_novel
+    catalog: metis/domains/kitchen/catalogs/kitchen_host.llp
+    watch: every=0.5
+    narrate: [surprise, consistent, episode_over]

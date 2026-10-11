@@ -34,6 +34,7 @@ import (
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/aec"
 	"github.com/metis-lang-dev/metis-agent/go/internal/audio"
+	"github.com/metis-lang-dev/metis-agent/go/internal/kernel"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
 	"github.com/metis-lang-dev/metis-agent/go/internal/pipeline"
 	"github.com/metis-lang-dev/metis-agent/go/internal/stt"
@@ -128,12 +129,16 @@ type config struct {
 	StopWords *[]string `yaml:"stop_words"`
 	Grammar   string    `yaml:"grammar"`  // GBNF file (token-exact intent grammar)
 	BargeIn   string    `yaml:"barge_in"` // off | vad | confirm
+	// Kernel: the runtime process (metis --json under a host) whose
+	// signals the dialog hears (runtime-wire step 2; ws transport only)
+	Kernel kernel.Config `yaml:"kernel"`
 }
 
 func main() {
 	cfgPath := flag.String("config", "config.playground.yaml", "YAML config")
 	headless := flag.Bool("headless", false, "stdin text instead of the mic")
 	uiDir := flag.String("ui-dir", "", "ws transport: serve this static UI at / (overrides ws.ui_dir)")
+	kernelHost := flag.String("kernel-host", "", "attach the runtime under this host SPEC (enables kernel:, overrides kernel.host)")
 	flag.Parse()
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 
@@ -403,8 +408,81 @@ func main() {
 			cfg.VAD.Aggressiveness, cfg.VAD.PaddingMs)
 	}
 
+	if *kernelHost != "" {
+		cfg.Kernel.Enabled, cfg.Kernel.Host = true, *kernelHost
+	}
+	if cfg.Kernel.Enabled {
+		if ws == nil {
+			log.Fatal("kernel: needs transport: ws (the runtime's events go to the UI)")
+		}
+		kc := startKernel(ctx, cfg.Kernel, eng, ws)
+		defer kc.Close()
+	}
+
 	eng.Run(ctx, vadEvents, textIn)
 	fmt.Fprintln(os.Stderr, "\nbye.")
+}
+
+// startKernel attaches the runtime (internal/kernel): every signal to the
+// UI's events pane, the narrated ones to the dialog, runtime intents from
+// the UI down as wire ops whose result answers a pending RUNTIME command.
+// The quiet-cost ledger is logged every ten minutes and at exit.
+func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, ws *transport.Server) *kernel.Client {
+	if kernel.RuntimeCommand != pipeline.RuntimeCommand {
+		log.Fatal("kernel: RuntimeCommand names disagree")
+	}
+	h := kernel.NewHost(kcfg, eng.Tasks)
+	h.OnEvent = func(ev kernel.Event) {
+		ws.Runtime(ev.Kind, ev.Path, ev.Fact, ev.Narrate, ev.Raw)
+		if ev.Narrate {
+			eng.RuntimeEvent(pipeline.RuntimeEvent{Kind: ev.Kind, Path: ev.Path, Fact: ev.Fact,
+				Narrate: true, At: ev.At})
+		}
+	}
+	h.OnTask = func(id, result, detail string) {
+		eng.TaskEvent(pipeline.Task{ID: id, Result: result, Detail: detail})
+	}
+	kc, err := kernel.Start(ctx, kcfg, h.Signal)
+	if err != nil {
+		log.Fatal(err)
+	}
+	h.C = kc
+	ws.OnRuntimeIntent = func(text string) {
+		go func() {
+			if _, err := h.Intent(text); err != nil {
+				log.Printf("[kernel] intent %q: %v", text, err)
+			}
+		}()
+	}
+	w := kcfg.Watch
+	if w == "" {
+		w = "every=0.5"
+	}
+	ans, err := kc.Op("watch", w, 30*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	b, _ := json.Marshal(ans)
+	log.Printf("[kernel] watch %s → %s", w, b)
+	ledger := func() {
+		n, bytes, by, up := kc.Stats.Snapshot()
+		log.Printf("[kernel] quiet cost: %d lines, %d B in %s (%.0f lines/h); by kind %v; narrated %d",
+			n, bytes, up.Round(time.Second), float64(n)/up.Hours(), by, h.Narrated())
+	}
+	go func() {
+		t := time.NewTicker(10 * time.Minute)
+		defer t.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				ledger()
+				return
+			case <-t.C:
+				ledger()
+			}
+		}
+	}()
+	return kc
 }
 
 // serveWS runs the ws transport's HTTP server: plain http on ws.addr, or
