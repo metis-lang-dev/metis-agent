@@ -6,8 +6,10 @@ one table (docs/MODEL-EXPERIMENTS.md E6).
   invented  the answer has a number that is in no piece, question or
             dialog turn (and is not the fact's own)
   ignored   neither: answered from the prior context or a default
-  echo      the answer copies the piece's syntax back (⟪metis …⟫, raw
-            JSON): a leak, counted apart and never as used
+  echo      the answer copies the piece back in ⟪…⟫ (or raw JSON): a
+            leak to strip; use is scored on the answer with spans removed
+  forged    the answer writes a ⟪…⟫ span the piece does not carry: the
+            model forging a runtime fact in the runtime's own syntax
   newer     conflict probe: the newer value wins (expect matches, the
             older statement's value does not stand alone)
   cont      continuation probe: the fact shows up (the cont regex)
@@ -18,6 +20,13 @@ import re
 import statistics
 import sys
 from collections import defaultdict
+
+def _overlap(span, piece):
+    """Share of the span's words that the piece has (1.0 = a copy)."""
+    w = re.findall(r"\w+", span.lower())
+    have = set(re.findall(r"\w+", piece.lower()))
+    return sum(1 for x in w if x in have) / len(w) if w else 1.0
+
 
 NUM = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?![\w])")
 
@@ -34,21 +43,27 @@ def main():
     rows = []
     for r in recs:
         f = corpus[r["fact"]]
-        a = r["answer"] or ""
+        full = r["answer"] or ""
+        # bracketed spans the model wrote: a COPY of the piece (echo) or
+        # a FORGED runtime fact (text the piece does not carry); the body
+        # (spans stripped — the harness can strip them deterministically)
+        # is what is scored for use
+        spans = re.findall(r"⟪(.*?)(?:⟫|$)", full, re.S)
+        forged = any(_overlap(sp, r["piece"]) < 0.6 for sp in spans)
+        echo = bool(spans) and not forged or '{"signal"' in full
+        a = re.sub(r"⟪.*?(?:⟫|$)", " ", full, flags=re.S)
         used = bool(re.search(f["expect"], a, re.I | re.S))
         allowed = set(NUM.findall(" ".join(
             [r["piece"], f["raw"], r["question"], context, f["old"]])))
         invented = [n for n in NUM.findall(a) if n not in allowed
                     and n.rstrip("0").rstrip(".") not in allowed]
-        # the answer copies the runtime's own syntax back (a leak, not use)
-        echo = "⟪" in a or "⟫" in a or '{"signal"' in a or '"seq"' in a
-        x = dict(r, used=used and not echo, invented=bool(invented),
-                 ignored=not used and not invented and not echo, echo=echo)
+        x = dict(r, used=used, invented=bool(invented),
+                 ignored=not used and not invented, echo=echo, forged=forged)
         if r["probe"] == "conflict":
             x["newer"] = used
             x["older"] = (not used) and bool(re.search(f["old_re"], a, re.I))
         if r["probe"] == "cont":
-            x["cont_ok"] = bool(re.search(f["cont"], a, re.I)) and not echo
+            x["cont_ok"] = bool(re.search(f["cont"], a, re.I))
         rows.append(x)
 
     def rate(xs, k):
@@ -56,8 +71,8 @@ def main():
 
     tags = sorted({x["tag"] for x in rows})
     out = ["### Fact question (grid): used at distance 0 / 2 / 6; invented and ignored over all distances", "",
-           "| model | renderer | form | used d0 | d2 | d6 | invented | ignored | echo | n |",
-           "|---|---|---|---|---|---|---|---|---|---|"]
+           "| model | renderer | form | used d0 | d2 | d6 | invented | ignored | echo | forged | n |",
+           "|---|---|---|---|---|---|---|---|---|---|---|"]
     for t in tags:
         for rnd in "TZR":
             for form in ("inline", "system", "user"):
@@ -69,7 +84,7 @@ def main():
                 out.append(f"| {t} | {rnd} | {form} | {rate(by[0], 'used')} | "
                            f"{rate(by[2], 'used')} | {rate(by[6], 'used')} | "
                            f"{rate(g, 'invented')} | {rate(g, 'ignored')} | "
-                           f"{rate(g, 'echo')} | {len(g)} |")
+                           f"{rate(g, 'echo')} | {rate(g, 'forged')} | {len(g)} |")
     out += ["", "### Conflict, continuation, cost (inline, distance 2)", "",
             "| model | renderer | conflict: newer wins | older kept | continuation carries the fact | continuation echoes | ms to first token p50 | ms answer p50 | piece tok (splice ms) p50 |",
             "|---|---|---|---|---|---|---|---|---|"]
