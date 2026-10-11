@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/metis-lang-dev/metis-agent/go/internal/fsm"
 	"github.com/metis-lang-dev/metis-agent/go/internal/wire"
 )
 
@@ -17,18 +18,34 @@ const RuntimeCommand = "RUNTIME"
 // factCap bounds a runtime fact in speech (a surprise names a few atoms).
 const factCap = 240
 
-// RuntimeEvent is a runtime signal the dialog may narrate (runtime-wire
-// step 2). Fact is a sentence the adapter built from the signal's own
-// fields; the narration may rephrase it but not invent a number.
+// RuntimeEvent is one runtime piece (runtime-wire step 4, docs/CML.md §7):
+// a deterministic plain-words template of a signal. The robot narrates
+// pieces unsolicited, floor permitting: a "progress" piece waits for a free
+// floor (batched with the others waiting, thinking off); a "surprise" piece
+// (surprise, notice, refused result) is narrated at once with thinking on
+// and takes the next floor, cutting a progress narration. Quiet beats send
+// nothing, so nothing is said.
 type RuntimeEvent struct {
-	Kind    string // surprise | consistent | episode_over | …
+	Kind    string // event | reading | operator | quiescence | surprise | result | notice
 	Path    string // the runtime domain ("kitchen")
-	Fact    string
+	Fact    string // the piece
+	Class   string // progress | surprise
+	Rec     int    // the surprise record it belongs to, -1 for none
 	Narrate bool
 	At      time.Time
 }
 
-// RuntimeEvent queues a runtime signal for the dialog. Safe from any
+// Speaker is the cued narration seat (llm.LLM.Speak): one sentence after
+// prefix + tape + the pieces and their cue, thinking per call.
+type Speaker interface {
+	Speak(systemPrompt, user string, think bool) (string, time.Duration, string, error)
+}
+
+// maxProgress bounds the progress pieces waiting for a floor; older ones go
+// to the tape unsaid.
+const maxProgress = 8
+
+// RuntimeEvent queues a runtime piece for the dialog. Safe from any
 // goroutine; drops (logged) rather than block the runtime reader.
 func (e *Engine) RuntimeEvent(ev RuntimeEvent) {
 	if ev.At.IsZero() {
@@ -41,36 +58,122 @@ func (e *Engine) RuntimeEvent(ev RuntimeEvent) {
 	}
 }
 
-// onRuntime narrates a runtime event like a task outcome: parked as a
-// system utterance for the next free floor, held while asleep.
 func (e *Engine) onRuntime(ev RuntimeEvent) {
 	if !ev.Narrate {
 		return
 	}
-	text := e.narrateRuntime(ev)
-	if text == "" {
+	if ev.Class == "surprise" {
+		text, user := e.narratePieces([]RuntimeEvent{ev}, true)
+		e.tape(ev.Kind, ev.Rec, user, text)
+		if text == "" {
+			return
+		}
+		if !e.Attn.Awake() {
+			log.Printf("[runtime] %s: asleep — parked", ev.Kind)
+		} else if e.speaking && e.speakingProg {
+			log.Printf("[runtime] %s takes the floor from a progress narration", ev.Kind)
+			e.TTS.Cancel()
+		}
+		// first in line: the next free floor is the surprise's
+		e.pending = append([]announcement{{text, ev.At}}, e.pending...)
+		e.tryAnnounce()
 		return
 	}
 	if !e.Attn.Awake() {
-		log.Printf("[runtime] %s: asleep — parked", ev.Kind)
+		e.tape(ev.Kind, ev.Rec, ev.Fact, "") // the fact still goes on, unsaid
+		return
 	}
-	log.Printf("[runtime] %s (%s) → %q", ev.Kind, ev.Path, text)
-	if e.OnRuntimeSpoken != nil {
-		e.OnRuntimeSpoken(text)
+	e.progressQ = append(e.progressQ, ev)
+	if n := len(e.progressQ) - maxProgress; n > 0 {
+		for _, old := range e.progressQ[:n] {
+			e.tape(old.Kind, old.Rec, old.Fact, "")
+		}
+		e.progressQ = e.progressQ[n:]
 	}
-	e.park(announcement{text, ev.At})
+	e.tryAnnounce()
 }
 
-// narrateRuntime speaks a runtime event's fact as built from the signal
-// (runtime-wire step-2 review: E2B's own phrasing dropped the model's
-// number — "The kitchen reading is 3." — so a runtime fact is the
-// template; the LLM speaks results and decisions, through the task path).
-func (e *Engine) narrateRuntime(ev RuntimeEvent) string {
-	fact := cleanText(ev.Fact, factCap)
-	if fact == "" {
-		return ""
+// tryProgress narrates the progress pieces waiting, as one sentence, when
+// the floor is free and the room awake.
+func (e *Engine) tryProgress() {
+	if len(e.progressQ) == 0 || e.speaking || !e.Attn.Awake() {
+		return
 	}
-	return fact + "."
+	if e.Turn.State != fsm.FreeU && e.Turn.State != fsm.FreeS {
+		return
+	}
+	batch := e.progressQ
+	e.progressQ = nil
+	text, user := e.narratePieces(batch, false)
+	rec := -1
+	for _, p := range batch {
+		if p.Rec > rec {
+			rec = p.Rec
+		}
+	}
+	e.tape("progress", rec, user, text)
+	if text == "" || e.Turn.SystemAction('G') != nil {
+		return
+	}
+	log.Printf("[announce] %q", text)
+	e.speakingProg = true
+	e.say(text)
+}
+
+func (e *Engine) tape(kind string, rec int, pieces, spoken string) {
+	if e.OnRuntimeTape != nil {
+		e.OnRuntimeTape(kind, rec, pieces, spoken)
+	}
+}
+
+const (
+	cueProgress = "[The lines above are the robot's runtime report, not something the person said; do not classify them.] " +
+		"Tell the person in one short sentence, in your own words, what is going on in the %s. Use only numbers that are above."
+	cueSurprise = "[The line above is the robot's runtime report, not something the person said; do not classify it.] " +
+		"Tell the person in one short sentence, in your own words, what happened in the %s and what it means. Use only numbers that are above."
+)
+
+// narratePieces is the cued narration: the pieces, then the cue, then one
+// sentence from the model — guarded (unspeakable, forged fact syntax, a
+// number the pieces do not hold), else the last piece itself is said.
+// Returns the sentence and the turn's text (pieces + cue) for the tape.
+func (e *Engine) narratePieces(batch []RuntimeEvent, think bool) (string, string) {
+	var lines []string
+	for _, p := range batch {
+		lines = append(lines, cleanText(p.Fact, factCap)+".")
+	}
+	pieces := strings.Join(lines, "\n")
+	where := strings.ReplaceAll(batch[0].Path, "_", " ")
+	if where == "" {
+		where = "runtime"
+	}
+	cue := fmt.Sprintf(cueProgress, where)
+	if think {
+		cue = fmt.Sprintf(cueSurprise, where)
+	}
+	user := pieces + "\n" + cue
+	fallback := lines[len(lines)-1]
+	sp, ok := e.LLM.(Speaker)
+	if !ok {
+		return fallback, user
+	}
+	out, ttft, thought, err := sp.Speak(e.cfg.SystemPrompt, user, think)
+	if err != nil {
+		log.Printf("[runtime] narration failed: %v", err)
+		return fallback, user
+	}
+	s := sanitizeAck(out)
+	switch {
+	case !taskVoiceOK(s):
+		log.Printf("[runtime] narration %q rejected — the piece", out)
+		return fallback, user
+	case inventedNumbers(s, pieces) != "":
+		log.Printf("[runtime] narration %q says %s, not in the pieces — the piece", out, inventedNumbers(s, pieces))
+		return fallback, user
+	}
+	log.Printf("[runtime] narrate %d piece(s) (%s, think=%v) → %q (first token %d ms, thought %d chars)",
+		len(batch), batch[len(batch)-1].Kind, think, s, ttft.Milliseconds(), len(thought))
+	return s, user
 }
 
 // SetSystemPrompt replaces the system prompt before Run (runtime-wire step

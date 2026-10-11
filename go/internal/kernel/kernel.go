@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"os/exec"
 	"sync"
 	"time"
@@ -32,6 +33,7 @@ type Config struct {
 	Enabled bool     `yaml:"enabled"`
 	Cmd     []string `yaml:"cmd"`     // the runtime process (default: python3 -m metis.lang.repl)
 	Dir     string   `yaml:"dir"`     // its working directory (metispy)
+	Env     []string `yaml:"env"`     // extra KEY=VALUE for it (e.g. METIS_KITCHEN_EPISODE)
 	Host    string   `yaml:"host"`    // --host SPEC (the PortPlugin host, e.g. the kitchen)
 	Catalog string   `yaml:"catalog"` // the served catalog file
 	Watch   string   `yaml:"watch"`   // watch arguments (default "every=0.5")
@@ -116,6 +118,9 @@ func Start(ctx context.Context, cfg Config, onSignal func(Signal)) (*Client, err
 	}
 	cmd := exec.CommandContext(ctx, argv[0], args...)
 	cmd.Dir = cfg.Dir
+	if len(cfg.Env) > 0 {
+		cmd.Env = append(os.Environ(), cfg.Env...)
+	}
 	in, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err

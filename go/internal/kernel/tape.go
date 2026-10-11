@@ -74,16 +74,19 @@ func (h *Host) tapeAdd(kind string, rec int, text string) {
 	log.Printf("[tape] +%d tok (%s) → %d tok, %d ms", n, kind, total, dur.Milliseconds())
 }
 
-// Spoken puts what was said about the runtime on the tape as the model's
-// own turn, under the surprise it belongs to (the latest one).
-func (h *Host) Spoken(text string) {
-	if h.Tape == nil || strings.TrimSpace(text) == "" {
+// TapeNarration puts one cued narration on the tape: the pieces and their cue
+// as a user turn, the sentence said as the model's turn ("" when nothing
+// was said — asleep: the facts still go on). rec ties it to a surprise
+// episode for compaction (-1: progress, gone at the next quiescence).
+func (h *Host) TapeNarration(kind string, rec int, pieces, spoken string) {
+	if h.Tape == nil || strings.TrimSpace(pieces) == "" {
 		return
 	}
-	h.tapeMu.Lock()
-	rec := h.lastRec
-	h.tapeMu.Unlock()
-	h.tapeAdd("spoken", rec, h.Tape.Turn("model", text))
+	text := h.Tape.Turn("user", pieces)
+	if strings.TrimSpace(spoken) != "" {
+		text += h.Tape.Turn("model", spoken)
+	}
+	h.tapeAdd(kind, rec, text)
 }
 
 func (h *Host) compact() {

@@ -40,6 +40,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unsafe"
 )
@@ -67,12 +68,14 @@ type LLM struct {
 	// and kept in the KV between calls — runtime facts, results, spoken
 	// sentences. A turn rolls back to prefix+tape, never into it; only
 	// SetTape (compaction) rewrites it.
-	tapeText string
-	tapeToks []C.llama_token
-	firstTok time.Duration // generate(): time to the first sampled token
-	eotText string // end-of-turn marker text, stripped from decoded output
-	pass2   Pass2
-	stopIDs map[C.llama_token]bool // end-of-turn / end-of-sentence ids
+	tapeText   string
+	tapeToks   []C.llama_token
+	firstTok   time.Duration // generate(): time to the first sampled token
+	nDecoded   atomic.Int64
+	nGenerated atomic.Int64
+	eotText    string // end-of-turn marker text, stripped from decoded output
+	pass2      Pass2
+	stopIDs    map[C.llama_token]bool // end-of-turn / end-of-sentence ids
 
 	// Gemma 4 thinking (MODEL-EXPERIMENTS.md E1): <|think|> in the system
 	// turn, the model answers <|channel>thought…<channel|> first. Off unless
@@ -569,9 +572,15 @@ func (l *LLM) decodeTokens(toks []C.llama_token) error {
 			return fmt.Errorf("llama_decode returned %d (n_past=%d)", rc, l.nPast)
 		}
 		l.nPast += len(chunk)
+		l.nDecoded.Add(int64(len(chunk)))
 	}
 	return nil
 }
+
+// TokenCounts is the adapter's running count: tokens evaluated into the KV
+// (prompts, tails, the tape) and tokens generated (the quiet-cost and
+// tokens/hour measures, runtime-wire steps 4–5).
+func (l *LLM) TokenCounts() (decoded, generated int64) { return l.nDecoded.Load(), l.nGenerated.Load() }
 
 // ── KV prefix reuse (two_pass._prime_prefix) ─────────────────────────────────
 
@@ -927,6 +936,78 @@ func (l *LLM) DecideTimed(systemPrompt, user, cont, gbnf string, maxTokens int) 
 	return strings.TrimSpace(l.detokenize(toks)), ttft, nil
 }
 
+// Speak is the runtime's cued narration (runtime-wire step 4, CML.md §7):
+// one turn after prefix + tape (the piece and its cue as the user text),
+// one sentence back with pass-2 sampling, cut at the first newline. With
+// think, the turn opens the thought channel itself (<|channel>) — per call,
+// without <|think|> in the system turn, so the one prefix stays — the
+// thought runs greedily to its close (≤ thinkMax), then the sentence.
+// Returns the sentence, the time to its first spoken token and the thought.
+func (l *LLM) Speak(systemPrompt, user string, think bool) (string, time.Duration, string, error) {
+	t0 := time.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	base, err := l.primeLocked(systemPrompt)
+	if err != nil {
+		return "", 0, "", err
+	}
+	if err := l.rewind(systemPrompt, base); err != nil {
+		return "", 0, "", err
+	}
+	if err := l.decodeTokens(l.tailTokens(user)); err != nil {
+		return "", 0, "", err
+	}
+	var thought string
+	if think && l.chanOpen >= 0 {
+		if rc := C.decode_one(l.ctx, l.chanOpen); rc != 0 {
+			return "", 0, "", fmt.Errorf("llama_decode returned %d opening the thought", rc)
+		}
+		l.nPast++
+		g := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
+		C.llama_sampler_chain_add(g, C.llama_sampler_init_greedy())
+		var out []C.llama_token
+		max := min(l.thinkMax, 256) // a narration's thought: bounded
+		if max <= 0 {
+			max = 256
+		}
+		for len(out) < max {
+			tok := C.llama_sampler_sample(g, l.ctx, -1)
+			if tok == l.chanClose || bool(C.llama_vocab_is_eog(l.vocab, tok)) {
+				break
+			}
+			out = append(out, tok)
+			l.nGenerated.Add(1)
+			if rc := C.decode_one(l.ctx, tok); rc != 0 {
+				C.llama_sampler_free(g)
+				return "", 0, "", fmt.Errorf("llama_decode returned %d mid-thought", rc)
+			}
+			l.nPast++
+		}
+		C.llama_sampler_free(g)
+		thought = l.detokenize(out)
+		if rc := C.decode_one(l.ctx, l.chanClose); rc != 0 {
+			return "", 0, "", fmt.Errorf("llama_decode returned %d closing the thought", rc)
+		}
+		l.nPast++
+	}
+	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
+	C.llama_sampler_chain_add(chain, C.llama_sampler_init_top_k(C.int32_t(l.pass2.TopK)))
+	C.llama_sampler_chain_add(chain, C.llama_sampler_init_temp(C.float(l.pass2.Temp)))
+	C.llama_sampler_chain_add(chain, C.llama_sampler_init_dist(C.LLAMA_DEFAULT_SEED))
+	defer C.llama_sampler_free(chain)
+	tGen := time.Now()
+	toks, err := l.generate(chain, l.pass2.MaxTokens, "\n")
+	if err != nil {
+		return "", 0, thought, err
+	}
+	ttft := tGen.Sub(t0) + l.firstTok
+	voice := l.detokenize(toks)
+	if i := strings.IndexByte(voice, '\n'); i >= 0 {
+		voice = voice[:i]
+	}
+	return strings.TrimSpace(strings.Trim(l.clean(voice), `"`)), ttft, strings.TrimSpace(thought), nil
+}
+
 // Answer is one free-text model turn after the cached prefix and the tape
 // (E6 splice): the user text as the turn, the thought channel closed when
 // thinking is on, then greedy until the end of the turn. It returns the
@@ -1060,6 +1141,7 @@ func (l *LLM) generate(chain *C.struct_llama_sampler, maxTokens int,
 		if l.firstTok == 0 {
 			l.firstTok = time.Since(t0)
 		}
+		l.nGenerated.Add(1)
 		if bool(C.llama_vocab_is_eog(l.vocab, tok)) || l.stopIDs[tok] {
 			break
 		}

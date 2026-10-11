@@ -163,12 +163,15 @@ type Engine struct {
 	taskCh     chan Task         // host outcomes for emitted commands
 	runtimeCh  chan RuntimeEvent // runtime signals the dialog narrates (internal/kernel)
 
-	// OnRuntimeSpoken hears every sentence said about the runtime (its
-	// facts and its intents' results): the kernel puts them on the tape
-	OnRuntimeSpoken func(text string)
-	chatCh          chan string   // typed utterances (say_text)
-	chatQueue       []string      // typed utterances waiting for the floor
-	kick            chan struct{} // wakes the loop when something outside it changed (attention)
+	// OnRuntimeTape hears every cued narration (the pieces with their cue,
+	// and the sentence said — "" when nothing was): the kernel puts them on
+	// the tape (runtime-wire step 4, CML.md §7)
+	OnRuntimeTape func(kind string, rec int, pieces, spoken string)
+	progressQ     []RuntimeEvent // progress pieces waiting for a free floor
+	speakingProg  bool           // the current utterance is a progress narration (a surprise cuts it)
+	chatCh        chan string    // typed utterances (say_text)
+	chatQueue     []string       // typed utterances waiting for the floor
+	kick          chan struct{}  // wakes the loop when something outside it changed (attention)
 }
 
 type announcement struct {
@@ -299,6 +302,7 @@ func (e *Engine) Run(ctx context.Context, vadEvents <-chan vad.Event, textIn <-c
 
 		case ok := <-e.ttsDone:
 			e.speaking = false
+			e.speakingProg = false
 			e.speakEndT = time.Now()
 			_ = ok
 			// Response finished (or was cut): release the floor.
@@ -423,6 +427,12 @@ func (e *Engine) onTask(t Task) {
 		// it, later it ages out (architect's step-2 note)
 		log.Printf("[task] %s %s (%s): asleep — parked", t.ID, t.Result, it.Name)
 	}
+	if it.Name == RuntimeCommand {
+		// a runtime intent's result is narrated from its result piece
+		// (the runtime's own signal), not twice
+		log.Printf("[task] %s %s (RUNTIME): narrated from the result piece", t.ID, t.Result)
+		return
+	}
 	text := e.narrate(it, t)
 	if text == "" {
 		return
@@ -431,9 +441,6 @@ func (e *Engine) onTask(t Task) {
 		text = "Late news: " + strings.TrimSpace(text)
 	}
 	log.Printf("[task] %s %s (%s) → %q", t.ID, t.Result, it.Name, text)
-	if it.Name == RuntimeCommand && e.OnRuntimeSpoken != nil {
-		e.OnRuntimeSpoken(text)
-	}
 	e.park(announcement{text, t.At})
 }
 
@@ -911,7 +918,11 @@ func (e *Engine) Announce(text string) {
 // older than AnnounceMaxAge are dropped: a warning from half a minute ago
 // is stale, and nothing is spoken while ASLEEP.
 func (e *Engine) tryAnnounce() {
-	if len(e.pending) == 0 || e.speaking {
+	if e.speaking {
+		return
+	}
+	if len(e.pending) == 0 {
+		e.tryProgress() // nothing parked: the runtime's progress may speak
 		return
 	}
 	cut := time.Now().Add(-e.cfg.AnnounceMaxAge)

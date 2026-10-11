@@ -434,7 +434,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 	h := kernel.NewHost(kcfg, eng.Tasks)
 	var kc *kernel.Client
 	h.OnEvent = func(ev kernel.Event) {
-		ws.Runtime(ev.Kind, ev.Path, ev.Fact, ev.Narrate, ev.Raw)
+		ws.Runtime(ev.Kind, ev.Path, ev.Fact, len(ev.Pieces) > 0, ev.Raw)
 		if ev.Kind == "episode_over" && kc != nil {
 			// the runtime's own account of the run, once the surprises
 			// are closed (opus: one ledger line per fixture run)
@@ -446,9 +446,11 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 				}
 			}()
 		}
-		if ev.Narrate {
-			eng.RuntimeEvent(pipeline.RuntimeEvent{Kind: ev.Kind, Path: ev.Path, Fact: ev.Fact,
-				Narrate: true, At: ev.At})
+		// step 4 (CML.md §7): every piece is narrated unsolicited, floor
+		// permitting — progress waits for a free floor, a surprise takes it
+		for _, p := range ev.Pieces {
+			eng.RuntimeEvent(pipeline.RuntimeEvent{Kind: p.Kind, Path: ev.Path, Fact: p.Text,
+				Class: p.Class, Rec: p.Rec, Narrate: true, At: ev.At})
 		}
 	}
 	h.OnTask = func(id, result, detail string) {
@@ -491,7 +493,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 			log.Fatal(err)
 		}
 		h.Tape = tapeAdapter{l, h.Prompt}
-		eng.OnRuntimeSpoken = h.Spoken
+		eng.OnRuntimeTape = h.TapeNarration
 		log.Printf("[kernel] triage on: %d cards, call grammar %d B; one prefix %d tok (dog prompt + runtime section %d B); settle %s, keep %d episodes",
 			len(cards.Cards), len(h.Dec.GBNF), n, len(h.Dec.System), h.Settle, kcfg.KeepEpisodes)
 	}

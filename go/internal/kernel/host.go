@@ -23,6 +23,7 @@ type Event struct {
 	Narrate bool
 	Raw     json.RawMessage
 	At      time.Time
+	Pieces  []Piece // the signal in plain words for the model (step 4, CML.md §7)
 }
 
 // RuntimeCommand is the pending-command name of a runtime intent.
@@ -126,6 +127,11 @@ func (h *Host) Signal(s Signal) {
 		h.mu.Unlock()
 	}
 	ev := Translate(s)
+	var cards []Card
+	if h.Dec != nil {
+		cards = h.Dec.Cards
+	}
+	ev.Pieces = Pieces(s, cards)
 	ev.Narrate = ev.Narrate && h.narrate[ev.Kind]
 	if ev.Narrate {
 		h.narrated.Add(1)
@@ -135,16 +141,13 @@ func (h *Host) Signal(s Signal) {
 		h.OnEvent(ev)
 	}
 	if h.Tape != nil {
-		rec := -1
-		if r, ok := s.F["record"].(float64); ok {
-			rec = int(r)
-		}
+		// the pieces reach the tape with what was said about them
+		// (TapeNarration); the quiescence is where the stale ones go
 		if s.Kind == "surprise" {
 			h.tapeMu.Lock()
-			h.lastRec = rec
+			h.lastRec = int(num(s.F["record"]))
 			h.tapeMu.Unlock()
 		}
-		h.tapeAdd(s.Kind, rec, h.Tape.Turn("user", Fragment(s)))
 		if s.Kind == "quiescence" {
 			h.compact()
 		}
