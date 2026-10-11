@@ -316,23 +316,39 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
   2"). Every signal goes to the UI as `runtime{kind,path,fact,narrated,sig}`
   (events pane). Three kinds are narrated (`kernel.narrate`): `surprise`,
   `consistent` (a surprised reading agrees again) and `episode_over`.
-- **Narration:** a runtime fact is spoken as built: the template, with
-  numbers copied (step-2 review: E2B's own phrasing dropped the model's
-  number). The LLM speaks results and decisions through the task path, and
-  a RUNTIME result may not add a number that the runtime's reason lacks.
-  It is parked like any system utterance: free floor only, held while asleep.
+- **Narration (step 4, CML.md §7):** a signal becomes one or more
+  pieces (`kernel.Pieces`): a fixed template per kind in plain words
+  (`kernel.PlainWords`: atom names as words, cards as their provenance
+  text) that states the consequence, not only the state ("The runtime
+  stopped acting: it takes no new orders until the surprise is closed").
+  The dialog speaks a piece by cueing the model: the piece, then a cue
+  ("Tell the person in one short sentence …"), then the model's sentence.
+  - `progress` (events, readings, quiescence, admitted results) waits for
+    a free floor, is batched (up to 8 pieces per sentence) and runs with
+    thinking off.
+  - `surprise` (a surprise, a notice, a refused result) takes the floor
+    next, cuts a progress narration and runs with thinking on (capped at
+    64 tokens).
+  - Asleep, nothing is said.
+  - The sentence opens with "Spoken response:" and is sampled under a
+    one-sentence grammar, so the dog persona does not leak in.
+  - The guards (`sanitizeAck`, `taskVoiceOK`, `inventedNumbers`, and a
+    forged `⟪…⟫` or `metis seq=` is unspeakable) fall back to the piece
+    itself. The number guard compares numerals as written, so a model's
+    "two" for a piece's "+1" falls back.
+  - A RUNTIME task outcome is not narrated a second time; its result piece
+    already was.
 - **Intent → op → result.** A runtime intent (`reset 0`, `explain 0 CARD
   MOVE`, `escalate 0 TEXT`; from the UI's runtime box or `wsprobe
   -runtime-intent`) becomes a pending `RUNTIME` command in `wire.Pending`
   and one `{"op":"intent"}`. The runtime's `result` signal answers that
   command as `task{done|refused, detail = the runtime's reason}`. The
-  dialog agent hears it like any command outcome: refused through
-  `taskCue`, and admitted narrated too (the reason is the news). A result
-  that overtakes its op's answer is held until the answer names it.
+  dialog hears it as its result piece (step 4), not as a task outcome. A
+  result that overtakes its op's answer is held until the answer names it.
 - **Quiet cost.** The ledger (lines, bytes, by kind, narrated) is logged
   every ten minutes and at exit. A quiet kitchen pushes nothing: quiet
-  beats say nothing, and `quiescence` comes once per entry. The LLM is
-  called only for the narrated kinds.
+  beats say nothing, and `quiescence` comes once per entry. Nothing is
+  decoded or generated between signals.
 - **Triage (step 3): the model closes every surprise.**
   - At attach time the `cards` op gives the tool declarations, rendered in
     Gemma 4's native format (E4) as reset(), explain(card, move) and
@@ -360,25 +376,23 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
     effects, the tool declarations). TwoPass, Narrate and Decide share it as
     one cached prefix: 2136 tok on E2B, and a surprise re-primes nothing.
     The dog corpus stays at 54/54 under it (`llmbench -kernel-cards`).
-  - **The tape** is whole turns kept in the KV after the prefix
-    (`llm.AppendTape` / `SetTape` / `TapeTurn`, tokenized in the context of
-    prefix+tape like F10's tail).
-    - It holds every signal as a fragment (`kernel.Fragment`: one line,
-      atom names and numbers verbatim, the witness on an admitted
-      explain), in a user turn.
-    - It holds every sentence said about the runtime as the model's turn.
-    - A turn (TwoPass, Narrate, Decide) evaluates only its own tail and
-      rolls back to prefix+tape.
-  - **Compaction** runs at quiescence and is deterministic. The events and
-    quiescences of the past go. A surprise episode (its fact, readings,
-    results, what was said) stays: the last `keep_episodes` of them (3),
-    and the open one always.
+  - **The standing region** (E6b) is ONE user turn after the prefix,
+    overwritten in place (`llm.SetTape`) whenever a fact in it changes. A
+    superseded fact is deleted, not appended over.
+    - It holds a head line, the mirror line (`ctx --mirror`, refreshed at
+      quiescence and on results), the open or escalated surprises and the
+      last three notices.
+    - It runs 67 tok when nothing is open and is bounded by about 260 tok.
+      A rewrite costs 8–38 ms.
+  - **The stream** has no history. A piece lives only in the turn whose
+    cue speaks about it (distance 0). A turn (TwoPass, Speak, Decide)
+    evaluates only its own tail and rolls back to prefix+standing.
   - **Triage's turn** restates the surprise's difference ("Close SURPRISE
     #r" alone let E2B reset a persisting partner diff it had explained
     twice). `settle_beats` (2.5) is the wait for the next reading.
     `admitted+notice` (metispy d725507) counts as admitted, and the notice
-    is narrated once per card+move.
-  - **Results** are narrated through a per-verb cue (`runtimeResultCue`).
+    is narrated once per card+move (a `notice` piece, class surprise) and shows in the events pane as a runtime row.
+  - **Results** have a piece per verb (applied, reset, explain, escalate, refused), and the result piece is the only narration of it (the task path logs "narrated from the result piece"; `runtimeResultCue` is no longer reached).
   - **SIGUSR2** ends a watch and logs the ledger.
 - **The episode loop (step 5):** `go/cmd/episodes` runs seeded episodes
   (`python -m metis.domains.kitchen.eval episodes`), one fresh runtime per
