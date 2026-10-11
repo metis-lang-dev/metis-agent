@@ -188,7 +188,7 @@ kitchen at step-1 rates after the quiet-tick fix).
 These land in runtime-wire step 4 (nina). E6b (plain-word renderer,
 think-on ceiling) runs as a check, not as a gate.
 
-## 8. The rack (brainstorm, 2026-10-12, user)
+## 8. The RAG (brainstorm, 2026-10-12, user)
 
 Per-agent tapes: each metis runtime (domain) keeps its own tape —
 shared stable prefix, then that domain's pieces, mirror line and what
@@ -202,7 +202,7 @@ orchestrator's state (the active set, the signal's path, the expanded
 path on a surprise) — never semantic (no embeddings, no model choice).
 
 Consequences, if we go this way:
-- the rack is on the certified side: tapes are written by the
+- the RAG is on the certified side: tapes are written by the
   runtime's renderer (facts) and by the model's spoken sentences
   (heard text), indexed by domain path;
 - retrieval triggers = the signals: event → that domain's last pieces;
@@ -215,6 +215,6 @@ Consequences, if we go this way:
 - the model never chooses what to retrieve; the orchestrator does —
   the authority split holds for context as it does for action;
 - this is phase 2's orchestrator catalog (G-G) seen from the context
-  side: intents as linear tokens + the rack as orchestrator state.
-  E7 (if run) = rack retrieval keyed by path vs. flat mixing, on two
+  side: intents as linear tokens + the RAG as orchestrator state.
+  E7 (if run) = RAG retrieval keyed by path vs. flat mixing, on two
   runtimes.
