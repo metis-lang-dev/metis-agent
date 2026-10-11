@@ -279,3 +279,60 @@ and under load, and a recommendation line. Code that is needed to run
 them (a llmbench flag, a wsprobe mode, a NeMo-Speech.cpp build script)
 goes under `go/tools/` or `go/cmd/`, behind flags, never changing the
 harness defaults. Nothing is pushed.
+
+## E6 — splice: does an inserted fact steer the continuation? (user, 2026-10-11 night)
+
+The question under the stream idea (docs/CML.md, brainstorm): if a
+runtime result is formed into a short text piece and inserted into a
+bigger, ongoing context, does the model reason from it, ignore it, or
+invent around it? Everything else (who forms the piece, where it goes,
+how the floor splices it) only matters if the answer is "reasons from it".
+
+**Facts.** From the kitchen trace at quiescence: the five fixtures'
+ledgers + mirror lines (metispy `ledger`, `ctx --mirror`). ~12 distinct
+facts, e.g. `P[served]=0.95 @12`, `pot_onion 2, model 1`, `observe-only
+since the surprise at beat 1`, `kitchen_shared explained it: partner_load`,
+`the run is over`.
+
+**Forming the piece** (the independent variable 1):
+- T: the deterministic fact template (the harness's runtime fact line);
+- Z: zero-context narration — the model narrates the trace line alone
+  (fresh context, single pass, the "RAG chunk" way) into one sentence;
+- R: the raw trace line (JSON) as is.
+
+**Inserting it** (independent variable 2): into a bigger context = the
+persona prefix + a 6-turn dialog transcript (dog chat corpus turns) +
+the piece + N distractor turns + the probe. Forms:
+- as an inline bracketed fragment `⟪metis …⟫` in the transcript;
+- as a system-role note at the top;
+- as a user turn ("status: …").
+Distance N ∈ {0, 2, 6} turns between the piece and the probe.
+
+**Probes** (the dependent variable): one question per fact whose correct
+answer needs it: "is the soup served?", "how many onions are in the pot?",
+"can you take a new order now?" (observe-only → no), "who put the second
+onion in?" — plus a continuation probe ("go on with the status report")
+scored for whether the fact appears, and a CONFLICT probe: the transcript
+holds an older contradicting value and the piece the newer one (recency
+vs. prior).
+
+**Measures** (per model × form × distance × renderer): fact-used rate,
+ignored rate (answer from the prior context or a default), invented rate
+(a number in the answer that is in no fact), conflict resolution (newer
+wins?), and ms (cache_prompt hits — a spliced piece should cost its own
+tokens only). Models: E2B Q4 think-off (the harness), E4B Q5 as reference,
+one E2B think-on row for the surprise facts. Corpus ≈ 12 facts × 3
+renderers × 3 forms × 3 distances = 324 probes + 36 conflict + 36
+continuation; one command, one table.
+
+**Tooling:** `llmbench -splice` (the bench's own renderer and the
+harness's prefix), a `splice-corpus.tsv` generator from the fixtures'
+ledgers, `tools/splice-bench.sh`. GPU: E2B ≈ 2.1 GB — fits beside the
+harness and llama-server; serialize E4B.
+
+**Reads:** fact-used ≥ 0.9 at distance 0 with the inline fragment =
+the stream idea is sound; if the system-role note wins by a wide
+margin, facts belong in the prefix zone, not the stream; if Z (zero-
+context narration) loses to T, the renderer stays deterministic; if the
+conflict probe keeps the older value, recency cannot be relied on and
+compaction must delete the stale fact, not just append the new one.
