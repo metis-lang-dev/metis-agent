@@ -927,6 +927,43 @@ func (l *LLM) DecideTimed(systemPrompt, user, cont, gbnf string, maxTokens int) 
 	return strings.TrimSpace(l.detokenize(toks)), ttft, nil
 }
 
+// Answer is one free-text model turn after the cached prefix and the tape
+// (E6 splice): the user text as the turn, the thought channel closed when
+// thinking is on, then greedy until the end of the turn. It returns the
+// cleaned text, the time to its first token (the user turn's evaluation
+// included) and the whole call. The turn is rolled back by the next call.
+func (l *LLM) Answer(systemPrompt, user string, maxTokens int) (string, time.Duration, time.Duration, error) {
+	t0 := time.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	base, err := l.primeLocked(systemPrompt)
+	if err != nil {
+		return "", 0, 0, err
+	}
+	if err := l.rewind(systemPrompt, base); err != nil {
+		return "", 0, 0, err
+	}
+	if err := l.decodeTokens(l.tailTokens(user)); err != nil {
+		return "", 0, 0, err
+	}
+	if _, _, _, err := l.thinkLocked(); err != nil {
+		return "", 0, 0, err
+	}
+	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
+	C.llama_sampler_chain_add(chain, C.llama_sampler_init_greedy())
+	defer C.llama_sampler_free(chain)
+	if maxTokens <= 0 {
+		maxTokens = 80
+	}
+	tGen := time.Now()
+	toks, err := l.generate(chain, maxTokens, "")
+	if err != nil {
+		return "", 0, 0, err
+	}
+	ttft := tGen.Sub(t0) + l.firstTok
+	return strings.TrimSpace(l.clean(l.detokenize(toks))), ttft, time.Since(t0), nil
+}
+
 // ── the tape (runtime-wire step 4) ───────────────────────────────────────────
 
 // Splice is what one tape write cost.

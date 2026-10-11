@@ -150,6 +150,10 @@ func main() {
 	pass2Cue := flag.String("pass2-cue", "", "with -pass2-turn: the user-turn cue text (default \"Spoken response:\")")
 	mmproj := flag.String("mmproj", "", "E3: multimodal projector GGUF with an audio encoder (build with GOFLAGS=-tags=mtmd)")
 	audioF := flag.String("audio", "", "E3: WAV manifest (wav<TAB>utterance<TAB>intent<TAB>source); every turn is HEARD through -mmproj")
+	spliceF := flag.String("splice", "", "E6 splice corpus (JSONL, tools/splice-corpus.py): each runtime fact × renderer T/Z/R × form inline/system/user × distance 0/2/6, + conflict and continuation probes")
+	spliceDialog := flag.String("splice-dialog", "grammar/splice-dialog.json", "E6: persona, transcript, distractor turns, Z-narration prompt")
+	spliceOnly := flag.String("splice-only", "", "E6: fact ids (comma) or kind:<kind> (e.g. kind:surprise)")
+	spliceGrid := flag.Bool("splice-grid-only", false, "E6: the fact-question grid only (no conflict/continuation)")
 	eventsF := flag.String("events", "", "narrate corpus (intent<TAB>args JSON<TAB>result<TAB>detail): each task outcome through the harness's taskCue + Narrate + guard")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
 	flag.Parse()
@@ -201,7 +205,7 @@ func main() {
 	for _, u := range flag.Args() {
 		rows = append(rows, row{utt: u})
 	}
-	if len(rows) == 0 && *eventsF == "" {
+	if len(rows) == 0 && *eventsF == "" && *spliceF == "" {
 		fail(fmt.Errorf("nothing to run: -corpus, -audio, -events or utterances"))
 	}
 	// a held-out row the prompt now teaches verbatim is no longer held out
@@ -263,6 +267,14 @@ func main() {
 	sum.Template, sum.EOT = l.Template(), l.EOT()
 	if *eventsF != "" {
 		runEvents(l, string(prompt), *eventsF, *tag, sum.VRAM, emit)
+		return
+	}
+	if *spliceF != "" {
+		if *vram {
+			g, _ := gpuMiB()
+			fmt.Fprintf(os.Stderr, "vram after load: gpu %d MiB\n", g)
+		}
+		runSplice(l, *spliceF, *spliceDialog, *spliceOnly, *tag, *spliceGrid, emit)
 		return
 	}
 	fmt.Fprintf(os.Stderr, "model %s  template=%s eot=%q ngl=%d n_ctx=%d think=%v\nload %dms  prime %d tok in %dms\n",
