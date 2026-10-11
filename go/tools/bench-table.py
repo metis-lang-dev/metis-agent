@@ -7,13 +7,16 @@
 Columns: resident VRAM (this process, model + KV at n_ctx, after prime),
 turn latency mean/p50/p90, pass-1 (json) / pass-2 (voice) / thought ms,
 intent class total and held-out (rows the prompt teaches verbatim count
-apart as "in prompt"), pass-2 voice leak/echo, the -narrate column when
+apart as "in prompt"), pass-2 voice leak/echo as llmbench counted it,
+voice ok = spoken sentences (also no bare intent name) and how many are
+distinct — a cue that collapses to "I am ready." shows here, the -narrate column when
 present, prefix invariant.
 --voices adds the narration table (the same sentences across models);
 --misses lists every missed row per run.
 """
 import argparse
 import json
+import re
 import sys
 from collections import OrderedDict
 
@@ -32,6 +35,17 @@ def load(paths):
                 else:
                     turns.setdefault(r["tag"], []).append(r)
     return runs, turns
+
+
+def voice_ok(t):
+    """the spoken line is a sentence: not JSON/markup, not a bare intent
+    name, not the utterance repeated (llmbench voiceBad, re-applied so old
+    records score the same way)"""
+    v = (t.get("voice") or "").strip()
+    if not v or re.search(r"[{}\[\]<>]", v) or re.fullmatch(r'"?[A-Z_]+"?', v):
+        return False
+    n = lambda x: x.strip().strip("\"' ").rstrip(".!?").lower()
+    return n(v) != n(t["utt"])
 
 
 def fmt_vram(r):
@@ -55,7 +69,11 @@ def main():
 
     hdr = ["run", "template", "think", "VRAM resident", "load ms", "turn mean/p50/p90 ms",
            "pass-1 json", "pass-2", "pass-2 voice", "thought ms/tok", "intent class", "held-out",
-           "voice leak/echo", "narrate ms leak/echo", "prefix"]
+           "voice leak/echo", "voice ok (distinct)", "narrate ms leak/echo", "prefix"]
+    def ok_col(ts):
+        ok = [t["voice"].strip().strip('"') for t in ts if voice_ok(t)]
+        return f"{len(ok)}/{len(ts)} ({len(set(ok))})"
+
     rows = []
     for tag, r in runs.items():
         hit, n = r.get("by_src_hit") or {}, r.get("by_src_n") or {}
@@ -71,7 +89,7 @@ def main():
                      f"{r['ms_mean']}/{r['ms_p50']}/{r['ms_p90']}", f"{r['ms_json_mean']} ms",
                      "turn" if r.get("pass2_turn") else "cue", f"{r['ms_tts_mean']} ms", th,
                      f"{r['hit']}/{r['scored']}", held,
-                     f"{r.get('unspeakable', 0)}/{r.get('echo', '-')}", narr, pre])
+                     f"{r.get('unspeakable', 0)}/{r.get('echo', '-')}", ok_col(turns.get(tag, [])), narr, pre])
     print("| " + " | ".join(hdr) + " |")
     print("|" + "---|" * len(hdr))
     for row in rows:

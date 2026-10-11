@@ -499,10 +499,12 @@ func readCorpus(path string) ([]row, error) {
 	return out, sc.Err()
 }
 
-// voiceBad classifies a spoken line: "unspeakable" (empty, or JSON /
-// markup leaking into speech), "echo" (the utterance repeated back), or "".
+// voiceBad classifies a spoken line: "unspeakable" (empty, JSON / markup,
+// or a bare intent name like "UNKNOWN" leaking into speech), "echo" (the
+// utterance repeated back), or "".
 func voiceBad(voice, utt string) string {
-	if strings.ContainsAny(voice, "{}[]<>") || strings.TrimSpace(voice) == "" {
+	if strings.ContainsAny(voice, "{}[]<>") || strings.TrimSpace(voice) == "" ||
+		bareIntent.MatchString(strings.TrimSpace(voice)) {
 		return "unspeakable"
 	}
 	norm := func(s string) string {
@@ -513,6 +515,8 @@ func voiceBad(voice, utt string) string {
 	}
 	return ""
 }
+
+var bareIntent = regexp.MustCompile(`^"?[A-Z_]+"?$`)
 
 func fail(err error) {
 	fmt.Fprintln(os.Stderr, "llmbench:", err)
