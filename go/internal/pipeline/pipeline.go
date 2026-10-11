@@ -23,6 +23,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/attention"
 	"github.com/metis-lang-dev/metis-agent/go/internal/fsm"
@@ -379,6 +380,11 @@ func (e *Engine) onTask(t Task) {
 		log.Printf("[task] %s %s: no pending-command store — dropped", t.ID, t.Result)
 		return
 	}
+	if t.Detail != "" {
+		raw := t.Detail
+		t.Detail = cleanDetail(raw)
+		log.Printf("[task] %s detail raw (%d B): %q", t.ID, len(raw), raw)
+	}
 	if t.Result == "progress" {
 		if it, ok := e.Tasks.Touch(t.ID); ok {
 			log.Printf("[task] %s progress (%s): window re-armed%s", t.ID, it.Name,
@@ -517,6 +523,40 @@ func narrateTemplate(it wire.Item, t Task) string {
 		return "The " + what + " timed out."
 	}
 	return ""
+}
+
+// detailCap bounds the host's reason in speech (step-4 F14).
+const detailCap = 120
+
+var (
+	markupTag  = regexp.MustCompile(`<[^>]*>`)
+	markupRune = strings.NewReplacer("`", "", "*", "", "#", "", "{", "", "}", "",
+		"[", "", "]", "", "<", "", ">", "", "|", "", "\\", "")
+)
+
+// cleanDetail makes a task's detail safe to speak (step-4 F14). The detail
+// comes from a host and the narration echoes it — into the model's cue and
+// into the template — so it is data: tags and markup characters go,
+// newlines and control characters become spaces, whitespace collapses, and
+// it is cut at a word boundary within detailCap runes, with trailing
+// punctuation dropped (the sentence adds its own). onTask logs the raw one.
+func cleanDetail(s string) string {
+	s = markupTag.ReplaceAllString(s, " ")
+	s = markupRune.Replace(s)
+	s = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return ' '
+		}
+		return r
+	}, s)
+	s = strings.Join(strings.Fields(s), " ")
+	if r := []rune(s); len(r) > detailCap {
+		s = string(r[:detailCap])
+		if i := strings.LastIndexByte(s, ' '); i > detailCap/2 {
+			s = s[:i]
+		}
+	}
+	return strings.TrimRight(s, " .,;:!?-")
 }
 
 func (e *Engine) onVadEvent(ev vad.Event) {
