@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/metis-lang-dev/metis-agent/go/internal/gputest"
 )
 
 const (
@@ -24,9 +26,7 @@ func loadOrSkip(t *testing.T, path string) *LLM {
 	}
 	l, err := Load(Config{ModelPath: path, NCtx: 512, NBatch: 512, NThreads: 4,
 		NGpuLayers: 0})
-	if err != nil {
-		t.Fatal(err)
-	}
+	gputest.LoadOK(t, err)
 	t.Cleanup(l.Close)
 	return l
 }
@@ -85,9 +85,7 @@ func TestExplicitTemplateOverrideAndUnknown(t *testing.T) {
 	}
 	l, err := Load(Config{ModelPath: gemmaPath, NCtx: 512, NBatch: 512, NThreads: 4,
 		Template: "chatml"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	gputest.LoadOK(t, err)
 	defer l.Close()
 	if l.Template() != "chatml" {
 		t.Errorf("override ignored: %q", l.Template())
@@ -108,9 +106,7 @@ func TestNarrateProducesASentence(t *testing.T) {
 	}
 	// CPU: the GPU belongs to a running harness or a bench
 	l, err := Load(Config{ModelPath: gemmaPath, NCtx: 2048, NBatch: 512, NThreads: 8})
-	if err != nil {
-		t.Fatal(err)
-	}
+	gputest.LoadOK(t, err)
 	defer l.Close()
 	out, err := l.Narrate(string(prompt),
 		"Task feedback: the command LOCAL_ACTION (action=STAND_UP) refused. Detail: the robot is not armed.")

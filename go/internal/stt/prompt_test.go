@@ -9,6 +9,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/metis-lang-dev/metis-agent/go/internal/gputest"
 )
 
 const (
@@ -30,9 +32,7 @@ func TestInitialPromptOnHalt(t *testing.T) {
 	}
 	halt, stop := wavPCM(t, "48-halt.wav"), wavPCM(t, "24-stop.wav")
 	s, err := New(whisperModel, "en", nil, 4)
-	if err != nil {
-		t.Fatal(err)
-	}
+	gputest.LoadOK(t, err)
 	defer s.Close()
 	for _, p := range []string{"", DefaultPrompt} {
 		s.SetInitialPrompt(p)

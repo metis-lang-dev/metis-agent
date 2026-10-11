@@ -316,12 +316,11 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
   2"). Every signal goes to the UI as `runtime{kind,path,fact,narrated,sig}`
   (events pane). Three kinds are narrated (`kernel.narrate`): `surprise`,
   `consistent` (a surprised reading agrees again) and `episode_over`.
-- **Narration** goes through the task path's discipline. It uses a framed
-  cue (`runtimeCue`: "Robot status report — not something the person said",
-  the fact quoted), `Narrate`, and the voice guard. One more check applies:
-  a number the model says that the fact does not hold sends the fact itself
-  to TTS instead. The result is parked like any system utterance (free
-  floor only, held while asleep).
+- **Narration:** a runtime fact is spoken as built: the template, with
+  numbers copied (step-2 review: E2B's own phrasing dropped the model's
+  number). The LLM speaks results and decisions through the task path, and
+  a RUNTIME result may not add a number that the runtime's reason lacks.
+  It is parked like any system utterance: free floor only, held while asleep.
 - **Intent → op → result.** A runtime intent (`reset 0`, `explain 0 CARD
   MOVE`, `escalate 0 TEXT`; from the UI's runtime box or `wsprobe
   -runtime-intent`) becomes a pending `RUNTIME` command in `wire.Pending`
@@ -334,3 +333,23 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
   every ten minutes and at exit. A quiet kitchen pushes nothing: quiet
   beats say nothing, and `quiescence` comes once per entry. The LLM is
   called only for the narrated kinds.
+- **Triage (step 3): the model closes every surprise.**
+  - At attach time the `cards` op gives the tool declarations, rendered in
+    Gemma 4's native format (E4) as reset(), explain(card, move) and
+    escalate(text). Each sibling move is listed with its clause effect
+    (metispy c937c7a).
+  - The cards also give the call grammar: one `<|tool_call>` over exactly
+    those card:move pairs. The record is the open surprise's.
+  - On a surprise the adapter waits 2.5 beats for the next reading, since
+    the runtime says only when a reading changes. It then asks
+    `llm.Decide` (pass 1 only, greedy, under the call grammar, with the
+    tool prompt as its own cached prefix) and sends the call as the intent.
+  - A refusal goes back into the model's turn as a `<|tool_response>`, and
+    the model calls again. At most 3 calls; after that the fact is
+    escalated without the model. The runtime's refusals are the bound: no
+    second reset of the same surprise, and no second explain while activate
+    is phase 2.
+  - Each step shows in the events pane as `decide`. The ledger op is
+    logged once per run, at the end of the episode.
+  - Switching between the dog prompt and the tool prompt re-primes the
+    cached prefix once each way.

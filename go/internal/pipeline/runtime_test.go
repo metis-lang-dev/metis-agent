@@ -10,27 +10,31 @@ import (
 
 const surpriseFact = "The kitchen reading does not match the model: pot onion is 3, the model says 2. It only watches now and acts on nothing."
 
-// runtime-wire step 2: a runtime fact is narrated through the framed cue
-// and the voice guard; a number the fact does not hold sends it back to
-// the template (the fact itself).
-func TestRuntimeNarrationIsFramedAndFaithful(t *testing.T) {
+// A runtime fact is spoken as built (step-2 review): the model is not asked.
+func TestRuntimeFactIsTheTemplate(t *testing.T) {
+	cues := []string{}
+	e := New(Config{SystemPrompt: "p"}, fakeNarrator{out: "The kitchen reading is 3.", cues: &cues}, fakeSTT{}, newFakeSpeaker(0))
 	ev := RuntimeEvent{Kind: "surprise", Path: "kitchen", Fact: surpriseFact, Narrate: true}
+	if got := e.narrateRuntime(ev); got != surpriseFact {
+		t.Errorf("spoken %q", got)
+	}
+	if len(cues) != 0 {
+		t.Errorf("the model was asked: %q", cues)
+	}
+}
+
+// A narrated RUNTIME result may not add a number the runtime's reason lacks.
+func TestRuntimeResultNumbersGuard(t *testing.T) {
+	it := wire.Item{ID: "k-1", Name: RuntimeCommand, Args: map[string]any{"action": "escalate the surprise"}}
+	tk := Task{ID: "k-1", Result: "refused", Detail: "record 1 is not open (reset at beat 8)"}
 	for out, want := range map[string]string{
-		"I found three onions in the pot where I expected two, so I'm only watching now.": "I found three onions in the pot where I expected two, so I'm only watching now.",
-		"The pot has 3 onions, not 2; I stopped acting.":                                 "The pot has 3 onions, not 2; I stopped acting.",
-		"The pot has 4 onions now.":                                                      surpriseFact,
-		"I see five onions.":                                                             surpriseFact,
-		"UNKNOWN":                                                                        surpriseFact,
-		`{"intent":"STOP"}`:                                                              surpriseFact,
+		"I couldn't escalate: record 1 was already closed at beat 8.": "I couldn't escalate: record 1 was already closed at beat 8.",
+		"I couldn't escalate: record 2 is closed.":                    "I can't escalate the surprise: record 1 is not open (reset at beat 8).",
 	} {
 		cues := []string{}
 		e := New(Config{SystemPrompt: "p"}, fakeNarrator{out: out, cues: &cues}, fakeSTT{}, newFakeSpeaker(0))
-		if got := e.narrateRuntime(ev); got != want {
+		if got := e.narrate(it, tk); got != want {
 			t.Errorf("model %q → %q, want %q", out, got, want)
-		}
-		if len(cues) != 1 || !strings.Contains(cues[0], "not something the person said") ||
-			!strings.Contains(cues[0], "kitchen monitor") || !strings.Contains(cues[0], "pot onion is 3") {
-			t.Errorf("cue %q", cues)
 		}
 	}
 }

@@ -1,7 +1,6 @@
 package pipeline
 
 import (
-	"fmt"
 	"log"
 	"regexp"
 	"strings"
@@ -56,46 +55,16 @@ func (e *Engine) onRuntime(ev RuntimeEvent) {
 	e.park(announcement{text, ev.At})
 }
 
-// narrateRuntime is narrate()'s runtime twin: the framed cue, the guard,
-// and the fact itself as the template. One more guard: every number the
-// model says must be in the fact (the numbers are copied, never generated).
+// narrateRuntime speaks a runtime event's fact as built from the signal
+// (runtime-wire step-2 review: E2B's own phrasing dropped the model's
+// number — "The kitchen reading is 3." — so a runtime fact is the
+// template; the LLM speaks results and decisions, through the task path).
 func (e *Engine) narrateRuntime(ev RuntimeEvent) string {
 	fact := cleanText(ev.Fact, factCap)
 	if fact == "" {
 		return ""
 	}
-	fallback := fact + "."
-	n, ok := e.LLM.(Narrator)
-	if !ok {
-		return fallback
-	}
-	out, err := n.Narrate(e.cfg.SystemPrompt, runtimeCue(ev.Path, fact))
-	if err != nil {
-		log.Printf("[runtime] narration failed: %v", err)
-		return fallback
-	}
-	s := sanitizeAck(out)
-	if !taskVoiceOK(s) {
-		log.Printf("[runtime] narration %q rejected — template", out)
-		return fallback
-	}
-	if bad := inventedNumbers(s, fact); bad != "" {
-		log.Printf("[runtime] narration %q says %s, not in the fact — template", out, bad)
-		return fallback
-	}
-	return s
-}
-
-// runtimeCue frames a runtime fact the way taskCue frames a host's reason:
-// who speaks, what it is, and what is wanted — a sentence, not an intent.
-func runtimeCue(path, fact string) string {
-	where := strings.ReplaceAll(path, "_", " ")
-	if where == "" {
-		where = "runtime"
-	}
-	return fmt.Sprintf("[Robot status report — not something the person said; do not classify it.] "+
-		"The %s monitor reports, quoted: %q. Tell the person in one short first-person sentence what happened; "+
-		"use only the numbers in the report; no JSON, no intent name.", where, fact)
+	return fact + "."
 }
 
 var (
@@ -104,7 +73,9 @@ var (
 		"five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9", "ten": "10"}
 )
 
-// inventedNumbers returns the first number in s (digits or a number word)
+// inventedNumbers (the guard on a narrated RUNTIME result: the runtime's
+// reason holds the numbers, the model may not add any) returns the first
+// number in s (digits or a number word)
 // that the fact does not contain, or "".
 func inventedNumbers(s, fact string) string {
 	have := map[string]bool{}

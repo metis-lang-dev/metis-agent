@@ -462,6 +462,10 @@ func (e *Engine) narrate(it wire.Item, t Task) string {
 		return fallback
 	}
 	if s := sanitizeAck(out); taskVoiceOK(s) {
+		if bad := inventedNumbers(s, t.Detail+" "+commandPhrase(it)); it.Name == RuntimeCommand && bad != "" {
+			log.Printf("[task] narration %q says %s, not in the runtime's reason — template", out, bad)
+			return fallback
+		}
 		return s
 	}
 	log.Printf("[task] narration %q rejected — template", out)

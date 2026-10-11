@@ -39,6 +39,9 @@ type Config struct {
 	// "consistent" (a surprised reading agrees again), "episode_over".
 	// Everything else reaches the UI only. Default: all three.
 	Narrate []string `yaml:"narrate"`
+	// Triage: the model closes every surprise with one tool call (step 3);
+	// unset = on (needs the gemma4 template), false = surprises stay open
+	Triage *bool `yaml:"triage"`
 }
 
 // Signal is one pushed line: its kind, sequence number and the whole object.

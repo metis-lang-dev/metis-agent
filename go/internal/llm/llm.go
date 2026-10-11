@@ -488,8 +488,13 @@ func (l *LLM) tail(user string) string {
 // stable. The prefix itself IS stable (checked in primeLocked); if a turn
 // ever re-tokenizes it differently, the split tokenization is the fallback
 // and the miss is logged.
-func (l *LLM) tailTokens(user string) []C.llama_token {
-	t := l.tail(user)
+func (l *LLM) tailTokens(user string) []C.llama_token { return l.tailTokensWith(user, "") }
+
+// tailTokensWith is tailTokens with text already in the model's turn
+// appended (Decide: earlier calls and their responses), tokenized in the
+// same context.
+func (l *LLM) tailTokensWith(user, cont string) []C.llama_token {
+	t := l.tail(user) + cont
 	whole := l.tokenize(l.preText+t, true)
 	if n := len(l.preToks); len(whole) > n && sameTokens(whole[:n], l.preToks) {
 		return whole[n:]
@@ -839,6 +844,49 @@ func (l *LLM) Narrate(systemPrompt, event string) (string, error) {
 		voice = voice[:i]
 	}
 	return strings.TrimSpace(strings.Trim(l.clean(voice), `"`)), nil
+}
+
+// Decide is one grammar-constrained, greedy pass under its own system
+// prompt (runtime-wire step 3: the orchestrator's tool call). The system
+// prompt is the cached prefix like TwoPass's — switching from the dog
+// prompt re-primes it once. cont is what is already in the model's turn
+// after the user text (earlier calls and the runtime's responses), so a
+// refusal steers the next call. Gemma 4 only (the native call markup).
+func (l *LLM) Decide(systemPrompt, user, cont, gbnf string, maxTokens int) (string, error) {
+	if l.tmpl != TemplateGemma4 {
+		return "", errors.New("llm: Decide needs the gemma4 template (native tool calls)")
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	nPrefix, err := l.primeLocked(systemPrompt)
+	if err != nil {
+		return "", err
+	}
+	if err := l.rewind(systemPrompt, nPrefix); err != nil {
+		return "", err
+	}
+	if err := l.decodeTokens(l.tailTokensWith(user, cont)); err != nil {
+		return "", err
+	}
+	cGbnf, cRoot := C.CString(gbnf), C.CString("root")
+	defer C.free(unsafe.Pointer(cGbnf))
+	defer C.free(unsafe.Pointer(cRoot))
+	grammar := C.llama_sampler_init_grammar(l.vocab, cGbnf, cRoot)
+	if grammar == nil {
+		return "", errors.New("llm: decide grammar failed to compile")
+	}
+	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
+	C.llama_sampler_chain_add(chain, grammar)
+	C.llama_sampler_chain_add(chain, C.llama_sampler_init_greedy())
+	defer C.llama_sampler_free(chain)
+	if maxTokens <= 0 {
+		maxTokens = 120
+	}
+	toks, err := l.generate(chain, maxTokens, "")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(l.detokenize(toks)), nil
 }
 
 // generate samples tokens with the given chain until EOG / the model's

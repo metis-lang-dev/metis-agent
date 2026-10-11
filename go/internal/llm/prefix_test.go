@@ -10,6 +10,8 @@ import (
 	"os"
 	"regexp"
 	"testing"
+
+	"github.com/metis-lang-dev/metis-agent/go/internal/gputest"
 )
 
 func TestTailTokensMatchWholePrompt(t *testing.T) {
@@ -21,9 +23,7 @@ func TestTailTokensMatchWholePrompt(t *testing.T) {
 		t.Skip("prompt not present")
 	}
 	l, err := Load(Config{ModelPath: gemmaPath, NCtx: 2048, NBatch: 512, NThreads: 8})
-	if err != nil {
-		t.Fatal(err)
-	}
+	gputest.LoadOK(t, err)
 	defer l.Close()
 	sys := string(prompt)
 	if _, err := l.PrimePrefix(sys); err != nil {

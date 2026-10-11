@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"testing"
 
+	"github.com/metis-lang-dev/metis-agent/go/internal/gputest"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
 	"github.com/metis-lang-dev/metis-agent/go/internal/wire"
 )
@@ -29,9 +30,7 @@ func TestTaskCueWithEveryPromptExampleAsDetail(t *testing.T) {
 	}
 	l, err := llm.Load(llm.Config{ModelPath: model, NCtx: 2048, NBatch: 512, NThreads: 8,
 		NGpuLayers: ngl, Pass2: llm.Pass2{Temp: 0.4, TopK: 40, MaxTokens: 50}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	gputest.LoadOK(t, err)
 	defer l.Close()
 	sys := string(prompt)
 	it := wire.Item{ID: "c-1", Name: "LOCAL_ACTION", Args: map[string]any{"action": "STAND_UP"}}

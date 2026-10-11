@@ -42,6 +42,30 @@ type Host struct {
 	byIntent map[int]string // runtime intent number → pending command id
 	early    map[int]Signal // results that beat their op's answer
 	narrated atomic.Int64   // signals handed to the dialog to speak (quiet cost)
+	waiters  map[string]chan [2]string // command id → its outcome, for triage
+
+	// Triage (runtime-wire step 3): with Dec and LLM set, every surprise is
+	// closed by the model with one tool call; a refusal goes back to it as
+	// the tool's response, up to MaxTries calls, then the fact is escalated.
+	Dec      *Decider
+	LLM      LLM
+	MaxTries int
+	Beat     time.Duration // the watch's beat: triage waits one for the next reading
+	triageQ  chan Signal
+	settled  map[int]bool // records whose reading came back consistent
+	inTriage atomic.Int64 // surprises queued or being closed
+}
+
+// WaitTriage waits until every queued surprise is closed (or the timeout).
+func (h *Host) WaitTriage(timeout time.Duration) bool {
+	end := time.Now().Add(timeout)
+	for h.inTriage.Load() > 0 {
+		if time.Now().After(end) {
+			return false
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return true
 }
 
 // Narrated is how many signals went to the dialog to be spoken.
@@ -53,7 +77,9 @@ func NewHost(cfg Config, pend *wire.Pending) *Host {
 	if kinds == nil {
 		kinds = []string{"surprise", "consistent", "episode_over"}
 	}
-	h := &Host{Pend: pend, narrate: map[string]bool{}, byIntent: map[int]string{}, early: map[int]Signal{}}
+	h := &Host{Pend: pend, narrate: map[string]bool{}, byIntent: map[int]string{}, early: map[int]Signal{},
+		waiters: map[string]chan [2]string{}, MaxTries: 3, Beat: watchEvery(cfg.Watch),
+		settled: map[int]bool{}}
 	for _, k := range kinds {
 		h.narrate[k] = true
 	}
@@ -65,6 +91,11 @@ func (h *Host) Signal(s Signal) {
 	if s.Kind == "result" {
 		h.result(s)
 	}
+	if s.Kind == "event" && s.F["kind"] == "reading" && s.F["consistent"] == true {
+		h.mu.Lock()
+		h.settled[int(num(s.F["record"]))] = true
+		h.mu.Unlock()
+	}
 	ev := Translate(s)
 	ev.Narrate = ev.Narrate && h.narrate[ev.Kind]
 	if ev.Narrate {
@@ -74,15 +105,119 @@ func (h *Host) Signal(s Signal) {
 	if h.OnEvent != nil {
 		h.OnEvent(ev)
 	}
+	if s.Kind == "surprise" && h.Dec != nil && h.LLM != nil {
+		h.startTriage()
+		h.inTriage.Add(1)
+		select {
+		case h.triageQ <- s:
+		default:
+			h.inTriage.Add(-1)
+			log.Printf("[kernel] triage queue full — surprise #%d left open", s.Seq)
+		}
+	}
+}
+
+func (h *Host) startTriage() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.triageQ == nil {
+		h.triageQ = make(chan Signal, 8)
+		go func() {
+			for s := range h.triageQ {
+				h.triage(s)
+				h.inTriage.Add(-1)
+			}
+		}()
+	}
+}
+
+// triage closes one surprise: Decide → intent → its result; a refusal is
+// appended to the model's turn as the tool response and it decides again.
+// Bounded by MaxTries and by the runtime itself (it refuses what it will
+// not admit); the last resort escalates the fact without the model.
+func (h *Host) triage(s Signal) {
+	r := int(num(s.F["record"]))
+	// the runtime reads again every beat and says so only when the reading
+	// changes; the first re-read lands up to two beats after the surprise
+	// (live: +1.0 s at every=0.5), so 2.5 beats tell a misread from a gap
+	time.Sleep(2*h.Beat + h.Beat/2)
+	settled := h.isSettled(r)
+	next := "Next reading: the difference persists."
+	if settled {
+		next = "Next reading: it matches the model again."
+	}
+	user := SurpriseText(s) + "\n" + next
+	cont := ""
+	for try := 1; try <= h.MaxTries; try++ {
+		out, err := h.LLM.Decide(h.Dec.System, user, cont, h.Dec.GBNF, 120)
+		if err != nil {
+			log.Printf("[kernel] decide record %d: %v", r, err)
+			break
+		}
+		call, err := ParseCall(out)
+		if err != nil {
+			log.Printf("[kernel] decide record %d: %v", r, err)
+			break
+		}
+		line := call.Intent(r)
+		h.note("decide", s.Path, fmt.Sprintf("record %d, call %d: %s", r, try, line))
+		res, reason := h.intentWait(line)
+		if res == "done" {
+			return
+		}
+		if !settled && h.isSettled(r) {
+			settled = true
+			reason += ". Since then the reading matches the model again"
+		}
+		cont += call.Markup() + Response(call.Verb, "refused", reason)
+	}
+	line := fmt.Sprintf("escalate %d %s", r, strings.TrimSuffix(Translate(s).Fact, "."))
+	h.note("decide", s.Path, fmt.Sprintf("record %d: no admitted call — %s", r, line))
+	h.intentWait(line)
+}
+
+func (h *Host) isSettled(r int) bool {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.settled[r]
+}
+
+// note puts a triage step in the UI's events pane (not narrated).
+func (h *Host) note(kind, path, fact string) {
+	log.Printf("[kernel] %s %s", kind, fact)
+	if h.OnEvent != nil {
+		h.OnEvent(Event{Kind: kind, Path: path, Fact: fact, At: time.Now(),
+			Raw: json.RawMessage(fmt.Sprintf(`{"triage":%q}`, fact))})
+	}
+}
+
+// intentWait sends an intent and waits for its outcome (result, reason).
+func (h *Host) intentWait(line string) (string, string) {
+	ch := make(chan [2]string, 1)
+	id := newID()
+	h.mu.Lock()
+	h.waiters[id] = ch
+	h.mu.Unlock()
+	defer func() { h.mu.Lock(); delete(h.waiters, id); h.mu.Unlock() }()
+	if _, err := h.intent(id, line); err != nil {
+		return "failed", err.Error()
+	}
+	select {
+	case r := <-ch:
+		return r[0], r[1]
+	case <-time.After(20 * time.Second):
+		return "failed", "no result within 20 s"
+	}
 }
 
 // Intent sends one runtime intent (`reset 0`, `explain 0 kitchen_shared
 // drop_onion`, `escalate 0 …`) down as a wire op, remembered as a pending
 // RUNTIME command; its result signal answers that command.
-func (h *Host) Intent(line string) (string, error) {
+func (h *Host) Intent(line string) (string, error) { return h.intent(newID(), line) }
+
+func (h *Host) intent(id, line string) (string, error) {
 	line = strings.TrimSpace(line)
 	verb, rest, _ := strings.Cut(line, " ")
-	id := newID()
 	if h.Pend != nil {
 		h.Pend.Add(wire.Item{ID: id, Name: RuntimeCommand, At: time.Now(),
 			Args: map[string]any{"action": intentPhrase(verb, rest), "intent": line}})
@@ -134,6 +269,12 @@ func (h *Host) result(s Signal) {
 func (h *Host) answer(id, result, detail string) {
 	if h.OnTask != nil {
 		h.OnTask(id, result, detail)
+	}
+	h.mu.Lock()
+	ch := h.waiters[id]
+	h.mu.Unlock()
+	if ch != nil {
+		ch <- [2]string{result, detail}
 	}
 }
 
@@ -235,4 +376,20 @@ func num(v any) float64 {
 	return f
 }
 
-func newID() string { return fmt.Sprintf("k-%x", time.Now().UnixNano()&0xffffffff) }
+// watchEvery reads the beat out of the watch arguments ("every=0.5").
+func watchEvery(w string) time.Duration {
+	for _, f := range strings.Fields(w) {
+		if v, ok := strings.CutPrefix(f, "every="); ok {
+			if d, err := time.ParseDuration(v + "s"); err == nil {
+				return d
+			}
+		}
+	}
+	return 500 * time.Millisecond
+}
+
+var idSeq atomic.Int64
+
+func newID() string {
+	return fmt.Sprintf("k-%x-%d", time.Now().UnixNano()&0xffffff, idSeq.Add(1))
+}

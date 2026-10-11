@@ -415,7 +415,7 @@ func main() {
 		if ws == nil {
 			log.Fatal("kernel: needs transport: ws (the runtime's events go to the UI)")
 		}
-		kc := startKernel(ctx, cfg.Kernel, eng, ws)
+		kc := startKernel(ctx, cfg.Kernel, eng, ws, l)
 		defer kc.Close()
 	}
 
@@ -427,13 +427,25 @@ func main() {
 // UI's events pane, the narrated ones to the dialog, runtime intents from
 // the UI down as wire ops whose result answers a pending RUNTIME command.
 // The quiet-cost ledger is logged every ten minutes and at exit.
-func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, ws *transport.Server) *kernel.Client {
+func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, ws *transport.Server, dec kernel.LLM) *kernel.Client {
 	if kernel.RuntimeCommand != pipeline.RuntimeCommand {
 		log.Fatal("kernel: RuntimeCommand names disagree")
 	}
 	h := kernel.NewHost(kcfg, eng.Tasks)
+	var kc *kernel.Client
 	h.OnEvent = func(ev kernel.Event) {
 		ws.Runtime(ev.Kind, ev.Path, ev.Fact, ev.Narrate, ev.Raw)
+		if ev.Kind == "episode_over" && kc != nil {
+			// the runtime's own account of the run, once the surprises
+			// are closed (opus: one ledger line per fixture run)
+			go func() {
+				h.WaitTriage(90 * time.Second)
+				if ans, err := kc.Op("ledger", "", 30*time.Second); err == nil {
+					b, _ := json.Marshal(ans)
+					log.Printf("[kernel] ledger %s", b)
+				}
+			}()
+		}
 		if ev.Narrate {
 			eng.RuntimeEvent(pipeline.RuntimeEvent{Kind: ev.Kind, Path: ev.Path, Fact: ev.Fact,
 				Narrate: true, At: ev.At})
@@ -442,7 +454,8 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 	h.OnTask = func(id, result, detail string) {
 		eng.TaskEvent(pipeline.Task{ID: id, Result: result, Detail: detail})
 	}
-	kc, err := kernel.Start(ctx, kcfg, h.Signal)
+	var err error
+	kc, err = kernel.Start(ctx, kcfg, h.Signal)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -453,6 +466,23 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 				log.Printf("[kernel] intent %q: %v", text, err)
 			}
 		}()
+	}
+	// triage (runtime-wire step 3): the cards at attach time → the tool
+	// declarations and the call grammar; every surprise is then closed by
+	// the model with one call, bounded by the runtime's refusals
+	if kcfg.Triage == nil || *kcfg.Triage {
+		ans, err := kc.Op("cards", "", 30*time.Second)
+		if err != nil {
+			log.Fatal(err)
+		}
+		var cards struct {
+			Cards []kernel.Card `json:"cards"`
+		}
+		b, _ := json.Marshal(ans)
+		_ = json.Unmarshal(b, &cards)
+		h.Dec, h.LLM = kernel.NewDecider(cards.Cards), dec
+		log.Printf("[kernel] triage on: %d cards, call grammar %d B, tool prompt %d B",
+			len(cards.Cards), len(h.Dec.GBNF), len(h.Dec.System))
 	}
 	w := kcfg.Watch
 	if w == "" {

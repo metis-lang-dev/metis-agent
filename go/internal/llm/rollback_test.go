@@ -10,6 +10,8 @@ package llm
 import (
 	"os"
 	"testing"
+
+	"github.com/metis-lang-dev/metis-agent/go/internal/gputest"
 )
 
 func TestRollbackLeavesNoTrace(t *testing.T) {
@@ -34,9 +36,7 @@ func TestRollbackLeavesNoTrace(t *testing.T) {
 	}
 	l, err := Load(Config{ModelPath: gemmaPath, NCtx: 2048, NBatch: 512, NThreads: 8,
 		NGpuLayers: ngl})
-	if err != nil {
-		t.Fatal(err)
-	}
+	gputest.LoadOK(t, err)
 	defer l.Close()
 	sys, g := string(prompt), string(gbnf)
 	cold := map[string]string{}
