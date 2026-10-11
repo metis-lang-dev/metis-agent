@@ -26,6 +26,8 @@ NEMO=${NEMO:-$HOME/archive/vox/NeMo-Speech.cpp}
 NEMO_BIN=$NEMO/build/cuda-asr/bin/nemo-speech
 NEMO_MODEL=${NEMO_MODEL:-models/nemotron/nemotron-3.5-asr-streaming-0.6b.q8_0.gguf}
 PROMPT=${PROMPT:-grammar/dog-prompt.txt}   # the live prompt; PROMPT= pins another
+VADPAD=${VADPAD:--lead-ms 300 -pad-ms 600}   # what the VAD delivers around speech (pre-roll, hangover);
+                                             # trimmed TTS WAVs without it cut Nemotron's last word
 CPUS=${CPUS:-0-3}   # the CPU leg: NeMo's C API has no thread knob (min(8,cores)), so pin + nice
 mkdir -p "$OUT"
 [ -x bin/asrbench ] || ./build.sh asrbench
@@ -58,11 +60,11 @@ grep '^== ' "$OUT/whisper.log"
 
 echo; echo "=== nemotron streaming, GPU, real-time paced — partial/final latency + WER"
 echo "--- nvidia-smi before nemotron-gpu: $(nvidia-smi --query-gpu=memory.used --format=csv,noheader)" | tee -a "$OUT/env.txt"
-echo "nemotron-gpu: $(sample "$OUT/nemotron-gpu.log" bin/nemo-stream-latency -model "$NEMO_MODEL" -manifest "$MAN" -device cuda:0 -tsv "$OUT/nemotron-gpu.tsv")" | tee -a "$OUT/env.txt"
+echo "nemotron-gpu: $(sample "$OUT/nemotron-gpu.log" bin/nemo-stream-latency -model "$NEMO_MODEL" -manifest "$MAN" -device cuda:0 $VADPAD -tsv "$OUT/nemotron-gpu.tsv")" | tee -a "$OUT/env.txt"
 sed -n '/^== /,$p' "$OUT/nemotron-gpu.log"
 
 echo; echo "=== nemotron streaming, CPU, real-time paced"
-echo "nemotron-cpu (cores $CPUS): $(sample "$OUT/nemotron-cpu.log" nice taskset -c "$CPUS" bin/nemo-stream-latency -model "$NEMO_MODEL" -manifest "$MAN" -device cpu -tsv "$OUT/nemotron-cpu.tsv")" | tee -a "$OUT/env.txt"
+echo "nemotron-cpu (cores $CPUS): $(sample "$OUT/nemotron-cpu.log" nice taskset -c "$CPUS" bin/nemo-stream-latency -model "$NEMO_MODEL" -manifest "$MAN" -device cpu $VADPAD -tsv "$OUT/nemotron-cpu.tsv")" | tee -a "$OUT/env.txt"
 sed -n '/^== /,$p' "$OUT/nemotron-cpu.log"
 
 echo; echo "=== nemotron offline bench (nemo-speech bench asr, GPU) — the vendor's own latency numbers"
@@ -77,9 +79,11 @@ except Exception as e: print("bench asr: unparsed", e)
 EOF
 
 # WER of the nemotron transcripts (asrbench computes WER for whisper itself)
-python3 - "$MAN" "$OUT/nemotron-gpu.tsv" "$OUT/nemotron-cpu.tsv" <<'EOF' | tee "$OUT/wer.txt"
+python3 - "$MAN" "$OUT/whisper.tsv" "$OUT/nemotron-gpu.tsv" "$OUT/nemotron-cpu.tsv" <<'EOF' | tee "$OUT/wer.txt"
 import sys,re
-def norm(s): return ' '.join(re.sub(r"[^a-z0-9' ]+",' ',s.lower()).split())
+NUM={'zero':'0','one':'1','two':'2','three':'3','four':'4','five':'5','six':'6','seven':'7','eight':'8','nine':'9','ten':'10','ninety':'90','apriltag':'april tag'}
+def norm(s):  # digits and number words count as the same word
+    return ' '.join(NUM.get(x,x) for x in re.sub(r"[^a-z0-9' ]+",' ',s.lower()).split())
 def wer(r,h):
     r,h=r.split(),h.split()
     if not r: return 0.0 if not h else 1.0
@@ -108,7 +112,7 @@ co() {
   bin/llmbench -model "$COLLM" -ngl 99 -threads 4 -corpus grammar/dog-corpus.tsv -prompt "$COPROMPT" -vram > "$OUT/coresident-llm.log" 2>&1 &
   local llm=$!
   sleep 4   # LLM loaded and primed before the ASR comes up
-  bin/nemo-stream-latency -model "$NEMO_MODEL" -manifest "$MAN" -device cuda:0 -tsv "$OUT/coresident-nemotron.tsv"
+  bin/nemo-stream-latency -model "$NEMO_MODEL" -manifest "$MAN" -device cuda:0 $VADPAD -tsv "$OUT/coresident-nemotron.tsv"
   wait $llm || true
 }
 echo "coresident (E2B + nemotron-gpu): $(sample "$OUT/coresident-asr.log" co)" | tee -a "$OUT/env.txt"

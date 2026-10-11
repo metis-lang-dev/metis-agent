@@ -11,7 +11,13 @@
 //       -o bin/nemo-stream-latency
 // Run:
 //   bin/nemo-stream-latency -model models/nemotron/…q8_0.gguf -manifest models/corpus-wav/manifest.tsv \
-//       [-device cuda:0|cpu]  (default cuda:0) [-fast] [-tsv out.tsv]
+//       [-device cuda:0|cpu]  (default cuda:0) [-fast] [-tsv out.tsv] [-lead-ms 300] [-pad-ms 600]
+// -pad-ms appends that much silence after each WAV, as the mic keeps
+// delivering it while the VAD hangover runs: trimmed TTS renders otherwise
+// end on the last phoneme and a streaming model never sees the right context
+// it needs to emit the last word (E2: "lie do", short commands → silence).
+// -lead-ms prepends silence likewise (the VAD pre-roll before speech onset).
+// final-end is always measured from the end of the speech, not the padding.
 // Output per row: wav, audio s, first-partial ms (from audio start), final
 // ms from audio start, final ms after audio end, transcript. -tsv writes
 // transcript<TAB>intent<TAB>source for llmbench -corpus (intent after ASR).
@@ -74,12 +80,14 @@ double ms_since(clk::time_point t) { return std::chrono::duration<double, std::m
 }  // namespace
 
 int main(int argc, char** argv) {
-    std::string model, manifest = "models/corpus-wav/manifest.tsv", device, tsv; bool fast = false;
+    std::string model, manifest = "models/corpus-wav/manifest.tsv", device, tsv; bool fast = false; int pad_ms = 0, lead_ms = 0;
     for (int i = 1; i < argc; i++) {
         std::string a = argv[i];
         auto next = [&]() { return i + 1 < argc ? std::string(argv[++i]) : std::string(); };
         if (a == "-model") model = next(); else if (a == "-manifest") manifest = next();
         else if (a == "-device") device = next(); else if (a == "-tsv") tsv = next(); else if (a == "-fast") fast = true;
+        else if (a == "-pad-ms") pad_ms = std::atoi(next().c_str());
+        else if (a == "-lead-ms") lead_ms = std::atoi(next().c_str());
         else { std::fprintf(stderr, "unknown arg %s\n", a.c_str()); return 2; }
     }
     if (model.empty()) { std::fprintf(stderr, "-model required\n"); return 2; }
@@ -120,9 +128,12 @@ int main(int argc, char** argv) {
         std::vector<float> pcm;
         if (!read_wav16k(base + "/" + row.wav, pcm)) { std::fprintf(stderr, "skip %s (not 16k mono s16)\n", row.wav.c_str()); continue; }
         double audio_s = pcm.size() / 16000.0;
+        pcm.insert(pcm.begin(), static_cast<size_t>(lead_ms) * 16, 0.f);  // VAD pre-roll
+        const size_t speech_n = pcm.size();
+        pcm.resize(speech_n + static_cast<size_t>(pad_ms) * 16, 0.f);
         nemo_speech_asr_stream* s = nullptr;
         if (nemo_speech_asr_streaming_recognize(rec, &opts, &s) != NEMO_SPEECH_ASR_OK) { std::fprintf(stderr, "stream: %s\n", nemo_speech_asr_last_error()); return 1; }
-        auto t0 = clk::now(); double first = -1, fin = -1; std::string text, last;
+        auto t0 = clk::now(); double first = -1, fin = -1, t_end = -1; std::string text, last;
         auto pump = [&]() {
             nemo_speech_asr_result* r = nullptr;
             while (nemo_speech_asr_stream_next(s, &r) == NEMO_SPEECH_ASR_OK && r) {
@@ -136,6 +147,7 @@ int main(int argc, char** argv) {
         };
         for (size_t off = 0; off < pcm.size(); off += frame) {
             size_t n_s = std::min(frame, pcm.size() - off);
+            if (t_end < 0 && off >= speech_n) t_end = ms_since(t0);  // speech ended; padding follows
             if (!fast) {  // pace to the wall clock: this frame is "recorded" at off/16000 s
                 auto due = t0 + std::chrono::microseconds(static_cast<long long>(off * 1e6 / 16000));
                 std::this_thread::sleep_until(due);
@@ -143,7 +155,7 @@ int main(int argc, char** argv) {
             nemo_speech_asr_stream_push_f32(s, pcm.data() + off, n_s, 16000);
             pump();
         }
-        double t_end = ms_since(t0);  // audio ended (≈ audio_s*1000 when paced)
+        if (t_end < 0) t_end = ms_since(t0);  // audio ended (≈ audio_s*1000 when paced)
         nemo_speech_asr_stream_finish(s);
         pump();
         nemo_speech_asr_stream_close(s);
@@ -157,7 +169,7 @@ int main(int argc, char** argv) {
         if (v.empty()) return; std::sort(v.begin(), v.end()); double sum = 0; for (double x : v) sum += x;
         std::printf("  %-10s mean %.0f  p50 %.0f  p90 %.0f  max %.0f ms\n", name, sum / v.size(), v[v.size() / 2], v[v.size() * 9 / 10], v.back());
     };
-    std::printf("\n== nemotron streaming, %s, %s pacing, n=%d\n", device.empty() ? "auto" : device.c_str(), fast ? "no" : "real-time", n);
+    std::printf("\n== nemotron streaming, %s, %s pacing, pad %d ms, n=%d\n", device.empty() ? "auto" : device.c_str(), fast ? "no" : "real-time", pad_ms, n);
     stat(firsts, "partial"); stat(finals_start, "final"); stat(finals_end, "final-end");
     if (out) std::fclose(out);
     nemo_speech_asr_destroy(rec);
