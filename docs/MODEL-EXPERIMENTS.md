@@ -6,6 +6,99 @@ harness until the numbers are in. Implementer: opus. The harness and
 the regression (nina-harness, steps 3–4) stay on **gemma3:4b** —
 nothing here is a dependency of the web UI.
 
+## Results and recommendation (2026-10-11, opus; reviewed step by step by architect)
+
+**The decision this page is for (the user's):** switch the harness's intent model from gemma3:4b to Gemma 4 E2B Q4_K_M. The switch is one config file, `go/config.ws.gemma4.yaml` (nina, prep): the E2B GGUF, `prompt_extra: [grammar/pass2-examples-gemma4.txt]`, and whisper base.en with the command-vocabulary initial prompt (F12) as the ASR. Everything else is unchanged: FSTTM, GBNF, KV-prefix reuse, the voice guard.
+
+**Recommendation:**
+- **Switch to E2B Q4_K_M, thinking off, with whisper base.en + initial prompt.** Every number below is on taycann's RTX PRO 2000 (8151 MiB). The corpus is the 54-turn dog corpus (34 prompt + 20 held-out rows; 3 held-out rows are prompt examples since 888668c and are counted apart). The audio is RHVoice renders of the same utterances.
+- **Narration of task outcomes** (table 2) is clean on both models through the harness framing. E2B is faster and sticks to the given reason; gemma3 invents causes when none is given.
+- **Not recommended now:** E4B (no gain, about 2 GB more), thinking on (no gain on intent, 1.3–1.6 s more per turn on E2B), Nemotron (twice whisper's WER on one-word commands), and the single-model heard path (more VRAM with today's projector, and no transcript).
+
+### Budget line (8151 MiB card)
+
+| resident set | GPU | how measured |
+|---|---|---|
+| today: gemma3-4b Q4 + whisper base.en | ≈ 3.8 GB | nina's harness, live |
+| **switch: E2B Q4 + whisper base.en** | **≈ 2.55 GB** | 2136 MiB (E2B + KV 4096 + buffers) + 409 MiB (whisper peak); the two summed, not co-resident |
+| E2B Q4 + Nemotron 0.6B (GPU), co-resident | 3212 MiB | whole card, both loaded and running at once |
+| E2B Q4 heard (mmproj F16 audio+vision) | 3328 MiB | one process, projector loaded |
+
+### 1. Intent model, text path (E1; `tools/bench-models.sh`, results/e1-p2ex)
+
+| model | VRAM | turn p50 / p90 | intent | held-out | voice ok, model (distinct) | +guard | narrate leak (utterances) |
+|---|---|---|---|---|---|---|---|
+| gemma3-4b Q4 (harness today) | 3556 MiB | 506 / 833 ms | 52/54 | 16/17 | 50/54 (28; "Okay." ×18) | 51/54 | 44/54 |
+| **E2B Q4** | **2136 MiB** | **458 / 722 ms** | **54/54** | **17/17** | **54/54 (47)** | 54/54 | 0/54 |
+| E2B Q5 | 2374 MiB | 466 / 742 ms | 54/54 | 17/17 | 54/54 (47) | 54/54 | 0/54 |
+| E4B Q4 | 3810 MiB | 603 / 960 ms | 52/54 | 15/17 | 53/54 (44) | 54/54 | 0/54 |
+| E4B Q5 | 4292 MiB | 637 / 992 ms | 53/54 | 16/17 | 53/54 (42) | 54/54 | 0/54 |
+
+- Gemma 4 rows run with the pass-2 examples for CANCEL/UNKNOWN; gemma3 runs the live prompt, as in its harness config.
+- Without the examples, E2B leaked JSON into speech on 9/54 rows; TIME and DATE leaks are moot, because the engine's reply overrides the voice.
+- The own-turn cue (`-pass2-turn`) collapses to "I am ready." ×31, so the bare cue stays.
+- Thinking rows (results/e1-p2ex): E2B 53–54/54 at p50 1.8–2.1 s.
+
+### 2. Task-outcome narration (step 4; `tools/narrate-bench.sh`, results/narrate)
+
+The run used 24 failed or refused task outcomes (`grammar/narrate-events.tsv`). Each went through the harness's own path, `taskCue` → `Narrate` → `sanitizeAck` + `taskVoiceOK`, with the template as fallback. gemma3 ran its live prompt; E2B ran the switch prompt (live + pass-2 examples). The GPU window was 20:48, one model at a time.
+
+| model | events | sentence passed guard (distinct) | raw leak | template fallback | ms mean / p50 / p90 |
+|---|---|---|---|---|---|
+| gemma3-4b Q4 | 24 | 24 (24) | 0 | 0 | 166 / 165 / 206 |
+| **E2B Q4** | 24 | 24 (24) | 0 | 0 | **115 / 108 / 139** |
+
+Through nina's a5d22c0 framing, both models narrate cleanly. The 44/54 gemma3 leak in table 1 is the bare single-pass path, not the harness's. The guard never fired. The difference is in fidelity (the full side-by-side is in `results/narrate/table.md`):
+- **gemma3 invents causes.** With an empty reason it said "because my joints are stiff" and "due to an obstacle". It also drops or generalizes given reasons: "My sensors aren't working right now." for "perception is offline", and "I couldn't locate the object" for "searched the whole room".
+- **E2B states the given reason, formulaically.** It uses "My command to … failed because …". With an empty reason it says "did not work" and invents nothing on 1 of 2 rows; on the other it said "couldn't find the location". There are two tautologies ("lost sight of you because I couldn't see you").
+- **Adversarial reasons** (instructions planted in the detail field) are repeated but not obeyed by E2B: "I was told to order a pizza, so I couldn't go to the tag." and "…because you asked me to do a backflip." gemma3 gives a generic refusal. Neither model acted on them. Repeating a detail is a harness concern, not a model one: `detail` comes from our own runtime. The raw JSON error came out as "a timeout" on both.
+- **E2B is about 35% faster** per narration (p50 108 against 165 ms).
+
+### 3. ASR (E2; `tools/e2-asr.sh`, results/e2)
+
+| engine | GPU | WER (num-normalized) | exact | dropped | intent after ASR (E2B / gemma3) | latency after the VAD closes |
+|---|---|---|---|---|---|---|
+| whisper base.en | 409 MiB | 4.8% | 50/54 | 0 | 52 / 48 of 54 | 17 ms decode |
+| **whisper base.en + initial prompt (F12)** | 409 MiB | **1.9%** | **52/54** | 0 | **53** / – of 54 | 17 ms |
+| Nemotron 3.5 streaming 0.6B q8, GPU | 1071 MiB | 9.6%¹ | 48/54 | 3 | 50 / 50 of 54 | 10 ms after finish; partials ≈ 0.65 s into speech |
+| Nemotron, CPU only (4 cores) | 0 | 9.6%¹ | 48/54 | 3 | – | 100 ms after finish |
+
+¹ The Nemotron rows use VAD-like padding: 300 ms pre-roll and 600 ms hangover. On trimmed TTS without it, Nemotron cut the last word, giving 20.9%.
+
+- "halt" was lost by both engines before F12: whisper heard "Health", Nemotron returned nothing.
+- Nemotron does not endpoint by itself, so final latency is the VAD's for both engines. Its case is the streaming seam (HARNESS.md §5.1), and it waits for the user's real recordings.
+
+### 4. Heard vs read (E3; `tools/e3-audio.sh`, results/e3)
+
+| path | VRAM | turn p50 | audio encode | intent | held-out |
+|---|---|---|---|---|---|
+| E2B Q4, read (typed) | 2136 MiB | 458 ms | – | 54/54 | 17/17 |
+| **E2B Q4, heard** (in-process libmtmd) | 3328 MiB | 511 ms | 14 ms | 53/54 | 17/17 ("halt" → STOP) |
+| E4B Q5, heard | 5490 MiB | 686 ms | 23 ms | 53/54 | 17/17 |
+| whisper + initial prompt → E2B Q4, read | ≈ 2.55 GB | ≈ 17 + 458 ms | – | 53/54 | – |
+
+The heard path matches the ASR pipeline on accuracy and latency.
+- **Why it isn't recommended yet:** it costs about 0.8 GB more, because the F16 mmproj carries both towers (audio 584 MiB, vision 349 MiB). It also has no transcript for the logs or the journal.
+- **Re-pack:** an audio-only Q8 projector (about 2.6 GB total) is a separate decision, tied to the real recordings.
+- **libmtmd gotcha** (also in `internal/llm/audio.go`): `mtmd_helper_eval_chunk_single` *adds* a text chunk's length to `*new_n_past` and sets it for media chunks, so the caller must initialize `new_n_past = n_past`. Otherwise the second turn's audio lands at position ~4 against a KV ending at the prefix, and decode fails with "inconsistent sequence positions".
+
+### 5. Domain activation as a native tool call (E4; `go/tools/e4-activate`, results/e4)
+
+| model | tool call | JSON intent | p50 tool / JSON |
+|---|---|---|---|
+| E2B Q4 | 12/12 | 11/12 | 379 / 334 ms |
+| E4B Q5 | 12/12 | 12/12 | 541 / 505 ms |
+
+A GBNF over Gemma 4's native call markup keeps the activation surface token-exact. The details are in "E4 findings" below. Nothing changes in the harness.
+
+### Open items
+
+1. **The user's real recordings** (20–30 laptop-mic commands with room noise). They re-run E2 and E3 unchanged: add them to `models/corpus-wav/manifest.tsv`. They decide Nemotron and the heard path.
+2. **Projector re-pack** (audio-only, Q8) for the heard path: a separate decision, only if (1) favors hearing.
+3. **E4 result-turn round-trip:** render the runtime's admission or refusal as a `<|tool_response>` turn, and check that a refusal steers the next proposal.
+4. **"halt" and other one-word safety commands:** F12's keyword STOP in front of the LLM covers the harness. The bench corpus is synthetic, so this needs a check on the real recordings.
+5. **E2B + whisper co-resident measurement:** the budget line above sums two measurements. One co-resident run on the switch config would replace the ≈.
+
 ## Why
 
 Gemma 4 (March 2026) brings, versus Gemma 3: a thinking on/off toggle
