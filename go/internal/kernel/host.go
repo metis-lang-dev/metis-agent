@@ -59,9 +59,8 @@ type Host struct {
 	// said about the runtime, appended after the prefix; compacted at
 	// quiescence, deterministically
 	Tape     TapeWriter
-	keep     int
 	tapeMu   sync.Mutex
-	entries  []tapeEntry
+	stand    standing
 	lastRec  int
 	Ledger   TapeLedger
 	triageQ  chan Signal
@@ -100,16 +99,13 @@ func NewHost(cfg Config, pend *wire.Pending) *Host {
 	}
 	h := &Host{Pend: pend, narrate: map[string]bool{}, byIntent: map[int]string{}, early: map[int]Signal{},
 		waiters: map[string]chan [2]string{}, MaxTries: 3, Beat: watchEvery(cfg.Watch),
-		settled: map[int]bool{}, keep: cfg.KeepEpisodes, lastRec: -1, noticed: map[string]bool{},
+		settled: map[int]bool{}, lastRec: -1, noticed: map[string]bool{},
 		woke: map[int]bool{}}
 	sb := cfg.SettleBeats
 	if sb <= 0 {
 		sb = 2.5
 	}
 	h.Settle = time.Duration(sb * float64(h.Beat))
-	if h.keep <= 0 {
-		h.keep = 3
-	}
 	for _, k := range kinds {
 		h.narrate[k] = true
 	}
@@ -141,15 +137,21 @@ func (h *Host) Signal(s Signal) {
 		h.OnEvent(ev)
 	}
 	if h.Tape != nil {
-		// the pieces reach the tape with what was said about them
-		// (TapeNarration); the quiescence is where the stale ones go
+		// the standing region: what stays true, overwritten in place
 		if s.Kind == "surprise" {
 			h.tapeMu.Lock()
 			h.lastRec = int(num(s.F["record"]))
 			h.tapeMu.Unlock()
 		}
-		if s.Kind == "quiescence" {
-			h.compact()
+		h.Stand(s, ev.Pieces)
+		if (s.Kind == "quiescence" || s.Kind == "result") && h.C != nil {
+			// the mirror line, refreshed off the reader goroutine (an op's
+			// answer comes through it)
+			go func() {
+				if ans, err := h.C.Op("ctx", "--mirror", 10*time.Second); err == nil {
+					h.SetMirror(MirrorLine(ans, cards))
+				}
+			}()
 		}
 	}
 	wake := s.Kind == "surprise"

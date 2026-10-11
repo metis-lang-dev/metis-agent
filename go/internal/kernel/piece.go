@@ -54,15 +54,15 @@ func Pieces(s Signal, cards []Card) []Piece {
 			return []Piece{p("event", "progress", fmt.Sprintf("In the %s, from outside: %s.", where, strings.Join(ops, ", ")))}
 		case "reading":
 			if f["consistent"] == true {
-				return []Piece{p("reading", "progress", fmt.Sprintf("The %s reading agrees with the model again.", where))}
+				return []Piece{p("reading", "progress", fmt.Sprintf("The %s reading agrees with the model again: the odd reading was a one-off.", where))}
 			}
 			return []Piece{p("reading", "progress", fmt.Sprintf("The %s reading changed: %s.", where, signedRaw(diffOf(f))))}
 		case "operator":
-			return []Piece{p("operator", "progress", fmt.Sprintf("The operator resumed the %s on its reading.", where))}
+			return []Piece{p("operator", "progress", fmt.Sprintf("The operator resumed the %s on its reading: it takes orders again.", where))}
 		}
 		return []Piece{p("event", "progress", fmt.Sprintf("In the %s: %s %s.", where, kind, name))}
 	case "quiescence":
-		t := fmt.Sprintf("The %s is quiet after %d moves.", where, int(num(f["fired"])))
+		t := fmt.Sprintf("The %s is quiet after %d moves: the order is done, it waits for the next one.", where, int(num(f["fired"])))
 		if f["episode_over"] == true {
 			t = fmt.Sprintf("The %s run is over after %d moves.", where, int(num(f["fired"])))
 		}
@@ -82,7 +82,7 @@ func Pieces(s Signal, cards []Card) []Piece {
 		}
 		t := fmt.Sprintf("Surprise %d in the %s: %s.", rec, where, strings.Join(parts, "; "))
 		if f["observe_only"] == true {
-			t += " The runtime stopped acting and only watches."
+			t += " The runtime stopped acting: it takes no new orders until the surprise is closed."
 		}
 		return []Piece{p("surprise", "surprise", t)}
 	case "result":
@@ -90,15 +90,24 @@ func Pieces(s Signal, cards []Card) []Piece {
 		status, _ := f["status"].(string)
 		reason, _ := f["reason"].(string)
 		var out []Piece
-		if strings.HasPrefix(status, "admitted") {
+		// the consequence, not only the state (E6b: facts that must be
+		// applied are used less than facts read back)
+		switch {
+		case strings.HasPrefix(status, "admitted") && verb == "reset":
+			out = append(out, p("result", "progress", fmt.Sprintf("Your reset of surprise %d was accepted: the odd reading is set aside as a misread, and the runtime takes orders again.", rec)))
+		case strings.HasPrefix(status, "admitted") && verb == "explain":
+			out = append(out, p("result", "progress", fmt.Sprintf("Your explanation of surprise %d was accepted: %s; the runtime takes orders again.", rec, reason)))
+		case strings.HasPrefix(status, "admitted") && verb == "escalate":
+			out = append(out, p("result", "progress", fmt.Sprintf("Your escalation of surprise %d was accepted: it goes to the people who revise the model, and the runtime takes no new orders until the operator resumes it.", rec)))
+		case strings.HasPrefix(status, "admitted"):
 			out = append(out, p("result", "progress", fmt.Sprintf("Your %s of surprise %d was accepted: %s.", verb, rec, reason)))
-		} else {
-			out = append(out, p("result", "surprise", fmt.Sprintf("Your %s of surprise %d was refused: %s.", verb, rec, reason)))
+		default:
+			out = append(out, p("result", "surprise", fmt.Sprintf("Your %s of surprise %d was refused: %s. The surprise stays open: the runtime still takes no new orders.", verb, rec, reason)))
 		}
 		if nt, ok := f["notice"].(map[string]any); ok {
 			card, _ := nt["card"].(string)
 			move, _ := nt["move"].(string)
-			out = append(out, p("notice", "surprise", fmt.Sprintf("Notice: %s with %s explained the reading %d orders running; the %s model lacks it.",
+			out = append(out, p("notice", "surprise", fmt.Sprintf("Notice: %s with %s explained the reading %d orders running: the %s model lacks it, so the people who revise the model are told; orders go on.",
 				card, move, int(num(nt["orders"])), where)))
 		}
 		return out

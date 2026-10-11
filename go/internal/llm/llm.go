@@ -900,9 +900,9 @@ func (l *LLM) DecideTimed(systemPrompt, user, cont, gbnf string, maxTokens int) 
 	if l.tmpl != TemplateGemma4 {
 		return "", 0, errors.New("llm: Decide needs the gemma4 template (native tool calls)")
 	}
-	t0 := time.Now()
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	t0 := time.Now() // after the lock: the splice cost, not the wait behind a narration
 	nPrefix, err := l.primeLocked(systemPrompt)
 	if err != nil {
 		return "", 0, err
@@ -966,7 +966,7 @@ func (l *LLM) Speak(systemPrompt, user string, think bool) (string, time.Duratio
 		g := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
 		C.llama_sampler_chain_add(g, C.llama_sampler_init_greedy())
 		var out []C.llama_token
-		max := min(l.thinkMax, 256) // a narration's thought: bounded
+		max := min(l.thinkMax, 64) // a narration's thought: short (live: uncapped it ran ~250 tok, 1.7 s)
 		if max <= 0 {
 			max = 256
 		}
@@ -990,13 +990,28 @@ func (l *LLM) Speak(systemPrompt, user string, think bool) (string, time.Duratio
 		}
 		l.nPast++
 	}
+	// the turn speaks through the dog prompt's own convention: its examples
+	// teach that "Spoken response:" is followed by a natural sentence
+	// (live, without it: "Hello, …", "UNKNOWN: …", "DANGER: …")
+	if err := l.decodeTokens(l.tokenize("Spoken response:", false)); err != nil {
+		return "", 0, thought, err
+	}
+	// the sentence is held to a sentence by grammar: under the one prefix
+	// (dog JSON + tool declarations) E2B answered some cues with an intent
+	// or a tool call (live, step 4)
+	cG, cR := C.CString(sentenceGBNF), C.CString("root")
+	defer C.free(unsafe.Pointer(cG))
+	defer C.free(unsafe.Pointer(cR))
 	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
+	if g := C.llama_sampler_init_grammar(l.vocab, cG, cR); g != nil {
+		C.llama_sampler_chain_add(chain, g)
+	}
 	C.llama_sampler_chain_add(chain, C.llama_sampler_init_top_k(C.int32_t(l.pass2.TopK)))
 	C.llama_sampler_chain_add(chain, C.llama_sampler_init_temp(C.float(l.pass2.Temp)))
 	C.llama_sampler_chain_add(chain, C.llama_sampler_init_dist(C.LLAMA_DEFAULT_SEED))
 	defer C.llama_sampler_free(chain)
 	tGen := time.Now()
-	toks, err := l.generate(chain, l.pass2.MaxTokens, "\n")
+	toks, err := l.generate(chain, l.pass2.MaxTokens+20, "\n")
 	if err != nil {
 		return "", 0, thought, err
 	}
@@ -1007,6 +1022,10 @@ func (l *LLM) Speak(systemPrompt, user string, think bool) (string, time.Duratio
 	}
 	return strings.TrimSpace(strings.Trim(l.clean(voice), `"`)), ttft, strings.TrimSpace(thought), nil
 }
+
+// sentenceGBNF: one spoken sentence — a capital, ordinary text without
+// markup, JSON, tool-call or fact-syntax characters, a final stop.
+const sentenceGBNF = `root ::= " "? "\""? [A-Z] [a-zA-Z0-9 ,;'()%-]{3,200} [.!?] "\""?`
 
 // Answer is one free-text model turn after the cached prefix and the tape
 // (E6 splice): the user text as the turn, the thought channel closed when

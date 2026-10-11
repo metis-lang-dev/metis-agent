@@ -48,9 +48,6 @@ type Config struct {
 	// asks the model (beats; the first re-read lands up to two beats after
 	// the surprise). Unset = 2.5.
 	SettleBeats float64 `yaml:"settle_beats"`
-	// KeepEpisodes: compaction keeps the last N surprise episodes on the
-	// tape (their fact, readings, results and what was said). Unset = 3.
-	KeepEpisodes int `yaml:"keep_episodes"`
 }
 
 // Signal is one pushed line: its kind, sequence number and the whole object.

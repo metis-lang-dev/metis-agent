@@ -493,9 +493,8 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 			log.Fatal(err)
 		}
 		h.Tape = tapeAdapter{l, h.Prompt}
-		eng.OnRuntimeTape = h.TapeNarration
-		log.Printf("[kernel] triage on: %d cards, call grammar %d B; one prefix %d tok (dog prompt + runtime section %d B); settle %s, keep %d episodes",
-			len(cards.Cards), len(h.Dec.GBNF), n, len(h.Dec.System), h.Settle, kcfg.KeepEpisodes)
+		log.Printf("[kernel] triage on: %d cards, call grammar %d B; one prefix %d tok (dog prompt + runtime section %d B); settle %s",
+			len(cards.Cards), len(h.Dec.GBNF), n, len(h.Dec.System), h.Settle)
 	}
 	w := kcfg.Watch
 	if w == "" {

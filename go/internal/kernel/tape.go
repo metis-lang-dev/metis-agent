@@ -1,6 +1,7 @@
 package kernel
 
 import (
+	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -15,12 +16,6 @@ type TapeWriter interface {
 	Turn(role, text string) string
 	Append(text string) (tokens, tape int, dur time.Duration, err error)
 	Set(text string) (tape int, dur time.Duration, err error)
-}
-
-type tapeEntry struct {
-	kind string // the signal kind, or "spoken"
-	rec  int    // the surprise record it belongs to, -1 for none
-	text string
 }
 
 // TapeLedger is step 4's measures: tape size over time, splice cost,
@@ -49,108 +44,139 @@ func (l *TapeLedger) Snapshot() (appends, appendTok int, appendDur time.Duration
 	return l.Appends, l.AppendTok, l.AppendDur, l.Compactions, l.MaxTape, l.Tape, append([]time.Duration(nil), l.DecideTTFT...)
 }
 
-func (h *Host) tapeAdd(kind string, rec int, text string) {
+// The standing region (step 4, the architect's E6b refinements): the
+// runtime facts that stay true — the mirror line, the open or escalated
+// surprise, the last notices — as ONE user turn after the prefix,
+// overwritten in place whenever one of them changes (a superseded fact is
+// deleted, never appended over). Everything else is the stream: a piece
+// lives only in the turn whose cue speaks about it, at distance 0.
+type standing struct {
+	mirror  string
+	open    map[int]string // record → its surprise piece, while open or escalated
+	notices []string       // the last three
+	text    string         // what the tape holds now
+}
+
+const standingHead = "[Runtime standing facts — the runtime's own, kept up to date; not something the person said.]"
+
+// Stand updates the standing region from one signal's pieces and rewrites
+// the tape if it changed. Safe from the reader goroutine (no wire op).
+func (h *Host) Stand(s Signal, pieces []Piece) {
+	if h.Tape == nil {
+		return
+	}
 	h.tapeMu.Lock()
 	defer h.tapeMu.Unlock()
-	n, total, dur, err := h.Tape.Append(text)
-	if err != nil {
-		log.Printf("[tape] append %s: %v — compacting", kind, err)
-		h.compactLocked(true)
-		if n, total, dur, err = h.Tape.Append(text); err != nil {
-			log.Printf("[tape] append %s after compaction: %v — dropped", kind, err)
-			return
+	st := &h.stand
+	if st.open == nil {
+		st.open = map[int]string{}
+	}
+	for _, p := range pieces {
+		switch p.Kind {
+		case "surprise":
+			st.open[p.Rec] = p.Text
+		case "result":
+			verb, _ := s.F["verb"].(string)
+			status, _ := s.F["status"].(string)
+			switch {
+			case strings.HasPrefix(status, "admitted") && (verb == "reset" || verb == "explain"):
+				delete(st.open, p.Rec)
+			case strings.HasPrefix(status, "admitted") && verb == "escalate":
+				st.open[p.Rec] = p.Text // escalated: no new orders until the operator
+			}
+		case "operator":
+			for r := range st.open {
+				delete(st.open, r)
+			}
+		case "notice":
+			st.notices = append(st.notices, p.Text)
+			if len(st.notices) > 3 {
+				st.notices = st.notices[len(st.notices)-3:]
+			}
 		}
 	}
-	h.entries = append(h.entries, tapeEntry{kind, rec, text})
+	h.rewriteLocked()
+}
+
+// SetMirror replaces the mirror line (from ctx --mirror) and rewrites.
+func (h *Host) SetMirror(line string) {
+	if h.Tape == nil {
+		return
+	}
+	h.tapeMu.Lock()
+	defer h.tapeMu.Unlock()
+	h.stand.mirror = line
+	h.rewriteLocked()
+}
+
+func (h *Host) rewriteLocked() {
+	st := &h.stand
+	lines := []string{standingHead}
+	if st.mirror != "" {
+		lines = append(lines, st.mirror)
+	}
+	recs := make([]int, 0, len(st.open))
+	for r := range st.open {
+		recs = append(recs, r)
+	}
+	sort.Ints(recs)
+	for _, r := range recs {
+		lines = append(lines, st.open[r])
+	}
+	lines = append(lines, st.notices...)
+	if len(lines) == 1 {
+		lines = nil // nothing stands: an empty tape
+	}
+	text := ""
+	if lines != nil {
+		text = h.Tape.Turn("user", strings.Join(lines, "\n"))
+	}
+	if text == st.text {
+		return
+	}
+	total, dur, err := h.Tape.Set(text)
+	if err != nil {
+		log.Printf("[tape] standing rewrite: %v", err)
+		return
+	}
+	st.text = text
 	h.Ledger.mu.Lock()
+	h.Ledger.Compactions++ // a rewrite in place
 	h.Ledger.Appends++
-	h.Ledger.AppendTok += n
+	h.Ledger.AppendTok += total
 	h.Ledger.AppendDur += dur
 	h.Ledger.Tape = total
 	if total > h.Ledger.MaxTape {
 		h.Ledger.MaxTape = total
 	}
 	h.Ledger.mu.Unlock()
-	log.Printf("[tape] +%d tok (%s) → %d tok, %d ms", n, kind, total, dur.Milliseconds())
+	log.Printf("[tape] standing: %d tok (mirror %v, open %v, notices %d), %d ms", total, st.mirror != "", recs, len(st.notices), dur.Milliseconds())
 }
 
-// TapeNarration puts one cued narration on the tape: the pieces and their cue
-// as a user turn, the sentence said as the model's turn ("" when nothing
-// was said — asleep: the facts still go on). rec ties it to a surprise
-// episode for compaction (-1: progress, gone at the next quiescence).
-func (h *Host) TapeNarration(kind string, rec int, pieces, spoken string) {
-	if h.Tape == nil || strings.TrimSpace(pieces) == "" {
-		return
+// MirrorLine renders the ctx --mirror answer's first row in plain words.
+func MirrorLine(ans map[string]any, cards []Card) string {
+	rows, _ := ans["mirror"].([]any)
+	if len(rows) == 0 {
+		return ""
 	}
-	text := h.Tape.Turn("user", pieces)
-	if strings.TrimSpace(spoken) != "" {
-		text += h.Tape.Turn("model", spoken)
+	r, _ := rows[0].(map[string]any)
+	path, _ := r["path"].(string)
+	status, _ := r["status"].(string)
+	open := "no open surprise"
+	if sp, ok := r["surprise"].(map[string]any); ok && sp != nil {
+		open = fmt.Sprintf("surprise %d open", int(num(sp["record"])))
 	}
-	h.tapeAdd(kind, rec, text)
-}
-
-func (h *Host) compact() {
-	h.tapeMu.Lock()
-	defer h.tapeMu.Unlock()
-	h.compactLocked(false)
-}
-
-// compactLocked is the deterministic compaction at quiescence: the events
-// and quiescences of the past go; a surprise episode (its fact, readings,
-// results and what was said under it) stays, the last keep episodes of
-// them, and the open one always. force also drops the oldest kept episode
-// when nothing else would go (the tape is full).
-func (h *Host) compactLocked(force bool) {
-	recs := []int{}
-	seen := map[int]bool{}
-	for _, e := range h.entries {
-		if e.rec >= 0 && !seen[e.rec] {
-			seen[e.rec] = true
-			recs = append(recs, e.rec)
+	var bel []string
+	if b, ok := r["beliefs"].(map[string]any); ok {
+		keys := make([]string, 0, len(b))
+		for k := range b {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			bel = append(bel, fmt.Sprintf("%s %.2f", k, num(b[k])))
 		}
 	}
-	keep := h.keep
-	if force && len(recs) > 1 {
-		keep = min(keep, len(recs)-1)
-	}
-	kept := map[int]bool{}
-	for i := len(recs) - 1; i >= 0 && len(kept) < keep; i-- {
-		kept[recs[i]] = true
-	}
-	if h.lastRec >= 0 {
-		kept[h.lastRec] = true
-	}
-	var out []tapeEntry
-	var b strings.Builder
-	for _, e := range h.entries {
-		if e.rec >= 0 && kept[e.rec] {
-			out = append(out, e)
-			b.WriteString(e.text)
-		}
-	}
-	if len(out) == len(h.entries) {
-		return
-	}
-	before := h.Ledger.Tape
-	total, dur, err := h.Tape.Set(b.String())
-	if err != nil {
-		log.Printf("[tape] compaction: %v", err)
-		return
-	}
-	h.entries = out
-	h.Ledger.mu.Lock()
-	h.Ledger.Compactions++
-	h.Ledger.Tape = total
-	h.Ledger.mu.Unlock()
-	ks := keys(kept)
-	sort.Ints(ks)
-	log.Printf("[tape] compacted %d → %d tok (%d entries, episodes kept %v), %d ms", before, total, len(out), ks, dur.Milliseconds())
-}
-
-func keys(m map[int]bool) []int {
-	var k []int
-	for x := range m {
-		k = append(k, x)
-	}
-	return k
+	return PlainWords(fmt.Sprintf("The %s now: %s, %s; likely within %d beats: %s.", path, status, open,
+		int(num(r["horizon"])), strings.Join(bel, ", ")), cards)
 }
