@@ -6,6 +6,8 @@
 //
 //	fsttm-go -config config.playground.yaml            # voice pipeline
 //	fsttm-go -config config.playground.yaml -headless  # stdin → intent → voice
+//	fsttm-go -config config.ws.yaml -ui-dir ../../metis-loop/apps/nina-web
+//	                                                   # browser mic/speaker over ws
 //
 // Idle means IDLE: every goroutine blocks on a channel; a silent room costs
 // one native VAD call per 20 ms frame and the GPU runs no kernels between
@@ -20,9 +22,13 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
+	"time"
 
 	"gopkg.in/yaml.v3"
 
@@ -35,6 +41,7 @@ import (
 	"github.com/metis-lang-dev/metis-agent/go/internal/tts"
 	"github.com/metis-lang-dev/metis-agent/go/internal/vad"
 	"github.com/metis-lang-dev/metis-agent/go/internal/voiceid"
+	"github.com/metis-lang-dev/metis-agent/go/internal/wire"
 )
 
 type config struct {
@@ -58,7 +65,7 @@ type config struct {
 		NThreads  int      `yaml:"n_threads"` // 0 = 6 (legacy)
 	} `yaml:"stt"`
 	TTS struct {
-		Engine string  `yaml:"engine"` // librhvoice (default) | subprocess
+		Engine string  `yaml:"engine"` // librhvoice (default) | subprocess | ws (browser plays)
 		Voice  string  `yaml:"voice"`
 		Rate   float64 `yaml:"rate"`
 		Volume float64 `yaml:"volume"`
@@ -85,20 +92,34 @@ type config struct {
 		WakeWords    []string `yaml:"wake_words"`
 		SleepPhrases []string `yaml:"sleep_phrases"`
 	} `yaml:"attention"`
-	// Transport: where the engine's events go and where say/chat come from.
+	// Transport: where the engine's events go and where say/chat/task come from.
 	//   jsonl  events on stdout, say on stdin (SIL / headless)
-	//   ws     the websocket server of HARNESS.md §6 (step 2)
+	//   ws     the websocket server of HARNESS.md §6: /ws events both ways,
+	//          /ws_mic audio in, TTS audio out, the UI from -ui-dir
 	Transport string `yaml:"transport"`
-	// Mic: local (malgo capture) | remote (640-byte frames over /ws_mic, step 2)
-	Mic     string `yaml:"mic"`
-	Prompt  string `yaml:"prompt"`   // system prompt file
-	Grammar string `yaml:"grammar"`  // GBNF file (token-exact intent grammar)
-	BargeIn string `yaml:"barge_in"` // off | vad | confirm
+	// Mic: local (malgo capture) | remote (640-byte frames over /ws_mic)
+	Mic string `yaml:"mic"`
+	WS  struct {
+		Addr       string  `yaml:"addr"`         // :8392
+		UIDir      string  `yaml:"ui_dir"`       // static UI (-ui-dir overrides)
+		TTSMarginS float64 `yaml:"tts_margin_s"` // tts_done wait beyond audio length (2)
+		TLSCACert  string  `yaml:"tls_ca_cert"`  // fleet CA: https (Chrome's mic needs a secure context off localhost)
+		TLSCAKey   string  `yaml:"tls_ca_key"`
+		TLSAddr    string  `yaml:"tls_addr"`     // :443 (adds a :80 redirect)
+		TLSLeafDir string  `yaml:"tls_leaf_dir"` // persisted leaf (default <config dir>/metis-agent/tls)
+		TLSSAN     string  `yaml:"tls_san"`      // extra names/IPs, comma-separated
+	} `yaml:"ws"`
+	AnnounceMaxAgeS float64 `yaml:"announce_max_age_s"` // deferred announcements older than this are dropped (30)
+	TaskMaxAgeS     float64 `yaml:"task_max_age_s"`     // a command unanswered this long is forgotten (60)
+	Prompt          string  `yaml:"prompt"`             // system prompt file
+	Grammar         string  `yaml:"grammar"`            // GBNF file (token-exact intent grammar)
+	BargeIn         string  `yaml:"barge_in"`           // off | vad | confirm
 }
 
 func main() {
 	cfgPath := flag.String("config", "config.playground.yaml", "YAML config")
 	headless := flag.Bool("headless", false, "stdin text instead of the mic")
+	uiDir := flag.String("ui-dir", "", "ws transport: serve this static UI at / (overrides ws.ui_dir)")
 	flag.Parse()
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 
@@ -116,17 +137,29 @@ func main() {
 	if cfg.Mic == "" {
 		cfg.Mic = "local"
 	}
-	switch cfg.Transport {
-	case "jsonl":
-	case "ws":
-		log.Fatal("transport: ws arrives with HARNESS.md step 2; use jsonl")
-	default:
+	if cfg.Transport != "jsonl" && cfg.Transport != "ws" {
 		log.Fatalf("transport: %q (jsonl|ws)", cfg.Transport)
 	}
-	if cfg.Mic == "remote" {
-		log.Fatal("mic: remote needs the ws transport (step 2); use local")
-	} else if cfg.Mic != "local" {
+	if cfg.Mic != "local" && cfg.Mic != "remote" {
 		log.Fatalf("mic: %q (local|remote)", cfg.Mic)
+	}
+	if cfg.Mic == "remote" && cfg.Transport != "ws" {
+		log.Fatal("mic: remote needs transport: ws")
+	}
+	if *uiDir != "" {
+		cfg.WS.UIDir = *uiDir
+	}
+	if cfg.WS.Addr == "" {
+		cfg.WS.Addr = ":8392"
+	}
+	if cfg.TTS.Engine == "" {
+		cfg.TTS.Engine = "librhvoice"
+		if cfg.Transport == "ws" {
+			cfg.TTS.Engine = "ws"
+		}
+	}
+	if cfg.TTS.Engine == "ws" && cfg.Transport != "ws" {
+		log.Fatal("tts.engine: ws needs transport: ws")
 	}
 	prompt, err := os.ReadFile(cfg.Prompt)
 	if err != nil {
@@ -142,7 +175,7 @@ func main() {
 	defer stop()
 
 	// ── echo cancellation + noise suppression (local mic only) ───────────
-	if !*headless {
+	if !*headless && cfg.Mic == "local" {
 		ec, err := aec.Start(aec.Config{Enabled: cfg.AEC.Enabled,
 			RNNoise: cfg.AEC.RNNoise, Method: cfg.AEC.Method,
 			SourceMaster: cfg.AEC.SourceMaster})
@@ -193,25 +226,58 @@ func main() {
 	defer s.Close()
 	log.Print("[stt] whisper ready (warmed)")
 
-	t, err := tts.NewSpeaker(tts.Config{Engine: cfg.TTS.Engine, Voice: cfg.TTS.Voice,
-		Rate: cfg.TTS.Rate, Volume: cfg.TTS.Volume, Player: cfg.TTS.Player})
-	if err != nil {
+	// ── transport + speaker ──────────────────────────────────────────────
+	// ws: one process serves the UI, takes the mic and chat, plays TTS in the
+	// browser and receives the host's task events. jsonl: stdout/stdin.
+	var link transport.Transport
+	var ws *transport.Server
+	var jl *transport.Jsonl
+	if cfg.Transport == "ws" {
+		ws = transport.NewServer(cfg.WS.UIDir)
+		link = ws
+	} else {
+		jl = transport.NewJsonl(os.Stdout)
+		link = jl
+	}
+	tcfg := tts.Config{Engine: cfg.TTS.Engine, Voice: cfg.TTS.Voice,
+		Rate: cfg.TTS.Rate, Volume: cfg.TTS.Volume, Player: cfg.TTS.Player}
+	var t tts.Speaker
+	if cfg.TTS.Engine == "ws" {
+		synth, err := tts.NewLib(tcfg) // RHVoice renders here, the browser plays
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer synth.Close()
+		t = transport.NewWsSpeaker(ws, synth,
+			time.Duration(cfg.WS.TTSMarginS*float64(time.Second)))
+	} else if t, err = tts.NewSpeaker(tcfg); err != nil {
 		log.Fatal(err)
 	}
 	log.Printf("[tts] speaker ready (engine=%T)", t)
 
 	eng := pipeline.New(pipeline.Config{
 		SystemPrompt: string(prompt), GBNF: string(gbnf),
-		Attention:    cfg.Attention.Enabled,
-		WakeWords:    cfg.Attention.WakeWords,
-		SleepPhrases: cfg.Attention.SleepPhrases,
-		BargeIn:      cfg.BargeIn,
-		OwnerGate:    cfg.VoiceID.Gate,
+		Attention:      cfg.Attention.Enabled,
+		WakeWords:      cfg.Attention.WakeWords,
+		SleepPhrases:   cfg.Attention.SleepPhrases,
+		BargeIn:        cfg.BargeIn,
+		OwnerGate:      cfg.VoiceID.Gate,
+		AnnounceMaxAge: time.Duration(cfg.AnnounceMaxAgeS * float64(time.Second)),
 	}, l, s, t)
 	eng.Owner = owner
-
-	// ── transport ────────────────────────────────────────────────────────
-	link := transport.NewJsonl(os.Stdout)
+	if ws != nil {
+		// commands go to the host as typed events and are remembered until
+		// its task event comes back to the dialog agent (HARNESS.md §4)
+		eng.Tasks = wire.NewPending(16, time.Duration(cfg.TaskMaxAgeS*float64(time.Second)))
+		eng.Dsp = wire.NewDispatcher(ws, eng.Tasks)
+		ws.OnSayText = eng.SayText
+		ws.OnSay = eng.Announce
+		ws.OnAttention = eng.ForceAttention
+		ws.OnMaster = eng.ForceAttention // mic grabbed → AWAKE, released → ASLEEP (as on the robot)
+		ws.OnTask = func(tk transport.Task) {
+			eng.TaskEvent(pipeline.Task{ID: tk.ID, Result: tk.Result, Detail: tk.Detail})
+		}
+	}
 	eng.Events = func(kind string, payload any) {
 		switch kind {
 		case "intent":
@@ -232,11 +298,15 @@ func main() {
 			}
 		}
 	}
-	if !*headless {
+	if jl != nil && !*headless {
 		// the host owns our stdin (say requests); in -headless the terminal does
-		go link.ReadSay(os.Stdin, eng.Announce)
+		go jl.ReadSay(os.Stdin, eng.Announce)
 	}
-	log.Printf("[transport] jsonl on stdout (mic=%s)", cfg.Mic)
+	if ws != nil {
+		go serveWS(ctx, cfg, ws.Handler(), stop)
+	} else {
+		log.Printf("[transport] jsonl on stdout (mic=%s)", cfg.Mic)
+	}
 
 	// SIGUSR1 → system-initiated announcement (transition 5): a live trigger
 	// for shells/tests — kill -USR1 $(pidof fsttm-go)
@@ -271,12 +341,22 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		go func() {
-			if err := audio.Capture(ctx, frames); err != nil {
-				log.Printf("[audio] %v", err)
-				stop()
-			}
-		}()
+		if cfg.Mic == "remote" {
+			// the browser's AudioWorklet frames (/ws_mic) feed the same segmenter
+			go func() {
+				for f := range ws.Mic() {
+					frames <- f
+				}
+			}()
+			log.Print("[vad] mic source = remote (/ws_mic)")
+		} else {
+			go func() {
+				if err := audio.Capture(ctx, frames); err != nil {
+					log.Printf("[audio] %v", err)
+					stop()
+				}
+			}()
+		}
 		go seg.Run(ctx, frames, vadEvents)
 		log.Printf("[vad] streaming (aggr=%d padding=%dms) — say something",
 			cfg.VAD.Aggressiveness, cfg.VAD.PaddingMs)
@@ -284,4 +364,69 @@ func main() {
 
 	eng.Run(ctx, vadEvents, textIn)
 	fmt.Fprintln(os.Stderr, "\nbye.")
+}
+
+// serveWS runs the ws transport's HTTP server: plain http on ws.addr, or
+// https signed by the fleet CA (HARNESS.md §6; Chrome wants a secure
+// context for getUserMedia off localhost) with a :80 redirect when on :443.
+// Lifted from nina_splat main.go.
+func serveWS(ctx context.Context, cfg config, handler http.Handler, stop func()) {
+	w := cfg.WS
+	if w.TLSCACert != "" && w.TLSCAKey != "" {
+		leafDir := w.TLSLeafDir
+		if leafDir == "" {
+			if d, e := os.UserConfigDir(); e == nil {
+				leafDir = filepath.Join(d, "metis-agent", "tls")
+			} else {
+				leafDir = filepath.Join(filepath.Dir(w.TLSCACert), "leaf")
+			}
+		}
+		var sans []string
+		for _, n := range strings.Split(w.TLSSAN, ",") {
+			if n = strings.TrimSpace(n); n != "" {
+				sans = append(sans, n)
+			}
+		}
+		tlsCfg, err := transport.FleetTLSConfig(w.TLSCACert, w.TLSCAKey, leafDir, sans)
+		if err != nil {
+			log.Printf("[ws] fleet TLS: %v", err)
+			stop()
+			return
+		}
+		addr := w.TLSAddr
+		if addr == "" {
+			addr = ":443"
+		}
+		srv := &http.Server{Addr: addr, Handler: handler, TLSConfig: tlsCfg}
+		go func() { <-ctx.Done(); srv.Close() }()
+		if addr == ":443" {
+			redir := &http.Server{Addr: ":80", Handler: http.HandlerFunc(
+				func(rw http.ResponseWriter, r *http.Request) {
+					host := r.Host
+					if i := strings.LastIndexByte(host, ':'); i >= 0 && !strings.Contains(host[i:], "]") {
+						host = host[:i]
+					}
+					http.Redirect(rw, r, "https://"+host+r.URL.RequestURI(), http.StatusMovedPermanently)
+				})}
+			go func() { <-ctx.Done(); redir.Close() }()
+			go func() {
+				if err := redir.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Printf("[ws] http redirect: %v", err)
+				}
+			}()
+		}
+		log.Printf("[ws] serving https on %s (fleet CA; ui=%s)", addr, w.UIDir)
+		if err := srv.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+			log.Printf("[ws] %v", err)
+			stop()
+		}
+		return
+	}
+	srv := &http.Server{Addr: w.Addr, Handler: handler}
+	go func() { <-ctx.Done(); srv.Close() }()
+	log.Printf("[ws] serving http on %s (ui=%s) — /ws, /ws_mic", w.Addr, w.UIDir)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Printf("[ws] %v", err)
+		stop()
+	}
 }

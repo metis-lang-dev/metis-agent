@@ -30,6 +30,7 @@ import (
 	"github.com/metis-lang-dev/metis-agent/go/internal/stt"
 	"github.com/metis-lang-dev/metis-agent/go/internal/tts"
 	"github.com/metis-lang-dev/metis-agent/go/internal/vad"
+	"github.com/metis-lang-dev/metis-agent/go/internal/wire"
 )
 
 // Driver seams — small interfaces so e2e tests can fake every stage while
@@ -40,6 +41,23 @@ type Transcriber interface {
 
 type IntentGen interface {
 	TwoPass(systemPrompt, userText, gbnf string) (*llm.Result, error)
+}
+
+// Narrator is the optional single-pass narration of a typed event (the
+// "Narrate an event" row of DESIGN.md). An IntentGen without it gets the
+// template sentences of narrateTemplate.
+type Narrator interface {
+	Narrate(systemPrompt, event string) (string, error)
+}
+
+// Task is the host's answer to a command the harness emitted (HARNESS.md
+// §4): correlated by the id the wire backend assigned, delivered to the
+// dialog agent — never to Announce.
+type Task struct {
+	ID     string
+	Result string // done | failed | refused | expired
+	Detail string
+	At     time.Time
 }
 
 // OwnerVerifier gates utterances on the imprinted owner's voice
@@ -79,6 +97,10 @@ type Config struct {
 	//   "off" | "wake" (imprinting: only the owner can wake it) | "always".
 	// Barge-in confirmation ALWAYS verifies when a verifier is present.
 	OwnerGate string
+
+	// AnnounceMaxAge: a deferred announcement (or task narration) older than
+	// this is dropped instead of spoken late (default 30 s).
+	AnnounceMaxAge time.Duration
 }
 
 type Engine struct {
@@ -90,6 +112,9 @@ type Engine struct {
 	Turn  *fsm.Model
 	Attn  *attention.Attention
 	Owner OwnerVerifier // nil → open to everyone
+	// Tasks holds the commands awaiting a task event (set with a wire
+	// Dispatcher); nil → every task event is unknown and dropped.
+	Tasks *wire.Pending
 	// Events, when set, receives engine happenings for external consumers
 	// (the nina relay → /nina/intent, /nina/dialog_state):
 	//   kind "intent":  payload = *llm.Result (after a completed turn)
@@ -102,13 +127,25 @@ type Engine struct {
 	speakEndT time.Time
 	speaking  bool
 
-	announceCh chan string // system-initiated narration (warnings, status)
-	pending    []string    // announcements deferred while the floor is busy
+	announceCh chan string    // system-initiated narration (warnings, status)
+	pending    []announcement // deferred while the floor is busy / asleep
+	taskCh     chan Task      // host outcomes for emitted commands
+	chatCh     chan string    // typed utterances (say_text)
+	chatQueue  []string       // typed utterances waiting for the floor
+	kick       chan struct{}  // wakes the loop when something outside it changed (attention)
+}
+
+type announcement struct {
+	text string
+	at   time.Time
 }
 
 func New(cfg Config, l IntentGen, s Transcriber, t tts.Speaker) *Engine {
 	if cfg.BargeIn == "" {
 		cfg.BargeIn = "off"
+	}
+	if cfg.AnnounceMaxAge <= 0 {
+		cfg.AnnounceMaxAge = 30 * time.Second
 	}
 	return &Engine{
 		cfg: cfg, LLM: l, STT: s, TTS: t,
@@ -119,6 +156,9 @@ func New(cfg Config, l IntentGen, s Transcriber, t tts.Speaker) *Engine {
 		speakReq:   make(chan string),
 		ttsDone:    make(chan bool),
 		announceCh: make(chan string, 8),
+		taskCh:     make(chan Task, 8),
+		chatCh:     make(chan string, 8),
+		kick:       make(chan struct{}, 1),
 	}
 }
 
@@ -158,13 +198,44 @@ func (e *Engine) Run(ctx context.Context, vadEvents <-chan vad.Event, textIn <-c
 	for {
 		e.tryAnnounce() // deferred announcements go out once the floor frees
 
+		// while announcements wait, wake up when the oldest ages out so it is
+		// dropped (or spoken) without any other event; idle otherwise
+		var ageC <-chan time.Time
+		if len(e.pending) > 0 {
+			d := time.Until(e.pending[0].at.Add(e.cfg.AnnounceMaxAge)) + time.Millisecond
+			if d < time.Millisecond {
+				d = time.Millisecond
+			}
+			timer := time.NewTimer(d)
+			ageC = timer.C
+			defer timer.Stop()
+		}
+
 		select {
 		case <-ctx.Done():
 			return
 
+		case <-ageC:
+			// re-run tryAnnounce at the top of the loop
+
+		case <-e.kick:
+			// attention changed outside the loop: re-evaluate the queue
+
 		case text := <-e.announceCh:
-			e.pending = append(e.pending, text)
+			e.pending = append(e.pending, announcement{text, time.Now()})
 			// dispatched by tryAnnounce at the top of the loop
+
+		case t := <-e.taskCh:
+			e.onTask(t)
+
+		case text := <-e.chatCh:
+			// chat is a finished utterance: it takes the floor like a
+			// transcript does; while the system speaks it waits its turn
+			if e.speaking {
+				e.chatQueue = append(e.chatQueue, text)
+			} else {
+				e.userTurn(text)
+			}
 
 		case ev, open := <-vadEvents:
 			if !open {
@@ -183,6 +254,11 @@ func (e *Engine) Run(ctx context.Context, vadEvents <-chan vad.Event, textIn <-c
 			// Response finished (or was cut): release the floor.
 			_ = e.Turn.SystemAction('R')
 			e.event("dialog", "LISTENING")
+			if len(e.chatQueue) > 0 {
+				text := e.chatQueue[0]
+				e.chatQueue = e.chatQueue[1:]
+				e.userTurn(text)
+			}
 
 		case text, open := <-textIn:
 			if !open {
@@ -208,12 +284,134 @@ func (e *Engine) Run(ctx context.Context, vadEvents <-chan vad.Event, textIn <-c
 					return
 				}
 			}
-			// Simulate the user turn (grab + release).
-			_ = e.Turn.UserAction('G')
-			_ = e.Turn.UserAction('R')
-			e.processUtterance(text, nil)
+			e.userTurn(text)
 		}
 	}
+}
+
+// userTurn runs a text utterance (headless stdin, chat) through the floor
+// exactly like a transcript: grab + release, then the attention + intent
+// path. The transcript event lets the UI show what was typed.
+func (e *Engine) userTurn(text string) {
+	_ = e.Turn.UserAction('G')
+	_ = e.Turn.UserAction('R')
+	e.event("transcript", text)
+	e.processUtterance(text, nil)
+}
+
+// SayText feeds a typed utterance (the UI's chat input, HARNESS.md §5):
+// skips VAD/ASR, goes through the same floor grab/release as a transcript.
+// Safe to call from any goroutine.
+func (e *Engine) SayText(text string) {
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return
+	}
+	select {
+	case e.chatCh <- text:
+	default:
+		log.Printf("[chat] queue full, dropped %q", text)
+	}
+}
+
+// TaskEvent delivers a host outcome for an emitted command (HARNESS.md §4).
+// Safe to call from any goroutine; the orchestrator decides whether and
+// what to speak.
+func (e *Engine) TaskEvent(t Task) {
+	if t.At.IsZero() {
+		t.At = time.Now()
+	}
+	select {
+	case e.taskCh <- t:
+	default:
+		log.Printf("[task] queue full, dropped %s %s", t.ID, t.Result)
+	}
+}
+
+// onTask is the dialog agent's side of the two-beat acknowledgment: the
+// intent turn said what the harness knew ("on it"); the outcome is this
+// separate system turn. It is spoken only when the command is still
+// pending (not expired, not already answered), the room is awake, and the
+// floor frees before the narration ages out — through say, like every
+// other system utterance.
+func (e *Engine) onTask(t Task) {
+	if e.Tasks == nil {
+		log.Printf("[task] %s %s: no pending-command store — dropped", t.ID, t.Result)
+		return
+	}
+	it, ok := e.Tasks.Take(t.ID)
+	if !ok {
+		log.Printf("[task] %s %s: unknown or expired command — not narrated", t.ID, t.Result)
+		return
+	}
+	if !e.Attn.Awake() {
+		log.Printf("[task] %s %s (%s): asleep — not narrated", t.ID, t.Result, it.Name)
+		return
+	}
+	text := e.narrate(it, t)
+	if text == "" {
+		return
+	}
+	log.Printf("[task] %s %s (%s) → %q", t.ID, t.Result, it.Name, text)
+	e.pending = append(e.pending, announcement{text, t.At})
+}
+
+// narrate turns the typed event into one sentence: the LLM when it can
+// (single pass, the same prefix), the template otherwise or when the model
+// produced nothing speakable.
+func (e *Engine) narrate(it wire.Item, t Task) string {
+	fallback := narrateTemplate(it, t)
+	n, ok := e.LLM.(Narrator)
+	if !ok {
+		return fallback
+	}
+	ev := fmt.Sprintf("Task feedback: the command %s%s %s.", it.Name,
+		argsBrief(it.Args), t.Result)
+	if t.Detail != "" {
+		ev += " Detail: " + t.Detail + "."
+	}
+	out, err := n.Narrate(e.cfg.SystemPrompt, ev)
+	if err != nil {
+		log.Printf("[task] narration failed: %v", err)
+		return fallback
+	}
+	if s := sanitizeAck(out); s != "" && s != "Okay." {
+		return s
+	}
+	return fallback
+}
+
+func narrateTemplate(it wire.Item, t Task) string {
+	what := strings.ToLower(strings.ReplaceAll(it.Name, "_", " "))
+	detail := strings.TrimSpace(t.Detail)
+	switch t.Result {
+	case "done":
+		return "Done."
+	case "failed":
+		if detail != "" {
+			return "That didn't work: " + detail + "."
+		}
+		return "That didn't work."
+	case "refused":
+		if detail != "" {
+			return "I can't do that: " + detail + "."
+		}
+		return "I can't do that right now."
+	case "expired":
+		return "The " + what + " timed out."
+	}
+	return ""
+}
+
+func argsBrief(args map[string]any) string {
+	if len(args) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(args))
+	for k, v := range args {
+		parts = append(parts, fmt.Sprintf("%s=%v", k, v))
+	}
+	return " (" + strings.Join(parts, ", ") + ")"
 }
 
 func (e *Engine) onVadEvent(ev vad.Event) {
@@ -435,7 +633,7 @@ func (e *Engine) say(text string) {
 // parrots the intent JSON instead of a natural sentence — never speak that
 // (the mic would hear it and re-command). Placeholders likewise.
 func sanitizeAck(text string) string {
-	t := strings.TrimSpace(strings.Trim(strings.TrimSpace(text), `"`))
+	t := strings.TrimSpace(strings.Trim(strings.TrimSpace(text), "\"\u201c\u201d\u2018\u2019'"))
 	if t == "" {
 		return ""
 	}
@@ -459,10 +657,26 @@ func (e *Engine) Announce(text string) {
 }
 
 // tryAnnounce dispatches the oldest pending announcement when the floor is
-// free (FREEu/FREEs) and nothing is playing.
+// free (FREEu/FREEs), nothing is playing, and the room is awake. Entries
+// older than AnnounceMaxAge are dropped: a warning from half a minute ago
+// is stale, and nothing is spoken while ASLEEP.
 func (e *Engine) tryAnnounce() {
 	if len(e.pending) == 0 || e.speaking {
 		return
+	}
+	cut := time.Now().Add(-e.cfg.AnnounceMaxAge)
+	kept := e.pending[:0]
+	for _, a := range e.pending {
+		if a.at.Before(cut) {
+			log.Printf("[announce] dropped stale %q (%.0fs old)", a.text,
+				time.Since(a.at).Seconds())
+			continue
+		}
+		kept = append(kept, a)
+	}
+	e.pending = kept
+	if len(e.pending) == 0 || !e.Attn.Awake() {
+		return // asleep: hold them; they age out if the room stays asleep
 	}
 	if e.Turn.State != fsm.FreeU && e.Turn.State != fsm.FreeS {
 		return // user holds (or contests) the floor — never cut them
@@ -470,7 +684,7 @@ func (e *Engine) tryAnnounce() {
 	if err := e.Turn.SystemAction('G'); err != nil {
 		return
 	}
-	text := e.pending[0]
+	text := e.pending[0].text
 	e.pending = e.pending[1:]
 	log.Printf("[announce] %q", text)
 	e.say(text)
@@ -482,9 +696,10 @@ func (e *Engine) event(kind string, payload any) {
 	}
 }
 
-// ForceAttention is the mic-possession hook (viewer bone grabbed/released):
-// wake or sleep without a wake word — ambient-noise sessions where "nina"
-// never survives STT. No-op when attention is disabled or already there.
+// ForceAttention is the UI's attention switch and the mic-possession hook
+// (mic grabbed/released): wake or sleep without a wake word — ambient-noise
+// sessions where "nina" never survives STT. No-op when attention is
+// disabled or already there.
 func (e *Engine) ForceAttention(awake bool) {
 	if !e.Attn.Force(awake) {
 		return
@@ -493,6 +708,10 @@ func (e *Engine) ForceAttention(awake bool) {
 	if awake {
 		st = "AWAKE"
 	}
-	log.Printf("[attention] %s (forced by mic possession)", strings.ToLower(st))
+	log.Printf("[attention] %s (forced: UI switch or mic possession)", strings.ToLower(st))
 	e.event("dialog", st)
+	select {
+	case e.kick <- struct{}{}:
+	default:
+	}
 }

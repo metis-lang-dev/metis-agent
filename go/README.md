@@ -21,7 +21,8 @@ capture ──frames──▶ vad ──events──▶ orchestrator ──speak
 | `internal/attention`, `vad`, `audio`, `stt`, `tts`, `voiceid`, `aec` | senses (cgo: whisper.cpp, webrtcvad, RHVoice, sherpa-onnx, malgo) |
 | `internal/intent` | the dog intent struct and the dispatcher seams; `grammar/dog.gbnf` is its token-exact grammar |
 | `internal/llm` | the llama.cpp cgo shim: `TwoPass` (grammar JSON, then the spoken ack), `PrimePrefix` KV reuse, `seq_rm` rollback; chat template and end-of-turn token read from the model |
-| `internal/transport` | jsonl events (the websocket transport of HARNESS.md §6 follows) |
+| `internal/transport` | the two transports: `Jsonl` (stdout/stdin) and the ws `Server` (HARNESS.md §6: /ws events both ways, /ws_mic 20 ms frames in, TTS as binary frames out, the UI from `-ui-dir`, fleet-CA TLS) plus `WsSpeaker`, the tts.Speaker that blocks on the browser's `tts_done` |
+| `internal/wire` | the Dispatcher's host-facing backend: robot seams become `command{id,name,args}` events, remembered as pending until the host's `task{id,result,detail}` comes back (HARNESS.md §4) |
 
 ## Build
 
@@ -45,8 +46,32 @@ from the vocabulary.
 
 ```bash
 ./bin/fsttm-go -config config.playground.yaml -headless    # type turns, events on stdout
+./bin/fsttm-go -config config.ws.yaml -ui-dir ../../metis-loop/apps/nina-web   # browser mic + speaker
+./bin/wsprobe -say "stand up" -task refused:"not armed"    # drive /ws from the shell
+./bin/wsprobe -wav utterance-16k.wav                       # stream a WAV as the remote mic
 ./bin/llmbench -model <gguf> -ngl 99 -corpus grammar/dog-corpus.tsv   # GPU; -ngl 0 = CPU
 ```
+
+### The ws wire (`config.ws.yaml`)
+
+Text frames are JSON with `ev`; names are the jsonl vocabulary.
+
+| direction | message |
+|---|---|
+| → browser | `state{dialog}` · `transcript{text,t}` · `reply{text,t}` · `intent{intent,voice,t}` |
+| → browser | `command{id,name,args}` — what the host would execute; answer it with `task` |
+| → browser | `tts{id,rate,channels,format,samples}` + binary s16le chunks + `tts_end{id}` · `tts_stop{id}` |
+| → browser | `role{master,mic_tok}` · `role{claimed}` · `denied{what}` |
+| → server | `say_text{text}` (chat: a finished utterance through the floor) · `attention{AWAKE\|ASLEEP}` |
+| → server | `task{id,result,detail}` with result `done\|failed\|refused\|expired` · `say{text}` (external announce) |
+| → server | `tts_done{id,played_ms}` when playback truly ends · `grab_master` / `release_master` (mic token) |
+| `/ws_mic?tok=` | binary 640-byte frames (20 ms s16le 16 kHz); only the current token streams |
+
+Task feedback is narrated by the dialog agent as its own system turn (two
+beats: "Okay, standing up." then "I cannot stand up."), only while awake,
+only for a command still pending, only on a free floor, and dropped when
+older than `announce_max_age_s`. A mic grab wakes the engine; a release
+puts it to sleep.
 
 `grammar/dog-corpus.tsv` is the regression baseline (HARNESS.md §7): the
 prompt's examples plus held-out paraphrases, scored by intent class.

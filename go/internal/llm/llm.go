@@ -422,7 +422,7 @@ func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
 	defer C.llama_sampler_free(chain1)
 
 	t0 := time.Now()
-	jsonToks, err := l.generate(chain1, 80, false)
+	jsonToks, err := l.generate(chain1, 80, "")
 	if err != nil {
 		return nil, err
 	}
@@ -442,7 +442,7 @@ func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
 
 	t0 = time.Now()
 	// 30 cut acks mid-sentence ("...here to help you! How can I")
-	ttsToks, err := l.generate(chain2, l.pass2.MaxTokens, true)
+	ttsToks, err := l.generate(chain2, l.pass2.MaxTokens, "\n")
 	if err != nil {
 		return nil, err
 	}
@@ -466,10 +466,49 @@ func (l *LLM) clean(text string) string {
 	return strings.TrimSpace(strings.TrimSuffix(t, "<|end|>"))
 }
 
+// Narrate is the single-pass narration of a typed event (HARNESS.md §4,
+// DESIGN.md "Narrate an event"): the same cached prefix, the event as the
+// user turn, then only the spoken-response pass — no intent JSON. One
+// sentence, pass-2 sampling, stops at the first newline.
+func (l *LLM) Narrate(systemPrompt, event string) (string, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	nPrefix, err := l.primeLocked(systemPrompt)
+	if err != nil {
+		return "", err
+	}
+	mem := C.llama_get_memory(l.ctx)
+	C.llama_memory_seq_rm(mem, 0, C.llama_pos(nPrefix), -1)
+	l.nPast = nPrefix
+	if err := l.decodeTokens(l.tokenize(l.tail(event), false)); err != nil {
+		return "", err
+	}
+	if err := l.decodeTokens(l.tokenize("Spoken response:", false)); err != nil {
+		return "", err
+	}
+	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
+	C.llama_sampler_chain_add(chain, C.llama_sampler_init_top_k(C.int32_t(l.pass2.TopK)))
+	C.llama_sampler_chain_add(chain, C.llama_sampler_init_temp(C.float(l.pass2.Temp)))
+	C.llama_sampler_chain_add(chain, C.llama_sampler_init_dist(C.LLAMA_DEFAULT_SEED))
+	defer C.llama_sampler_free(chain)
+	// the few-shot prompt teaches `"utterance" → {json}`; a narration that
+	// starts imitating it is cut at the arrow or the brace
+	toks, err := l.generate(chain, l.pass2.MaxTokens, "\n→{")
+	if err != nil {
+		return "", err
+	}
+	voice := l.detokenize(toks)
+	if i := strings.IndexAny(voice, "\n→{"); i >= 0 {
+		voice = voice[:i]
+	}
+	return strings.TrimSpace(strings.Trim(l.clean(voice), `"`)), nil
+}
+
 // generate samples tokens with the given chain until EOG / the model's
-// end-of-turn / maxTokens (/ a newline in the decoded text when stopOnNewline).
+// end-of-turn / maxTokens (/ any rune of stopChars shows up in the decoded
+// text; "" = none).
 func (l *LLM) generate(chain *C.struct_llama_sampler, maxTokens int,
-	stopOnNewline bool) ([]C.llama_token, error) {
+	stopChars string) ([]C.llama_token, error) {
 	var out []C.llama_token
 	for len(out) < maxTokens {
 		tok := C.llama_sampler_sample(chain, l.ctx, -1) // applies + accepts
@@ -477,7 +516,7 @@ func (l *LLM) generate(chain *C.struct_llama_sampler, maxTokens int,
 			break
 		}
 		out = append(out, tok)
-		if stopOnNewline && strings.Contains(l.detokenize(out), "\n") {
+		if stopChars != "" && strings.ContainsAny(l.detokenize(out), stopChars) {
 			break
 		}
 		if rc := C.decode_one(l.ctx, tok); rc != 0 {

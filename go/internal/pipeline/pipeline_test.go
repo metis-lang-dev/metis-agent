@@ -6,6 +6,7 @@ func TestSanitizeAck(t *testing.T) {
 	cases := map[string]string{
 		`Going to the kitchen.`:          "Going to the kitchen.",
 		`"Okay, I will follow you."`:     "Okay, I will follow you.",
+		"\u201cOkay.\u201d":              "Okay.", // gemma's curly quotes
 		`{"intent":"FIND","target":...}`: "Okay.", // JSON parrot → canned ack
 		`It's [current time].`:           "Okay.", // placeholder
 		`  `:                             "",

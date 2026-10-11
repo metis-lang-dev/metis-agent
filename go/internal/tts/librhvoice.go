@@ -288,6 +288,63 @@ func (e *LibEngine) Speak(ctx context.Context, text string) (SpeakResult, error)
 	}, nil
 }
 
+// Synthesize renders text to PCM without playing it (Synthesizer). The
+// same utterance sink and the same Cancel: a cut mid-synthesis returns the
+// part rendered so far with Cancelled set.
+func (e *LibEngine) Synthesize(ctx context.Context, text string) (Audio, error) {
+	if text == "" {
+		return Audio{}, nil
+	}
+	u := &utterance{
+		rateReady: make(chan struct{}),
+		cancel:    make(chan struct{}),
+	}
+	e.mu.Lock()
+	e.cur = u
+	e.mu.Unlock()
+	defer func() {
+		e.mu.Lock()
+		if e.cur == u {
+			e.cur = nil
+		}
+		e.mu.Unlock()
+	}()
+	handle := cgo.NewHandle(u)
+	synthDone := make(chan int, 1)
+	go func() {
+		cText, cProf := C.CString(text), C.CString(e.cfg.Voice)
+		rc := C.fsttm_speak(e.engine, cText, cProf,
+			C.double(e.cfg.Rate), C.double(e.cfg.Volume), C.uintptr_t(handle))
+		C.free(unsafe.Pointer(cText))
+		C.free(unsafe.Pointer(cProf))
+		handle.Delete()
+		synthDone <- int(rc)
+	}()
+	select {
+	case <-synthDone:
+	case <-ctx.Done():
+		select {
+		case <-u.cancel:
+		default:
+			close(u.cancel)
+		}
+		<-synthDone
+		return Audio{}, ctx.Err()
+	}
+	u.mu.Lock()
+	a := Audio{PCM: u.samples, Rate: u.sampleRate}
+	u.mu.Unlock()
+	select {
+	case <-u.cancel:
+		a.Cancelled = true
+	default:
+	}
+	if a.Rate == 0 && !a.Cancelled {
+		return Audio{}, errors.New("tts: RHVoice produced no audio")
+	}
+	return a, nil
+}
+
 // Cancel cuts the current utterance: synthesis aborts at the next callback,
 // playback stops within one device period. No-op when silent.
 func (e *LibEngine) Cancel() {

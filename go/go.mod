@@ -5,6 +5,7 @@ go 1.24.0
 require (
 	github.com/gen2brain/malgo v0.11.26
 	github.com/ggerganov/whisper.cpp/bindings/go v0.0.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/maxhawkins/go-webrtcvad v0.0.0-20210121163624-be60036f3083
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -23,4 +24,4 @@ require (
 	github.com/k2-fsa/sherpa-onnx-go-windows v1.13.6 // indirect
 )
 
-replace github.com/ggerganov/whisper.cpp/bindings/go => /home/axadmin/archive/vox/whisper.cpp/bindings/go
+replace github.com/ggerganov/whisper.cpp/bindings/go => /home/axadmin/repo/vox/whisper.cpp/bindings/go

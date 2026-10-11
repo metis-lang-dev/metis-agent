@@ -7,6 +7,7 @@ package llm
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -94,5 +95,30 @@ func TestExplicitTemplateOverrideAndUnknown(t *testing.T) {
 	if _, err := Load(Config{ModelPath: gemmaPath, NCtx: 512, NBatch: 512,
 		Template: "no-such-template"}); err == nil {
 		t.Error("unknown template must fail at Load")
+	}
+}
+
+func TestNarrateProducesASentence(t *testing.T) {
+	if _, err := os.Stat(gemmaPath); err != nil {
+		t.Skip("model not present")
+	}
+	prompt, err := os.ReadFile("../../grammar/dog-prompt.txt")
+	if err != nil {
+		t.Skip("prompt not present")
+	}
+	l, err := Load(Config{ModelPath: gemmaPath, NCtx: 4096, NBatch: 512, NThreads: 6,
+		NGpuLayers: 99})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer l.Close()
+	out, err := l.Narrate(string(prompt),
+		"Task feedback: the command LOCAL_ACTION (action=STAND_UP) refused. Detail: the robot is not armed.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("narration: %q", out)
+	if out == "" || len(out) > 200 || strings.ContainsAny(out, "{}[]") {
+		t.Errorf("not a speakable sentence: %q", out)
 	}
 }
