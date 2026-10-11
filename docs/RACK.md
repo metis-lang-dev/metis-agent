@@ -25,9 +25,16 @@ One record per piece, append-only per domain:
 
 - `kind=said` is what the model spoke about this domain (the heard
   text, as fsttm-web keeps it); everything else is a rendered fact in
-  plain words (CML §7: per-kind templates, atoms → provenance words).
+  plain words (CML §7: per-kind templates, atoms → provenance words),
+  WITH counts and consequences: "the cook served a soup (served now 2)",
+  "observe-only: it takes no new orders" (E6b; finding 3).
 - A domain's tape = its records in seq order. The mirror line is not
-  stored; it is rendered from the runtime on demand (`ctx --mirror`).
+  stored; it is rendered from the runtime on demand (`ctx --mirror`) and
+  carries, besides stage/status/surprise/P[#query], the task's progress
+  counts (served N of M) and the last event in plain words — one line,
+  still (step-1 finding 1: an `ask` must answer "what is it doing").
+- `t` is ONE clock across runtimes: the harness's arrival time (monotonic
+  at the adapter); `beat` stays per domain (finding 4).
 - Compaction per domain at that domain's quiescence (CML §3): drop
   events older than the last quiescence, keep surprises and their
   resolutions, keep `said` only for the last order.
@@ -44,7 +51,10 @@ One record per piece, append-only per domain:
    - `event(path)` → that path's records since its last quiescence;
    - `surprise(path)` → the raising path's expanded path: its own
      records since the last quiescence + the mirror lines of ancestors
-     and siblings + their cards (the explanation candidates);
+     and siblings + their cards (the explanation candidates) + the
+     siblings' EVENT records since their last quiescence (one window):
+     the sibling's `partner_load` is a fact on its tape, not a
+     hypothesis on the card — that is the rack's value (finding 2);
    - `quiescence(path)` with a pending goal → the mirror lines of the
      whole active set + each set member's last `said`;
    - `ask(question)` (the person asks) → every active path's mirror line
