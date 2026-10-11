@@ -1,0 +1,463 @@
+{
+ "about": "metis-agent fsm_test.go + paper_test.go as data: both FSTTMs (Go, fsttm-web/web/fsttm.js) run these. 'at' is reached from boot by setup[at] (legal steps only).",
+ "setup": {
+  "FREEu": [],
+  "USER": [
+   [
+    "user",
+    "G"
+   ]
+  ],
+  "SYSTEM": [
+   [
+    "system",
+    "G"
+   ]
+  ],
+  "FREEs": [
+   [
+    "system",
+    "G"
+   ],
+   [
+    "system",
+    "R"
+   ]
+  ],
+  "BOTHs": [
+   [
+    "system",
+    "G"
+   ],
+   [
+    "user",
+    "G"
+   ]
+  ],
+  "BOTHu": [
+   [
+    "user",
+    "G"
+   ],
+   [
+    "system",
+    "G"
+   ]
+  ]
+ },
+ "transitions": [
+  {
+   "name": "1 SYSTEM -(R,W)-> FREEs (release at prompt end)",
+   "at": "SYSTEM",
+   "actor": "system",
+   "action": "R",
+   "want": "FREEs"
+  },
+  {
+   "name": "2 FREEs -(W,G)-> USER (gap transition)",
+   "at": "FREEs",
+   "actor": "user",
+   "action": "G",
+   "want": "USER"
+  },
+  {
+   "name": "3 FREEs -(G,W)-> SYSTEM (time-out re-establish)",
+   "at": "FREEs",
+   "actor": "system",
+   "action": "G",
+   "want": "SYSTEM"
+  },
+  {
+   "name": "4 USER -(W,R)-> FREEu (user releases)",
+   "at": "USER",
+   "actor": "user",
+   "action": "R",
+   "want": "FREEu"
+  },
+  {
+   "name": "5 FREEu -(G,W)-> SYSTEM (gap transition)",
+   "at": "FREEu",
+   "actor": "system",
+   "action": "G",
+   "want": "SYSTEM"
+  },
+  {
+   "name": "6 FREEu -(W,G)-> USER (user resumes)",
+   "at": "FREEu",
+   "actor": "user",
+   "action": "G",
+   "want": "USER"
+  },
+  {
+   "name": "7 SYSTEM -(K,G)-> BOTHs (barge-in attempt)",
+   "at": "SYSTEM",
+   "actor": "user",
+   "action": "G",
+   "want": "BOTHs"
+  },
+  {
+   "name": "8 BOTHs -(R,K)-> USER (successful barge-in)",
+   "at": "BOTHs",
+   "actor": "system",
+   "action": "R",
+   "want": "USER"
+  },
+  {
+   "name": "9 BOTHs -(K,R)-> SYSTEM (failed user interruption)",
+   "at": "BOTHs",
+   "actor": "user",
+   "action": "R",
+   "want": "SYSTEM"
+  },
+  {
+   "name": "10 USER -(G,K)-> BOTHu (system cut-in)",
+   "at": "USER",
+   "actor": "system",
+   "action": "G",
+   "want": "BOTHu"
+  },
+  {
+   "name": "11 BOTHu -(K,R)-> SYSTEM (successful cut-in)",
+   "at": "BOTHu",
+   "actor": "user",
+   "action": "R",
+   "want": "SYSTEM"
+  },
+  {
+   "name": "12 BOTHu -(R,K)-> USER (failed system interruption)",
+   "at": "BOTHu",
+   "actor": "system",
+   "action": "R",
+   "want": "USER"
+  }
+ ],
+ "illegal": [
+  {
+   "name": "SYSTEM cannot spawn BOTHu (system K + user K illegal)",
+   "at": "SYSTEM",
+   "actor": "system",
+   "action": "K"
+  },
+  {
+   "name": "USER: system cannot release a floor it doesn't hold",
+   "at": "USER",
+   "actor": "system",
+   "action": "R"
+  },
+  {
+   "name": "FREEs: user release is meaningless",
+   "at": "FREEs",
+   "actor": "user",
+   "action": "R"
+  },
+  {
+   "name": "FREEu: user release is meaningless",
+   "at": "FREEu",
+   "actor": "user",
+   "action": "R"
+  },
+  {
+   "name": "FREEs: system keep without floor",
+   "at": "FREEs",
+   "actor": "system",
+   "action": "K"
+  },
+  {
+   "name": "USER: user W self-transition only via G",
+   "at": "USER",
+   "actor": "user",
+   "action": "K"
+  },
+  {
+   "name": "BOTHs: user grab again",
+   "at": "BOTHs",
+   "actor": "user",
+   "action": "G"
+  },
+  {
+   "name": "BOTHu: system grab again",
+   "at": "BOTHu",
+   "actor": "system",
+   "action": "G"
+  },
+  {
+   "name": "boot: system release without floor must fail",
+   "at": "FREEu",
+   "actor": "system",
+   "action": "R"
+  }
+ ],
+ "sequences": [
+  {
+   "name": "normal turn cycle from boot",
+   "at": "FREEu",
+   "steps": [
+    [
+     "user",
+     "G",
+     "USER"
+    ],
+    [
+     "user",
+     "R",
+     "FREEu"
+    ],
+    [
+     "system",
+     "G",
+     "SYSTEM"
+    ],
+    [
+     "system",
+     "R",
+     "FREEs"
+    ],
+    [
+     "user",
+     "G",
+     "USER"
+    ]
+   ]
+  },
+  {
+   "name": "barge-in from a boot announcement",
+   "at": "FREEu",
+   "steps": [
+    [
+     "system",
+     "G",
+     "SYSTEM"
+    ],
+    [
+     "user",
+     "G",
+     "BOTHs"
+    ],
+    [
+     "system",
+     "R",
+     "USER"
+    ]
+   ]
+  },
+  {
+   "name": "system initiates narration at boot",
+   "at": "FREEu",
+   "steps": [
+    [
+     "system",
+     "G",
+     "SYSTEM"
+    ],
+    [
+     "system",
+     "R",
+     "FREEs"
+    ],
+    [
+     "user",
+     "G",
+     "USER"
+    ]
+   ]
+  },
+  {
+   "name": "gap transition system→user",
+   "at": "SYSTEM",
+   "steps": [
+    [
+     "system",
+     "R",
+     "FREEs"
+    ],
+    [
+     "user",
+     "G",
+     "USER"
+    ]
+   ]
+  },
+  {
+   "name": "gap transition user→system",
+   "at": "USER",
+   "steps": [
+    [
+     "user",
+     "R",
+     "FREEu"
+    ],
+    [
+     "system",
+     "G",
+     "SYSTEM"
+    ]
+   ]
+  },
+  {
+   "name": "overlap: successful user barge-in",
+   "at": "SYSTEM",
+   "steps": [
+    [
+     "user",
+     "G",
+     "BOTHs"
+    ],
+    [
+     "system",
+     "R",
+     "USER"
+    ]
+   ]
+  },
+  {
+   "name": "overlap: successful system cut-in",
+   "at": "USER",
+   "steps": [
+    [
+     "system",
+     "G",
+     "BOTHu"
+    ],
+    [
+     "user",
+     "R",
+     "SYSTEM"
+    ]
+   ]
+  },
+  {
+   "name": "failed system interruption withdraws",
+   "at": "USER",
+   "steps": [
+    [
+     "system",
+     "G",
+     "BOTHu"
+    ],
+    [
+     "system",
+     "R",
+     "USER"
+    ]
+   ]
+  },
+  {
+   "name": "time-out: system re-establishes",
+   "at": "SYSTEM",
+   "steps": [
+    [
+     "system",
+     "R",
+     "FREEs"
+    ],
+    [
+     "system",
+     "G",
+     "SYSTEM"
+    ]
+   ]
+  }
+ ],
+ "costs": [
+  {
+   "at": "SYSTEM",
+   "has": [
+    "K",
+    "R"
+   ],
+   "lacks": [
+    "G"
+   ]
+  },
+  {
+   "at": "BOTHs",
+   "has": [
+    "K",
+    "R"
+   ],
+   "lacks": [
+    "G"
+   ]
+  },
+  {
+   "at": "BOTHu",
+   "has": [
+    "K",
+    "R"
+   ],
+   "lacks": [
+    "G"
+   ]
+  },
+  {
+   "at": "USER",
+   "has": [
+    "W",
+    "G"
+   ],
+   "lacks": [
+    "K"
+   ]
+  },
+  {
+   "at": "FREEu",
+   "has": [
+    "W",
+    "G"
+   ],
+   "lacks": [
+    "K"
+   ]
+  },
+  {
+   "at": "FREEs",
+   "has": [
+    "W",
+    "G"
+   ],
+   "lacks": [
+    "K"
+   ]
+  }
+ ],
+ "cost_order": [
+  {
+   "at": "USER",
+   "greater": "G",
+   "than": "W",
+   "why": "§4.1: in USER grabbing costs more than waiting (cut-in penalty)"
+  }
+ ],
+ "holds": [
+  {
+   "at": "SYSTEM",
+   "system": true,
+   "user": false
+  },
+  {
+   "at": "BOTHs",
+   "system": true,
+   "user": false
+  },
+  {
+   "at": "BOTHu",
+   "system": true,
+   "user": false
+  },
+  {
+   "at": "USER",
+   "system": false,
+   "user": true
+  },
+  {
+   "at": "FREEu",
+   "system": false,
+   "user": true
+  },
+  {
+   "at": "FREEs",
+   "system": false,
+   "user": true
+  }
+ ]
+}

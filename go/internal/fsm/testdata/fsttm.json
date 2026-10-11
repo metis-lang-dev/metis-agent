@@ -1,0 +1,112 @@
+{
+ "about": "The N09-1071 finite-state turn-taking model as metis-agent go/internal/fsm has it: six floor states, the 14 transitions keyed by the (system,user) action pair, the action remap, and the §3.2 cost constants. Canonical here; fsttm-web/web/fsttm.json is a verbatim copy and TestTableIsTheJSON keeps fsm.go equal to it.",
+ "states": [
+  "SYSTEM",
+  "BOTHs",
+  "BOTHu",
+  "USER",
+  "FREEu",
+  "FREEs"
+ ],
+ "boot": "FREEu",
+ "system_holds": [
+  "SYSTEM",
+  "BOTHs",
+  "BOTHu"
+ ],
+ "user_holds": [
+  "USER",
+  "FREEs",
+  "FREEu"
+ ],
+ "transitions": [
+  {
+   "event": "R_W",
+   "src": "SYSTEM",
+   "dst": "FREEs"
+  },
+  {
+   "event": "G_W",
+   "src": "FREEs",
+   "dst": "SYSTEM"
+  },
+  {
+   "event": "K_G",
+   "src": "SYSTEM",
+   "dst": "BOTHs"
+  },
+  {
+   "event": "K_R",
+   "src": "BOTHs",
+   "dst": "SYSTEM"
+  },
+  {
+   "event": "K_R",
+   "src": "BOTHu",
+   "dst": "SYSTEM"
+  },
+  {
+   "event": "G_W",
+   "src": "FREEu",
+   "dst": "SYSTEM"
+  },
+  {
+   "event": "G_W",
+   "src": "SYSTEM",
+   "dst": "SYSTEM"
+  },
+  {
+   "event": "W_R",
+   "src": "USER",
+   "dst": "FREEu"
+  },
+  {
+   "event": "W_G",
+   "src": "FREEu",
+   "dst": "USER"
+  },
+  {
+   "event": "G_K",
+   "src": "USER",
+   "dst": "BOTHu"
+  },
+  {
+   "event": "R_K",
+   "src": "BOTHu",
+   "dst": "USER"
+  },
+  {
+   "event": "R_K",
+   "src": "BOTHs",
+   "dst": "USER"
+  },
+  {
+   "event": "W_G",
+   "src": "FREEs",
+   "dst": "USER"
+  },
+  {
+   "event": "W_G",
+   "src": "USER",
+   "dst": "USER"
+  }
+ ],
+ "remap": {
+  "R": "W",
+  "G": "K",
+  "K": "K",
+  "W": "W"
+ },
+ "cost": {
+  "c_s": 100.0,
+  "p_b": 0.1,
+  "c_u": 5000.0,
+  "c_g_pause": 1.0,
+  "p_f_pause": 0.38,
+  "c_g_speech": 500.0,
+  "p_f_speech": 0.2,
+  "c_g_free_s": 1000.0,
+  "p_f_free_s": 0.0,
+  "formula": "tau = ms in state; c_o = exp((tau+100)/1000). System holds: K = p_b*c_o, R = (1-p_b)*c_s. FREEu: W = p_f_pause*(c_g_pause*tau), G = (1-p_f_pause)*c_u. USER: W = p_f_speech*c_g_speech, G = (1-p_f_speech)*c_u. FREEs: W = p_f_free_s*c_g_free_s, G = (1-p_f_free_s)*c_u."
+ }
+}

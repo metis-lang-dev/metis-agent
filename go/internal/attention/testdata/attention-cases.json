@@ -1,0 +1,106 @@
+{
+ "about": "metis-agent attention_test.go as data (fsttm-web/web/attention.js runs them too).",
+ "match": {
+  "wake_words": [
+   "nina",
+   "hey nina",
+   "hello nina"
+  ],
+  "cases": [
+   {
+    "text": "Hello Nina!",
+    "wake": true,
+    "rem": ""
+   },
+   {
+    "text": "hey nina, go to the kitchen",
+    "wake": true,
+    "rem": "go to the kitchen"
+   },
+   {
+    "text": "Nina go to the kitchen",
+    "wake": true,
+    "rem": "go to the kitchen"
+   },
+   {
+    "text": "go to the kitchen nina",
+    "wake": true,
+    "rem": "go to the kitchen"
+   },
+   {
+    "text": "the banana is yellow",
+    "wake": false,
+    "rem": ""
+   },
+   {
+    "text": "go to the kitchen",
+    "wake": false,
+    "rem": ""
+   }
+  ]
+ },
+ "sessions": [
+  {
+   "name": "sleep requires the wake prefix",
+   "enabled": true,
+   "wake_words": [
+    "nina",
+    "hey nina"
+   ],
+   "sleep_phrases": null,
+   "start_asleep": false,
+   "steps": [
+    {
+     "text": "go to sleep",
+     "action": "command",
+     "state": "AWAKE"
+    },
+    {
+     "text": "nina, go to sleep",
+     "action": "sleep",
+     "state": "ASLEEP"
+    },
+    {
+     "text": "stand up",
+     "action": "ignore",
+     "state": "ASLEEP"
+    },
+    {
+     "text": "hey nina stand up",
+     "action": "wake",
+     "out": "stand up",
+     "state": "AWAKE"
+    }
+   ]
+  },
+  {
+   "name": "disabled is always command",
+   "enabled": false,
+   "wake_words": null,
+   "sleep_phrases": null,
+   "start_asleep": true,
+   "steps": [
+    {
+     "text": "anything at all",
+     "action": "command",
+     "state": "AWAKE"
+    }
+   ]
+  }
+ ],
+ "defaults": {
+  "wake_words": [
+   "nina",
+   "hey nina",
+   "hi nina",
+   "hello nina"
+  ],
+  "sleep_phrases": [
+   "go to sleep",
+   "voice off",
+   "stop listening",
+   "that s all",
+   "goodbye"
+  ]
+ }
+}
