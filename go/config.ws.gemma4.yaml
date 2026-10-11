@@ -1,0 +1,56 @@
+# config.ws.yaml with gemma4 E2B Q4 as the intent model — PREP, not the
+# default (the switch is the user's call). Same as opus's E1 row
+# "gemma-4-E2B-it-Q4_K_M" + p2ex: template gemma4, thinking off, the
+# pass-2 examples appended to the prompt (54/54 intents, 0 voice leaks,
+# ~2.1 GB resident on taycann). Run the step-4 wsprobe corpus on both:
+#   fsttm-go -config config.ws.yaml        -ui-dir ../../metis-loop/apps/nina-web
+#   fsttm-go -config config.ws.gemma4.yaml -ui-dir ../../metis-loop/apps/nina-web
+# The harness behind the web UI (HARNESS.md §5-§6): the browser captures the
+# mic (AudioWorklet → /ws_mic) and plays TTS (binary frames → tts_done); the
+# dialog, VAD, ASR, intent and synthesis stay here. Events + chat + task
+# feedback on /ws. Start with -ui-dir <metis-loop/apps/nina-web>.
+llm:
+    model: models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf
+    n_ctx: 4096
+    n_batch: 512
+    n_threads: 6
+    n_gpu_layers: 99
+    template: gemma4            # rendered by the adapter (TemplateGemma4); thinking stays off
+    pass2: {temperature: 0.4, top_k: 40, max_tokens: 50}
+stt:
+    model: /home/axadmin/archive/vox/FSTTM/models/ggml-base.en-q5_1.bin
+    language: en
+    parasites: ["thank you", "thanks", "thanks for watching", "you"]
+tts:
+    engine: ws                  # RHVoice renders here, the browser plays (tts_done releases the floor)
+    voice: SLT
+    rate: 0.3
+    volume: -0.1
+vad: {aggressiveness: 3, padding_ms: 700}
+aec: {enabled: false}           # local mics only; the browser's echoCancellation covers the remote mic
+voice_id: {gate: "off"}
+attention:                      # starts ASLEEP; wakes on the wake word, the UI's attention
+    enabled: true               # switch (attention{AWAKE|ASLEEP}) or a mic grab; sleeps on
+    wake_words: ["nina", "hey nina", "hello nina"]     # the sleep phrases, the switch or release
+    sleep_phrases: ["go to sleep", "voice off", "stop listening", "that's all"]
+transport: ws
+mic: remote                     # 640-byte frames from /ws_mic (local = this machine's mic)
+ws:
+    addr: ":8392"
+    ui_dir: ""                  # or -ui-dir on the command line
+    tts_margin_s: 2             # tts_done wait beyond the audio length
+    # tls_ca_cert / tls_ca_key / tls_addr / tls_leaf_dir / tls_san: https off localhost
+announce_max_age_s: 30
+task_max_age_s:                 # per command kind; task{progress} re-arms the window
+    default: 60
+    LOCAL_ACTION: 90
+    STOP: 30
+    CANCEL: 30
+    NAVIGATE: 600
+    EXPLORE: 600
+    FOLLOW: 600
+    GOTO_TAG: 600
+prompt:  grammar/dog-prompt.txt
+prompt_extra: [grammar/pass2-examples-gemma4.txt]   # gemma4 leaked JSON on CANCEL/UNKNOWN without them (E1)
+grammar: grammar/dog.gbnf
+barge_in: vad                   # the remote mic is echo-cancelled by Chrome: a VAD onset cuts TTS

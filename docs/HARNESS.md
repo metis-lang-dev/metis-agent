@@ -169,6 +169,59 @@ enters the pipeline as a finished utterance (skips VAD/ASR, goes
 through the same floor grab/release as a transcript), so chat and
 voice regress the same dialog code.
 
+Stop words (step-4 F12): a final transcript of at most three words
+carrying `stop_words` (default stop, halt, freeze, and "health", which
+is how whisper base.en hears a lone "halt") is a STOP **before and
+without** the LLM, logged `[intent] keyword stop`. Whisper is primed
+with the command vocabulary (`stt.initial_prompt`, default
+`stt.DefaultPrompt`, `""` = off). On the corpus it turns "Howl" into
+"Halt", "tab" into "tag" and "Pounds" into "Pounce", and degrades none
+of the 54 rows. On 2 s of pure digital silence it yields "You" (a
+listed parasite, and the VAD does not pass silence).
+
+### 5.1 Streaming ASR seam — design note, nothing built (step-4, from opus's E2)
+
+Today the VAD segmenter is the only turn-taking sense: `SpeechStart` →
+the FSM's user `G` (or a barge-in cut), `Utterance` (after 700 ms of
+hangover) → whisper on the whole segment (~14 ms on the GPU) → intent.
+A streaming ASR (Nemotron 3.5, 160 ms steps: first partial ~650–800 ms
+into the audio, final at the audio end + ~10 ms) adds a third signal,
+**partial{text, stable}**, between the two. The seam:
+
+- **Tentative grab on `SpeechStart`.** Unchanged in meaning, but the
+  grab becomes *tentative*: FSM `USER?` — the floor is held against
+  announcements and task narration, yet a TTS in progress is only
+  ducked, not cut (the `confirm` barge-in mode's behaviour, for every
+  mode). A segment that ends with no partial (cough, door, echo
+  residue) releases the tentative grab silently, without a turn.
+- **Commit on the first partial with words.** The first non-empty
+  partial confirms the user: the grab becomes the FSM's `USER`, a
+  ducked TTS is cut (`tts_stop`), and `dialog: LISTENING` goes to the
+  UI with the partial text (the chat pane can show it live). This is
+  where the echo guard and the owner gate apply, i.e. on the words,
+  not on the onset.
+- **Early STOP on a partial.** The keyword stop above runs on every
+  partial, not only on the final: a partial whose words hit
+  `stop_words` dispatches STOP at once (~0.7 s after onset instead of
+  onset + utterance + 700 ms hangover + ASR + LLM ≈ 1.5–2.5 s), and the
+  final transcript of that segment is then dropped (it would only
+  STOP twice). Only STOP is taken from a partial; every other intent
+  waits for the final, where the LLM runs as today.
+- **The final** replaces `Utterance`: same path (attention gate,
+  keyword stop, LLM, say). The VAD's hangover can shrink when the
+  ASR's own end-of-utterance is trusted, but that is a measurement,
+  not a design decision.
+
+Costs and open points: Nemotron on this corpus is worse than whisper
+(normalized WER 0.10–0.21 vs 0.05; it drops "sit" and "halt"
+entirely, so the keyword path cannot rescue it), so the seam is only
+worth building with an ASR whose partials are good. The `USER?` state is
+new to the FSM: it needs its own row in the transition table and a
+timeout (a VAD onset without a partial within ~1.2 s releases).
+Whisper can feed the same seam by decoding a sliding window every
+~300 ms. That is more GPU work per utterance than today, but it gives
+partials with whisper's accuracy.
+
 ## 6. The web interface **(user: a separate app in metis-loop, ported from nina_splat)**
 
 Split:
