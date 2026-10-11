@@ -25,7 +25,8 @@ done
 NEMO=${NEMO:-$HOME/archive/vox/NeMo-Speech.cpp}
 NEMO_BIN=$NEMO/build/cuda-asr/bin/nemo-speech
 NEMO_MODEL=${NEMO_MODEL:-models/nemotron/nemotron-3.5-asr-streaming-0.6b.q8_0.gguf}
-PROMPT=${PROMPT:-results/step1-prompt.txt}
+PROMPT=${PROMPT:-grammar/dog-prompt.txt}   # the live prompt; PROMPT= pins another
+CPUS=${CPUS:-0-3}   # the CPU leg: NeMo's C API has no thread knob (min(8,cores)), so pin + nice
 mkdir -p "$OUT"
 [ -x bin/asrbench ] || ./build.sh asrbench
 [ -x bin/llmbench ] || ./build.sh llmbench
@@ -51,16 +52,17 @@ echo "# e2-asr $(date -Is) manifest=$MAN nemo=$($NEMO_BIN --version 2>/dev/null 
 echo "--- idle: $(nvidia-smi --query-gpu=memory.used --format=csv,noheader)" | tee -a "$OUT/env.txt"
 
 echo; echo "=== whisper base.en (internal/stt, GPU) — WER + per-utterance decode"
-echo "whisper: $(sample "$OUT/whisper.log" bin/asrbench -manifest "$MAN" -out "$OUT/whisper.tsv" -jsonl "$OUT/asr.jsonl" -tag whisper-gpu)" | tee -a "$OUT/env.txt"
+echo "--- nvidia-smi before whisper: $(nvidia-smi --query-gpu=memory.used --format=csv,noheader)" | tee -a "$OUT/env.txt"
+echo "whisper: $(sample "$OUT/whisper.log" bin/asrbench -threads 4 -manifest "$MAN" -out "$OUT/whisper.tsv" -jsonl "$OUT/asr.jsonl" -tag whisper-gpu)" | tee -a "$OUT/env.txt"
 grep '^== ' "$OUT/whisper.log"
 
 echo; echo "=== nemotron streaming, GPU, real-time paced — partial/final latency + WER"
+echo "--- nvidia-smi before nemotron-gpu: $(nvidia-smi --query-gpu=memory.used --format=csv,noheader)" | tee -a "$OUT/env.txt"
 echo "nemotron-gpu: $(sample "$OUT/nemotron-gpu.log" bin/nemo-stream-latency -model "$NEMO_MODEL" -manifest "$MAN" -device cuda:0 -tsv "$OUT/nemotron-gpu.tsv")" | tee -a "$OUT/env.txt"
 sed -n '/^== /,$p' "$OUT/nemotron-gpu.log"
-bin/asrbench -manifest "$MAN" -cmd "cat /dev/null" -tag wer-only >/dev/null 2>&1 || true   # (no-op; WER below via python)
 
 echo; echo "=== nemotron streaming, CPU, real-time paced"
-echo "nemotron-cpu: $(sample "$OUT/nemotron-cpu.log" bin/nemo-stream-latency -model "$NEMO_MODEL" -manifest "$MAN" -device cpu -tsv "$OUT/nemotron-cpu.tsv")" | tee -a "$OUT/env.txt"
+echo "nemotron-cpu (cores $CPUS): $(sample "$OUT/nemotron-cpu.log" nice taskset -c "$CPUS" bin/nemo-stream-latency -model "$NEMO_MODEL" -manifest "$MAN" -device cpu -tsv "$OUT/nemotron-cpu.tsv")" | tee -a "$OUT/env.txt"
 sed -n '/^== /,$p' "$OUT/nemotron-cpu.log"
 
 echo; echo "=== nemotron offline bench (nemo-speech bench asr, GPU) — the vendor's own latency numbers"
@@ -101,7 +103,7 @@ for llm in "${LLMS[@]}"; do
   tag=$(basename "$llm" .gguf)
   for tsv in grammar/dog-corpus.tsv "$OUT/whisper.tsv" "$OUT/nemotron-gpu.tsv"; do
     name=$(basename "$tsv" .tsv)
-    bin/llmbench -model "$llm" -ngl 99 -corpus "$tsv" -prompt "$PROMPT" -jsonl "$OUT/intent.jsonl" -tag "$tag@$name" > "$OUT/intent-$tag@$name.log" 2>&1 || true
+    bin/llmbench -model "$llm" -ngl 99 -threads 4 -corpus "$tsv" -prompt "$PROMPT" -jsonl "$OUT/intent.jsonl" -tag "$tag@$name" > "$OUT/intent-$tag@$name.log" 2>&1 || true
     echo "$tag @ $name: $(grep '^== intent' "$OUT/intent-$tag@$name.log")"
   done
 done | tee "$OUT/intent-after-asr.txt"
