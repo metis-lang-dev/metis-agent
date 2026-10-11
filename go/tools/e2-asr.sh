@@ -73,8 +73,9 @@ python3 - "$OUT/nemo-bench.log" <<'EOF' || true
 import json,sys,re
 t=open(sys.argv[1]).read(); i=t.find('{')
 try:
-    d=json.loads(t[i:]); l=d.get('latency_ms',{})
-    print("bench asr:", {k:l.get(k) for k in ('mean','p50','p90','max')}, "rtfx", d.get('rtfx') or d.get('throughput'))
+    d=json.loads(t[i:]); r=(d.get('runs') or [{}])[0]; l=r.get('latency_ms',{})
+    print("bench asr (offline, per utterance):", {k:round(l[k],1) for k in ('mean','p50','p90','max') if k in l},
+          "items/s", round(r.get('items_per_second',0),1))
 except Exception as e: print("bench asr: unparsed", e)
 EOF
 

@@ -47,7 +47,7 @@ def main():
     ap.add_argument("-m", required=True, help="Gemma 4 text GGUF")
     ap.add_argument("-mm", required=True, help="its mmproj (audio) GGUF")
     ap.add_argument("-manifest", default="models/corpus-wav/manifest.tsv")
-    ap.add_argument("-prompt", default="results/step1-prompt.txt")
+    ap.add_argument("-prompt", default="grammar/dog-prompt.txt")  # the live prompt
     ap.add_argument("-gbnf", default="grammar/dog.gbnf")
     ap.add_argument("-ngl", type=int, default=99)
     ap.add_argument("-n", type=int, default=80)
@@ -74,7 +74,7 @@ def main():
     jl = open(os.path.join(out, "records.jsonl"), "w")
     print(f"{'wav':44s} {'got':13s} {'prompt_ms':>9s} {'eval_ms':>7s} {'wall_ms':>7s} {'peak_gpu':>8s}  json")
     for wav, text, want, src in rows:
-        cmd = [CLI, "--jinja", "-m", a.m, "--mmproj", a.mm, "-ngl", str(a.ngl), "--temp", "0", "-n", str(a.n),
+        cmd = [CLI, "--jinja", "--perf", "-lv", "4", "-m", a.m, "--mmproj", a.mm, "-ngl", str(a.ngl), "--temp", "0", "-n", str(a.n),
                "--grammar-file", a.gbnf, "-sys", system, "-p", "<__media__>", "--audio", os.path.join(base, wav)]
         samples, stop = [], threading.Event()
         th = threading.Thread(target=sample_gpu, args=(stop, samples), daemon=True)
