@@ -98,6 +98,22 @@ for p in sys.argv[2:]:
     print(f"{p}: n={len(w)} WER mean={sum(w)/len(w):.3f} exact={ex}/{len(w)}")
 EOF
 
+echo; echo "=== co-resident: E2B intent model + nemotron GPU at once — the 8 GB budget question"
+# the LLM runs the typed corpus while nemotron streams the WAVs; peak GPU is
+# the whole-card number with both loaded, and both latencies are under contention
+COLLM=${COLLM:-models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf}
+COPROMPT=$OUT/coresident-prompt.txt; cat "$PROMPT" grammar/pass2-examples-gemma4.txt > "$COPROMPT"
+echo "--- nvidia-smi before co-resident: $(nvidia-smi --query-gpu=memory.used --format=csv,noheader)" | tee -a "$OUT/env.txt"
+co() {
+  bin/llmbench -model "$COLLM" -ngl 99 -threads 4 -corpus grammar/dog-corpus.tsv -prompt "$COPROMPT" -vram > "$OUT/coresident-llm.log" 2>&1 &
+  local llm=$!
+  sleep 4   # LLM loaded and primed before the ASR comes up
+  bin/nemo-stream-latency -model "$NEMO_MODEL" -manifest "$MAN" -device cuda:0 -tsv "$OUT/coresident-nemotron.tsv"
+  wait $llm || true
+}
+echo "coresident (E2B + nemotron-gpu): $(sample "$OUT/coresident-asr.log" co)" | tee -a "$OUT/env.txt"
+sed -n '/^== /,$p' "$OUT/coresident-asr.log"; grep -E '^== |^vram' "$OUT/coresident-llm.log" || true
+
 echo; echo "=== intent class after ASR (llmbench on the transcripts; reference = the typed corpus)"
 for llm in "${LLMS[@]}"; do
   tag=$(basename "$llm" .gguf)
