@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -437,28 +438,11 @@ func taskCue(it wire.Item, t Task) string {
 	return cue + " Tell the person in one short first-person sentence what happened and why; no JSON, no intent name."
 }
 
-// intentNames is the dog grammar's intent enum plus the wire-only kinds.
-var intentNames = []string{"LOCAL_ACTION", "QUERY", "NAVIGATE", "FIND", "FOLLOW", "STOP",
-	"CANCEL", "TIME", "DATE", "CHITCHAT", "UNKNOWN", "EXPLORE", "GOTO_TAG"}
-
 // taskVoiceOK guards a narrated task outcome like voiceOr guards an ack:
-// empty, the "Okay." of sanitizeAck, an intent name in any case or
-// spelling ("UNKNOWN", "Local action."), or a lone all-caps token is not a
-// sentence — the template speaks instead.
+// unspeakable text, or the "Okay." of an empty narration, is not an
+// outcome — the template speaks instead.
 func taskVoiceOK(s string) bool {
-	w := strings.TrimRight(strings.TrimSpace(s), ".!")
-	if w == "" || w == "Okay" {
-		return false
-	}
-	for _, n := range intentNames {
-		if strings.EqualFold(w, n) || strings.EqualFold(w, strings.ReplaceAll(n, "_", " ")) {
-			return false
-		}
-	}
-	if !strings.ContainsAny(w, " \t") && w == strings.ToUpper(w) {
-		return false
-	}
-	return true
+	return !unspeakable(s) && strings.TrimRight(strings.TrimSpace(s), ".!") != "Okay"
 }
 
 // commandPhrase is the command in words: the action of a LOCAL_ACTION
@@ -706,22 +690,59 @@ func (e *Engine) handleUtterance(text string) {
 	e.say(spoken)
 }
 
-// voiceOr replaces a spoken ack that merely names the intent ("Unknown",
-// "Chitchat") with a sentence a person would say (step-4 F5).
+// voiceOr replaces a spoken ack nobody can say — leaked JSON, an intent
+// name ("Unknown"), an all-caps identifier ("STAND_UP"), empty — with the
+// intent's template line (step-4 F5, F11). Model-independent: gemma4 E2B
+// leaks the pass-1 JSON into pass 2 on CANCEL/UNKNOWN (opus's E1).
 func voiceOr(voice, intentName string) string {
-	v := sanitizeAck(voice)
-	if v == "" || strings.EqualFold(strings.TrimRight(v, "."), intentName) ||
-		strings.EqualFold(strings.TrimRight(v, "."), strings.ReplaceAll(intentName, "_", " ")) {
-		switch intentName {
-		case "UNKNOWN":
-			return "I can't do that."
-		case "CHITCHAT":
-			return "Hello! I'm listening."
-		default:
-			return "Okay."
+	if unspeakable(voice) {
+		if s, ok := ackTemplate[intentName]; ok {
+			return s
+		}
+		return "Okay."
+	}
+	return sanitizeAck(voice)
+}
+
+// ackTemplate is the per-intent line spoken when the model's ack is not.
+var ackTemplate = map[string]string{
+	"UNKNOWN":  "I can't do that.",
+	"CHITCHAT": "Hello! I'm listening.",
+	"CANCEL":   "Okay, cancelled.",
+	"STOP":     "Stopping.",
+	"NAVIGATE": "On my way.",
+	"FIND":     "I'll look for it.",
+	"FOLLOW":   "Following you.",
+	"QUERY":    "Let me look.",
+}
+
+// intentNames is the dog grammar's intent enum plus the wire-only kinds.
+var intentNames = []string{"LOCAL_ACTION", "QUERY", "NAVIGATE", "FIND", "FOLLOW", "STOP",
+	"CANCEL", "TIME", "DATE", "CHITCHAT", "UNKNOWN", "EXPLORE", "GOTO_TAG"}
+
+// identifier is a lone all-caps token of three or more (llmbench's
+// bareIntent); "OK", "NO" stay speech.
+var identifier = regexp.MustCompile(`^[A-Z][A-Z0-9_]{2,}$`)
+
+// unspeakable is the one test for text that must not reach TTS: empty,
+// braces/brackets/angles (JSON, markup), an intent name in any case or
+// spelling, or a lone all-caps identifier; quotes and end punctuation are
+// ignored. A single real word ("Okay.", "Woof!", "Stopping.") is speech.
+func unspeakable(text string) bool {
+	t := strings.TrimSpace(text)
+	if strings.ContainsAny(t, "{}[]<>") {
+		return true
+	}
+	w := strings.TrimSpace(strings.TrimRight(strings.Trim(t, "\"“”‘’' "), ".!?"))
+	if w == "" || identifier.MatchString(w) {
+		return true
+	}
+	for _, n := range intentNames {
+		if strings.EqualFold(w, n) || strings.EqualFold(w, strings.ReplaceAll(n, "_", " ")) {
+			return true
 		}
 	}
-	return v
+	return false
 }
 
 // say hands the narration to the speaker goroutine; the FSM floor is
