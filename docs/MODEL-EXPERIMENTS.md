@@ -8,7 +8,7 @@ nothing here is a dependency of the web UI.
 
 ## Results and recommendation (2026-10-11, opus; reviewed step by step by architect)
 
-**The decision this page is for (the user's):** switch the harness's intent model from gemma3:4b to Gemma 4 E2B Q4_K_M. The switch is one config file, `go/config.ws.gemma4.yaml` (nina, prep): the E2B GGUF, `prompt_extra: [grammar/pass2-examples-gemma4.txt]`, and whisper base.en with the command-vocabulary initial prompt (F12) as the ASR. Everything else is unchanged: FSTTM, GBNF, KV-prefix reuse, the voice guard.
+**The decision this page is for (the user's):** switch the harness's intent model from gemma3:4b to Gemma 4 E2B Q4_K_M. **Decided and done:** the switch is the harness default since 875c219, `go/config.ws.yaml`, with gemma3 kept as `go/config.ws.gemma3.yaml`. The config has the E2B GGUF, `prompt_extra: [grammar/pass2-examples-gemma4.txt]`, and whisper base.en with the command-vocabulary initial prompt (F12) as the ASR. Everything else is unchanged: FSTTM, GBNF, KV-prefix reuse, the voice guard.
 
 **Recommendation:**
 - **Switch to E2B Q4_K_M, thinking off, with whisper base.en + initial prompt.** Every number below is on taycann's RTX PRO 2000 (8151 MiB). The corpus is the 54-turn dog corpus (34 prompt + 20 held-out rows; 3 held-out rows are prompt examples since 888668c and are counted apart). The audio is RHVoice renders of the same utterances.
@@ -20,7 +20,7 @@ nothing here is a dependency of the web UI.
 | resident set | GPU | how measured |
 |---|---|---|
 | today: gemma3-4b Q4 + whisper base.en | ≈ 3.8 GB | nina's harness, live |
-| **switch: E2B Q4 + whisper base.en** | **≈ 2.55 GB** | 2136 MiB (E2B + KV 4096 + buffers) + 409 MiB (whisper peak); the two summed, not co-resident |
+| **switch: E2B Q4 + whisper base.en** | **2368–2374 MiB** | whole card, co-resident in one fsttm-go process on the switch config (nina's rehearsal, 21:14 and 21:18, after a 24-row wsprobe). The separate pieces were 2136 + 409 MiB. |
 | E2B Q4 + Nemotron 0.6B (GPU), co-resident | 3212 MiB | whole card, both loaded and running at once |
 | E2B Q4 heard (mmproj F16 audio+vision) | 3328 MiB | one process, projector loaded |
 
@@ -75,7 +75,7 @@ Through nina's a5d22c0 framing, both models narrate cleanly. The 44/54 gemma3 le
 | E2B Q4, read (typed) | 2136 MiB | 458 ms | – | 54/54 | 17/17 |
 | **E2B Q4, heard** (in-process libmtmd) | 3328 MiB | 511 ms | 14 ms | 53/54 | 17/17 ("halt" → STOP) |
 | E4B Q5, heard | 5490 MiB | 686 ms | 23 ms | 53/54 | 17/17 |
-| whisper + initial prompt → E2B Q4, read | ≈ 2.55 GB | ≈ 17 + 458 ms | – | 53/54 | – |
+| whisper + initial prompt → E2B Q4, read | 2374 MiB | ≈ 17 + 458 ms | – | 53/54 | – |
 
 The heard path matches the ASR pipeline on accuracy and latency.
 - **Why it isn't recommended yet:** it costs about 0.8 GB more, because the F16 mmproj carries both towers (audio 584 MiB, vision 349 MiB). It also has no transcript for the logs or the journal.
@@ -97,7 +97,7 @@ A GBNF over Gemma 4's native call markup keeps the activation surface token-exac
 2. **Projector re-pack** (audio-only, Q8) for the heard path: a separate decision, only if (1) favors hearing.
 3. **E4 result-turn round-trip:** render the runtime's admission or refusal as a `<|tool_response>` turn, and check that a refusal steers the next proposal.
 4. **"halt" and other one-word safety commands:** F12's keyword STOP in front of the LLM covers the harness. The bench corpus is synthetic, so this needs a check on the real recordings.
-5. **E2B + whisper co-resident measurement:** the budget line above sums two measurements. One co-resident run on the switch config would replace the ≈.
+5. ~~E2B + whisper co-resident measurement~~: done in nina's switch rehearsal, 2368–2374 MiB (budget line).
 
 ## Why
 
