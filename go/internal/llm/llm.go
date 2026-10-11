@@ -76,6 +76,9 @@ type LLM struct {
 	chanClose C.llama_token
 	pass2Turn bool
 	pass2Cue  string
+	// libmtmd context (audio.go, -tags mtmd): nil unless AttachAudio ran
+	mtmd      unsafe.Pointer
+	mtmdClose func()
 }
 
 type Config struct {
@@ -151,6 +154,8 @@ type Result struct {
 	TJSON time.Duration // pass-1 generation time
 	TTTS  time.Duration // pass-2 generation time
 	TEval time.Duration // tail eval time (prefix reuse path)
+	// TEncode: the media encoder's share of TEval (TwoPassAudio); 0 for text.
+	TEncode time.Duration
 	// Thinking (Config.Think): the thought channel text and its time;
 	// empty / 0 when the model opened no channel.
 	Thought string
@@ -264,6 +269,10 @@ func (l *LLM) EOT() string { return l.eotText }
 func (l *LLM) Close() {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	if l.mtmdClose != nil {
+		l.mtmdClose() // the projector references the model: free it first
+		l.mtmd, l.mtmdClose = nil, nil
+	}
 	if l.ctx != nil {
 		C.llama_free(l.ctx)
 		l.ctx = nil
@@ -615,7 +624,15 @@ func (l *LLM) rewind(systemPrompt string, nPrefix int) error {
 func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
+	return l.twoPassLocked(systemPrompt, gbnf, func() (time.Duration, error) {
+		return 0, l.decodeTokens(l.tailTokens(userText))
+	})
+}
 
+// twoPassLocked is TwoPass with the user tail's evaluation passed in: text
+// tokens for TwoPass, an audio slice through libmtmd for TwoPassAudio (the
+// E3 path). evalTail returns the share of its time spent encoding media.
+func (l *LLM) twoPassLocked(systemPrompt, gbnf string, evalTail func() (time.Duration, error)) (*Result, error) {
 	tEval0 := time.Now()
 	nPrefix, err := l.primeLocked(systemPrompt)
 	if err != nil {
@@ -625,7 +642,8 @@ func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
 	if err := l.rewind(systemPrompt, nPrefix); err != nil {
 		return nil, err
 	}
-	if err := l.decodeTokens(l.tailTokens(userText)); err != nil {
+	tEncode, err := evalTail()
+	if err != nil {
 		return nil, err
 	}
 	tEval := time.Since(tEval0)
@@ -692,7 +710,7 @@ func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
 	voice = l.clean(voice)
 
 	return &Result{JSON: jsonText, Voice: voice,
-		TJSON: tJSON, TTTS: tTTS, TEval: tEval,
+		TJSON: tJSON, TTTS: tTTS, TEval: tEval, TEncode: tEncode,
 		Thought: thought, NThink: nThink, TThink: tThink}, nil
 }
 

@@ -93,6 +93,8 @@ def main():
                 if r.get("narrate_n") else "-")
         think = "on" if r.get("think") else "off"
         th = f"{r.get('ms_think_mean', 0)}/{r.get('n_think_mean', 0)}" if r.get("think") else "-"
+        if r.get("audio"):  # E3: the turn was heard; audio encode is inside the eval
+            th = f"enc {r.get('ms_encode_mean', 0)} ms" + (f", think {th}" if r.get("think") else "")
         pre = {None: "-", True: "ok", False: "MISMATCH"}[r.get("prefix_ok")]
         rows.append([tag, r.get("template", ""), think, fmt_vram(r), str(r.get("ms_load", "")),
                      f"{r['ms_mean']}/{r['ms_p50']}/{r['ms_p90']}", f"{r['ms_json_mean']} ms",

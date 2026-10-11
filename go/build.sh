@@ -16,7 +16,7 @@ WHISPER_DIR="${WHISPER_DIR:-$(pick "$HOME/repo/vox/whisper.cpp" "$HOME/archive/v
 # + build/ggml/src; current master collects everything in build/bin
 WLIBS="$WHISPER_DIR/build/src:$WHISPER_DIR/build/ggml/src:$WHISPER_DIR/build/ggml/src/ggml-cuda:$WHISPER_DIR/build/bin"
 LLIBS="$LLAMA_DIR/build/bin"
-export CGO_CFLAGS="-I$LLAMA_DIR/include -I$LLAMA_DIR/ggml/include -I$WHISPER_DIR/include -I$WHISPER_DIR/ggml/include"
+export CGO_CFLAGS="-I$LLAMA_DIR/include -I$LLAMA_DIR/ggml/include -I$LLAMA_DIR/tools/mtmd -I$WHISPER_DIR/include -I$WHISPER_DIR/ggml/include"
 # classic DT_RPATH (--disable-new-dtags): RUNPATH is not transitive, so
 # libllama/libwhisper could not find libggml through the executable's path
 export CGO_LDFLAGS="-Wl,--disable-new-dtags -L$LLIBS -Wl,-rpath,$LLIBS -L${WLIBS//:/ -L} -Wl,-rpath,${WLIBS//:/ -Wl,-rpath,}"
@@ -31,6 +31,8 @@ if [ "${1:-}" = "test" ]; then
   export LD_LIBRARY_PATH="${LIBRARY_PATH}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   exec go test "${@:-./...}"
 fi
+# GOFLAGS=-tags=mtmd links libmtmd for the E3 audio path (internal/llm/audio.go);
+# the default build (the harness) does not.
 if [ $# -gt 0 ]; then targets=(); for t in "$@"; do targets+=("./cmd/$t"); done; else targets=(./cmd/...); fi
 go build -o bin/ "${targets[@]}"
 echo "built → go/bin/ (rpath-embedded; no LD_LIBRARY_PATH needed)"

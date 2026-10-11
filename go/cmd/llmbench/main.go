@@ -33,6 +33,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -49,7 +50,7 @@ import (
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
 )
 
-type row struct{ utt, want, src string }
+type row struct{ utt, want, src, wav string }
 
 // turnRec is the per-turn -jsonl record.
 type turnRec struct {
@@ -69,6 +70,7 @@ type turnRec struct {
 	NThink    int    `json:"n_think"`
 	Thought   string `json:"thought,omitempty"`
 	MsJSON    int64  `json:"ms_json"`
+	MsEncode  int64  `json:"ms_encode,omitempty"` // -audio: the audio chunk (encoder + embedding decode)
 	MsTTS     int64  `json:"ms_tts"`
 	MsTotal   int64  `json:"ms_total"`
 	Narrate   string `json:"narrate,omitempty"`
@@ -100,6 +102,8 @@ type summaryRec struct {
 	MsJSONMean  int64          `json:"ms_json_mean"`
 	MsTTSMean   int64          `json:"ms_tts_mean"`
 	MsThinkMean int64          `json:"ms_think_mean"`
+	MsEncMean   int64          `json:"ms_encode_mean,omitempty"`
+	Audio       string         `json:"audio,omitempty"` // -audio manifest (E3)
 	NThinkMean  int            `json:"n_think_mean"`
 	MsNarrMean  int64          `json:"ms_narrate_mean,omitempty"`
 	Hit         int            `json:"hit"`
@@ -140,6 +144,8 @@ func main() {
 	tag := flag.String("tag", "", "run label for -jsonl (default: model basename[+think])")
 	pass2Turn := flag.Bool("pass2-turn", false, "pass 2 as its own chat turn instead of the bare \"Spoken response:\" continuation")
 	pass2Cue := flag.String("pass2-cue", "", "with -pass2-turn: the user-turn cue text (default \"Spoken response:\")")
+	mmproj := flag.String("mmproj", "", "E3: multimodal projector GGUF with an audio encoder (build with GOFLAGS=-tags=mtmd)")
+	audioF := flag.String("audio", "", "E3: WAV manifest (wav<TAB>utterance<TAB>intent<TAB>source); every turn is HEARD through -mmproj")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
 	flag.Parse()
 	if *model == "" {
@@ -164,7 +170,14 @@ func main() {
 		fail(err)
 	}
 	rows := []row{}
-	if *corpusF != "" {
+	if *audioF != "" {
+		if *mmproj == "" {
+			fail(fmt.Errorf("-audio needs -mmproj"))
+		}
+		if rows, err = readManifest(*audioF); err != nil {
+			fail(err)
+		}
+	} else if *corpusF != "" {
 		if rows, err = readCorpus(*corpusF); err != nil {
 			fail(err)
 		}
@@ -217,6 +230,13 @@ func main() {
 		fail(err)
 	}
 	defer l.Close()
+	if *mmproj != "" {
+		if err := l.AttachAudio(*mmproj, *ngl > 0, *threads); err != nil {
+			fail(err)
+		}
+		sum.Audio = *audioF
+		fmt.Fprintf(os.Stderr, "audio: %s attached, %d Hz\n", *mmproj, l.AudioSampleRate())
+	}
 	tLoad := time.Since(t0)
 	t0 = time.Now()
 	n, err := l.PrimePrefix(string(prompt))
@@ -246,7 +266,7 @@ func main() {
 			head(prefix, 40), head(prefix[max(0, len(prefix)-40):], 40), tail)
 	}
 
-	var lat, latJSON, latTTS, latThink, latNarr []time.Duration
+	var lat, latJSON, latTTS, latThink, latNarr, latEnc []time.Duration
 	nThink := 0
 	hit, scored, parrot := 0, 0, 0
 	prefixOK := true
@@ -267,7 +287,19 @@ func main() {
 					r.utt, len(pre), len(whole))
 			}
 		}
-		res, err := l.TwoPass(string(prompt), r.utt, string(gbnf))
+		var res *llm.Result
+		if r.wav != "" {
+			pcm, rate, rerr := readWav(r.wav)
+			if rerr == nil && rate != l.AudioSampleRate() {
+				rerr = fmt.Errorf("%s: %d Hz, the projector wants %d", r.wav, rate, l.AudioSampleRate())
+			}
+			if rerr != nil {
+				fail(rerr)
+			}
+			res, err = l.TwoPassAudio(string(prompt), pcm, string(gbnf))
+		} else {
+			res, err = l.TwoPass(string(prompt), r.utt, string(gbnf))
+		}
 		if err != nil {
 			fmt.Printf("%-40q ERROR %v\n", r.utt, err)
 			rec.Err = err.Error()
@@ -283,6 +315,10 @@ func main() {
 		latJSON = append(latJSON, res.TJSON)
 		latTTS = append(latTTS, res.TTTS)
 		latThink = append(latThink, res.TThink)
+		if r.wav != "" {
+			latEnc = append(latEnc, res.TEncode)
+			rec.MsEncode = res.TEncode.Milliseconds()
+		}
 		nThink += res.NThink
 		got, verdict := "?", ""
 		if *raw {
@@ -376,6 +412,10 @@ func main() {
 	sum.MsJSONMean, sum.MsTTSMean, sum.MsThinkMean, sum.NThinkMean = mean(latJSON), mean(latTTS), mean(latThink), nThink/len(lat)
 	if len(latNarr) > 0 {
 		sum.MsNarrMean = mean(latNarr)
+	}
+	if len(latEnc) > 0 {
+		sum.MsEncMean = mean(latEnc)
+		fmt.Printf("== audio encode mean=%dms p50=%dms p90=%dms (inside eval)\n", mean(latEnc), pct(latEnc, 50), pct(latEnc, 90))
 	}
 	sum.Hit, sum.Scored, sum.Unspeak = hit, scored, parrot
 	if scored > 0 {
@@ -517,6 +557,70 @@ func voiceBad(voice, utt string) string {
 }
 
 var bareIntent = regexp.MustCompile(`^"?[A-Z_]+"?$`)
+
+// readManifest reads an E2/E3 WAV manifest: wav<TAB>utterance<TAB>intent[<TAB>source],
+// wav paths relative to the manifest. The utterance is the reference text
+// (prefix check, records), never shown to the model.
+func readManifest(path string) ([]row, error) {
+	dir := filepath.Dir(path)
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	var out []row
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		ln := strings.TrimSpace(sc.Text())
+		if ln == "" || strings.HasPrefix(ln, "#") {
+			continue
+		}
+		p := strings.Split(ln, "\t")
+		if len(p) < 3 {
+			return nil, fmt.Errorf("%s: bad row %q (want wav, utterance, intent)", path, ln)
+		}
+		r := row{wav: filepath.Join(dir, p[0]), utt: p[1], want: p[2], src: "corpus"}
+		if len(p) > 3 {
+			r.src = p[3]
+		}
+		out = append(out, r)
+	}
+	return out, sc.Err()
+}
+
+// readWav reads a PCM s16 mono WAV into float32 samples in [-1, 1).
+func readWav(path string) ([]float32, int, error) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, 0, err
+	}
+	if len(b) < 12 || string(b[0:4]) != "RIFF" || string(b[8:12]) != "WAVE" {
+		return nil, 0, fmt.Errorf("%s: not a WAV", path)
+	}
+	var rate, ch, bits int
+	for off := 12; off+8 <= len(b); {
+		id, n := string(b[off:off+4]), int(binary.LittleEndian.Uint32(b[off+4:]))
+		body := b[off+8 : min(len(b), off+8+n)]
+		switch id {
+		case "fmt ":
+			if len(body) < 16 || binary.LittleEndian.Uint16(body) != 1 {
+				return nil, 0, fmt.Errorf("%s: not PCM", path)
+			}
+			ch, rate, bits = int(binary.LittleEndian.Uint16(body[2:])), int(binary.LittleEndian.Uint32(body[4:])), int(binary.LittleEndian.Uint16(body[14:]))
+		case "data":
+			if ch != 1 || bits != 16 {
+				return nil, 0, fmt.Errorf("%s: want mono s16, got %d ch %d bit", path, ch, bits)
+			}
+			pcm := make([]float32, len(body)/2)
+			for i := range pcm {
+				pcm[i] = float32(int16(binary.LittleEndian.Uint16(body[2*i:]))) / 32768
+			}
+			return pcm, rate, nil
+		}
+		off += 8 + n + n%2
+	}
+	return nil, 0, fmt.Errorf("%s: no data chunk", path)
+}
 
 func fail(err error) {
 	fmt.Fprintln(os.Stderr, "llmbench:", err)
