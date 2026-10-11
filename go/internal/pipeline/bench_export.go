@@ -1,6 +1,10 @@
 package pipeline
 
-import "github.com/metis-lang-dev/metis-agent/go/internal/wire"
+import (
+	"fmt"
+
+	"github.com/metis-lang-dev/metis-agent/go/internal/wire"
+)
 
 // Bench hooks (cmd/llmbench -events, MODEL-EXPERIMENTS.md step 4): the
 // harness's own task-narration framing and guards, exported unchanged so the
@@ -10,3 +14,11 @@ func TaskCue(it wire.Item, t Task) string         { return taskCue(it, t) }
 func TaskVoiceOK(s string) bool                   { return taskVoiceOK(s) }
 func SanitizeAck(s string) string                 { return sanitizeAck(s) }
 func NarrateTemplate(it wire.Item, t Task) string { return narrateTemplate(it, t) }
+
+// E7 (docs/RAG.md §6, cmd/llmbench -e7): the rack's own cues, the focus
+// line's fact cleaning and the number guard, unchanged.
+
+func RackAskCue() string                    { return cueRackAsk }
+func RackSurpriseCue(where string) string   { return fmt.Sprintf(cueRackSurprise, where) }
+func CleanFact(s string) string             { return cleanText(s, factCap) }
+func InventedNumbers(s, fact string) string { return inventedNumbers(s, fact) }

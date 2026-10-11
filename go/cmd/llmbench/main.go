@@ -156,6 +156,12 @@ func main() {
 	spliceCards := flag.String("splice-cards", "grammar/splice-cards.json", "E6b: the cards op's JSON, for the plain-word renderer T2")
 	spliceRnd := flag.String("splice-renderers", "T,Z,R", "E6: pieces to run (T, Z, R; E6b: T2)")
 	spliceGrid := flag.Bool("splice-grid-only", false, "E6: the fact-question grid only (no conflict/continuation)")
+	e7F := flag.String("e7", "", "E7 corpus (grammar/e7-corpus.jsonl, tools/e7-corpus.py): 24 questions × arms S/F/1/S-nofocus over the RAG store (docs/RAG.md §6)")
+	e7Pair := flag.String("e7-pair", "grammar/e7-pair.jsonl", "E7: the kitchen pair run")
+	e7Cards := flag.String("e7-cards", "internal/kernel/testdata/kitchen-cards.json", "E7: the cards op's JSON")
+	e7Arms := flag.String("e7-arms", "S,F,1,S-nofocus", "E7: arms")
+	e7Dry := flag.Bool("e7-dry", false, "E7: write the insertions only, no generation")
+	e7Reps := flag.Int("e7-reps", 1, "E7: repeats of the whole corpus (pass-2 sampling is stochastic)")
 	eventsF := flag.String("events", "", "narrate corpus (intent<TAB>args JSON<TAB>result<TAB>detail): each task outcome through the harness's taskCue + Narrate + guard")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
 	flag.Parse()
@@ -207,7 +213,7 @@ func main() {
 	for _, u := range flag.Args() {
 		rows = append(rows, row{utt: u})
 	}
-	if len(rows) == 0 && *eventsF == "" && *spliceF == "" {
+	if len(rows) == 0 && *eventsF == "" && *spliceF == "" && *e7F == "" {
 		fail(fmt.Errorf("nothing to run: -corpus, -audio, -events or utterances"))
 	}
 	// a held-out row the prompt now teaches verbatim is no longer held out
@@ -269,6 +275,10 @@ func main() {
 	sum.Template, sum.EOT = l.Template(), l.EOT()
 	if *eventsF != "" {
 		runEvents(l, string(prompt), *eventsF, *tag, sum.VRAM, emit)
+		return
+	}
+	if *e7F != "" {
+		runE7(l, string(prompt), *e7Pair, *e7F, *e7Cards, *e7Arms, *tag, *e7Reps, *e7Dry, emit)
 		return
 	}
 	if *spliceF != "" {

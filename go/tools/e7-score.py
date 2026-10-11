@@ -2,9 +2,10 @@
 """E7 rack scorer (docs/RACK.md §6): the E7 run's records + the corpus
 → one table per arm (S structural / F flat / 1 single-domain).
 
-A run record (one per question × arm, written by the step-3 bench):
-  {"kind": "e7", "tag", "arm", "id", "answer", "inserted": "<the text
-   spliced>", "tok_inserted", "ms_first", "ms_total"}
+A run record (one per question × arm × rep, llmbench -e7):
+  {"kind": "e7", "tag", "arm", "id", "rep", "answer", "inserted": "<the
+   text spliced>", "covered", "guard", "tok_inserted", "ms_first",
+   "ms_total", ...}
 
   used        the answer carries the fact (expect, ⟪…⟫ spans stripped)
   attribution questions with a right/wrong domain regex: the right
@@ -51,7 +52,11 @@ def score(corpus, recs):
         invented = any(n not in allowed for n in NUM.findall(a))
         rows.append({**r, "cls": q["cls"], "used": used, "attr": attr,
                      "invented": invented, "forged": "⟪" in full,
-                     "covered": q["covered"].get(r["arm"])})
+                     # the bench's own insertion (step 3) when it says;
+                     # else the corpus's reference contract
+                     "covered": r["covered"] if "covered" in r
+                     else q["covered"].get(r["arm"]),
+                     "rejected": r.get("guard", "ok") != "ok"})
     return rows
 
 
@@ -60,13 +65,14 @@ def table(rows):
         xs = [x for x in xs if x[k] is not None]
         return f"{sum(1 for x in xs if x[k]) / len(xs):.2f}" if xs else "–"
     out = ["| model | arm | used: one | both | attr | all | attribution | "
-           "misattributed (one-domain) | invented | ⟪ in output | evidence covered | "
-           "tok inserted (mean) | ms first p50 | n |",
-           "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+           "misattributed (one-domain) | invented | ⟪ in output | guard rejected | "
+           "evidence covered | tok inserted (mean) | ms first p50 | n |",
+           "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     by = defaultdict(list)
     for x in rows:
         by[(x["tag"], x["arm"])].append(x)
-    for (tag, arm), xs in sorted(by.items()):
+    order = {"S": 0, "F": 1, "1": 2, "S-nofocus": 3}
+    for (tag, arm), xs in sorted(by.items(), key=lambda kv: (kv[0][0], order.get(kv[0][1], 9))):
         cls = {c: [x for x in xs if x["cls"] == c] for c in ("one", "both", "attr")}
         one = [x for x in xs if x["cls"] == "one" and x["attr"] is not None]
         mis = f"{sum(1 for x in one if not x['attr']) / len(one):.2f}" if one else "–"
@@ -77,6 +83,7 @@ def table(rows):
                    f"{rate(cls['both'], 'used')} | {rate(cls['attr'], 'used')} | "
                    f"{rate(xs, 'used')} | {rate(attr, 'attr')} | {mis} | "
                    f"{rate(xs, 'invented')} | {rate(xs, 'forged')} | "
+                   f"{rate(xs, 'rejected')} | "
                    f"{rate(xs, 'covered')} | {tok:.0f} | {ms} | {len(xs)} |")
     return "\n".join(out)
 

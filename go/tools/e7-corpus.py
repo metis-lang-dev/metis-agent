@@ -68,14 +68,40 @@ def since_quiescence(tape):
     return tape[idx[-1] + 1:] if idx else tape
 
 
+def closes(s):
+    """An admitted reset/explain result (an operator resume is an exo
+    event that closes every open surprise; none in the pair run)."""
+    return (s["signal"] == "result" and s.get("verb") in ("reset", "explain")
+            and s.get("status", "").startswith("admitted"))
+
+
+def current_order(tape):
+    """The path's current order: since its last quiescence, or — when the
+    path is quiet now — the order that quiescence ended (RAG §8.2)."""
+    if tape and tape[-1]["signal"] == "quiescence":
+        return since_quiescence(tape[:-1])
+    return since_quiescence(tape)
+
+
+def resolved(recs):
+    """The last surprise a record among recs closed, with that record."""
+    for i in range(len(recs) - 1, -1, -1):
+        if closes(recs[i]):
+            for j in range(i - 1, -1, -1):
+                if recs[j]["signal"] == "surprise" and \
+                        recs[j].get("record") == recs[i].get("record"):
+                    return [recs[j], recs[i]]
+    return []
+
+
 def retrieve_S(sigs, t, trigger, active=tuple(SCENES)):
     tapes = {p: [s for s in sigs if s["path"] == p and s["t"] <= t]
              for p in active}
     k, path = trigger["kind"], trigger.get("path")
     mirrors, cards, recs = [], [], []
     if k == "event":
+        # RAG §8.3: records only (the model echoed the mirror line)
         recs = since_quiescence(tapes[path])
-        mirrors = [path]
     elif k == "surprise":
         own = since_quiescence(tapes[path])
         # the surprise itself and what answered it are part of the work
@@ -99,7 +125,12 @@ def retrieve_S(sigs, t, trigger, active=tuple(SCENES)):
                                  r.get("record") == s.get("record") and
                                  r.get("status", "").startswith("admitted")
                                  for r in tapes[p])]
-            recs += open_[-1:]
+            if open_:
+                recs += open_[-1:]
+                continue
+            # RAG §8.2: else the last RESOLVED surprise with the result
+            # that closed it, while it belongs to the current order
+            recs += resolved(current_order(tapes[p]))
     recs = sorted(recs, key=lambda s: (-KIND_W[kind(s)], -s["t"]))
     out, used = [], sum(40 for _ in mirrors)
     for s in recs:
@@ -223,10 +254,14 @@ def questions():
         Q("q22", "attr", 101, ev(A), [A], "Which cook just served a soup?",
           r"first cook|\bthe cook\b", ["kitchen#24"],
           right=r"first cook|\bthe cook\b(?!.*second)", wrong=SECOND),
-        Q("q23", "attr", 93, su(A), [A],
+        # RAG §8.2: asked by the person AFTER the explain (the surprise is
+        # resolved, the order still open) — answerable from the resolved
+        # surprise and its result, which ask now takes
+        Q("q23", "attr", 93, ask, [A],
           "Which cook's pot got an onion it did not expect?",
           r"first cook|\bthe cook\b|\bmy\b|kitchen\b(?! shared|_shared)",
-          ["kitchen#18"], right=r"first cook|\bthe cook's\b", wrong=r"second cook's pot"),
+          ["kitchen#18"], probe="ask",
+          right=r"first cook|\bthe cook's\b", wrong=r"second cook's pot"),
         Q("q24", "attr", 206, qu(B), [B],
           "Which cook is stuck holding an onion?", SECOND,
           ["mirror:kitchen_shared"], right=SECOND, wrong=r"first cook"),
@@ -248,6 +283,7 @@ def questions():
            "q16": [[MA, MB], ["kitchen#14", "kitchen_shared#14"]],
            "q17": [[MA, MB], ["kitchen#26", "kitchen_shared#19"]],
            "q19": [[MA, MB], ["kitchen#36", "kitchen_shared#27"]],
+           "q23": [["kitchen#18"], ["kitchen#19"]],
            "q24": [[MB], ["kitchen_shared#36", "kitchen_shared#37"]]}
     for q in qs:
         q["evidence"] = alt.get(q["id"], q["evidence"])
