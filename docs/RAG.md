@@ -208,3 +208,37 @@ and no standing region. C also picked worse first intents (20 refusals
 to B's 8) at 5.6× tokens an hour. The standing region and the stream
 remain a NARRATION mechanism, which E6/E7 measure, and the RAG remains
 an experiment about what the narrator can say, not about triage.
+
+## 10. The read (architect, 2026-10-12, after E7 run 2)
+
+Run 2 (bf52dbd, bench 06a07ce, scorer 9c30d33): attribution S 0.80 =
+F 0.80, 1 0.60; tokens S 246 < F 254; invented 0 everywhere.
+
+**S ≈ F: flat mixing suffices until the tree exists. The RAG stays an
+experiment.** The structural retriever is not what made the model
+attribute; the display names did, in every arm (q07, q22, q23 went
+0/3 → 3/3). S wins only where F lacks evidence (mirror counts), and
+loses the onion-origin questions to F.
+
+What stands from the experiment, in the harness:
+- N runtimes on one narrator; one tape per domain on one clock
+  (the store, §2); per-domain compaction; mount = freeze.
+- Fragments tagged with the domain's DISPLAY NAME in the person's
+  words; cross-domain moves name their target; pieces carry counts.
+- The short mirror line; the beliefs tail on the pane only.
+- Triage on the bare context (runtime-wire step 5).
+
+What is parked, behind a config knob `rack.retrieve: flat | structural`
+with flat as the default: the §3 scoping and ranking. Flat = the last K
+records of every mounted tape in arrival order, plus each path's mirror
+line for the ask scope only (that is where S's mirror counts paid).
+The retriever code and its reference test stay in the repo; the tree
+(phase 2) is the next reason to turn it on.
+
+Open narration findings, not ruled here (a later experiment):
+- S narrates "the first cook loaded an onion" in 5 of 6 surprise probes
+  although the inserted piece says the second cook did; F never does.
+- The focus line hurts the origin questions (q13, q18) in S.
+- said records are copied as narration (nina, §9 follow-up): said only
+  in the quiescence scope, never in surprise/event/ask.
+- q24 (a stuck state) is unanswerable from the short mirror line.
