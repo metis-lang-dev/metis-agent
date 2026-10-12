@@ -162,6 +162,11 @@ func main() {
 	e7Arms := flag.String("e7-arms", "S,F,1,S-nofocus", "E7: arms")
 	e7Dry := flag.Bool("e7-dry", false, "E7: write the insertions only, no generation")
 	e7Reps := flag.Int("e7-reps", 1, "E7: repeats of the whole corpus (pass-2 sampling is stochastic)")
+	e8F := flag.String("e8", "", "E8 corpus (the E7 corpus): narration streaming from the script RAG (docs/RAG.md §11.2); reuses -e7-pair, -e7-cards, -e7-reps, -e7-dry")
+	e8Scripts := flag.String("e8-scripts", "grammar/e8-scripts.json", "E8: the runtimes' script op answers, by path")
+	e8Rows := flag.String("e8-rows", "flat/policy,flat/N-all,flat/R-all,structural/policy,structural/N-all,structural/R-all,flat/policy/think=off,flat/policy/think=256,flat/policy/interp=cue",
+		"E8: rows retrieval/form[/setting]; the plain flat/policy row is think=64 and interp=system")
+	e8K := flag.Int("e8-k", 12, "E8: the orchestrator's flat insertion, passed fragments per question (the harness's rack.k)")
 	eventsF := flag.String("events", "", "narrate corpus (intent<TAB>args JSON<TAB>result<TAB>detail): each task outcome through the harness's taskCue + Narrate + guard")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
 	flag.Parse()
@@ -213,7 +218,7 @@ func main() {
 	for _, u := range flag.Args() {
 		rows = append(rows, row{utt: u})
 	}
-	if len(rows) == 0 && *eventsF == "" && *spliceF == "" && *e7F == "" {
+	if len(rows) == 0 && *eventsF == "" && *spliceF == "" && *e7F == "" && *e8F == "" {
 		fail(fmt.Errorf("nothing to run: -corpus, -audio, -events or utterances"))
 	}
 	// a held-out row the prompt now teaches verbatim is no longer held out
@@ -275,6 +280,10 @@ func main() {
 	sum.Template, sum.EOT = l.Template(), l.EOT()
 	if *eventsF != "" {
 		runEvents(l, string(prompt), *eventsF, *tag, sum.VRAM, emit)
+		return
+	}
+	if *e8F != "" {
+		runE8(l, string(prompt), *e7Pair, *e8F, *e7Cards, *e8Scripts, *e8Rows, *tag, *e7Reps, *e8K, *e7Dry, emit)
 		return
 	}
 	if *e7F != "" {

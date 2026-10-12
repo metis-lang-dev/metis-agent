@@ -27,6 +27,9 @@ type Record struct {
 	// it names is no longer open (an escalated one stays open: the runtime
 	// takes no orders until the operator)
 	Closes bool `json:"closes,omitempty"`
+	// Agent is the agent's own sentence for this fragment (RAG §11:
+	// narration streaming), Text then its reference with counts
+	Agent string `json:"agent,omitempty"`
 }
 
 // Ref is the record's id, path#seq (the E7 corpus's evidence refs).
@@ -39,13 +42,16 @@ var Weights = map[string]int{"surprise": 5, "notice": 5, "refused": 5, "reading"
 
 // Tape is one domain's records, in seq order.
 type Tape struct {
-	Path    string
-	Name    string // the domain in the person's words (RAG §9.1); "" = the path in words
-	Card    string // the domain's card text (an explanation candidate for its siblings)
-	Mirror  string // the last mirror line with its beliefs: the UI pane's, never inserted
-	Recs    []Record
-	Mounted bool
-	Dropped int // records that arrived while frozen
+	Path   string
+	Name   string // the domain in the person's words (RAG §9.1); "" = the path in words
+	Card   string // the domain's card text (an explanation candidate for its siblings)
+	Mirror string // the last mirror line with its beliefs: the UI pane's, never inserted
+	// the pane's narration-streaming line (RAG §11)
+	lastFrag, lastSentence, lastForm string
+	script                           int
+	Recs                             []Record
+	Mounted                          bool
+	Dropped                          int // records that arrived while frozen
 }
 
 // Store is the rack: the tapes in the configured order.
@@ -71,6 +77,10 @@ type Store struct {
 	// structural retriever, parked until the tree.
 	Flat bool
 	K    int // flat: records per insertion (0 = 12)
+	// Render picks a record's words for a trigger (RAG §11.1 step 5: the
+	// form — the reference, the agent's sentence, both; "" = not passed).
+	// nil = the record's text.
+	Render func(trigger string, r Record) string
 }
 
 // New makes a rack over the paths, all mounted.
@@ -102,6 +112,35 @@ func (s *Store) Name(path, display string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.tapes[path].Name = display
+}
+
+// SetAgent puts the agent's sentence on its record (path, seq, kind) once
+// the narrator has it: the reference is on the tape from arrival, the
+// words follow (RAG §11). False when the record is gone (compacted).
+func (s *Store) SetAgent(path string, seq int, kind, sentence string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.tapes[path]
+	if !ok {
+		return false
+	}
+	for i := len(t.Recs) - 1; i >= 0; i-- {
+		if r := &t.Recs[i]; r.Seq == seq && r.Kind == kind {
+			r.Agent = sentence
+			return true
+		}
+	}
+	return false
+}
+
+// Narrated notes the agent's last fragment, its sentence and the form it
+// was passed in, and its script's size (the pane, RAG §11).
+func (s *Store) Narrated(path, frag, sentence, form string, scriptTok int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if t, ok := s.tapes[path]; ok {
+		t.lastFrag, t.lastSentence, t.lastForm, t.script = frag, sentence, form, scriptTok
+	}
 }
 
 // SetMirror keeps the domain's full mirror line for the UI pane (RAG §9.3:
@@ -465,11 +504,9 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 			lines = append(lines, s.Frag(p, mirrors[p]))
 		}
 		for _, r := range in.Records {
-			text := r.Text
-			if r.Kind == "said" {
-				text = "you said: " + text
+			if text := s.text(tr, r); text != "" {
+				lines = append(lines, s.Frag(r.Path, text))
 			}
-			lines = append(lines, s.Frag(r.Path, text))
 		}
 		in.Text = strings.Join(lines, "\n")
 		in.Dur = time.Since(t0)
@@ -499,17 +536,26 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 		}
 		for _, r := range in.Records {
 			if r.Path == p {
-				text := r.Text
-				if r.Kind == "said" {
-					text = "you said: " + text
+				if text := s.text(tr, r); text != "" {
+					lines = append(lines, s.Frag(p, text))
 				}
-				lines = append(lines, s.Frag(p, text))
 			}
 		}
 	}
 	in.Text = strings.Join(lines, "\n")
 	in.Dur = time.Since(t0)
 	return in
+}
+
+// text is a record's words in an insertion for the trigger.
+func (s *Store) text(tr Trigger, r Record) string {
+	if r.Kind == "said" {
+		return "you said: " + r.Text
+	}
+	if s.Render != nil {
+		return s.Render(tr.Kind, r)
+	}
+	return r.Text
 }
 
 // Frag renders one fragment, prefixed with the domain's display name
@@ -530,15 +576,21 @@ func (s *Store) Frag(path, text string) string {
 
 // Status is one domain's line for the UI's rack pane.
 type Status struct {
-	Path     string `json:"path"`
-	Name     string `json:"name,omitempty"`
-	Mirror   string `json:"mirror,omitempty"` // with the beliefs tail (RAG §9.3)
-	Mounted  bool   `json:"mounted"`
-	Records  int    `json:"records"`
-	Tok      int    `json:"tok"`
-	Open     int    `json:"open"`
-	Dropped  int    `json:"dropped"`
-	LastSaid string `json:"last_said"`
+	Path   string `json:"path"`
+	Name   string `json:"name,omitempty"`
+	Mirror string `json:"mirror,omitempty"` // with the beliefs tail (RAG §9.3)
+	// narration streaming (RAG §11): the agent's last fragment, its
+	// sentence, the form it was passed in, and the script's size
+	LastFrag     string `json:"last_fragment,omitempty"`
+	LastSentence string `json:"last_sentence,omitempty"`
+	LastForm     string `json:"last_form,omitempty"`
+	Script       int    `json:"script_tok,omitempty"`
+	Mounted      bool   `json:"mounted"`
+	Records      int    `json:"records"`
+	Tok          int    `json:"tok"`
+	Open         int    `json:"open"`
+	Dropped      int    `json:"dropped"`
+	LastSaid     string `json:"last_said"`
 }
 
 // Snapshot is the rack pane: per path, mounted, records, open, last said.
@@ -548,7 +600,7 @@ func (s *Store) Snapshot() []Status {
 	var out []Status
 	for _, p := range s.order {
 		t := s.tapes[p]
-		st := Status{Path: p, Name: t.Name, Mirror: t.Mirror, Mounted: t.Mounted, Records: len(t.Recs), Open: len(open(t.Recs)), Dropped: t.Dropped}
+		st := Status{Path: p, Name: t.Name, Mirror: t.Mirror, LastFrag: t.lastFrag, LastSentence: t.lastSentence, LastForm: t.lastForm, Script: t.script, Mounted: t.Mounted, Records: len(t.Recs), Open: len(open(t.Recs)), Dropped: t.Dropped}
 		for _, r := range t.Recs {
 			st.Tok += r.Tok
 			if r.Kind == "said" {

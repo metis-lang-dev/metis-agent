@@ -90,6 +90,8 @@ type LLM struct {
 	// libmtmd context (audio.go, -tags mtmd): nil unless AttachAudio ran
 	mtmd      unsafe.Pointer
 	mtmdClose func()
+	cfg       Config
+	sibling   bool // a second context on another LLM's model (Sibling): Close keeps the model
 }
 
 type Config struct {
@@ -188,6 +190,20 @@ func Load(cfg Config) (*LLM, error) {
 		return nil, fmt.Errorf("llm: cannot load model %s", cfg.ModelPath)
 	}
 
+	ctx := newContext(model, cfg)
+	if ctx == nil {
+		C.llama_model_free(model)
+		return nil, errors.New("llm: cannot create context")
+	}
+	l, err := withContext(model, ctx, cfg)
+	if err != nil {
+		l.Close()
+		return nil, err
+	}
+	return l, nil
+}
+
+func newContext(model *C.struct_llama_model, cfg Config) *C.struct_llama_context {
 	cp := C.llama_context_default_params()
 	cp.n_ctx = C.uint32_t(cfg.NCtx)
 	// sliding-window models (gemma3): a reduced SWA cache cannot remove a
@@ -196,14 +212,36 @@ func Load(cfg Config) (*LLM, error) {
 	cp.n_batch = C.uint32_t(cfg.NBatch)
 	cp.n_threads = C.int32_t(cfg.NThreads)
 	cp.n_threads_batch = C.int32_t(cfg.NThreads)
-	ctx := C.llama_init_from_model(model, cp)
-	if ctx == nil {
-		C.llama_model_free(model)
-		return nil, errors.New("llm: cannot create context")
-	}
+	return C.llama_init_from_model(model, cp)
+}
 
+// Sibling is a second context on this LLM's model (the weights loaded
+// once): its own KV, prefix and tape, its own lock. RAG §11: the agent
+// narrators' prefix next to the orchestrator's, so neither re-primes the
+// other. nCtx 0 = this one's. Close frees the context, not the model.
+func (l *LLM) Sibling(nCtx int) (*LLM, error) {
+	cfg := l.cfg
+	if nCtx > 0 {
+		cfg.NCtx = nCtx
+	}
+	ctx := newContext(l.model, cfg)
+	if ctx == nil {
+		return nil, errors.New("llm: cannot create a sibling context")
+	}
+	s, err := withContext(l.model, ctx, cfg)
+	if s != nil {
+		s.sibling = true
+	}
+	if err != nil {
+		s.Close()
+		return nil, err
+	}
+	return s, nil
+}
+
+func withContext(model *C.struct_llama_model, ctx *C.struct_llama_context, cfg Config) (*LLM, error) {
 	l := &LLM{
-		model: model, ctx: ctx,
+		model: model, ctx: ctx, cfg: cfg,
 		vocab:  C.llama_model_get_vocab(model),
 		nCtx:   cfg.NCtx,
 		nBatch: cfg.NBatch,
@@ -221,8 +259,7 @@ func Load(cfg Config) (*LLM, error) {
 		l.pass2Cue = "Spoken response:"
 	}
 	if err := l.resolveTemplate(cfg.Template); err != nil {
-		l.Close()
-		return nil, err
+		return l, err
 	}
 	return l, nil
 }
@@ -288,10 +325,10 @@ func (l *LLM) Close() {
 		C.llama_free(l.ctx)
 		l.ctx = nil
 	}
-	if l.model != nil {
+	if l.model != nil && !l.sibling {
 		C.llama_model_free(l.model)
-		l.model = nil
 	}
+	l.model = nil
 }
 
 // ── tokenizer plumbing ────────────────────────────────────────────────────────
@@ -469,6 +506,19 @@ func (l *LLM) renderGemma4(msgs []chatMsg, addAss bool) string {
 // the KV reuse is unchanged); templates that fold the system prompt into
 // the first user turn (gemma) split right before the user text instead.
 func (l *LLM) splitPrompt(system string) (prefix, tailFmt string, err error) {
+	if system == "" {
+		// no system turn (RAG §11.2: instructions folded into the user
+		// cue); the prefix is the template's text before the user's words
+		full, err := l.applyTemplate([]chatMsg{{"user", userSentinel}}, true)
+		if err != nil {
+			return "", "", err
+		}
+		i := strings.Index(full, userSentinel)
+		if i < 0 {
+			return "", "", errors.New("llm: template lost the user turn")
+		}
+		return full[:i], full[i:], nil
+	}
 	full, err := l.applyTemplate([]chatMsg{{"system", system}, {"user", userSentinel}}, true)
 	if err != nil {
 		return "", "", err
@@ -975,6 +1025,17 @@ func (l *LLM) DecideTimed(systemPrompt, user, cont, gbnf string, maxTokens int) 
 // thought runs greedily to its close (≤ thinkMax), then the sentence.
 // Returns the sentence, the time to its first spoken token and the thought.
 func (l *LLM) Speak(systemPrompt, user string, think bool) (string, time.Duration, string, error) {
+	n := 0
+	if think {
+		n = 64 // a narration's thought: short (live: uncapped it ran ~250 tok, 1.7 s)
+	}
+	return l.SpeakCap(systemPrompt, user, n)
+}
+
+// SpeakCap is Speak with the thought's cap per call: 0 = no thinking
+// (RAG §11.2's sweep: off / 64 / 256), bounded by Config.ThinkMaxTokens.
+func (l *LLM) SpeakCap(systemPrompt, user string, thinkCap int) (string, time.Duration, string, error) {
+	think := thinkCap > 0
 	t0 := time.Now()
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -997,9 +1058,9 @@ func (l *LLM) Speak(systemPrompt, user string, think bool) (string, time.Duratio
 		g := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
 		C.llama_sampler_chain_add(g, C.llama_sampler_init_greedy())
 		var out []C.llama_token
-		max := min(l.thinkMax, 64) // a narration's thought: short (live: uncapped it ran ~250 tok, 1.7 s)
-		if max <= 0 {
-			max = 256
+		max := thinkCap
+		if l.thinkMax > 0 {
+			max = min(l.thinkMax, thinkCap)
 		}
 		for len(out) < max {
 			tok := C.llama_sampler_sample(g, l.ctx, -1)

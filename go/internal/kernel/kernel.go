@@ -51,17 +51,30 @@ type Config struct {
 	// Path names the runtime's domain (rack: the tape it feeds); unset =
 	// the watch answer's path.
 	Path string `yaml:"path"`
-	// Display, Target, Says: the domain in the person's words (RAG §9.1–2),
-	// set on its card unless the cards op gives them (kernel.Name).
-	Display string            `yaml:"display"`
-	Target  string            `yaml:"target"`
-	Says    map[string]string `yaml:"says"`
+	// Display: the domain in the person's words (RAG §9.1), set on its
+	// card unless the cards op gives it (kernel.Name).
+	Display string `yaml:"display"`
 	// Runtimes (rack phase 1b, docs/RAG.md §5): N runtimes attached to the
 	// one narrator, each its own process and watch. An entry's set fields
 	// override this config's; empty = this config is the one runtime.
 	Runtimes []Config `yaml:"runtimes"`
 	// Rack: the per-domain tapes and the structural retriever (RAG §2–4).
 	Rack RackConfig `yaml:"rack"`
+	// Narr: narration streaming from the script RAG (RAG §11); needs rack.
+	Narr NarrConfig `yaml:"narr"`
+}
+
+// NarrConfig turns narration streaming on: each runtime's script (the
+// `script` op) in the RAG, every fragment narrated as it appears by the
+// per-agent narrator (a second context on the same model), then passed to
+// the dialog — the orchestrator — in a form.
+type NarrConfig struct {
+	Enabled   bool   `yaml:"enabled"`
+	Retrieval string `yaml:"retrieval"` // flat (default: every script resident in the narrator's prefix) | structural (the referenced entries per fragment)
+	Form      string `yaml:"form"`      // policy (default: progress R, surprise/notice/result R+N, ask N) | N-all | R-all
+	Think     *int   `yaml:"think"`     // the thought cap for surprise-class fragments (default 64; 0 = off)
+	Interp    string `yaml:"interp"`    // system (default: the instructions in the system turn) | cue (folded into every turn, no system turn)
+	NCtx      int    `yaml:"n_ctx"`     // the narrator's context (default 4096)
 }
 
 // RackConfig turns the rack on: narration and the person's questions are
@@ -117,7 +130,7 @@ func (c Config) Each() []Config {
 		if r.SettleBeats != 0 {
 			m.SettleBeats = r.SettleBeats
 		}
-		m.Path, m.Display, m.Target, m.Says = r.Path, r.Display, r.Target, r.Says
+		m.Path, m.Display = r.Path, r.Display
 		out = append(out, m)
 	}
 	return out

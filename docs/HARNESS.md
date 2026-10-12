@@ -512,3 +512,52 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
   mirror lines in the ask scope only. `structural` is the §3 retriever,
   parked until the tree (it and its E7 reference test stay). In both, a
   `said` record is retrieved only in the quiescence scope.
+
+## 11. Narration streaming from the script RAG (RAG §11, E8 step 2)
+
+`kernel.narr: {enabled, retrieval, form, think, interp, n_ctx}` (needs
+`kernel.rack.enabled`; off by default). `internal/narr`:
+
+- **The script RAG, one per agent.** The runtime's `script` op (metispy
+  aedf25f) is fetched once at attach (`narr.Parse`): per card its clauses
+  {name, stage, doc = the `%%` comment, premises, effects, target} and
+  atoms {name, doc}. No authored interpretation; `Script.Text` renders it
+  ("- move load: \"drop the onion into pot capacity.\"; needs held onion,
+  pot space; leaves hand free, pot onion."), a sibling card's moves under
+  their card, a move acting on another agent with "acts on <its name>".
+  The `says` dictionary is gone (card `target`/`says`, config, piece).
+- **Fragments are references** (`narr.FromSignal`): {path, seq, beat,
+  kind, ref, counts} (+ `expected` on a surprise), the counts after the
+  signal from the host's `kernel.Counts`. The R form is `Line` ("the first
+  cook: load; now hand free 1, pot onion 1"); the rack tape stores `Body`
+  (the reference, tagged by its prefix) from arrival.
+- **The narrator** (`narr.Narrator`) runs on a second context of the same
+  model (`llm.Sibling`): its own prefix next to the orchestrator's, so
+  neither re-primes the other. The prefix is `narr.Interpret` (how to read
+  a fragment against its entry) plus, flat, every script resident;
+  structural pulls per fragment only what the reference names (its move
+  entries, the things it counts; for a surprise the sibling cards' moves
+  and every other agent's moves that act on it). `interp: cue` folds the
+  instructions (and flat's scripts) into every turn with no system turn
+  (`llm` renders an empty system prompt as no system turn). Thinking per
+  call (`llm.SpeakCap`): `think` caps the thought on surprise-class
+  fragments (64 by default), progress is always off.
+- **Streaming.** One worker per agent narrates its fragments in arrival
+  order, not spoken (~0.3–0.6 s each alone on the GPU, ~1 s beside the
+  orchestrator). The sentence passes the harness's guards (voice,
+  invented numbers against the call's own text) and joins its record
+  (`rack.Store.SetAgent`); a rejected sentence passes R instead.
+- **The form** (`narr.Form`, `form: policy`): progress → R (the
+  orchestrator already tapes progress and speaks per order at
+  quiescence), surprise / notice / result → R+N, the person's ask → N
+  (the rack's `Render` hook picks per trigger); `N-all` / `R-all` for the
+  bench. The orchestrator is unchanged: it gets the form as the piece's
+  fact.
+- **The pane** shows per agent: tape and script tokens, the last fragment,
+  the agent's sentence and the form passed.
+- **Bench:** `llmbench -e8 grammar/e7-corpus.jsonl` with `-e8-rows
+  retrieval/form[/setting]` (settings `think=off|64|256`,
+  `interp=system|cue`; the plain flat/policy row is think=64,
+  interp=system), `-e8-scripts grammar/e8-scripts.json`, `-e8-k` (12),
+  `-e7-reps`, `-e7-dry`. Records `e8`, `e8-sentence`, `e8-run` for
+  `tools/e8-score.py`.

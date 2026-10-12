@@ -37,6 +37,7 @@ import (
 	"github.com/metis-lang-dev/metis-agent/go/internal/audio"
 	"github.com/metis-lang-dev/metis-agent/go/internal/kernel"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
+	"github.com/metis-lang-dev/metis-agent/go/internal/narr"
 	"github.com/metis-lang-dev/metis-agent/go/internal/pipeline"
 	"github.com/metis-lang-dev/metis-agent/go/internal/rack"
 	"github.com/metis-lang-dev/metis-agent/go/internal/stt"
@@ -471,6 +472,56 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 			log.Fatalf("kernel.rack.retrieve %q: flat | structural", kcfg.Rack.Retrieve)
 		}
 	}
+	// narration streaming (RAG §11): the per-agent narrator on a second
+	// context of the same model, the scripts fetched at attach
+	var st *streamer
+	if kcfg.Narr.Enabled {
+		if rk == nil {
+			log.Fatal("kernel.narr needs kernel.rack.enabled")
+		}
+		nctx := kcfg.Narr.NCtx
+		if nctx <= 0 {
+			nctx = 4096
+		}
+		nl, err := l.Sibling(nctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+		nr := &narr.Narrator{LLM: nl, Scripts: map[string]*narr.Script{}, Think: 64,
+			Name: func(p string) string { return kernel.DisplayName(p, cards) },
+			Tok:  func(s string) int { return len(nl.Tokens(s, false)) }}
+		switch kcfg.Narr.Retrieval {
+		case "", "flat":
+		case "structural":
+			nr.Structural = true
+		default:
+			log.Fatalf("kernel.narr.retrieval %q: flat | structural", kcfg.Narr.Retrieval)
+		}
+		switch kcfg.Narr.Interp {
+		case "", "system":
+		case "cue":
+			nr.InCue = true
+		default:
+			log.Fatalf("kernel.narr.interp %q: system | cue", kcfg.Narr.Interp)
+		}
+		if kcfg.Narr.Think != nil {
+			nr.Think = *kcfg.Narr.Think
+		}
+		mode := kcfg.Narr.Form
+		if mode == "" {
+			mode = "policy"
+		}
+		if mode != "policy" && mode != "N-all" && mode != "R-all" {
+			log.Fatalf("kernel.narr.form %q: policy | N-all | R-all", mode)
+		}
+		st = &streamer{nr: nr, mode: mode, rk: rk, eng: eng, q: map[string]chan streamWork{}}
+		rk.Render = func(trigger string, r rack.Record) string {
+			return narr.Render(narr.Form(mode, trigger, r.Kind), r.Text, r.Agent)
+		}
+		log.Printf("[narr] on: retrieval %s, form %s, think %d, interp %s, narrator context %d",
+			map[bool]string{true: "structural", false: "flat"}[nr.Structural], mode, nr.Think,
+			map[bool]string{true: "cue", false: "system"}[nr.InCue], nctx)
+	}
 	cardText := func(path string) string {
 		for _, c := range cards {
 			if c.Name == path {
@@ -512,10 +563,28 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 					kind, _ := f["signal"].(string)
 					seq, _ := f["seq"].(float64)
 					rk.Attach(ev.Path, cardText(ev.Path))
-					for _, rec := range rack.FromSignal(kernel.Signal{Kind: kind, Seq: int(seq), Path: ev.Path, F: f}, ev.Pieces) {
+					sig := kernel.Signal{Kind: kind, Seq: int(seq), Path: ev.Path, F: f}
+					recs := rack.FromSignal(sig, ev.Pieces)
+					var frags []narr.Fragment
+					if st != nil {
+						// RAG §11: the tape holds the references with counts
+						// (the host applied the counts already)
+						frags = narr.FromSignal(sig, h.Counts)
+						for i := range recs {
+							if i < len(frags) {
+								recs[i].Text = frags[i].Body()
+							}
+						}
+					}
+					for _, rec := range recs {
 						rk.Add(rec)
 					}
 					pushRack()
+					if st != nil && len(ev.Pieces) > 0 {
+						// narrated as it appears, then passed in its form
+						st.submit(streamWork{ev: ev, frags: frags, recs: recs})
+						return
+					}
 				}
 			}
 			// step 4 (CML.md §7): every piece is narrated unsolicited, floor
@@ -564,7 +633,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		if r.path == "" {
 			return
 		}
-		kernel.Name(cards, r.path, r.cfg.Display, r.cfg.Target, r.cfg.Says)
+		kernel.Name(cards, r.path, r.cfg.Display)
 		if rk != nil {
 			rk.Name(r.path, kernel.DisplayName(r.path, cards))
 		}
@@ -645,6 +714,14 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		}
 		log.Printf("[rack] on: flat %v (k %d), budget %d tok, wrap %v, ask %v", rk.Flat, rk.K, rk.Budget, rk.Wrap, eng.RackAsk)
 	}
+	if st != nil {
+		st.push = pushRack
+		for _, r := range rts { // every script in the RAG before the first signal
+			if r.path != "" {
+				fetchScript(st, r.c, r.path)
+			}
+		}
+	}
 	for _, r := range rts {
 		w := r.cfg.Watch
 		if w == "" {
@@ -663,6 +740,9 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		}
 		if rk != nil {
 			rk.Attach(r.path, cardText(r.path))
+		}
+		if st != nil && st.nr.ScriptTok(r.path) == 0 {
+			fetchScript(st, r.c, r.path) // a runtime whose path only the watch named
 		}
 		b, _ := json.Marshal(ans)
 		log.Printf("[kernel] %s watch %s → %s", r.path, w, b)

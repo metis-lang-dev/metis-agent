@@ -66,9 +66,9 @@ func TestPiecesNowCarryCounts(t *testing.T) {
 	}
 }
 
-// RAG §9.1–3: the domains in the person's words — the mirror line names
-// the domain once in both forms and is the short form (no beliefs tail);
-// a move into another domain names its target.
+// RAG §9.1, §9.3: the domains in the person's words — the mirror line
+// names the domain once in both forms and is the short form (no beliefs
+// tail).
 func TestDisplayNames(t *testing.T) {
 	var cards []Card
 	b, err := os.ReadFile("testdata/kitchen-cards.json")
@@ -89,11 +89,13 @@ func TestDisplayNames(t *testing.T) {
 	}
 	ev := Signal{Kind: "event", Path: "kitchen_shared", F: map[string]any{"kind": "clause", "name": "partner_load",
 		"consume": map[string]any{"pot_space": 1.0}, "produce": map[string]any{"pot_onion": 1.0}}}
-	if got := Pieces(ev, cards)[0].Text; got != "The second cook loaded an onion into the first cook's pot." {
+	// a move's own words are the script's now (RAG §11, narr): the piece
+	// stays the plain template
+	if got := Pieces(ev, cards)[0].Text; !strings.HasPrefix(got, "In the kitchen shared: partner load (pot onion +1, pot space -1)") {
 		t.Errorf("piece: %s", got)
 	}
 	c := NewCounts(map[string]any{"pot_space": 3.0})
-	if got := PiecesNow(ev, cards, c)[0].Text; got != "The second cook loaded an onion into the first cook's pot; now pot onion 1, pot space 2." {
+	if got := PiecesNow(ev, cards, c)[0].Text; got != "In the kitchen shared: partner load (pot onion +1, pot space -1); now pot onion 1, pot space 2." {
 		t.Errorf("piece now: %s", got)
 	}
 	if got := DisplayName("pantry", cards); got != "pantry" {
@@ -101,8 +103,8 @@ func TestDisplayNames(t *testing.T) {
 	}
 	// the runtime config fills what the cards op left out, never over it
 	cs := []Card{{Name: "pantry"}, {Name: "kitchen", Display: "the cook"}}
-	Name(cs, "pantry", "the pantry", "", nil)
-	Name(cs, "kitchen", "the first cook", "", nil)
+	Name(cs, "pantry", "the pantry")
+	Name(cs, "kitchen", "the first cook")
 	if cs[0].Display != "the pantry" || cs[1].Display != "the cook" {
 		t.Errorf("Name: %+v", cs)
 	}

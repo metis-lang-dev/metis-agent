@@ -1,0 +1,461 @@
+{
+ "kitchen": {
+  "script": [
+   {
+    "name": "kitchen",
+    "relation": "served",
+    "text": "a one-cook kitchen: onions into the pot, cook, plate and serve each order",
+    "clauses": [
+     {
+      "name": "fetch_onion",
+      "stage": "task",
+      "doc": "walk to a dispenser and take an onion.",
+      "premises": [
+       {
+        "atom": "hand_free",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "held_onion",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     },
+     {
+      "name": "load",
+      "stage": "task",
+      "doc": "drop the onion into pot capacity.",
+      "premises": [
+       {
+        "atom": "held_onion",
+        "n": 1,
+        "kept": false
+       },
+       {
+        "atom": "pot_space",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "hand_free",
+        "n": 1,
+        "kept": false
+       },
+       {
+        "atom": "pot_onion",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     },
+     {
+      "name": "cook",
+      "stage": "task",
+      "doc": "three onions start the cook — needs a free hand to press start (the env's interact semantics; also forces cook-before-dish).",
+      "premises": [
+       {
+        "atom": "hand_free",
+        "n": 1,
+        "kept": true
+       },
+       {
+        "atom": "pot_onion",
+        "n": 3,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "cooking",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     },
+     {
+      "name": "fetch_dish",
+      "stage": "task",
+      "doc": "fetch a dish while the soup cooks.",
+      "premises": [
+       {
+        "atom": "hand_free",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "held_dish",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     },
+     {
+      "name": "plate",
+      "stage": "task",
+      "doc": "cooked soup onto the held dish.",
+      "premises": [
+       {
+        "atom": "held_dish",
+        "n": 1,
+        "kept": false
+       },
+       {
+        "atom": "cooking",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "held_soup",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     },
+     {
+      "name": "serve",
+      "stage": "task",
+      "doc": "deliver.",
+      "premises": [
+       {
+        "atom": "held_soup",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "hand_free",
+        "n": 1,
+        "kept": false
+       },
+       {
+        "atom": "served",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     }
+    ],
+    "atoms": [
+     {
+      "name": "hand_free",
+      "doc": "a free hand"
+     },
+     {
+      "name": "held_onion",
+      "doc": "an onion in hand"
+     },
+     {
+      "name": "held_dish",
+      "doc": "a dish in hand"
+     },
+     {
+      "name": "held_soup",
+      "doc": "a soup in hand"
+     },
+     {
+      "name": "pot_space",
+      "doc": "room in the pot"
+     },
+     {
+      "name": "pot_onion",
+      "doc": "onions in the pot"
+     },
+     {
+      "name": "cooking",
+      "doc": "a soup cooking"
+     },
+     {
+      "name": "ready",
+      "doc": "a soup ready"
+     },
+     {
+      "name": "served",
+      "doc": "soups served"
+     }
+    ],
+    "missing": {
+     "clause_doc": [],
+     "atom_doc": []
+    }
+   },
+   {
+    "name": "kitchen_shared",
+    "relation": "sibling",
+    "text": "a shared kitchen: a second cook also loads onions into the pot",
+    "clauses": [
+     {
+      "name": "partner_load",
+      "stage": "task",
+      "doc": "the second cook drops an onion into the first cook's pot.",
+      "premises": [
+       {
+        "atom": "pot_space",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "pot_onion",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": "kitchen"
+     }
+    ],
+    "atoms": [
+     {
+      "name": "pot_space",
+      "doc": "room in the pot"
+     },
+     {
+      "name": "pot_onion",
+      "doc": "onions in the pot"
+     }
+    ],
+    "missing": {
+     "clause_doc": [],
+     "atom_doc": []
+    }
+   }
+  ],
+  "text": "kitchen [served] \"a one-cook kitchen: onions into the pot, cook, plate and serve each order\"\n  fetch_onion: walk to a dispenser and take an onion. [hand_free -o held_onion]\n  load: drop the onion into pot capacity. [held_onion * pot_space -o hand_free * pot_onion]\n  cook: three onions start the cook — needs a free hand to press start (the env's interact semantics; also forces cook-before-dish). [$hand_free * pot_onion^3 -o cooking]\n  fetch_dish: fetch a dish while the soup cooks. [hand_free -o held_dish]\n  plate: cooked soup onto the held dish. [held_dish * cooking -o held_soup]\n  serve: deliver. [held_soup -o hand_free * served]\n  atoms: hand_free = a free hand, held_onion = an onion in hand, held_dish = a dish in hand, held_soup = a soup in hand, pot_space = room in the pot, pot_onion = onions in the pot, cooking = a soup cooking, ready = a soup ready, served = soups served\nkitchen_shared [sibling] \"a shared kitchen: a second cook also loads onions into the pot\"\n  partner_load → kitchen: the second cook drops an onion into the first cook's pot. [pot_space -o pot_onion]\n  atoms: pot_space = room in the pot, pot_onion = onions in the pot"
+ },
+ "kitchen_shared": {
+  "script": [
+   {
+    "name": "kitchen_shared",
+    "relation": "served",
+    "text": "a shared kitchen: a second cook also loads onions into the pot",
+    "clauses": [
+     {
+      "name": "fetch_onion",
+      "stage": "task",
+      "doc": "walk to a dispenser and take an onion.",
+      "premises": [
+       {
+        "atom": "hand_free",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "held_onion",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     },
+     {
+      "name": "load",
+      "stage": "task",
+      "doc": "drop the onion into pot capacity.",
+      "premises": [
+       {
+        "atom": "held_onion",
+        "n": 1,
+        "kept": false
+       },
+       {
+        "atom": "pot_space",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "hand_free",
+        "n": 1,
+        "kept": false
+       },
+       {
+        "atom": "pot_onion",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     },
+     {
+      "name": "cook",
+      "stage": "task",
+      "doc": "three onions start the cook — needs a free hand to press start (the env's interact semantics; also forces cook-before-dish).",
+      "premises": [
+       {
+        "atom": "hand_free",
+        "n": 1,
+        "kept": true
+       },
+       {
+        "atom": "pot_onion",
+        "n": 3,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "cooking",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     },
+     {
+      "name": "fetch_dish",
+      "stage": "task",
+      "doc": "fetch a dish while the soup cooks.",
+      "premises": [
+       {
+        "atom": "hand_free",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "held_dish",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     },
+     {
+      "name": "plate",
+      "stage": "task",
+      "doc": "cooked soup onto the held dish.",
+      "premises": [
+       {
+        "atom": "held_dish",
+        "n": 1,
+        "kept": false
+       },
+       {
+        "atom": "cooking",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "held_soup",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     },
+     {
+      "name": "serve",
+      "stage": "task",
+      "doc": "deliver.",
+      "premises": [
+       {
+        "atom": "held_soup",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "hand_free",
+        "n": 1,
+        "kept": false
+       },
+       {
+        "atom": "served",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": null
+     },
+     {
+      "name": "partner_load",
+      "stage": "task",
+      "doc": "the second cook drops the onion it holds into the first cook's pot.",
+      "premises": [
+       {
+        "atom": "held_onion",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "effects": [
+       {
+        "atom": "hand_free",
+        "n": 1,
+        "kept": false
+       }
+      ],
+      "target": "kitchen"
+     }
+    ],
+    "atoms": [
+     {
+      "name": "hand_free",
+      "doc": "a free hand"
+     },
+     {
+      "name": "held_onion",
+      "doc": "an onion in hand"
+     },
+     {
+      "name": "held_dish",
+      "doc": "a dish in hand"
+     },
+     {
+      "name": "held_soup",
+      "doc": "a soup in hand"
+     },
+     {
+      "name": "pot_space",
+      "doc": "room in the pot"
+     },
+     {
+      "name": "pot_onion",
+      "doc": "onions in the pot"
+     },
+     {
+      "name": "cooking",
+      "doc": "a soup cooking"
+     },
+     {
+      "name": "ready",
+      "doc": "a soup ready"
+     },
+     {
+      "name": "served",
+      "doc": "soups served"
+     }
+    ],
+    "missing": {
+     "clause_doc": [],
+     "atom_doc": []
+    }
+   }
+  ],
+  "text": "kitchen_shared [served] \"a shared kitchen: a second cook also loads onions into the pot\"\n  fetch_onion: walk to a dispenser and take an onion. [hand_free -o held_onion]\n  load: drop the onion into pot capacity. [held_onion * pot_space -o hand_free * pot_onion]\n  cook: three onions start the cook — needs a free hand to press start (the env's interact semantics; also forces cook-before-dish). [$hand_free * pot_onion^3 -o cooking]\n  fetch_dish: fetch a dish while the soup cooks. [hand_free -o held_dish]\n  plate: cooked soup onto the held dish. [held_dish * cooking -o held_soup]\n  serve: deliver. [held_soup -o hand_free * served]\n  partner_load → kitchen: the second cook drops the onion it holds into the first cook's pot. [held_onion -o hand_free]\n  atoms: hand_free = a free hand, held_onion = an onion in hand, held_dish = a dish in hand, held_soup = a soup in hand, pot_space = room in the pot, pot_onion = onions in the pot, cooking = a soup cooking, ready = a soup ready, served = soups served"
+ }
+}

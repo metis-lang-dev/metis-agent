@@ -272,3 +272,32 @@ func TestFlatAndSaid(t *testing.T) {
 		}
 	}
 }
+
+// RAG §11: the reference is on the tape from arrival, the agent's
+// sentence joins it later, and Render picks the form per trigger.
+func TestAgentSentenceAndRender(t *testing.T) {
+	s := New("a")
+	s.Flat = true
+	s.Add(Record{Path: "a", Seq: 4, Kind: "event", Text: "load; now pot onion 1", Rec: -1})
+	if !s.SetAgent("a", 4, "event", "The cook dropped an onion into the pot.") || s.SetAgent("a", 9, "event", "x") {
+		t.Fatal("SetAgent")
+	}
+	s.Render = func(trigger string, r Record) string {
+		if trigger == "ask" {
+			return r.Agent
+		}
+		if r.Kind == "event" && trigger == "quiescence" {
+			return "" // not passed
+		}
+		return r.Text
+	}
+	if in := s.Retrieve(Trigger{Kind: "ask"}, nil); in.Text != "⟪a: The cook dropped an onion into the pot⟫" {
+		t.Errorf("ask: %q", in.Text)
+	}
+	if in := s.Retrieve(Trigger{Kind: "event", Path: "a"}, nil); in.Text != "⟪a: load; now pot onion 1⟫" {
+		t.Errorf("event: %q", in.Text)
+	}
+	if in := s.Retrieve(Trigger{Kind: "quiescence", Path: "a"}, nil); in.Text != "" {
+		t.Errorf("not passed: %q", in.Text)
+	}
+}
