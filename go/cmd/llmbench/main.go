@@ -138,7 +138,7 @@ func main() {
 	threads := flag.Int("threads", 6, "CPU threads")
 	temp := flag.Float64("pass2_temp", 0, "pass-2 temperature (0 = default 0.4)")
 	topk := flag.Int("pass2_top_k", 0, "pass-2 top_k (0 = default 40)")
-	seed := flag.Int("pass2_seed", 0, "E7/E8: pass-2 sampler seed, seed+rep per repeat (0 = random per call)")
+	seed := flag.Int("pass2_seed", 0, "E8: pass-2 sampler seed, seed+rep per repeat (0 = random per call)")
 	maxtok := flag.Int("pass2_max_tokens", 0, "pass-2 max tokens (0 = default 50)")
 	think := flag.Bool("think", false, "Gemma 4 thinking on (<|think|> in the system turn)")
 	thinkMax := flag.Int("think_max", 512, "max thought tokens with -think")
@@ -157,16 +157,13 @@ func main() {
 	spliceCards := flag.String("splice-cards", "grammar/splice-cards.json", "E6b: the cards op's JSON, for the plain-word renderer T2")
 	spliceRnd := flag.String("splice-renderers", "T,Z,R", "E6: pieces to run (T, Z, R; E6b: T2)")
 	spliceGrid := flag.Bool("splice-grid-only", false, "E6: the fact-question grid only (no conflict/continuation)")
-	e7F := flag.String("e7", "", "E7 corpus (grammar/e7-corpus.jsonl, tools/e7-corpus.py): 24 questions × arms S/F/1/S-nofocus over the RAG store (docs/RAG.md §6)")
-	e7Pair := flag.String("e7-pair", "grammar/e7-pair.jsonl", "E7: the kitchen pair run")
-	e7Cards := flag.String("e7-cards", "internal/kernel/testdata/kitchen-cards.json", "E7: the cards op's JSON")
-	e7Arms := flag.String("e7-arms", "S,F,1,S-nofocus", "E7: arms")
-	e7Dry := flag.Bool("e7-dry", false, "E7: write the insertions only, no generation")
-	e7Reps := flag.Int("e7-reps", 1, "E7: repeats of the whole corpus (pass-2 sampling is stochastic)")
-	e8F := flag.String("e8", "", "E8 corpus (the E7 corpus): narration streaming from the script RAG (docs/RAG.md §11.2); reuses -e7-pair, -e7-cards, -e7-reps, -e7-dry")
+	e8F := flag.String("e8", "", "E8 corpus (grammar/e7-corpus.jsonl): narration streaming from the script RAG (docs/RAG.md §11–12)")
+	e8Pair := flag.String("e8-pair", "grammar/e7-pair.jsonl", "E8: the kitchen pair run")
+	e8Cards := flag.String("e8-cards", "internal/kernel/testdata/kitchen-cards.json", "E8: the cards op's JSON")
+	e8Dry := flag.Bool("e8-dry", false, "E8: write the insertions only, no generation")
+	e8Reps := flag.Int("e8-reps", 1, "E8: repeats of the whole corpus")
 	e8Scripts := flag.String("e8-scripts", "grammar/e8-scripts.json", "E8: the runtimes' script op answers, by path")
-	e8Rows := flag.String("e8-rows", "flat/policy,flat/N-all,flat/R-all,structural/policy,structural/N-all,structural/R-all,flat/policy/think=64,flat/policy/think=256,flat/policy/interp=cue",
-		"E8: rows retrieval/form[/setting]; the plain flat/policy row is think=off and interp=system")
+	e8Forms := flag.String("e8-forms", "policy,N-all,R-all", "E8: the forms passed to the orchestrator (one narration pass per repeat serves them all)")
 	e8K := flag.Int("e8-k", 12, "E8: the orchestrator's flat insertion, passed fragments per question (the harness's rack.k)")
 	eventsF := flag.String("events", "", "narrate corpus (intent<TAB>args JSON<TAB>result<TAB>detail): each task outcome through the harness's taskCue + Narrate + guard")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
@@ -219,7 +216,7 @@ func main() {
 	for _, u := range flag.Args() {
 		rows = append(rows, row{utt: u})
 	}
-	if len(rows) == 0 && *eventsF == "" && *spliceF == "" && *e7F == "" && *e8F == "" {
+	if len(rows) == 0 && *eventsF == "" && *spliceF == "" && *e8F == "" {
 		fail(fmt.Errorf("nothing to run: -corpus, -audio, -events or utterances"))
 	}
 	// a held-out row the prompt now teaches verbatim is no longer held out
@@ -284,11 +281,7 @@ func main() {
 		return
 	}
 	if *e8F != "" {
-		runE8(l, string(prompt), *e7Pair, *e8F, *e7Cards, *e8Scripts, *e8Rows, *tag, *e7Reps, *e8K, uint32(*seed), *e7Dry, emit)
-		return
-	}
-	if *e7F != "" {
-		runE7(l, string(prompt), *e7Pair, *e7F, *e7Cards, *e7Arms, *tag, *e7Reps, *e7Dry, emit)
+		runE8(l, string(prompt), *e8Pair, *e8F, *e8Cards, *e8Scripts, *e8Forms, *tag, *e8Reps, *e8K, uint32(*seed), *e8Dry, emit)
 		return
 	}
 	if *spliceF != "" {

@@ -9,7 +9,6 @@ package narr
 import (
 	"encoding/json"
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -107,18 +106,6 @@ func (s *Script) Clause(name string) (*Card, *Clause) {
 	return nil, nil
 }
 
-// AtomDoc is an atom's doc ("" when the script has none).
-func (s *Script) AtomDoc(name string) string {
-	for _, c := range s.Cards {
-		for _, a := range c.Atoms {
-			if a.Name == name && a.Doc != "" {
-				return a.Doc
-			}
-		}
-	}
-	return ""
-}
-
 func terms(ts []Term) string {
 	var out []string
 	for _, t := range ts {
@@ -202,18 +189,4 @@ func (s *Script) Text(name Names) string {
 		}
 	}
 	return strings.TrimRight(b.String(), "\n")
-}
-
-// atomsOf: the atoms a clause touches, sorted.
-func atomsOf(cl *Clause) []string {
-	set := map[string]bool{}
-	for _, t := range append(append([]Term{}, cl.Premises...), cl.Effects...) {
-		set[t.Atom] = true
-	}
-	out := make([]string, 0, len(set))
-	for a := range set {
-		out = append(out, a)
-	}
-	sort.Strings(out)
-	return out
 }

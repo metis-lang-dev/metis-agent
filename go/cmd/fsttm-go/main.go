@@ -461,15 +461,9 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		if kcfg.Rack.Wrap != nil {
 			rk.Wrap = *kcfg.Rack.Wrap
 		}
-		switch kcfg.Rack.Retrieve {
-		case "", "flat":
-			rk.Flat, rk.K = true, kcfg.Rack.K
-			if rk.K <= 0 {
-				rk.K = 12
-			}
-		case "structural":
-		default:
-			log.Fatalf("kernel.rack.retrieve %q: flat | structural", kcfg.Rack.Retrieve)
+		rk.K = kcfg.Rack.K
+		if rk.K <= 0 {
+			rk.K = 12
 		}
 	}
 	// narration streaming (RAG §11): the per-agent narrator on a second
@@ -487,26 +481,9 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		if err != nil {
 			log.Fatal(err)
 		}
-		nr := &narr.Narrator{LLM: nl, Scripts: map[string]*narr.Script{}, // thinking off (RAG §12.4)
+		nr := &narr.Narrator{LLM: nl, Scripts: map[string]*narr.Script{},
 			Name: func(p string) string { return kernel.DisplayName(p, cards) },
 			Tok:  func(s string) int { return len(nl.Tokens(s, false)) }}
-		switch kcfg.Narr.Retrieval {
-		case "", "flat":
-		case "structural":
-			nr.Structural = true
-		default:
-			log.Fatalf("kernel.narr.retrieval %q: flat | structural", kcfg.Narr.Retrieval)
-		}
-		switch kcfg.Narr.Interp {
-		case "", "system":
-		case "cue":
-			nr.InCue = true
-		default:
-			log.Fatalf("kernel.narr.interp %q: system | cue", kcfg.Narr.Interp)
-		}
-		if kcfg.Narr.Think != nil {
-			nr.Think = *kcfg.Narr.Think
-		}
 		mode := kcfg.Narr.Form
 		if mode == "" {
 			mode = "policy"
@@ -518,18 +495,9 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		rk.Render = func(trigger string, r rack.Record) string {
 			return narr.Render(narr.Form(mode, trigger, r.Kind), r.Text, r.Agent)
 		}
-		log.Printf("[narr] on: retrieval %s, form %s, think %d, interp %s, narrator context %d",
-			map[bool]string{true: "structural", false: "flat"}[nr.Structural], mode, nr.Think,
-			map[bool]string{true: "cue", false: "system"}[nr.InCue], nctx)
+		log.Printf("[narr] on: form %s, narrator context %d", mode, nctx)
 	}
-	cardText := func(path string) string {
-		for _, c := range cards {
-			if c.Name == path {
-				return kernel.PlainWords(c.Text, nil)
-			}
-		}
-		return ""
-	}
+
 	pushRack := func() {
 		if rk != nil {
 			rkMu.Lock()
@@ -562,7 +530,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 				if json.Unmarshal(ev.Raw, &f) == nil {
 					kind, _ := f["signal"].(string)
 					seq, _ := f["seq"].(float64)
-					rk.Attach(ev.Path, cardText(ev.Path))
+					rk.Attach(ev.Path)
 					sig := kernel.Signal{Kind: kind, Seq: int(seq), Path: ev.Path, F: f}
 					recs := rack.FromSignal(sig, ev.Pieces)
 					var frags []narr.Fragment
@@ -702,8 +670,8 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 			rkMu.Lock()
 			last = fmt.Sprintf("%s(%s): %d records, %d tok, %d ms", in.Trigger.Kind, in.Trigger.Path, len(in.Records), in.Tok, in.Dur.Milliseconds())
 			rkMu.Unlock()
-			log.Printf("[rack] insertion %s(%s): %d records + %d mirror lines + %d cards, %d tok, %s (mirror ops included)",
-				in.Trigger.Kind, in.Trigger.Path, len(in.Records), len(in.Mirrors), len(in.Cards), in.Tok, in.Dur.Round(time.Millisecond))
+			log.Printf("[rack] insertion %s(%s): %d records + %d mirror lines, %d tok, %s (mirror ops included)",
+				in.Trigger.Kind, in.Trigger.Path, len(in.Records), len(in.Mirrors), in.Tok, in.Dur.Round(time.Millisecond))
 			pushRack()
 		}, onSaid: pushRack}
 		eng.RackAsk = kcfg.Rack.Ask == nil || *kcfg.Rack.Ask
@@ -712,7 +680,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 			log.Printf("[rack] mount %s %v (known %v); active %v", path, on, ok, rk.Active())
 			pushRack()
 		}
-		log.Printf("[rack] on: flat %v (k %d), budget %d tok, wrap %v, ask %v", rk.Flat, rk.K, rk.Budget, rk.Wrap, eng.RackAsk)
+		log.Printf("[rack] on: k %d, budget %d tok, wrap %v, ask %v", rk.K, rk.Budget, rk.Wrap, eng.RackAsk)
 	}
 	if st != nil {
 		st.push = pushRack
@@ -739,7 +707,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 			name(r)
 		}
 		if rk != nil {
-			rk.Attach(r.path, cardText(r.path))
+			rk.Attach(r.path)
 		}
 		if st != nil && st.nr.ScriptTok(r.path) == 0 {
 			fetchScript(st, r.c, r.path) // a runtime whose path only the watch named
@@ -805,7 +773,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 }
 
 // rackAdapter is the dialog's pipeline.Rack over the rack store: the
-// structural insertion for a trigger, with each path's mirror line from
+// insertion for a trigger (RAG §10, flat), with each path's mirror line from
 // its runtime on demand (ctx --mirror).
 type rackAdapter struct {
 	s        *rack.Store

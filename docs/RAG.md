@@ -243,6 +243,8 @@ Open narration findings, not ruled here (a later experiment):
   in the quiescence scope, never in surprise/event/ask.
 - q24 (a stuck state) is unanswerable from the short mirror line.
 
+**Removed (consolidation, 2026-10-12):** the parked §3 structural retriever, its `rack.retrieve` knob and `TestRetrieverMatchesTheE7Reference` are gone from the harness; flat is the only path. E7's history stays in `grammar/e7-corpus.jsonl`, `grammar/e7-pair.jsonl`, `tools/e7-corpus.py`, `tools/e7-score.py` and the rack subject's step-3 records and tables.
+
 ## 11. E8 — narration streaming from the script RAG (user, 2026-10-12)
 
 **(user)** Formulate it as narration streaming. There is one RAG whose
@@ -423,3 +425,5 @@ cells, so "deterministic" held only at the score level. The bench now
 takes `-pass2_seed` (seed + rep per repeat): byte-identical insertions
 give 24/24 identical answers. Live stays random. Closing commit
 325f1f0 (nina): the §12 defaults, the result's short form, the seed.
+
+**Removed (consolidation, 2026-10-12):** the narrator's structural retrieval (`Pull`), its `interp: cue` switch and its thinking knob are gone; the narrator has one path (every script resident in the system turn, thinking off) and `llmbench -e8` runs forms only. E8's history stays in `grammar/e8-scripts.json`, `tools/e8-score.py` and the script-rag subject's step-3 records and table.

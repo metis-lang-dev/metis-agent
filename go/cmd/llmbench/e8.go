@@ -19,11 +19,12 @@ package main
 // the focus line ("Just now: …") for a narration trigger. -pass2_seed
 // fixes the sampler per repeat: one insertion, one answer across rows.
 //
-// Rows: -e8-rows "retrieval/form[/setting]", retrieval flat | structural
-// (the narrator's script retrieval), setting "" | think=off|64|256 |
-// interp=system|cue (the §11.2 sweeps). The narration pass runs once per
-// (rep, retrieval, setting) and serves every form of it. Records: e8,
-// e8-sentence, e8-run (tools/e8-score.py's docstring).
+// Rows: -e8-forms (policy, N-all, R-all). The narrator is the harness's
+// one path since the consolidation: every script resident in its system
+// turn, thinking off (RAG §12); the run's structural / interp=cue /
+// thinking rows are history (the script-rag subject's step 3 records).
+// One narration pass per repeat serves every form. Records: e8 (retrieval
+// "flat", setting "" kept for tools/e8-score.py), e8-sentence, e8-run.
 
 import (
 	"encoding/json"
@@ -67,7 +68,7 @@ type e8Sentence struct {
 	Sentence  string         `json:"sentence"`
 	Guard     string         `json:"guard"` // ok | voice: the harness passes R instead of N
 	TokFrag   int            `json:"tok_fragment"`
-	TokScript int            `json:"tok_script"`
+	TokScript int            `json:"tok_script"` // 0: the scripts are resident in the prefix
 	Ms        int64          `json:"ms"`
 	Thought   int            `json:"thought_chars"`
 	Passed    string         `json:"passed"`
@@ -91,26 +92,14 @@ type e8Run struct {
 	Ms          int64   `json:"ms"` // the narration pass
 }
 
-type e8Row struct{ retrieval, form, setting string }
-
-func parseE8Rows(s string) []e8Row {
-	var out []e8Row
-	for _, r := range strings.Split(s, ",") {
-		f := strings.Split(strings.TrimSpace(r), "/")
-		if len(f) < 2 {
-			fail(fmt.Errorf("e8: row %q: retrieval/form[/setting]", r))
+func parseE8Forms(s string) []string {
+	var out []string
+	for _, f := range strings.Split(s, ",") {
+		f = strings.TrimSpace(f)
+		if f != "policy" && f != "N-all" && f != "R-all" {
+			fail(fmt.Errorf("e8: form %q: policy | N-all | R-all", f))
 		}
-		row := e8Row{retrieval: f[0], form: f[1]}
-		if len(f) > 2 {
-			row.setting = f[2]
-		}
-		if row.retrieval != "flat" && row.retrieval != "structural" {
-			fail(fmt.Errorf("e8: row %q: retrieval flat | structural", r))
-		}
-		if row.form != "policy" && row.form != "N-all" && row.form != "R-all" {
-			fail(fmt.Errorf("e8: row %q: form policy | N-all | R-all", r))
-		}
-		out = append(out, row)
+		out = append(out, f)
 	}
 	return out
 }
@@ -124,7 +113,7 @@ type e8Narrated struct {
 	guard    string
 }
 
-func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, rowsS, tag string, reps, k int, seed uint32, dry bool, emit func(any)) {
+func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, formsS, tag string, reps, k int, seed uint32, dry bool, emit func(any)) {
 	pairRows, err := e7Lines(pairF)
 	if err != nil {
 		fail(err)
@@ -201,37 +190,17 @@ func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, rowsS, tag stri
 		store.Name(p, name(p))
 	}
 
-	rows := parseE8Rows(rowsS)
-	type passKey struct{ retrieval, setting string }
-	var order []passKey
-	byPass := map[passKey][]e8Row{}
-	for _, r := range rows {
-		pk := passKey{r.retrieval, r.setting}
-		if _, ok := byPass[pk]; !ok {
-			order = append(order, pk)
-		}
-		byPass[pk] = append(byPass[pk], r)
-	}
+	forms := parseE8Forms(formsS)
+	// the one narrator (RAG §12): every script resident, thinking off
+	nr := &narr.Narrator{LLM: nl, Scripts: scripts, Order: paths, Name: name, Tok: tok}
+	resident := tok(nr.System()) - tok(narr.Interpret)
 	n, t0 := 0, time.Now()
 	for rep := 0; rep < reps; rep++ {
 		if seed != 0 { // one answer per insertion within a repeat (RAG §12.7)
 			l.SetSeed(seed + uint32(rep))
 			nl.SetSeed(seed + uint32(rep))
 		}
-		for _, pk := range order {
-			nr := &narr.Narrator{LLM: nl, Scripts: scripts, Order: paths, Name: name,
-				Structural: pk.retrieval == "structural", Tok: tok} // thinking off by default (RAG §12.4)
-			switch pk.setting {
-			case "", "think=off", "interp=system":
-			case "think=64":
-				nr.Think = 64
-			case "think=256":
-				nr.Think = 256
-			case "interp=cue":
-				nr.InCue = true
-			default:
-				fail(fmt.Errorf("e8: setting %q", pk.setting))
-			}
+		{
 			// the narration pass: every fragment as it appears
 			tp := time.Now()
 			narrated := make([]e8Narrated, len(frags))
@@ -244,7 +213,7 @@ func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, rowsS, tag stri
 					if pipeline.TaskVoiceOK(said) {
 						nd.sentence, nd.guard = said, "ok"
 					}
-					fmt.Fprintf(os.Stderr, "r%d %s/%s %s#%d %-10s → %q (%d ms)\n", rep, pk.retrieval, pk.setting, f.Path, f.Seq, f.Kind, nd.sn.Text, nd.sn.Dur.Milliseconds())
+					fmt.Fprintf(os.Stderr, "r%d %s#%d %-10s → %q (%d ms)\n", rep, f.Path, f.Seq, f.Kind, nd.sn.Text, nd.sn.Dur.Milliseconds())
 				}
 				narrated[i] = nd
 			}
@@ -253,11 +222,8 @@ func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, rowsS, tag stri
 			for _, nd := range narrated {
 				tape += tok(nd.f.Line(name))
 			}
-			resident := 0
-			if !nr.InCue && !nr.Structural {
-				resident = tok(nr.System()) - tok(narr.Interpret)
-			}
-			for _, row := range byPass[pk] {
+			for _, form := range forms {
+				row := struct{ retrieval, form, setting string }{"flat", form, ""} // the scorer's columns
 				// what reaches the orchestrator, and when
 				passed := make([]string, len(narrated))
 				passedAt := make([]float64, len(narrated))
@@ -274,7 +240,7 @@ func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, rowsS, tag stri
 					emit(e8Sentence{Kind: "e8-sentence", Tag: tag, Retrieval: row.retrieval, Form: row.form, Setting: row.setting, Rep: rep,
 						T: nd.f.T, Path: nd.f.Path, Seq: nd.f.Seq, Beat: nd.f.Beat, FragKind: nd.f.Kind, Ref: nd.f.Ref,
 						Counts: nd.f.Counts, Expected: nd.f.Expected, Inserted: nd.sn.Inserted, Sentence: nd.sn.Text, Guard: nd.guard,
-						TokFrag: nd.sn.TokFrag, TokScript: nd.sn.TokScript, Ms: nd.sn.Dur.Milliseconds(), Thought: len(nd.sn.Thought),
+						TokFrag: nd.sn.TokFrag, TokScript: 0, Ms: nd.sn.Dur.Milliseconds(), Thought: len(nd.sn.Thought),
 						Passed: form, PassedAt: passedAt[i], TokPassed: passTok(form, tok, store.Frag(nd.f.Path, text)), Err: errString(nd.sn.Err)})
 				}
 				emit(e8Run{Kind: "e8-run", Tag: tag, Retrieval: row.retrieval, Form: row.form, Setting: row.setting, Rep: rep,

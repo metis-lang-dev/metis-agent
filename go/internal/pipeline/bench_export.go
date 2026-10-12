@@ -15,8 +15,8 @@ func TaskVoiceOK(s string) bool                   { return taskVoiceOK(s) }
 func SanitizeAck(s string) string                 { return sanitizeAck(s) }
 func NarrateTemplate(it wire.Item, t Task) string { return narrateTemplate(it, t) }
 
-// E7 (docs/RAG.md §6, cmd/llmbench -e7): the rack's own cues, the focus
-// line's fact cleaning and the number guard, unchanged.
+// E7/E8 (docs/RAG.md §6, §11; cmd/llmbench -e8): the rack's own cues, the
+// focus line's fact cleaning and the number guard, unchanged.
 
 func RackAskCue() string                    { return cueRackAsk }
 func RackSurpriseCue(where string) string   { return fmt.Sprintf(cueRackSurprise, where) }

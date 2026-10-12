@@ -83,35 +83,16 @@ func TestScriptAndFragments(t *testing.T) {
 		t.Errorf("surprise line: %s", got)
 	}
 
-	// structural: the surprise pulls the candidate moves — the sibling
-	// card's and the second cook's move that acts on the first cook
-	n := &Narrator{Scripts: sc, Order: []string{"kitchen", "kitchen_shared"}, Name: cooks, Structural: true, Think: 64}
-	pull := "\n" + strings.Join(n.Pull(fs[0]), "\n")
-	for _, want := range []string{"\nmove partner load (sibling card kitchen shared), acts on the first cook",
-		"the second cook's move partner load, acts on the first cook", "the first cook's things: pot onion = onions in the pot; pot space = room in the pot",
-		"the second cook's things: hand free = a free hand; held onion = an onion in hand"} {
-		if !strings.Contains(pull, want) {
-			t.Errorf("surprise pull lacks %q:\n%s", want, pull)
-		}
-	}
-	if p := strings.Join(n.Pull(fr[0]), "\n"); !strings.Contains(p, "the second cook's move partner load, acts on the first cook") || strings.Contains(p, "fetch onion") {
-		t.Errorf("event pull:\n%s", p)
-	}
-
+	// one prefix: the instructions and every script, resident; thinking
+	// off; the fragment and the cue as the turn
 	sk := &fakeSpeaker{}
-	n.LLM = sk
+	n := &Narrator{LLM: sk, Scripts: sc, Order: []string{"kitchen", "kitchen_shared"}, Name: cooks}
 	n.Narrate(fr[0])
 	n.Narrate(fs[0])
-	if sk.sys[0] != Interpret || sk.think[0] != 0 || sk.think[1] != 64 || !strings.Contains(sk.user[1], "From the scripts:") {
-		t.Errorf("structural calls: sys %q think %v user %q", sk.sys[0][:20], sk.think, sk.user[1])
+	if sk.sys[0] != sk.sys[1] || sk.think[0] != 0 || sk.think[1] != 0 || sk.user[1] != n.FragmentText(fs[0])+"\n\n"+Cue {
+		t.Errorf("calls: think %v user %q", sk.think, sk.user[1])
 	}
-	n.Structural, n.InCue = false, true
-	n.Narrate(fr[0])
-	if sk.sys[2] != "" || !strings.HasPrefix(sk.user[2], Interpret) || !strings.Contains(sk.user[2], "Script of the second cook") {
-		t.Errorf("in-cue call: sys %q", sk.sys[2])
-	}
-	n.InCue = false
-	if s := n.System(); !strings.HasPrefix(s, Interpret) || !strings.Contains(s, "Script of the first cook") {
+	if s := n.System(); !strings.HasPrefix(s, Interpret) || !strings.Contains(s, "Script of the first cook") || !strings.Contains(s, "Script of the second cook") {
 		t.Errorf("flat system lacks the scripts")
 	}
 }

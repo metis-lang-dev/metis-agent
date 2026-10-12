@@ -527,19 +527,6 @@ func (l *LLM) renderGemma4(msgs []chatMsg, addAss bool) string {
 // the KV reuse is unchanged); templates that fold the system prompt into
 // the first user turn (gemma) split right before the user text instead.
 func (l *LLM) splitPrompt(system string) (prefix, tailFmt string, err error) {
-	if system == "" {
-		// no system turn (RAG §11.2: instructions folded into the user
-		// cue); the prefix is the template's text before the user's words
-		full, err := l.applyTemplate([]chatMsg{{"user", userSentinel}}, true)
-		if err != nil {
-			return "", "", err
-		}
-		i := strings.Index(full, userSentinel)
-		if i < 0 {
-			return "", "", errors.New("llm: template lost the user turn")
-		}
-		return full[:i], full[i:], nil
-	}
 	full, err := l.applyTemplate([]chatMsg{{"system", system}, {"user", userSentinel}}, true)
 	if err != nil {
 		return "", "", err

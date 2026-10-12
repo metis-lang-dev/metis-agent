@@ -78,17 +78,14 @@ kernel:
     #   - {path: kitchen_shared, host: "metis.domains.kitchen.pair:make_pair_shared",
     #      catalog: metis/domains/kitchen/catalogs/shared/kitchen_shared.llp, env: [METIS_PAIR_DIR=/tmp/pair],
     #      display: the second cook}
-    rack:                        # per-domain tapes + the structural retriever (RAG §2–4)
+    rack:                        # per-domain tapes, flat insertion (RAG §2, §10)
         enabled: false
         budget: 2500             # tokens per insertion, mirror lines included
         wrap: true               # ⟪path: text⟫ fragments (false: "path: text.")
         ask: true                # the person's chitchat / off-map questions answered from ask()
-        retrieve: flat           # flat (RAG §10): last k records of every mounted tape; structural: the §3 retriever
-        k: 12
-    narr:                        # narration streaming from the script RAG (RAG §11); needs rack
+        k: 12                    # the last k records of every mounted tape, in arrival order
+    narr:                        # narration streaming from the script RAG (RAG §11–12); needs rack. Every script
+                                 # resident in the narrator's system turn, thinking off
         enabled: false
-        retrieval: flat          # flat: every script resident in the narrator's prefix; structural: per fragment
         form: policy             # policy (progress N at arrival, surprise/notice/result R+N, ask N) | N-all | R-all
-        think: 0                 # thought cap on surprise-class fragments; 0 = off (RAG §12.4)
-        interp: system           # system: the instructions in the system turn; cue: in every turn
         n_ctx: 4096              # the narrator's own context on the same model

@@ -35,16 +35,10 @@ type Record struct {
 // Ref is the record's id, path#seq (the E7 corpus's evidence refs).
 func (r Record) Ref() string { return fmt.Sprintf("%s#%d", r.Path, r.Seq) }
 
-// Weights rank records within a scope (RAG §3: surprise, notice, refused
-// result > reading > event > said); the E7 reference retriever's.
-var Weights = map[string]int{"surprise": 5, "notice": 5, "refused": 5, "reading": 3,
-	"result": 3, "event": 2, "quiescence": 1, "said": 1}
-
 // Tape is one domain's records, in seq order.
 type Tape struct {
 	Path   string
 	Name   string // the domain in the person's words (RAG §9.1); "" = the path in words
-	Card   string // the domain's card text (an explanation candidate for its siblings)
 	Mirror string // the last mirror line with its beliefs: the UI pane's, never inserted
 	// the pane's narration-streaming line (RAG §11)
 	lastFrag, lastSentence, lastForm string
@@ -71,12 +65,10 @@ type Store struct {
 	Wrap bool
 	// Clock overrides the arrival clock (a bench's own t).
 	Clock func() float64
-	// Flat (RAG §10, the default in the harness: S ≈ F in E7): the last K
-	// records of every mounted tape in arrival order, each path's mirror
-	// line in the ask scope only; no scoping, no ranking. Off = the §3
-	// structural retriever, parked until the tree.
-	Flat bool
-	K    int // flat: records per insertion (0 = 12)
+	// K: records per insertion (0 = 12) — the last K of every mounted
+	// tape in arrival order (RAG §10: flat mixing; the §3 structural
+	// retriever is gone, its E7 history is in tools/ and grammar/)
+	K int
 	// Render picks a record's words for a trigger (RAG §11.1 step 5: the
 	// form — the reference, the agent's sentence, both; "" = not passed).
 	// nil = the record's text.
@@ -87,28 +79,25 @@ type Store struct {
 func New(paths ...string) *Store {
 	s := &Store{tapes: map[string]*Tape{}, Budget: 2500, Compact: true, Wrap: true}
 	for _, p := range paths {
-		s.Attach(p, "")
+		s.Attach(p)
 	}
 	return s
 }
 
-// Attach adds a domain (mounted) with its card text.
-func (s *Store) Attach(path, card string) {
+// Attach adds a domain (mounted).
+func (s *Store) Attach(path string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if t, ok := s.tapes[path]; ok {
-		if card != "" {
-			t.Card = card
-		}
+	if _, ok := s.tapes[path]; ok {
 		return
 	}
 	s.order = append(s.order, path)
-	s.tapes[path] = &Tape{Path: path, Card: card, Mounted: true}
+	s.tapes[path] = &Tape{Path: path, Mounted: true}
 }
 
 // Name sets the domain's display name: every fragment's prefix (RAG §9.1).
 func (s *Store) Name(path, display string) {
-	s.Attach(path, "")
+	s.Attach(path)
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.tapes[path].Name = display
@@ -277,11 +266,10 @@ type Trigger struct {
 // Insertion is the retriever's selection, rendered.
 type Insertion struct {
 	Trigger Trigger
-	Mirrors []string // paths whose mirror line went in, in insertion order
-	Cards   []string // paths whose card went in
+	Mirrors []string // paths whose mirror line went in (an ask)
 	Records []Record // in time order
-	Tok     int      // mirror lines + cards + records
-	Text    string   // the fragments, grouped by path
+	Tok     int      // mirror lines + records
+	Text    string   // the fragments, in arrival order
 	Dur     time.Duration
 }
 
@@ -292,46 +280,6 @@ func (in Insertion) Refs() []string {
 		out[i] = r.Ref()
 	}
 	return out
-}
-
-func sinceQuiescence(recs []Record) []Record {
-	for i := len(recs) - 1; i >= 0; i-- {
-		if recs[i].Kind == "quiescence" {
-			return recs[i+1:]
-		}
-	}
-	return recs
-}
-
-// currentOrder is the records of the domain's current order: since its
-// last quiescence, or — when the domain is quiet now (its last record a
-// quiescence, `said` aside) — the order that quiescence ended.
-func currentOrder(recs []Record) []Record {
-	end := len(recs)
-	for end > 0 && recs[end-1].Kind == "said" {
-		end--
-	}
-	if end > 0 && recs[end-1].Kind == "quiescence" {
-		return sinceQuiescence(recs[:end-1])
-	}
-	return sinceQuiescence(recs)
-}
-
-// resolved is the last surprise among recs that a record closed, with the
-// closing record (nil when none).
-func resolved(recs []Record) []Record {
-	for i := len(recs) - 1; i >= 0; i-- {
-		c := recs[i]
-		if !c.Closes {
-			continue
-		}
-		for j := i - 1; j >= 0; j-- {
-			if recs[j].Kind == "surprise" && (c.Rec < 0 || recs[j].Rec == c.Rec) {
-				return []Record{recs[j], c}
-			}
-		}
-	}
-	return nil
 }
 
 // open is the domain's open surprises: a surprise no reset, explain or
@@ -360,126 +308,46 @@ func open(recs []Record) []Record {
 	return still
 }
 
-// Retrieve is the structural retriever (RAG §3): mount filter, scope by
-// trigger, rank (kind weight, then latest first), budget (mirror lines
-// first and always; never a truncated record), then the insertion in time
-// order, grouped by path. mirror renders a path's mirror line on demand
-// ("" = none).
+// Retrieve is the insertion for a trigger (RAG §10, flat): the last K
+// records of every mounted tape in arrival order, each tagged with its
+// domain's name; each path's mirror line first for the person's ask only;
+// what was said only to sum up an order (the quiescence trigger: the model
+// copied a said record as a surprise's narration). Budget drops the
+// oldest records first. mirror renders a path's mirror line on demand.
 func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion {
 	t0 := time.Now()
 	s.mu.Lock()
 	active := s.activeLocked()
-	tapes := map[string][]Record{}
-	cardText := map[string]string{}
+	var recs []Record
 	for _, p := range active {
-		tapes[p] = append([]Record(nil), s.tapes[p].Recs...)
-		cardText[p] = s.tapes[p].Card
+		for _, r := range s.tapes[p].Recs {
+			if r.Kind != "said" || tr.Kind == "quiescence" {
+				recs = append(recs, r)
+			}
+		}
 	}
 	s.mu.Unlock()
 
 	in := Insertion{Trigger: tr}
-	mounted := tapes[tr.Path] != nil
-	// what was said is retrieved only to sum up an order (RAG §10: the
-	// model copied a said record as a surprise's narration)
-	notSaid := func(rs []Record) []Record {
-		var out []Record
-		for _, r := range rs {
-			if r.Kind != "said" || tr.Kind == "quiescence" {
-				out = append(out, r)
-			}
-		}
-		return out
-	}
-	var recs []Record
-	switch {
-	case s.Flat:
-		for _, p := range active {
-			recs = append(recs, notSaid(tapes[p])...)
-		}
-		if tr.Kind == "ask" {
-			in.Mirrors = active
-		}
-	case tr.Kind == "event":
-		if mounted {
-			// records only (RAG §8.3: the model echoed the mirror line
-			// instead of the event)
-			recs = notSaid(sinceQuiescence(tapes[tr.Path]))
-		}
-	case tr.Kind == "surprise":
-		if mounted {
-			recs = append(recs, notSaid(sinceQuiescence(tapes[tr.Path]))...)
-			in.Mirrors = []string{tr.Path}
-		}
-		for _, p := range active {
-			if p == tr.Path {
-				continue
-			}
-			in.Mirrors = append(in.Mirrors, p)
-			in.Cards = append(in.Cards, p)
-			// RAG v2: the siblings' EVENT records since their last
-			// quiescence — the fact, not only the card's hypothesis
-			for _, r := range sinceQuiescence(tapes[p]) {
-				if r.Kind == "event" {
-					recs = append(recs, r)
-				}
-			}
-		}
-	case tr.Kind == "quiescence":
-		in.Mirrors = active
-		for _, p := range active {
-			for i := len(tapes[p]) - 1; i >= 0; i-- {
-				if tapes[p][i].Kind == "said" {
-					recs = append(recs, tapes[p][i])
-					break
-				}
-			}
-		}
-	case tr.Kind == "ask":
-		in.Mirrors = active
-		for _, p := range active {
-			if o := open(tapes[p]); len(o) > 0 {
-				recs = append(recs, o[len(o)-1])
-				continue
-			}
-			// RAG §8.2: else the last RESOLVED surprise with the result
-			// that closed it, while it belongs to the current order
-			recs = append(recs, resolved(currentOrder(tapes[p]))...)
-		}
-	}
+	// latest first, for K and the budget
 	sort.SliceStable(recs, func(i, j int) bool {
-		wi, wj := Weights[recs[i].Kind], Weights[recs[j].Kind]
-		if wi != wj && !s.Flat { // flat: latest first, nothing else
-			return wi > wj
-		}
 		return recs[i].T > recs[j].T || recs[i].T == recs[j].T && recs[i].Path == recs[j].Path && recs[i].Seq > recs[j].Seq
 	})
-	if k := s.K; s.Flat {
-		if k <= 0 {
-			k = 12
-		}
-		if len(recs) > k {
-			recs = recs[:k]
-		}
+	k := s.K
+	if k <= 0 {
+		k = 12
 	}
-
-	mirrors := map[string]string{}
-	var keepM []string
-	for _, p := range in.Mirrors {
-		line := ""
-		if mirror != nil {
-			line = mirror(p)
-		}
-		if line == "" {
-			continue
-		}
-		mirrors[p] = line
-		keepM = append(keepM, p)
-		in.Tok += s.tok(line)
+	if len(recs) > k {
+		recs = recs[:k]
 	}
-	in.Mirrors = keepM
-	for _, p := range in.Cards {
-		if cardText[p] != "" {
-			in.Tok += s.tok(cardText[p])
+	var lines []string
+	if tr.Kind == "ask" && mirror != nil {
+		for _, p := range active {
+			if line := mirror(p); line != "" {
+				in.Mirrors = append(in.Mirrors, p)
+				in.Tok += s.tok(line)
+				lines = append(lines, s.Frag(p, line))
+			}
 		}
 	}
 	for _, r := range recs {
@@ -496,50 +364,9 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 		}
 		return a.Path == b.Path && a.Seq < b.Seq
 	})
-
-	if s.Flat {
-		// arrival order across the tapes, each line tagged with its domain
-		var lines []string
-		for _, p := range in.Mirrors {
-			lines = append(lines, s.Frag(p, mirrors[p]))
-		}
-		for _, r := range in.Records {
-			if text := s.text(tr, r); text != "" {
-				lines = append(lines, s.Frag(r.Path, text))
-			}
-		}
-		in.Text = strings.Join(lines, "\n")
-		in.Dur = time.Since(t0)
-		return in
-	}
-	// grouped by path: the trigger's path first, then the active order
-	paths := []string{}
-	if mounted {
-		paths = append(paths, tr.Path)
-	}
-	for _, p := range active {
-		if p != tr.Path {
-			paths = append(paths, p)
-		}
-	}
-	isCard := map[string]bool{}
-	for _, p := range in.Cards {
-		isCard[p] = true
-	}
-	var lines []string
-	for _, p := range paths {
-		if m := mirrors[p]; m != "" {
-			lines = append(lines, s.Frag(p, m))
-		}
-		if isCard[p] && cardText[p] != "" {
-			lines = append(lines, s.Frag(p, "its card: "+cardText[p]))
-		}
-		for _, r := range in.Records {
-			if r.Path == p {
-				if text := s.text(tr, r); text != "" {
-					lines = append(lines, s.Frag(p, text))
-				}
-			}
+	for _, r := range in.Records {
+		if text := s.text(tr, r); text != "" {
+			lines = append(lines, s.Frag(r.Path, text))
 		}
 	}
 	in.Text = strings.Join(lines, "\n")

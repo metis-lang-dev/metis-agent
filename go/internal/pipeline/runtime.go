@@ -177,7 +177,7 @@ const (
 )
 
 // Rack is the narrator's rack (internal/rack, wired in main): the
-// structural insertion for a trigger — kind event | surprise | quiescence
+// insertion for a trigger (RAG §10, flat) — kind event | surprise | quiescence
 // | ask, the raising path — and the record of what was said about a path.
 type Rack interface {
 	Insert(kind, path string) (text string, records, tok int)

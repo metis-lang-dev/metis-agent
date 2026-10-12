@@ -440,42 +440,38 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
     last order.
   - Unmount freezes a tape: its records stay, new ones are counted as
     dropped, and the retriever skips it.
-- **The retriever** is RAG §3 verbatim: mount filter, scope by trigger,
-  rank by kind weight then recency, budget, and mirror lines first.
-  - The scopes are `event(path)`, `surprise(path)` (plus the siblings'
-    mirror lines, cards and event records), `quiescence(path)` and
-    `ask`.
-  - Fed opus's E7 pair run through the harness renderer, it selects the
-    reference S arm's records, mirror lines and cards for all 24
-    questions (`TestRetrieverMatchesTheE7Reference`).
-- **Insertion and cue (RAG §4).** The insertion is ⟪path: text⟫
-  fragments grouped by path: the trigger's path first, each path's mirror
-  line first (from `ctx --mirror` on demand).
+- **The insertion (RAG §10, flat).** `Store.Retrieve` takes the last `k`
+  (12) records of every mounted tape in arrival order, each a ⟪name:
+  text⟫ fragment tagged with the domain's display name; the budget drops
+  the oldest first. Each path's mirror line (from `ctx --mirror` on
+  demand) goes in first for the person's ask only. A `said` record is
+  retrieved only to sum up an order (the quiescence trigger).
   - Then comes `Just now: <the trigger's pieces>`, the focus. In the
     smoke, without it a surprise among seven records was narrated as "the
     kitchen is running".
   - The step-4 cue follows; a surprise asks also "where it came from if
     the lines say".
   - Guards and fallback are as in step 4.
+  - The §3 structural retriever (scopes by trigger, kind weights, cards,
+    grouping by path) and its E7 reference test are gone (consolidation,
+    2026-10-12): E7 found S ≈ F (RAG §10). Its bench history is the E7
+    corpus and pair run in `grammar/`, `tools/e7-corpus.py` and
+    `tools/e7-score.py`, and the rack subject's step-3 records.
 - **The person's questions.** A CHITCHAT/UNKNOWN turn is answered from
-  the `ask()` insertion: every mounted domain's mirror line and its open
-  surprise. So is a QUERY whose target is not on the dog's map ("which
+  the `ask` insertion: every mounted domain's mirror line and the last
+  records. So is a QUERY whose target is not on the dog's map ("which
   cook got the extra onion" parses as QUERY PERSON cook). The answer is
   one guarded sentence; otherwise the dog's reply stands.
 - **UI.** nina-web's rack pane shows one row per domain: the mount switch
   (`rack_mount{text: path, state: on|off}`), records, tokens, open
   surprises, dropped-while-frozen, the last sentence said, and the last
   insertion's trigger, size and time. A late joiner gets the last pane.
-- Config `kernel.rack: {enabled, budget, wrap, ask}`. Off by default, so
-  the dog and step 4 are unchanged.
+- Config `kernel.rack: {enabled, budget, wrap, ask, k}`. Off by default,
+  so the dog and step 4 are unchanged.
 - **RAG §8 amendments (after the step-2 review).** Item 1, the focus line,
   was already built.
-  - **2.** `ask` also takes each path's last resolved surprise and the
-    result that closed it, while it belongs to the current order. If the
-    domain is quiet, that is the order its last quiescence ended.
-    Compaction keeps the quiescence before the last one, as that order's
-    start.
-  - **3.** The event scope inserts records only, with no mirror line.
+  - **2–3** (the ask scope's resolved surprise, the event scope without a
+    mirror line) were scopes of the structural retriever and went with it.
   - **4.** Clause events are recorded (tape, rack) but not spoken. At the
     order's quiescence, one sentence is said: from the quiescence scope
     with the rack, or else from the order's last events (with their
@@ -496,27 +492,23 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
     name (`rack.Store.Name`, `Store.Frag`): `⟪the second cook: …⟫`. The
     mirror line names the domain once in both forms: "The second cook
     (kitchen shared) now: …". The path stays the key everywhere.
-  - **2. Cross-domain moves name their target.** A card's `target` (the
-    domain whose things its moves change) and `says` (a move's words,
-    `{target}` for the target's name) give the piece "The second cook
-    loaded an onion into the first cook's pot; now …".
+  - **2.** Cross-domain moves named their target through a card `says`
+    dictionary; since RAG §11 the script's own comment says it, and the
+    dictionary is gone.
   - **3. The short mirror line.** Every insertion and the standing region
     carry status, the open surprise, counts and the last move. The beliefs
     tail ("likely within 12 beats") is only on the rack pane
     (`MirrorRowFull`, `Status.mirror`). q13's insertion: 342 → 287 tok.
   - **4. Decide on B's context**, see §9 above. Step 5's arm C now runs
     triage like B.
-- **RAG §10 (E7 closed, S ≈ F).** `kernel.rack.retrieve: flat |
-  structural`, flat by default: the last `k` (12) records of every mounted
-  tape in arrival order, each fragment tagged with its display name, the
-  mirror lines in the ask scope only. `structural` is the §3 retriever,
-  parked until the tree (it and its E7 reference test stay). In both, a
-  `said` record is retrieved only in the quiescence scope.
+- **RAG §10 (E7 closed, S ≈ F).** Flat mixing is the only insertion
+  (above); the `kernel.rack.retrieve` knob is gone with the structural
+  retriever.
 
 ## 11. Narration streaming from the script RAG (RAG §11, E8 step 2)
 
-`kernel.narr: {enabled, retrieval, form, think, interp, n_ctx}` (needs
-`kernel.rack.enabled`; off by default). `internal/narr`:
+`kernel.narr: {enabled, form, n_ctx}` (needs `kernel.rack.enabled`; off
+by default). `internal/narr`:
 
 - **The script RAG, one per agent.** The runtime's `script` op (metispy
   aedf25f) is fetched once at attach (`narr.Parse`): per card its clauses
@@ -533,39 +525,35 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
   (the reference, tagged by its prefix) from arrival.
 - **The narrator** (`narr.Narrator`) runs on a second context of the same
   model (`llm.Sibling`): its own prefix next to the orchestrator's, so
-  neither re-primes the other. The prefix is `narr.Interpret` (how to read
-  a fragment against its entry) plus, flat, every script resident;
-  structural pulls per fragment only what the reference names (its move
-  entries, the things it counts; for a surprise the sibling cards' moves
-  and every other agent's moves that act on it). `interp: cue` folds the
-  instructions (and flat's scripts) into every turn with no system turn
-  (`llm` renders an empty system prompt as no system turn). Thinking per
-  call (`llm.SpeakCap`): `think` caps the thought on surprise-class
-  fragments (64 by default), progress is always off.
+  neither re-primes the other. The prefix is the native system turn:
+  `narr.Interpret` (how to read a fragment against its entry) and every
+  script, resident. The turn is the fragment and the cue. Thinking is off
+  (`llm.SpeakCap(…, 0)`; the per-call cap stays for the orchestrator).
+  E8's other rows — structural retrieval (`Pull`), `interp: cue` (no
+  system turn) and the narrator's thinking caps — are gone
+  (consolidation, 2026-10-12); their history is the script-rag subject's
+  step-3 records and table, scored by `tools/e8-score.py`.
 - **Streaming.** One worker per agent narrates its fragments in arrival
   order, not spoken (~0.3–0.6 s each alone on the GPU, ~1 s beside the
   orchestrator). The sentence passes the harness's guards (voice,
   invented numbers against the call's own text) and joins its record
   (`rack.Store.SetAgent`); a rejected sentence passes R instead.
-- **The form** (`narr.Form`, `form: policy`): progress → R (the
-  orchestrator already tapes progress and speaks per order at
-  quiescence), surprise / notice / result → R+N, the person's ask → N
-  (the rack's `Render` hook picks per trigger); `N-all` / `R-all` for the
+- **The form** (`narr.Form`, `form: policy`, RAG §12.3): progress → N at
+  arrival, surprise / notice / result → R+N, the person's ask → N (the
+  rack's `Render` hook picks per trigger); `N-all` / `R-all` for the
   bench. The orchestrator is unchanged: it gets the form as the piece's
   fact.
 - **The pane** shows per agent: tape and script tokens, the last fragment,
   the agent's sentence and the form passed.
-- **Bench:** `llmbench -e8 grammar/e7-corpus.jsonl` with `-e8-rows
-  retrieval/form[/setting]` (settings `think=off|64|256`,
-  `interp=system|cue`; the plain flat/policy row is think=64,
-  interp=system), `-e8-scripts grammar/e8-scripts.json`, `-e8-k` (12),
-  `-e7-reps`, `-e7-dry`. Records `e8`, `e8-sentence`, `e8-run` for
-  `tools/e8-score.py`.
-- **After E8 (RAG §12).** Defaults: retrieval flat; form policy =
-  progress → N at arrival, surprise / notice / result → R+N, ask → N;
-  narrator thinking off. A result fragment is its own short form ("explain
-  of surprise 0 admitted: card kitchen_shared, move partner_load"; a
-  refusal keeps its reason), not the runtime's reason text.
+- **Bench:** `llmbench -e8 grammar/e7-corpus.jsonl` with `-e8-forms`
+  (policy,N-all,R-all; one narration pass per repeat serves them all),
+  `-e8-pair`, `-e8-cards`, `-e8-scripts grammar/e8-scripts.json`, `-e8-k`
+  (12), `-e8-reps`, `-e8-dry`, `-pass2_seed`. Records `e8`, `e8-sentence`,
+  `e8-run` for `tools/e8-score.py` (retrieval "flat", setting "").
+- **After E8 (RAG §12).** A result fragment is its own short form
+  ("explain of surprise 0 admitted: card kitchen_shared, move
+  partner_load"; a refusal keeps its reason), not the runtime's reason
+  text.
 - **The orchestrator's noise floor (RAG §12.7).** It is the pass-2
   sampler, not the narrator's context. The sampler is seeded at random
   per call at temp 0.4: E7 run 2, with no second context, had different
@@ -575,6 +563,6 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
   12/12), and the E8 bench never overlaps the two (the narration pass
   ends before the probes). So nothing is serialised. Instead
   `llm.Pass2.Seed` / `SetSeed` and `llmbench -pass2_seed N` (seed+rep per
-  repeat) give one answer per insertion within a repeat: flat/R-all vs
-  structural/R-all, byte-identical insertions, 24/24 identical answers.
+  repeat) give one answer per insertion within a repeat: two R-all rows
+  with byte-identical insertions gave 24/24 identical answers.
   Live stays random.

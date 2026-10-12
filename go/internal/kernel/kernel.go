@@ -68,13 +68,12 @@ type Config struct {
 // `script` op) in the RAG, every fragment narrated as it appears by the
 // per-agent narrator (a second context on the same model), then passed to
 // the dialog — the orchestrator — in a form.
+// Every script sits resident in the narrator's system turn, thinking off
+// (RAG §12).
 type NarrConfig struct {
-	Enabled   bool   `yaml:"enabled"`
-	Retrieval string `yaml:"retrieval"` // flat (default: every script resident in the narrator's prefix) | structural (the referenced entries per fragment)
-	Form      string `yaml:"form"`      // policy (default: progress N at arrival, surprise/notice/result R+N, ask N) | N-all | R-all
-	Think     *int   `yaml:"think"`     // the thought cap for surprise-class fragments (default 0 = off, RAG §12.4)
-	Interp    string `yaml:"interp"`    // system (default: the instructions in the system turn) | cue (folded into every turn, no system turn)
-	NCtx      int    `yaml:"n_ctx"`     // the narrator's context (default 4096)
+	Enabled bool   `yaml:"enabled"`
+	Form    string `yaml:"form"`  // policy (default: progress N at arrival, surprise/notice/result R+N, ask N) | N-all | R-all
+	NCtx    int    `yaml:"n_ctx"` // the narrator's context (default 4096)
 }
 
 // RackConfig turns the rack on: narration and the person's questions are
@@ -84,11 +83,9 @@ type RackConfig struct {
 	Budget  int   `yaml:"budget"` // tokens per insertion (default 2500)
 	Wrap    *bool `yaml:"wrap"`   // ⟪path: text⟫ fragments (default true, RAG §4)
 	Ask     *bool `yaml:"ask"`    // the person's chitchat/unknown turns answered from ask() (default true)
-	// Retrieve: flat (default, RAG §10: S ≈ F in E7) = the last K records
-	// of every mounted tape in arrival order, mirror lines for asks only;
-	// structural = the §3 retriever, parked until the tree.
-	Retrieve string `yaml:"retrieve"`
-	K        int    `yaml:"k"` // flat: records per insertion (default 12)
+	// K: the last K records of every mounted tape per insertion, in
+	// arrival order (RAG §10; default 12)
+	K int `yaml:"k"`
 }
 
 // Each returns the runtimes to attach: the entries merged over this
