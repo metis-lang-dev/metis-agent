@@ -177,6 +177,12 @@ NO = r"\b(no|not|nothing|none|isn't|is not)\b"
 _Q = r"(quiet|done|over|idle|finished|resting)"
 _A1 = r"(first cook|\bkitchen\b(?! shared))"
 _B1 = r"(second cook|kitchen shared|shared kitchen)"
+# RAG §11.2: the narration probes' attribution — the second cook loaded
+# the onion; naming the first cook as the one who loaded/dropped/put it is
+# the E7 run-2 misattribution ("The first cook loaded an onion into the
+# pot"). "the first cook's pot" is not a claim about who loaded.
+NARR_WRONG = (r"first cook (just |had |has )?(loaded|dropped|put|added|placed"
+              r"|tossed|threw)|first cook's own onion")
 BOTH_QUIET = (r"^(?!.*\b(no|not)\b).*(\bboth\b.*%s|yes\b"
               r"|%s.*%s.*%s.*%s|%s.*%s.*%s.*%s)"
               % (_Q, _A1, _Q, _B1, _Q, _B1, _Q, _A1, _Q))
@@ -236,7 +242,8 @@ def questions():
           "Where did the extra onion in the first cook's pot come from?",
           SECOND, ["kitchen#19", "card:kitchen_shared"]),
         Q("q14", "both", 91, su(A), [A, B], CUE, SECOND,
-          ["kitchen#19", "card:kitchen_shared"], probe="cue"),
+          ["kitchen#19", "card:kitchen_shared"], probe="cue",
+          right=SECOND, wrong=NARR_WRONG),
         # RAG §9.5: YES failed a correct two-domain answer ("the kitchen is
         # done, and the kitchen shared is done") and passed a half one —
         # both kitchens must be said quiet (or "both")
@@ -256,7 +263,8 @@ def questions():
           r"\b5\b|\bfive\b", ["mirror:kitchen", "mirror:kitchen_shared"],
           probe="ask"),
         Q("q20", "both", 91, su(A), [A, B], CUE, r"surpris\w*|unexpected|extra",
-          ["kitchen#18", "kitchen#19"], probe="cue"),
+          ["kitchen#18", "kitchen#19"], probe="cue",
+          right=SECOND, wrong=NARR_WRONG),
         # attribution among similar facts (4)
         Q("q21", "attr", 40, ev(B), [B], "Which cook just served a soup?",
           SECOND, ["kitchen_shared#12"], right=SECOND, wrong=r"first cook"),

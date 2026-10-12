@@ -11,6 +11,8 @@ A run record (one per question × arm × rep, llmbench -e7):
   attribution questions with a right/wrong domain regex: the right
               domain named and the wrong one not; one-domain questions:
               the other domain is NOT named (misattribution counted)
+  narration attribution  the same on the two narration probes (q14,
+              q20: the second cook loaded the onion; RAG §11.2)
   invented    a number in the answer that is in no inserted text or
               question
   covered     the arm inserted the evidence (the corpus's contract check):
@@ -27,6 +29,11 @@ from collections import defaultdict
 NUM = re.compile(r"(?<![\w.])\d+(?:\.\d+)?(?![\w])")
 FIRST = re.compile(r"first cook", re.I)
 SECOND = re.compile(r"second cook|other cook|another cook|partner|shared kitchen|kitchen.shared", re.I)
+
+
+# the narration probes (cue, not a question): RAG §11.2 gives them an
+# attribution regex; their rate is its own column, beside the questions'
+NARRATION = ("q14", "q20")
 
 
 def load(p):
@@ -55,7 +62,7 @@ def score(corpus, recs):
                      # the bench's own insertion (step 3) when it says;
                      # else the corpus's reference contract
                      "covered": r["covered"] if "covered" in r
-                     else q["covered"].get(r["arm"]),
+                     else q["covered"].get(r.get("arm")),
                      "rejected": r.get("guard", "ok") != "ok"})
     return rows
 
@@ -65,9 +72,10 @@ def table(rows):
         xs = [x for x in xs if x[k] is not None]
         return f"{sum(1 for x in xs if x[k]) / len(xs):.2f}" if xs else "–"
     out = ["| model | arm | used: one | both | attr | all | attribution | "
+           "narration attribution | "
            "misattributed (one-domain) | invented | ⟪ in output | guard rejected | "
            "evidence covered | tok inserted (mean) | ms first p50 | n |",
-           "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+           "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     by = defaultdict(list)
     for x in rows:
         by[(x["tag"], x["arm"])].append(x)
@@ -77,11 +85,13 @@ def table(rows):
         one = [x for x in xs if x["cls"] == "one" and x["attr"] is not None]
         mis = f"{sum(1 for x in one if not x['attr']) / len(one):.2f}" if one else "–"
         attr = [x for x in xs if x["cls"] == "attr" or x["id"] == "q17"]
+        narr = [x for x in xs if x["id"] in NARRATION]
         tok = statistics.mean(x.get("tok_inserted", 0) for x in xs)
         ms = int(statistics.median(x.get("ms_first", 0) for x in xs))
         out.append(f"| {tag} | {arm} | {rate(cls['one'], 'used')} | "
                    f"{rate(cls['both'], 'used')} | {rate(cls['attr'], 'used')} | "
-                   f"{rate(xs, 'used')} | {rate(attr, 'attr')} | {mis} | "
+                   f"{rate(xs, 'used')} | {rate(attr, 'attr')} | "
+                   f"{rate(narr, 'attr')} | {mis} | "
                    f"{rate(xs, 'invented')} | {rate(xs, 'forged')} | "
                    f"{rate(xs, 'rejected')} | "
                    f"{rate(xs, 'covered')} | {tok:.0f} | {ms} | {len(xs)} |")
