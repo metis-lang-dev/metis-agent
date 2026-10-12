@@ -32,6 +32,7 @@ type talker struct {
 
 type talkTurn struct {
 	id, user, full, heard string
+	note                  string // a narration the person heard: a short system turn, no reply
 }
 
 func newTalker(main *llm.LLM, cfg TalkConfig) (*talker, error) {
@@ -120,11 +121,28 @@ func (t *talker) cut(id, heard string) {
 	log.Printf("[talk] cut %s: no such turn", id)
 }
 
+// note puts a narration the person heard into the dialog's context.
+func (t *talker) note(text string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.turns = append(t.turns, talkTurn{note: text})
+	if n := len(t.turns) - 2*t.cfg.Keep; n > 0 {
+		t.turns = t.turns[n:]
+	}
+	if _, err := t.retape(); err != nil {
+		log.Printf("[talk] note: %v", err)
+	}
+}
+
 // retape writes the history as the context's tape: each turn the user's
 // words and the reply as heard, [interrupted] when cut short.
 func (t *talker) retape() (llm.Splice, error) {
 	var b strings.Builder
 	for _, x := range t.turns {
+		if x.note != "" {
+			b.WriteString(t.l.TapeTurn("system", "You told the person: "+x.note))
+			continue
+		}
 		b.WriteString(t.l.TapeTurn("user", x.user))
 		r := x.heard
 		if r == "" {

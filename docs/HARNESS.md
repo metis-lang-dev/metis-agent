@@ -1,5 +1,17 @@
 # The harness: nina_speak → metis-agent, and the web interface
 
+> **Historical in §2–§8** (agent-framework iteration 3, 2026-10-12): the Go
+> floor machine, the senses (VAD, whisper, RHVoice, AEC, speaker id), the
+> ws audio transport, `cmd/fsttm-go` and the nina-web UI are removed. The
+> dialog's floor, attention, barge-in, recognition and synthesis are
+> fsttm-web's; metis-agent is the agent core and the console backend
+> (`docs/FRAMEWORK.md`, current). §9–§11 (the runtime adapter, the rack,
+> narration streaming) stand, carried by `internal/agent`; where they name
+> `fsttm-go`, `startKernel`, `pipeline` or `config.ws.yaml`, read
+> `internal/agent`, `cmd/metis-agent` and `config.agent.yaml`. The code of
+> §2–§8 stays in git history (main before agent-framework step 3) and in
+> nina_speak.
+
 Status: design, 2026-10-11 (architect). Decisions by the user are
 marked **(user)**. Implementer: nina. Source inventories: nina_speak
 `go/` and nina_splat `go/` + `nina_splat/static/`, read 2026-10-11;
@@ -13,7 +25,7 @@ call, and talks to the certified side (the metis kernel, C++ with the
 IR interpreter) through ports. It is reached by people through a web
 UI (voice and chat in Chrome). It does not know ROS **(user)**.
 
-## 2. Port from nina_speak **(user: reuse the code, drop ROS, keep FSTTM)**
+## 2. Port from nina_speak **(user: reuse the code, drop ROS, keep FSTTM)** *(historical)*
 
 Target layout in this repo: `go/` with the same module shape as
 nina_speak (`cmd/`, `internal/`, `grammar/`), history not preserved
@@ -46,7 +58,7 @@ changes, §3), `stt`, `tts`, `vad`, `aec`, `voice_id`, `attention`,
 `prompt`, `grammar`, `barge_in`. `nina.*` collapses to `transport: ws`
 + `mic: local|remote`. `go/config.playground.yaml` is the template.
 
-## 3. LLM: the gemma weights ollama serves, through the llama.cpp adapter **(user)**
+## 3. LLM: the gemma weights ollama serves, through the llama.cpp adapter **(user)** *(historical)*
 
 Same model, different door. The gemma model that already narrates
 well under ollama is the model; but it is loaded **in-process through
@@ -78,7 +90,7 @@ RAG later. Ollama stays a serving convenience, never a dependency.
 - Config: `llm: {model: <gguf path>, n_ctx, n_batch, n_threads,
   n_gpu_layers}` as today; `template: auto|<name>` added.
 
-## 4. The FSM degradation and its fix
+## 4. The FSM degradation and its fix *(historical)*
 
 Finding (nina_speak as deployed): every utterance passes the floor
 (`pipeline.say`, one speaker goroutine), but **task feedback bypasses
@@ -124,7 +136,7 @@ seen from the harness):
   with expiry) and part of the tree mirror later (DESIGN.md context
   file).
 
-## 5. Voice path: Chrome → FSTTM **(user: design for voice/ASR/VAD)**
+## 5. Voice path: Chrome → FSTTM **(user: design for voice/ASR/VAD)** *(historical)*
 
 Decision: **the browser captures and plays; everything that
 understands audio stays in Go.** VAD (webrtcvad, 20 ms), ASR
@@ -222,7 +234,7 @@ Whisper can feed the same seam by decoding a sliding window every
 ~300 ms. That is more GPU work per utterance than today, but it gives
 partials with whisper's accuracy.
 
-## 6. The web interface **(user: a separate app in metis-loop, ported from nina_splat)**
+## 6. The web interface **(user: a separate app in metis-loop, ported from nina_splat)** *(historical)*
 
 Split:
 - **Backend = the harness binary** (`cmd/fsttm-go`, metis-agent). It
@@ -266,7 +278,7 @@ Later the same `command`/`task` pair is what the Go adapter exchanges
 with the C++ kernel over ports; the UI is the first host that speaks
 it.
 
-## 7. Regression in Chrome **(user: same intents as the robot)**
+## 7. Regression in Chrome **(user: same intents as the robot)** *(historical)*
 
 Once the Go codebase exists: run the harness with gemma4, open the UI
 in Chrome, and drive the dog intent corpus — voice (user) and chat
@@ -282,7 +294,7 @@ in Chrome, and drive the dog intent corpus — voice (user) and chat
   spoken as a refusal in the next free floor, a stale one is not;
 - chat and voice reach the same states for the same text.
 
-## 8. Order of work (one subject, nina implements, architect reviews)
+## 8. Order of work (one subject, nina implements, architect reviews) *(historical)*
 
 1. Copy + cleanup: nina_speak → metis-agent `go/`, ROS gone, builds
    without ROS, tests pass; the llama.cpp adapter loads the gemma

@@ -1,5 +1,10 @@
 # Runtime ↔ LLM integration — where we stand, and phase 1
 
+> Since agent-framework (2026-10-12, `docs/FRAMEWORK.md`): "the harness" below is
+> metis-agent's agent core (`internal/agent`, `cmd/metis-agent`); its floor
+> machine, senses, `cmd/fsttm-go` and the nina-web UI are gone — the dialog
+> is fsttm-web's.
+
 Status: plan, 2026-10-11 evening (architect). Builds on DESIGN.md
 (the contract, EXISTS/GAP table, the user's decisions of 2026-10-11)
 and HARNESS.md (the proposing side as built). Decisions for the user

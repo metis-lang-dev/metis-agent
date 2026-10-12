@@ -49,7 +49,7 @@ import (
 	"github.com/metis-lang-dev/metis-agent/go/internal/intent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/kernel"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
-	"github.com/metis-lang-dev/metis-agent/go/internal/pipeline"
+	"github.com/metis-lang-dev/metis-agent/go/internal/agent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/wire"
 )
 
@@ -638,7 +638,7 @@ type narrRec struct {
 }
 
 // runEvents is the step-4 narrate corpus: each failed/refused task outcome
-// is framed by pipeline.TaskCue (the harness's own framing, a5d22c0 F8 —
+// is framed by agent.TaskCue (the harness's own framing, a5d22c0 F8 —
 // never re-framed here), narrated by l.Narrate under the same prompt, and
 // passed through the harness's sanitizeAck + taskVoiceOK; a rejected
 // sentence falls back to the template, as onTask does.
@@ -670,8 +670,8 @@ func runEvents(l *llm.LLM, prompt, path, tag string, vram map[string]int, emit f
 			detail = p[3]
 		}
 		it := wire.Item{ID: fmt.Sprintf("ev%d", n), Name: p[0], Args: args}
-		tk := pipeline.Task{ID: it.ID, Result: p[2], Detail: detail}
-		cue := pipeline.TaskCue(it, tk)
+		tk := agent.Task{ID: it.ID, Result: p[2], Detail: detail}
+		cue := agent.TaskCue(it, tk)
 		t0 := time.Now()
 		out, err := l.Narrate(prompt, cue)
 		d := time.Since(t0)
@@ -679,9 +679,9 @@ func runEvents(l *llm.LLM, prompt, path, tag string, vram map[string]int, emit f
 			out = ""
 		}
 		rec := narrRec{Kind: "narrate", Tag: tag, Intent: p[0], Result: p[2], Detail: detail, Cue: cue,
-			Raw: out, Template: pipeline.NarrateTemplate(it, tk), Ms: d.Milliseconds()}
-		s := pipeline.SanitizeAck(out)
-		rec.ModelOK = pipeline.TaskVoiceOK(s)
+			Raw: out, Template: agent.NarrateTemplate(it, tk), Ms: d.Milliseconds()}
+		s := agent.SanitizeAck(out)
+		rec.ModelOK = agent.TaskVoiceOK(s)
 		rec.Leak = voiceBad(out, "\x00") == "unspeakable"
 		rec.Spoken = rec.Template
 		if rec.ModelOK {

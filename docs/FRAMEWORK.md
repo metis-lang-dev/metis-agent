@@ -276,3 +276,28 @@ against the page.
   - Late viewers get the last domains and rack frames. Narrations are not replayed.
   - `-wait-viewer` attaches the domains when the first page connects, so the page hears the run from its start. `-no-domains` runs the persona alone.
 - **GPU.** The model with three contexts (intent 4096, talk 4096, narrator 4096) needs about 3.2 GB. Beside the user's fsttm-go on :8392 and llama-server on :8393 (4.6 GB), the narrator's context could not be allocated. So the E8 run had talk off, and the talk check had no domains. Alone on the GPU, all three fit.
+
+## 9. As built: iteration 3 (nina, 2026-10-12)
+
+- **Quiescence carries the order (ruling 1).**
+  - The streamer keeps each path's clause-event fragments since its previous quiescence.
+  - At the quiescence, `narr.NarrateOrder` makes them ONE sentence, sent as form N.
+  - A quiescence with no event since the last one goes as R with no sentence: the page shows it and never voices it.
+- **Heard (ruling 2).**
+  - Narration frames carry an `id`. When a voiced narration finishes or is cut, the page sends `heard{id, text}`.
+  - `Agent.Heard` records it as `rack.Said`, which no longer happens at send.
+  - The talk tape gets it as a short system turn: "You told the person: …".
+  - Task outcomes and announcements are narrations too, so they reach the talk context the same way. This closes the open item on announcements in the talk history.
+- **Removed:**
+  - packages `fsm`, `attention`, `vad`, `stt`, `tts`, `aec`, `voiceid`, `audio`, `transport` and `pipeline`;
+  - commands `fsttm-go`, `asrbench`, `fsttm-imprint` and `wsprobe`;
+  - `config.ws*.yaml`, `config.playground.yaml` and `tools/e2-asr.sh`.
+- **Moved and narrowed:**
+  - `pipeline`'s bench hooks moved to `internal/agent/bench_export.go`; llmbench is retargeted at them.
+  - `build.sh` needs llama.cpp only.
+  - `go.mod` is now websocket and yaml only: whisper, malgo, webrtcvad and sherpa are gone.
+- **Docs.**
+  - HARNESS §2–§8 are marked historical.
+  - CML, RAG and INTEGRATION open with a note that "the harness" now means the agent core.
+  - fsttm-web `lib/fsttm.json` and its fixtures are canonical; `fsm/testdata` is gone.
+- **metis-loop.** `apps/nina-web` is removed and its README points at fsttm-web. This is committed on a branch, not on the checked-out master, because the user's running :8392 harness serves its page from that folder. It merges when the user stops :8392.

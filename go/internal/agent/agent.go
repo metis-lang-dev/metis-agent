@@ -71,6 +71,7 @@ type Turn struct {
 // R the reference line, N the sentence, R+N both (RAG §11.1 step 5). The
 // page voices it floor permitting, or parks it.
 type Narration struct {
+	ID       string    `json:"id"` // the page answers heard{id, text} when it voiced it
 	Path     string    `json:"path"`
 	Kind     string    `json:"kind"` // event | reading | surprise | notice | result | quiescence | task | announce
 	Form     string    `json:"form"`
@@ -109,6 +110,10 @@ type Agent struct {
 
 	talk  *talker
 	narrQ chan Narration
+	nmu   sync.Mutex
+	nseq  int
+	nPath map[string]string // narration id → path, the last narrations (heard)
+	nIDs  []string
 }
 
 // New makes the agent on a loaded model; Attach adds the domains.
@@ -162,6 +167,19 @@ func (a *Agent) narrate(n Narration) {
 	if n.T.IsZero() {
 		n.T = time.Now()
 	}
+	a.nmu.Lock()
+	a.nseq++
+	n.ID = fmt.Sprintf("n%d", a.nseq)
+	if a.nPath == nil {
+		a.nPath = map[string]string{}
+	}
+	a.nPath[n.ID] = n.Path
+	a.nIDs = append(a.nIDs, n.ID)
+	if len(a.nIDs) > 512 {
+		delete(a.nPath, a.nIDs[0])
+		a.nIDs = a.nIDs[1:]
+	}
+	a.nmu.Unlock()
 	select {
 	case a.narrQ <- n:
 	default:
@@ -274,6 +292,29 @@ func (a *Agent) Cut(id, heard string) {
 	if a.talk != nil {
 		a.talk.cut(id, heard)
 	}
+}
+
+// Heard: the page voiced narration id, and this much of it was heard (all
+// of it, or up to a cut). It is what was said (rack.Said, the ask scope's
+// "said" records) and it joins the dialog's context: the talk tape gets it
+// as a short system turn, so "what did you just tell me" answers from it.
+func (a *Agent) Heard(id, text string) {
+	text = strings.TrimSpace(text)
+	a.nmu.Lock()
+	path, ok := a.nPath[id]
+	a.nmu.Unlock()
+	if !ok || text == "" {
+		log.Printf("[agent] heard %s: unknown narration or nothing heard", id)
+		return
+	}
+	if a.rk != nil && path != "" {
+		a.rk.Said(path, text)
+		a.pushRack()
+	}
+	if a.talk != nil {
+		a.talk.note(text)
+	}
+	log.Printf("[agent] heard %s (%s): %q", id, path, text)
 }
 
 // ── outcomes and announcements ───────────────────────────────────────────────

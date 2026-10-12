@@ -22,7 +22,7 @@ import (
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/kernel"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
-	"github.com/metis-lang-dev/metis-agent/go/internal/pipeline"
+	"github.com/metis-lang-dev/metis-agent/go/internal/agent"
 )
 
 // the hour's surprise shapes (nina's step-4 hour log, 8 surprises: #41
@@ -91,24 +91,24 @@ func runCap(l *llm.LLM, prompt, cardsF, capsS, tag string, reps int, seed uint32
 					"record": 0.0, "observed": obs, "model": mod, "diff": diff, "observe_only": true}}
 				var lines []string
 				for _, p := range kernel.Pieces(sig, cards) {
-					lines = append(lines, pipeline.CleanFact(p.Text)+".")
+					lines = append(lines, agent.CleanFact(p.Text)+".")
 				}
 				pieces := strings.Join(lines, "\n")
 				rec := capRec{Kind: "cap", Tag: tag, ID: h.id, Cap: cp, Rep: rep, Inserted: pieces,
 					Observed: h.observed, Expected: h.mod}
 				ts := time.Now()
-				out, ttft, thought, err := l.SpeakCap(sys, pieces+"\n"+pipeline.SurpriseCue("kitchen"), cp)
+				out, ttft, thought, err := l.SpeakCap(sys, pieces+"\n"+agent.SurpriseCue("kitchen"), cp)
 				rec.MsTotal, rec.MsFirst, rec.Thought = time.Since(ts).Milliseconds(), ttft.Milliseconds(), len(thought)
 				if err != nil {
 					rec.Err = err.Error()
 				}
 				rec.Answer = out
-				said := pipeline.SanitizeAck(out)
+				said := agent.SanitizeAck(out)
 				switch {
-				case !pipeline.TaskVoiceOK(said):
+				case !agent.TaskVoiceOK(said):
 					rec.Guard = "voice"
-				case pipeline.InventedNumbers(said, pieces) != "":
-					rec.Guard = "number:" + pipeline.InventedNumbers(said, pieces)
+				case agent.InventedNumbers(said, pieces) != "":
+					rec.Guard = "number:" + agent.InventedNumbers(said, pieces)
 				default:
 					rec.Guard = "ok"
 				}

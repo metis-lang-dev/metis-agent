@@ -21,8 +21,9 @@ type streamer struct {
 	nr   *narr.Narrator
 	mode string // policy | N-all | R-all
 
-	mu sync.Mutex
-	q  map[string]chan streamWork
+	mu    sync.Mutex
+	q     map[string]chan streamWork
+	order map[string][]narr.Fragment // per path: the clause events since its last quiescence
 }
 
 type streamWork struct {
@@ -54,6 +55,14 @@ func (s *streamer) submit(w streamWork) {
 
 func (s *streamer) run(w streamWork) {
 	for i, f := range w.frags {
+		if f.Kind == "quiescence" {
+			var rec *rack.Record
+			if i < len(w.recs) {
+				rec = &w.recs[i]
+			}
+			s.quiescence(f, rec, w)
+			continue
+		}
 		sn := s.nr.Narrate(f)
 		said := sanitizeAck(sn.Text)
 		guard := "ok"
@@ -81,8 +90,55 @@ func (s *streamer) run(w streamWork) {
 			continue
 		}
 		s.a.narrate(Narration{Path: f.Path, Kind: f.Kind, Form: form, Line: line, Sentence: said, T: w.ev.At})
-		if text := narr.Render(form, line, said); text != "" {
-			s.a.rk.Said(f.Path, text) // what the page is given to say (it may park or drop it asleep)
+		if f.Kind == "event" {
+			s.mu.Lock()
+			if s.order == nil {
+				s.order = map[string][]narr.Fragment{}
+			}
+			s.order[f.Path] = append(s.order[f.Path], f)
+			s.mu.Unlock()
 		}
 	}
+}
+
+// quiescence carries the order (the step-3 ruling, RAG §12.3): the clause
+// events since the agent's previous quiescence narrated as ONE sentence,
+// form N. A quiescence with no event since the previous one is shown (R),
+// never voiced — no "waiting for the next order" repeated.
+func (s *streamer) quiescence(f narr.Fragment, rec *rack.Record, w streamWork) {
+	s.mu.Lock()
+	events := s.order[f.Path]
+	delete(s.order, f.Path)
+	s.mu.Unlock()
+	line := f.Line(s.nr.Name)
+	if len(events) == 0 {
+		log.Printf("[narr] %s#%d quiescence: no event since the last — shown, not voiced", f.Path, f.Seq)
+		s.a.rk.Narrated(f.Path, line, "", narr.FormR, s.nr.ScriptTok(f.Path))
+		s.a.pushRack()
+		s.a.narrate(Narration{Path: f.Path, Kind: f.Kind, Form: narr.FormR, Line: line, T: w.ev.At})
+		return
+	}
+	sn := s.nr.NarrateOrder(events, f)
+	said := sanitizeAck(sn.Text)
+	guard := "ok"
+	switch {
+	case sn.Err != nil:
+		guard, said = "error: "+sn.Err.Error(), ""
+	case !taskVoiceOK(said):
+		guard, said = "voice", ""
+	case inventedNumbers(said, sn.Inserted) != "":
+		guard, said = "number:"+inventedNumbers(said, sn.Inserted), ""
+	}
+	form := narr.FormN
+	if said == "" {
+		form = narr.FormR
+	}
+	log.Printf("[narr] %s#%d order of %d event(s) → %q (%s, %d tok, %d ms) passed %s",
+		f.Path, f.Seq, len(events), sn.Text, guard, sn.TokFrag, sn.Dur.Milliseconds(), form)
+	if rec != nil && said != "" {
+		s.a.rk.SetAgent(f.Path, rec.Seq, rec.Kind, said)
+	}
+	s.a.rk.Narrated(f.Path, line, said, form, s.nr.ScriptTok(f.Path))
+	s.a.pushRack()
+	s.a.narrate(Narration{Path: f.Path, Kind: f.Kind, Form: form, Line: line, Sentence: said, T: w.ev.At})
 }

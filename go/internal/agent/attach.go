@@ -327,9 +327,6 @@ func (a *Agent) onEvent(d *dom, ev kernel.Event) {
 	for _, p := range ev.Pieces {
 		line := cleanText(p.Text, factCap) + "."
 		a.narrate(Narration{Path: ev.Path, Kind: p.Kind, Form: narr.FormR, Line: line, T: ev.At})
-		if a.rk != nil {
-			a.rk.Said(ev.Path, line)
-		}
 	}
 }
 

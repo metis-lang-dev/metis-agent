@@ -1,5 +1,10 @@
 # CML — the context stream between the runtime and the model
 
+> Since agent-framework (2026-10-12, `docs/FRAMEWORK.md`): "the harness" below is
+> metis-agent's agent core (`internal/agent`, `cmd/metis-agent`); its floor
+> machine, senses, `cmd/fsttm-go` and the nina-web UI are gone — the dialog
+> is fsttm-web's.
+
 Status: BRAINSTORM NOTES, 2026-10-11 night (architect, from the user's
 "flow state" framing). Not an architecture and not a plan: the
 architecture is developed together with the user; nothing here is

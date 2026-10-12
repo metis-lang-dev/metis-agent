@@ -127,3 +127,21 @@ func TestFormPolicy(t *testing.T) {
 		t.Error("N without a sentence / Ø")
 	}
 }
+
+// The order summary's turn: every event of the order in turn, then the
+// quiescence, then the cue naming the agent (one call, thinking off).
+func TestNarrateOrderTurn(t *testing.T) {
+	sp := &fakeSpeaker{}
+	n := &Narrator{LLM: sp, Name: func(p string) string { return "the first cook" }}
+	ev := []Fragment{{Path: "kitchen", Kind: "event", Ref: "fetch_onion"}, {Path: "kitchen", Kind: "event", Ref: "load", Counts: map[string]int{"pot_onion": 1}}}
+	q := Fragment{Path: "kitchen", Kind: "quiescence", Ref: "quiet after 2 moves, waiting for the next order"}
+	sn := n.NarrateOrder(ev, q)
+	if sn.Text != "Said." || len(sp.user) != 1 || sp.think[0] != 0 {
+		t.Fatalf("got %q, %d calls, think %v", sn.Text, len(sp.user), sp.think)
+	}
+	for _, want := range []string{"The order of the first cook, in turn:", "- fetch onion", "- load; now pot onion 1", "Then: quiet after 2 moves", "what the first cook did in this order"} {
+		if !strings.Contains(sp.user[0], want) {
+			t.Errorf("turn lacks %q:\n%s", want, sp.user[0])
+		}
+	}
+}

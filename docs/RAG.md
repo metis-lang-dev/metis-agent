@@ -1,5 +1,10 @@
 # RAG — per-agent tapes and structural retrieval for the main narrator
 
+> Since agent-framework (2026-10-12, `docs/FRAMEWORK.md`): "the harness" below is
+> metis-agent's agent core (`internal/agent`, `cmd/metis-agent`); its floor
+> machine, senses, `cmd/fsttm-go` and the nina-web UI are gone — the dialog
+> is fsttm-web's.
+
 Status: design proposal, 2026-10-12 (architect; from the user's "RAG
 mechanism" framing, docs/CML.md §8). The name "rack" in earlier notes,
 the subject and the Go package is an ASR mishearing of "RAG"; code

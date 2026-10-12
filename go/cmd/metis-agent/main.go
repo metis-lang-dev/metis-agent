@@ -199,6 +199,8 @@ func main() {
 			a.Task(agent.Task{ID: m.ID, Result: m.Result, Detail: m.Detail})
 		case "say":
 			a.Announce(m.Text)
+		case "heard":
+			go a.Heard(m.ID, m.Text)
 		case "runtime_intent":
 			go func() {
 				if err := a.RuntimeIntent(m.Text); err != nil {

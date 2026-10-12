@@ -162,3 +162,30 @@ func Render(form, line, sentence string) string {
 	}
 	return line
 }
+
+// CueOrder closes an order's summary turn (RAG §12.3 as ruled for the
+// service: the quiescence carries the order).
+const CueOrder = "Narrate for the person, in one sentence, what %s did in this order."
+
+// NarrateOrder is one call for a whole order: the clause-event fragments
+// since the agent's previous quiescence and the quiescence itself, as one
+// sentence — what the agent did, not that it waits. thinking off.
+func (n *Narrator) NarrateOrder(events []Fragment, q Fragment) Sentence {
+	n.mu.RLock()
+	sys := n.system()
+	n.mu.RUnlock()
+	var b strings.Builder
+	fmt.Fprintf(&b, "The order of %s, in turn:\n", n.Name(q.Path))
+	for _, f := range events {
+		fmt.Fprintf(&b, "- %s\n", f.Body())
+	}
+	fmt.Fprintf(&b, "Then: %s\n\n", q.Body())
+	user := b.String() + fmt.Sprintf(CueOrder, n.Name(q.Path))
+	t0 := time.Now()
+	out, _, thought, err := n.LLM.SpeakCap(sys, user, 0)
+	sn := Sentence{Text: out, Thought: thought, Inserted: user, Dur: time.Since(t0), Err: err}
+	if n.Tok != nil {
+		sn.TokFrag = n.Tok(user)
+	}
+	return sn
+}

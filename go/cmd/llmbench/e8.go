@@ -38,7 +38,7 @@ import (
 	"github.com/metis-lang-dev/metis-agent/go/internal/kernel"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
 	"github.com/metis-lang-dev/metis-agent/go/internal/narr"
-	"github.com/metis-lang-dev/metis-agent/go/internal/pipeline"
+	"github.com/metis-lang-dev/metis-agent/go/internal/agent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/rack"
 )
 
@@ -216,9 +216,9 @@ func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, formsS, tag str
 				nd := e8Narrated{f: f, line: f.Body()}
 				if !dry {
 					nd.sn = nr.Narrate(f)
-					said := pipeline.SanitizeAck(nd.sn.Text)
+					said := agent.SanitizeAck(nd.sn.Text)
 					nd.guard = "voice"
-					if pipeline.TaskVoiceOK(said) {
+					if agent.TaskVoiceOK(said) {
 						nd.sentence, nd.guard = said, "ok"
 					}
 					fmt.Fprintf(os.Stderr, "r%d %s#%d %-10s → %q (%d ms)\n", rep, f.Path, f.Seq, f.Kind, nd.sn.Text, nd.sn.Dur.Milliseconds())
@@ -345,16 +345,16 @@ func e8Probe(l *llm.LLM, orch string, q map[string]any, nd []e8Narrated, passed 
 		for j := len(idx) - 1; j >= 0; j-- {
 			i := idx[j]
 			if nd[i].f.Path == path && nd[i].f.Kind == kind {
-				inserted += "\nJust now: " + pipeline.CleanFact(render(i)) + "."
+				inserted += "\nJust now: " + agent.CleanFact(render(i)) + "."
 				break
 			}
 		}
 	}
 	var cue string
 	if probe == "cue" {
-		cue = pipeline.RackSurpriseCue(strings.ReplaceAll(path, "_", " "))
+		cue = agent.RackSurpriseCue(strings.ReplaceAll(path, "_", " "))
 	} else {
-		cue = pipeline.RackAskCue() + "\nThe person asks: " + strconv.Quote(question)
+		cue = agent.RackAskCue() + "\nThe person asks: " + strconv.Quote(question)
 	}
 	think := kind == "surprise"
 	refs = dedup(refs)
@@ -374,12 +374,12 @@ func e8Probe(l *llm.LLM, orch string, q map[string]any, nd []e8Narrated, passed 
 		rec.Err = err.Error()
 	}
 	rec.Answer = out
-	said := pipeline.SanitizeAck(out)
+	said := agent.SanitizeAck(out)
 	switch {
-	case !pipeline.TaskVoiceOK(said):
+	case !agent.TaskVoiceOK(said):
 		rec.Guard = "voice"
-	case pipeline.InventedNumbers(said, inserted+" "+question) != "":
-		rec.Guard = "number:" + pipeline.InventedNumbers(said, inserted+" "+question)
+	case agent.InventedNumbers(said, inserted+" "+question) != "":
+		rec.Guard = "number:" + agent.InventedNumbers(said, inserted+" "+question)
 	default:
 		rec.Guard, rec.Said = "ok", said
 	}

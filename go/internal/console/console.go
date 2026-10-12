@@ -3,10 +3,10 @@
 // One agent, one session, N viewers of it. No audio and no floor: the page
 // owns both.
 //
-//	→ page     intent{id,intent,voice,t,…} · talk{id,text,done,t} · narration{path,kind,form,line,sentence,t}
+//	→ page     intent{id,intent,voice,t,…} · talk{id,text,done,t} · narration{id,path,kind,form,line,sentence,t}
 //	           runtime{kind,path,fact,narrated,sig,t} · rack{paths,last,t} · command{id,name,args,t}
 //	           pending{id,state,t} · domains{domains,t} · error{id,error,t}
-//	→ backend  say_text{id,text,mode} (mode intent | talk) · cut{id,heard} · task{id,result,detail}
+//	→ backend  say_text{id,text,mode} (mode intent | talk) · cut{id,heard} · heard{id,text} · task{id,result,detail}
 //	           say{text} · runtime_intent{text} · rack_mount{text,state}
 package console
 
@@ -229,7 +229,7 @@ func (s *Server) Talk(id, text string, done bool) {
 }
 
 func (s *Server) Narration(n agent.Narration) {
-	s.Send("narration", map[string]any{"path": n.Path, "kind": n.Kind, "form": n.Form,
+	s.Send("narration", map[string]any{"id": n.ID, "path": n.Path, "kind": n.Kind, "form": n.Form,
 		"line": n.Line, "sentence": n.Sentence})
 }
 
