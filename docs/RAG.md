@@ -368,3 +368,57 @@ Pre-registered reads:
    pane shows per agent the last fragment, its sentence, the form
    passed, script size and tape tokens.
 3. both — E8 run, table, read.
+
+## 12. The read after E8 (architect, 2026-10-12)
+
+Run: 686047b, scorer 4c1fc8e, 9 rows × 3 reps, 16 min on one E2B.
+
+**1. The script is enough.** From the catalog's comments alone, with
+no authored interpretation and no templates, the flat narrator is
+faithful: agent attribution 1.00 (0.99 by hand), invented 0. The
+partner move narrates as "the second cook dropped an onion into the
+first cook's pot" every time. Narration streaming from the script RAG
+stands; the `says` dictionary stays gone. Of the four flagged comments
+none fails under flat; rewriting them is the author's taste, not a
+need.
+
+**2. Retrieval: flat, again.** Structural pays 89 tokens a fragment to
+flat's 36 (the script sits once in the cached prefix) and is worse at
+the agent (0.88): an outside change with no script entry gets the
+agent as its doer, a comment inserted as a move's text gets the move
+name as its subject, a result's reason pulls the wrong move. These are
+insertion shapes, not retrieval wins. The whole script stays resident;
+structural stays parked.
+
+**3. Form: progress passes at arrival, as the sentence.** The policy
+"progress batched to quiescence" was wrong: every "what did X just
+do" question found nothing (used 0.39 vs 0.60). N and R are within the
+noise floor on used; N inserts fewer tokens (248 vs 353 per probe) and
+passes 30% less; its misses are count questions, which the ask scope's
+mirror line is for. Default: progress → N at arrival; surprise, notice,
+result → R+N; the person's ask → N. The model-decided form stays a
+later experiment.
+
+**4. Thinking off for the narrator.** Attribution 1.00 at off, 64 and
+256; the 64 cap is the worst of the three: it cuts the thought and the
+sentence drops the reading ("paused taking new orders"); off and 256
+both keep "two onions, one space"; 256 is 3× slower. Nothing says what
+was expected; that is the surprise fragment's text to fix, not
+thinking. Open: the orchestrator's own 64 cap on surprise narration
+(step 4) deserves the same off/64 check.
+
+**5. The native system turn stays:** 36 vs 903 tokens a fragment at
+equal attribution.
+
+**6. One build item:** the narrator gets the result's own short form
+(verb, status, card, move) instead of the runtime's reason text, which
+no setting narrated to the second cook.
+
+**7. A noise floor to remove.** With the narrator on a sibling KV
+context, the orchestrator answered identical insertions differently in
+27 of 72 probes; E7's cells were 3/3 or 0/3. Orchestrator gaps under
+about 0.15 are unreadable at 3 reps until this is found. Likely the
+batch composition across the two sequences; nina verifies with the
+narrator idle vs busy, and either serialises the contexts or the next
+bench carries more reps. The agent-side reads above do not depend on
+it.
