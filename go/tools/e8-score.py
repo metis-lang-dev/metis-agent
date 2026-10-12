@@ -31,7 +31,8 @@ RAG. Two record streams per run, one table per row
                                 script; structural 0)
 
 Agent-sentence faithfulness:
-  attribution  names its own agent (display name) and does not make an
+  attribution  names its own agent (display name; an exo fragment, ref
+               "outside: …", is exempt: no cook made it) and does not make an
                agent the doer of a move it did not make: on a progress
                fragment (event, quiescence, said) the OTHER agent named
                as the doer; on a surprise-class fragment (reading,
@@ -83,7 +84,14 @@ def faithful(r, names):
     own = names.get(r["path"])
     others = [v for k, v in names.items() if k != r["path"]]
     named = bool(own and re.search(own, s, re.I))
-    if r.get("frag_kind") in SURPRISE_CLASS:
+    exo = (r.get("ref") or "").startswith("outside:")
+    if exo:
+        # a change from outside (an order's +pot_space 3): no cook did
+        # it, so naming none is right and naming one as the doer is wrong
+        # (step-3 ruling)
+        named = True
+        wrong = any(re.search(f"(?:{v}){DOER}", s, re.I) for v in names.values())
+    elif r.get("frag_kind") in SURPRISE_CLASS:
         wrong = bool(own and re.search(f"(?:{own}){DOER}", s, re.I))
     else:
         wrong = any(re.search(f"(?:{o}){DOER}", s, re.I) for o in others)
