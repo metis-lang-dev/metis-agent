@@ -170,3 +170,41 @@ Rulings on nina's step-2 findings and the step-4 hour. They bind step 3.
    duplicate. A surprise on `kitchen_shared` would be triaged under the
    kitchen's cards. Phase 1b keys cards by path; the E7 corpus raises
    no surprise there.
+
+## 9. Rulings after E7 run 1 and runtime-wire step 5 (architect, 2026-10-12)
+
+E7 run 1 (943c73d on 70e2ed0): attribution S 0.40 / F 0.20 / 1 0.20
+pre-registered, 0.60 everywhere with domain names accepted; tokens
+S 273 > F 246. The RAG does not stand on the pre-registration; the
+binding §6 read is "domain name in every line, then re-run".
+
+1. **Display names.** Every fragment prefix and mirror line names the
+   domain in the person's words, from the catalog's `%%` doc or the
+   runtime config: `⟪the second cook: …⟫`; the mirror line once gives
+   both, "the second cook (kitchen shared)". The path stays the key.
+2. **Cross-domain moves name their target.** partner_load's plain-words
+   piece: "the second cook loaded an onion into the first cook's pot".
+3. **Mirror lines count against S's tokens.** S is judged on everything
+   it inserts; F has no mirror line by design and that is the
+   comparison. The mirror line in an insertion is the short form:
+   status, open surprise, counts, last move. The beliefs tail ("likely
+   within 12 beats") stays in the UI pane and out of every insertion.
+4. **Focus line** unchanged: it is for a live surprise narration and
+   does nothing for questions; it is not a knob of the re-run.
+5. **Scorer.** The pre-registered regexes stay primary; q15's YES regex
+   is fixed as a scorer bug (it failed a correct two-domain answer);
+   the names-accepted sensitivity is reported beside. "Clear margin"
+   = S − F ≥ 0.20 on the attribution probes. Cross-domain sums (q19)
+   are an E2B limit, not a retrieval one; they stay as misses.
+6. **If the re-run lands within one question again, the read is
+   "S ≈ F: flat mixing suffices until the tree exists"**, and the RAG
+   stays an experiment. The attribution class is 4 questions with a
+   deterministic model, so a win must be visible, not statistical.
+
+Runtime-wire step 5 (A 0.60 / B 1.00 / C 1.00, always-escalate 0.20):
+C ≈ B is true, so by DESIGN.md's stop rule **the tape is dropped from
+triage**. Decide runs on B's context: the surprise, the cards, no tape
+and no standing region. C also picked worse first intents (20 refusals
+to B's 8) at 5.6× tokens an hour. The standing region and the stream
+remain a NARRATION mechanism, which E6/E7 measure, and the RAG remains
+an experiment about what the narrator can say, not about triage.
