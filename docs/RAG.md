@@ -406,8 +406,15 @@ later experiment.
 sentence drops the reading ("paused taking new orders"); off and 256
 both keep "two onions, one space"; 256 is 3× slower. Nothing says what
 was expected; that is the surprise fragment's text to fix, not
-thinking. Open: the orchestrator's own 64 cap on surprise narration
-(step 4) deserves the same off/64 check.
+thinking. Checked for the orchestrator too (consolidation s-3d60c269, opus
+c575c12, MODEL-EXPERIMENTS.md): on its surprise speech the 64 cap
+drops the pause (consequence 0.33 vs 0.80 off); 256 keeps it and adds
+reading +0.13 and expected +0.13 over off, 2 sentences of 15, at
+1.75 s to the first word against 60 ms. The §11.2 rule says 256; the
+architect sets **off**, since CML §7's "thinking on for surprise-class"
+was accepted at +270 ms and a spoken alert at 1.75 s breaks that, while
+the two sentences gained carry values the surprise piece already states
+deterministically. The user can reverse this with one config line.
 
 **5. The native system turn stays:** 36 vs 903 tokens a fragment at
 equal attribution.
