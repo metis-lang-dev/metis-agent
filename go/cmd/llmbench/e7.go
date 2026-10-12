@@ -10,6 +10,7 @@ package main
 //
 //	S          rack.Store.Retrieve(trigger) — the live harness's store
 //	           (compaction on), mirror lines from kernel.MirrorRows
+//	(every arm's fragments carry the display names: Store.Frag, RAG §9.1)
 //	F          flat: the last K records of both tapes in arrival order,
 //	           no mirror lines, no scoping (K = S's record count, ≥ 6)
 //	1          single-domain: the asked path's last K records, its mirror
@@ -109,10 +110,6 @@ func e7Feed(s *rack.Store, sigs []map[string]any, cards []kernel.Card, upTo floa
 		}
 	}
 	return texts, all
-}
-
-func e7Frag(path, text string) string {
-	return "⟪" + strings.ReplaceAll(path, "_", " ") + ": " + strings.TrimSuffix(strings.TrimSpace(text), ".") + "⟫"
 }
 
 // e7LastK: the last k records (by arrival, then seq) of the given paths
@@ -220,6 +217,9 @@ func runE7(l *llm.LLM, prompt, pairF, corpusF, cardsF, armsS, tag string, reps i
 
 			s := rack.New("kitchen", "kitchen_shared")
 			s.Attach("kitchen_shared", e7Card)
+			for _, p := range []string{"kitchen", "kitchen_shared"} {
+				s.Name(p, kernel.DisplayName(p, cards)) // RAG §9.1, as the retriever test
+			}
 			s.Tok = tok
 			texts, all := e7Feed(s, sigs, cards, at)
 
@@ -269,18 +269,18 @@ func runE7(l *llm.LLM, prompt, pairF, corpusF, cardsF, armsS, tag string, reps i
 				case "F":
 					var fr []string
 					for _, r := range e7LastK(all, []string{"kitchen", "kitchen_shared"}, k) {
-						fr = append(fr, e7Frag(r.Path, r.Text))
+						fr = append(fr, s.Frag(r.Path, r.Text))
 						refs = append(refs, r.Ref())
 					}
 					ins = strings.Join(fr, "\n")
 				case "1":
 					var fr []string
 					if m := mirror(asked); m != "" {
-						fr = append(fr, e7Frag(asked, m))
+						fr = append(fr, s.Frag(asked, m))
 						ms = []string{asked}
 					}
 					for _, r := range e7LastK(all, []string{asked}, k) {
-						fr = append(fr, e7Frag(r.Path, r.Text))
+						fr = append(fr, s.Frag(r.Path, r.Text))
 						refs = append(refs, r.Ref())
 					}
 					ins = strings.Join(fr, "\n")
