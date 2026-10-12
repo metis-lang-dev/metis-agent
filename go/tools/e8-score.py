@@ -56,11 +56,11 @@ _spec = importlib.util.spec_from_file_location(
 e7 = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(e7)
 
-# the agents' names as the person says them (RAG §9.1 display names, and
-# the synonyms E7's regexes accept)
+# the agents' names as the person says them: the COOK (RAG §9.1 display
+# names; step-1 ruling — a domain name like "the shared kitchen" is not
+# naming the agent)
 NAMES = {"kitchen": r"first cook|\bthe cook\b(?!.*second)",
-         "kitchen_shared": r"second cook|other cook|another cook|partner"
-                           r"|shared kitchen|kitchen.shared"}
+         "kitchen_shared": r"second cook|other cook|another cook"}
 DOER = (r"(?:\s+(?:just|then|had|has|have|also))?\s+(?:loaded|dropped|put|"
         r"added|placed|tossed|threw|took|fetched|grabbed|picked|walked|"
         r"served|cooked|started|plated|delivered|carried|moved)\b")
@@ -69,7 +69,7 @@ SURPRISE_CLASS = {"reading", "surprise", "notice", "result"}
 
 def names_from(cards_f):
     """Display names from the cards file (llmbench -e7-cards), the
-    display name itself plus E7's synonyms for the second cook."""
+    display name itself plus the cook synonyms above."""
     out = dict(NAMES)
     for c in json.load(open(cards_f)):
         d = (c.get("display") or "").removeprefix("the ").strip()
@@ -184,7 +184,12 @@ def main():
     answers = e7.score(corpus, [r for r in recs if r.get("kind") == "e8"])
     sentences = [r for r in recs if r.get("kind") == "e8-sentence"]
     runs = [r for r in recs if r.get("kind") == "e8-run"]
+    print("pre-registered (primary):\n")
     print(table(answers, sentences, runs, names))
+    named = {k: {**q, **e7.NAMES_ACCEPTED.get(k, {})} for k, q in corpus.items()}
+    print("\nnames accepted (sensitivity, orchestrator only: q22, q23, q14, q20):\n")
+    print(table(e7.score(named, [r for r in recs if r.get("kind") == "e8"]),
+                [], [], names))
     misses = sentence_misses(sentences, names)
     if misses:
         print("\nagent sentences not faithful:")

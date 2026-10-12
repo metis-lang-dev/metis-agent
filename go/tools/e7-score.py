@@ -106,6 +106,10 @@ NAMES_ACCEPTED = {
     "q22": {"expect": _FIRST_NAMED, "right": _FIRST_NAMED},
     "q23": {"right": r"first cook|\bthe cook's\b|\bkitchen'?s pot|\bkitchen\b(?! shared)",
             "wrong": r"second cook's pot|kitchen shared'?s? pot"},
+    # the narration probes (RAG §11.2 ruling): the second cook's DOMAIN
+    # ("the shared kitchen card's move") attributes here, not in the primary
+    "q14": {"right": SECOND.pattern},
+    "q20": {"right": SECOND.pattern},
 }
 
 
@@ -116,7 +120,7 @@ def main():
     print("pre-registered (primary):\n")
     print(table(rows))
     named = {k: {**q, **NAMES_ACCEPTED.get(k, {})} for k, q in corpus.items()}
-    print("\nnames accepted (sensitivity: q22, q23):\n")
+    print("\nnames accepted (sensitivity: q22, q23, q14, q20):\n")
     print(table(score(named, recs)))
     misses = [x for x in rows if not x["used"] and x["covered"]]
     if misses:
