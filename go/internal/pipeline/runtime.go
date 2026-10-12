@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/fsm"
-	"github.com/metis-lang-dev/metis-agent/go/internal/wire"
 )
 
 // RuntimeCommand is the pending-command name of a runtime intent
@@ -306,43 +305,6 @@ func (e *Engine) narrateCued(batch []RuntimeEvent, think bool) (string, string) 
 // 4: with a kernel attached, the dog prompt + the runtime section is the
 // one cached prefix).
 func (e *Engine) SetSystemPrompt(p string) { e.cfg.SystemPrompt = p }
-
-// runtimeResultCue is the per-verb cue for a runtime intent's result
-// (step-3 review: the generic task cue read stilted — "My command to
-// escalate succeeded because I am still observe-only"). It says what the
-// outcome MEANS for the person, quotes the runtime's reason as a reason,
-// and asks for one plain sentence.
-func runtimeResultCue(it wire.Item, t Task) string {
-	line, _ := it.Args["intent"].(string)
-	verb, rest, _ := strings.Cut(line, " ")
-	f := strings.Fields(rest)
-	reason := strings.TrimSpace(t.Detail)
-	var what string
-	switch {
-	case t.Result == "done" && verb == "reset":
-		what = "You set an odd reading aside as a one-off misread, and the runtime is acting again."
-	case t.Result == "done" && verb == "explain" && strings.HasPrefix(reason, "notice: ") && len(f) >= 3:
-		what = fmt.Sprintf("You explained the odd reading again with %s (%s), and the runtime noticed it keeps happening: "+
-			"its model of the kitchen lacks that, so the people who revise it are told; it carries on.",
-			strings.ReplaceAll(f[1], "_", " "), strings.ReplaceAll(f[2], "_", " "))
-		reason = strings.TrimPrefix(reason, "notice: ")
-	case t.Result == "done" && verb == "explain" && len(f) >= 3:
-		what = fmt.Sprintf("You explained the odd reading: %s (%s) accounts for it, and the runtime carries on.",
-			strings.ReplaceAll(f[1], "_", " "), strings.ReplaceAll(f[2], "_", " "))
-	case t.Result == "done" && verb == "escalate":
-		what = "You passed the surprise on to the people who revise the model; until then the runtime only watches."
-	case t.Result == "done":
-		what = "The runtime accepted your " + verb + "."
-	default:
-		what = fmt.Sprintf("The runtime refused your %s. Its reason, quoted: %q.", verb, reason)
-		reason = ""
-	}
-	cue := "[Robot status report — not something the person said; do not classify it.] " + what
-	if reason != "" {
-		cue += fmt.Sprintf(" The runtime's words, quoted: %q.", reason)
-	}
-	return cue + " Tell the person in one short, plain first-person sentence; no JSON, no intent name, no numbers that are not here."
-}
 
 var (
 	idNumber    = regexp.MustCompile(`(?i)\b(surprise|record|intent|seq|beat)\s*#?\s*(\d+)`)

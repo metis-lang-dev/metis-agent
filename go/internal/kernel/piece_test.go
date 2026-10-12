@@ -3,6 +3,7 @@ package kernel
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -62,5 +63,47 @@ func TestPiecesNowCarryCounts(t *testing.T) {
 		if got[i] != want[i] {
 			t.Errorf("%d:\n got  %q\n want %q", i, got[i], want[i])
 		}
+	}
+}
+
+// RAG §9.1–3: the domains in the person's words — the mirror line names
+// the domain once in both forms and is the short form (no beliefs tail);
+// a move into another domain names its target.
+func TestDisplayNames(t *testing.T) {
+	var cards []Card
+	b, err := os.ReadFile("testdata/kitchen-cards.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(b, &cards); err != nil {
+		t.Fatal(err)
+	}
+	row := map[string]any{"path": "kitchen_shared", "status": "running", "now": map[string]any{"served": 2.0},
+		"last": "partner_load", "horizon": 12.0, "beliefs": map[string]any{"served": 0.5}}
+	want := "The second cook (kitchen shared) now: running, no open surprise; served 2; last move partner load (pot onion +1, pot space -1)."
+	if got := MirrorRow(row, cards); got != want {
+		t.Errorf("mirror line:\n got  %s\n want %s", got, want)
+	}
+	if got := MirrorRowFull(row, cards); !strings.HasPrefix(got, strings.TrimSuffix(want, ".")+"; likely within 12 beats: served 0.50") {
+		t.Errorf("the pane's line keeps the beliefs: %s", got)
+	}
+	ev := Signal{Kind: "event", Path: "kitchen_shared", F: map[string]any{"kind": "clause", "name": "partner_load",
+		"consume": map[string]any{"pot_space": 1.0}, "produce": map[string]any{"pot_onion": 1.0}}}
+	if got := Pieces(ev, cards)[0].Text; got != "The second cook loaded an onion into the first cook's pot." {
+		t.Errorf("piece: %s", got)
+	}
+	c := NewCounts(map[string]any{"pot_space": 3.0})
+	if got := PiecesNow(ev, cards, c)[0].Text; got != "The second cook loaded an onion into the first cook's pot; now pot onion 1, pot space 2." {
+		t.Errorf("piece now: %s", got)
+	}
+	if got := DisplayName("pantry", cards); got != "pantry" {
+		t.Errorf("an unnamed domain: %s", got)
+	}
+	// the runtime config fills what the cards op left out, never over it
+	cs := []Card{{Name: "pantry"}, {Name: "kitchen", Display: "the cook"}}
+	Name(cs, "pantry", "the pantry", "", nil)
+	Name(cs, "kitchen", "the first cook", "", nil)
+	if cs[0].Display != "the pantry" || cs[1].Display != "the cook" {
+		t.Errorf("Name: %+v", cs)
 	}
 }

@@ -184,23 +184,40 @@ func MirrorLine(ans map[string]any, cards []Card) string {
 	return MirrorRow(r, cards)
 }
 
-// MirrorRows renders every row of a ctx --mirror answer, by path.
+// MirrorRows renders every row of a ctx --mirror answer, by path: the
+// short form, as every insertion and the standing region carry it.
 func MirrorRows(ans map[string]any, cards []Card) map[string]string {
+	return mirrorRows(ans, cards, false)
+}
+
+// MirrorRowsFull is MirrorRows with the beliefs tail, for the UI pane.
+func MirrorRowsFull(ans map[string]any, cards []Card) map[string]string {
+	return mirrorRows(ans, cards, true)
+}
+
+func mirrorRows(ans map[string]any, cards []Card, beliefs bool) map[string]string {
 	out := map[string]string{}
 	rows, _ := ans["mirror"].([]any)
 	for _, x := range rows {
 		if r, ok := x.(map[string]any); ok {
 			p, _ := r["path"].(string)
-			out[p] = MirrorRow(r, cards)
+			out[p] = mirrorRow(r, cards, beliefs)
 		}
 	}
 	return out
 }
 
-// MirrorRow is one mirror row in plain words: stage status, the open
-// surprise, the #query atoms' counts now and the last event (metispy
-// 03d57ba, RAG v2 finding 1), and the horizon's beliefs.
-func MirrorRow(r map[string]any, cards []Card) string {
+// MirrorRow is one mirror row in plain words, the short form (RAG §9.3):
+// stage status, the open surprise, the #query atoms' counts now and the
+// last event (metispy 03d57ba, RAG v2 finding 1). The domain is named once
+// in both words, "the second cook (kitchen shared)" (RAG §9.1).
+func MirrorRow(r map[string]any, cards []Card) string { return mirrorRow(r, cards, false) }
+
+// MirrorRowFull adds the horizon's beliefs ("likely within 12 beats: …"):
+// the UI pane's line, never an insertion's.
+func MirrorRowFull(r map[string]any, cards []Card) string { return mirrorRow(r, cards, true) }
+
+func mirrorRow(r map[string]any, cards []Card, beliefs bool) string {
 	path, _ := r["path"].(string)
 	status, _ := r["status"].(string)
 	open := "no open surprise"
@@ -219,14 +236,18 @@ func MirrorRow(r map[string]any, cards []Card) string {
 		}
 		return strings.Join(out, ", ")
 	}
-	line := fmt.Sprintf("The %s now: %s, %s", words(path), status, open)
+	name := "the " + words(path)
+	if d := DisplayName(path, cards); d != words(path) {
+		name = d + " (" + words(path) + ")"
+	}
+	line := fmt.Sprintf("%s now: %s, %s", upperFirst(name), status, open)
 	if now, ok := r["now"].(map[string]any); ok && len(now) > 0 {
 		line += "; " + sorted(now, func(k string, v any) string { return fmt.Sprintf("%s %d", k, int(num(v))) })
 	}
 	if last, ok := r["last"].(string); ok && last != "" {
 		line += "; last move " + last
 	}
-	if b, ok := r["beliefs"].(map[string]any); ok && len(b) > 0 {
+	if b, ok := r["beliefs"].(map[string]any); ok && len(b) > 0 && beliefs {
 		line += fmt.Sprintf("; likely within %d beats: %s", int(num(r["horizon"])),
 			sorted(b, func(k string, v any) string { return fmt.Sprintf("%s %.2f", k, num(v)) }))
 	}

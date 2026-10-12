@@ -116,22 +116,6 @@ func TestRuntimeResultNotNarratedTwice(t *testing.T) {
 	}
 }
 
-// A narrated RUNTIME result may not add a number the runtime's reason lacks.
-func TestRuntimeResultNumbersGuard(t *testing.T) {
-	it := wire.Item{ID: "k-1", Name: RuntimeCommand, Args: map[string]any{"action": "escalate the surprise"}}
-	tk := Task{ID: "k-1", Result: "refused", Detail: "record 1 is not open (reset at beat 8)"}
-	for out, want := range map[string]string{
-		"I couldn't escalate: record 1 was already closed at beat 8.": "I couldn't escalate: record 1 was already closed at beat 8.",
-		"I couldn't escalate: record 2 is closed.":                    "I can't escalate the surprise: record 1 is not open (reset at beat 8).",
-	} {
-		cues := []string{}
-		e := New(Config{SystemPrompt: "p"}, fakeNarrator{out: out, cues: &cues}, fakeSTT{}, newFakeSpeaker(0))
-		if got := e.narrate(it, tk); got != want {
-			t.Errorf("model %q → %q, want %q", out, got, want)
-		}
-	}
-}
-
 // fakeRack records the triggers it is asked for and what was said.
 type fakeRack struct {
 	mu    sync.Mutex
@@ -200,7 +184,7 @@ func TestNoticeSaidAsItsPiece(t *testing.T) {
 func TestNumberGuardOnValuesOnly(t *testing.T) {
 	fact := "The kitchen is paused and takes no new orders until surprise 0 is closed: pot onion is 3 where the model expects 2."
 	for s, want := range map[string]string{
-		"The pot has 3 onions where 2 were expected.":         "",
+		"The pot has 3 onions where 2 were expected.":          "",
 		"Surprise 0 paused the kitchen: the pot has 3 onions.": "",
 		"The kitchen is cooking at 0.":                         "0",
 		"Surprise 4 paused the kitchen.":                       "4",

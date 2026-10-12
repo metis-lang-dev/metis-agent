@@ -17,6 +17,51 @@ type Card struct {
 	Relation string `json:"relation"` // served | sibling | …
 	Moves    []Move `json:"moves"`
 	Effects  []Move `json:"effects"` // the moves' clause effects (metispy c937c7a)
+	// The person's words for the domain (RAG §9.1): Display names it in
+	// every fragment prefix and mirror line ("the second cook"); Target is
+	// the domain whose things its moves change, and Says a move's plain
+	// words with {target} for the target's display name (RAG §9.2: "loaded
+	// an onion into {target}'s pot"). From the cards op when the catalog's
+	// %% doc gives them, else the runtime config (kernel.runtimes[].display,
+	// target, says).
+	Display string            `json:"display,omitempty"`
+	Target  string            `json:"target,omitempty"`
+	Says    map[string]string `json:"says,omitempty"`
+}
+
+// DisplayName is a domain in the person's words: its card's Display, else
+// its path in words ("kitchen shared"). The path stays the key.
+func DisplayName(path string, cards []Card) string {
+	for _, c := range cards {
+		if c.Name == path && c.Display != "" {
+			return c.Display
+		}
+	}
+	return words(path)
+}
+
+// Name sets a runtime's display name, target and move words on its card
+// (the runtime config's; a value the cards op already gave is kept).
+func Name(cards []Card, path, display, target string, says map[string]string) {
+	for i := range cards {
+		if cards[i].Name != path {
+			continue
+		}
+		if cards[i].Display == "" {
+			cards[i].Display = display
+		}
+		if cards[i].Target == "" {
+			cards[i].Target = target
+		}
+		for k, v := range says {
+			if cards[i].Says == nil {
+				cards[i].Says = map[string]string{}
+			}
+			if _, ok := cards[i].Says[k]; !ok {
+				cards[i].Says[k] = v
+			}
+		}
+	}
 }
 
 // Move is a card's move: a bare name, or (when the cards op lists it) the

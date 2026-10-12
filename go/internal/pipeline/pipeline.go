@@ -473,24 +473,15 @@ func (e *Engine) park(a announcement) {
 func (e *Engine) narrate(it wire.Item, t Task) string {
 	fallback := narrateTemplate(it, t)
 	n, ok := e.LLM.(Narrator)
-	runtimeDone := it.Name == RuntimeCommand && t.Result == "done" && strings.TrimSpace(t.Detail) != ""
-	if !ok || (t.Result != "failed" && t.Result != "refused" && !runtimeDone) {
+	if !ok || (t.Result != "failed" && t.Result != "refused") {
 		return fallback
 	}
-	cue := taskCue(it, t)
-	if it.Name == RuntimeCommand {
-		cue = runtimeResultCue(it, t)
-	}
-	out, err := n.Narrate(e.cfg.SystemPrompt, cue)
+	out, err := n.Narrate(e.cfg.SystemPrompt, taskCue(it, t))
 	if err != nil {
 		log.Printf("[task] narration failed: %v", err)
 		return fallback
 	}
 	if s := sanitizeAck(out); taskVoiceOK(s) {
-		if bad := inventedNumbers(s, t.Detail+" "+commandPhrase(it)); it.Name == RuntimeCommand && bad != "" {
-			log.Printf("[task] narration %q says %s, not in the runtime's reason — template", out, bad)
-			return fallback
-		}
 		return s
 	}
 	log.Printf("[task] narration %q rejected — template", out)

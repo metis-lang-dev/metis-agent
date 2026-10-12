@@ -58,6 +58,18 @@ func TestTapeSurvivesTurnsAndMatchesSetTape(t *testing.T) {
 	if r2.JSON != r1.JSON {
 		t.Errorf("same turn, same tape, different pass 1: %s vs %s", r1.JSON, r2.JSON)
 	}
+	// RAG §9: Decide runs on B's context — the prefix and the turn, the
+	// tape cut — and the next turn has the tape back
+	free := `root ::= [a-zA-Z ,.]+`
+	q := "Close SURPRISE #0 in kitchen: what happened in the kitchen?"
+	withTape, _, err := l.DecideTimed(sys, q, "", free, 24)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r4, _ := l.TwoPass(sys, "stand up", gbnf)
+	if r4.JSON != r1.JSON || l.TapeTokens() != n {
+		t.Errorf("after a bare Decide: %s (tape %d tok), want %s (%d)", r4.JSON, l.TapeTokens(), r1.JSON, n)
+	}
 	// the same tape written at once: the same KV, the same greedy answer
 	sp, err := l.SetTape(sys, strings.Join(entries, ""))
 	if err != nil {
@@ -73,6 +85,9 @@ func TestTapeSurvivesTurnsAndMatchesSetTape(t *testing.T) {
 	// compaction to nothing
 	if sp, _ := l.SetTape(sys, ""); sp.Tape != 0 || l.TapeTokens() != 0 {
 		t.Errorf("empty tape: %+v", sp)
+	}
+	if noTape, _, _ := l.DecideTimed(sys, q, "", free, 24); noTape != withTape {
+		t.Errorf("Decide saw the tape: %q with it, %q without", withTape, noTape)
 	}
 	t.Logf("tape %d tok over 4 entries; stand up → %s", n, r1.JSON)
 }

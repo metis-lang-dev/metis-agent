@@ -385,14 +385,18 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
     - It runs 67 tok when nothing is open and is bounded by about 260 tok.
       A rewrite costs 8–38 ms.
   - **The stream** has no history. A piece lives only in the turn whose
-    cue speaks about it (distance 0). A turn (TwoPass, Speak, Decide)
+    cue speaks about it (distance 0). A turn (TwoPass, Speak, Answer)
     evaluates only its own tail and rolls back to prefix+standing.
+  - **Decide runs on B's context** (RAG §9, after step 5's C ≈ B): the
+    prefix and the surprise's turn, with the standing region cut from the
+    KV for the call (`llm.DecideTimed`); the next turn decodes it back
+    (~200 tok). The region serves narration and asks only.
   - **Triage's turn** restates the surprise's difference ("Close SURPRISE
     #r" alone let E2B reset a persisting partner diff it had explained
     twice). `settle_beats` (2.5) is the wait for the next reading.
     `admitted+notice` (metispy d725507) counts as admitted, and the notice
     is narrated once per card+move (a `notice` piece, class surprise) and shows in the events pane as a runtime row.
-  - **Results** have a piece per verb (applied, reset, explain, escalate, refused), and the result piece is the only narration of it (the task path logs "narrated from the result piece"; `runtimeResultCue` is no longer reached).
+  - **Results** have a piece per verb (applied, reset, explain, escalate, refused), and the result piece is the only narration of it (the task path logs "narrated from the result piece"; `runtimeResultCue` is deleted).
   - **SIGUSR2** ends a watch and logs the ledger.
 - **The episode loop (step 5):** `go/cmd/episodes` runs seeded episodes
   (`python -m metis.domains.kitchen.eval episodes`), one fresh runtime per
@@ -485,3 +489,20 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
     record, intent, seq, beat N) neither licenses a value nor counts as
     one; an id named in the sentence must be in the fact.
   - Triage is untouched.
+- **RAG §9 (after E7 run 1 and step 5).**
+  - **1. Display names.** A card carries `display` ("the second cook"),
+    from the cards op when the catalog gives it, else the runtime config
+    (`kernel.runtimes[].display`). Every fragment's prefix is the display
+    name (`rack.Store.Name`, `Store.Frag`): `⟪the second cook: …⟫`. The
+    mirror line names the domain once in both forms: "The second cook
+    (kitchen shared) now: …". The path stays the key everywhere.
+  - **2. Cross-domain moves name their target.** A card's `target` (the
+    domain whose things its moves change) and `says` (a move's words,
+    `{target}` for the target's name) give the piece "The second cook
+    loaded an onion into the first cook's pot; now …".
+  - **3. The short mirror line.** Every insertion and the standing region
+    carry status, the open surprise, counts and the last move. The beliefs
+    tail ("likely within 12 beats") is only on the rack pane
+    (`MirrorRowFull`, `Status.mirror`). q13's insertion: 342 → 287 tok.
+  - **4. Decide on B's context**, see §9 above. Step 5's arm C now runs
+    triage like B.

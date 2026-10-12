@@ -51,6 +51,11 @@ type Config struct {
 	// Path names the runtime's domain (rack: the tape it feeds); unset =
 	// the watch answer's path.
 	Path string `yaml:"path"`
+	// Display, Target, Says: the domain in the person's words (RAG §9.1–2),
+	// set on its card unless the cards op gives them (kernel.Name).
+	Display string            `yaml:"display"`
+	Target  string            `yaml:"target"`
+	Says    map[string]string `yaml:"says"`
 	// Runtimes (rack phase 1b, docs/RAG.md §5): N runtimes attached to the
 	// one narrator, each its own process and watch. An entry's set fields
 	// override this config's; empty = this config is the one runtime.
@@ -107,7 +112,7 @@ func (c Config) Each() []Config {
 		if r.SettleBeats != 0 {
 			m.SettleBeats = r.SettleBeats
 		}
-		m.Path = r.Path
+		m.Path, m.Display, m.Target, m.Says = r.Path, r.Display, r.Target, r.Says
 		out = append(out, m)
 	}
 	return out

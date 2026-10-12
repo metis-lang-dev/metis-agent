@@ -40,7 +40,9 @@ var Weights = map[string]int{"surprise": 5, "notice": 5, "refused": 5, "reading"
 // Tape is one domain's records, in seq order.
 type Tape struct {
 	Path    string
+	Name    string // the domain in the person's words (RAG §9.1); "" = the path in words
 	Card    string // the domain's card text (an explanation candidate for its siblings)
+	Mirror  string // the last mirror line with its beliefs: the UI pane's, never inserted
 	Recs    []Record
 	Mounted bool
 	Dropped int // records that arrived while frozen
@@ -86,6 +88,24 @@ func (s *Store) Attach(path, card string) {
 	}
 	s.order = append(s.order, path)
 	s.tapes[path] = &Tape{Path: path, Card: card, Mounted: true}
+}
+
+// Name sets the domain's display name: every fragment's prefix (RAG §9.1).
+func (s *Store) Name(path, display string) {
+	s.Attach(path, "")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.tapes[path].Name = display
+}
+
+// SetMirror keeps the domain's full mirror line for the UI pane (RAG §9.3:
+// the beliefs tail stays there and out of every insertion).
+func (s *Store) SetMirror(path, line string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if t, ok := s.tapes[path]; ok {
+		t.Mirror = line
+	}
 }
 
 // Mount mounts or unmounts a domain. Unmount freezes its tape: the records
@@ -423,10 +443,10 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 	var lines []string
 	for _, p := range paths {
 		if m := mirrors[p]; m != "" {
-			lines = append(lines, s.frag(p, m))
+			lines = append(lines, s.Frag(p, m))
 		}
 		if isCard[p] && cardText[p] != "" {
-			lines = append(lines, s.frag(p, "its card: "+cardText[p]))
+			lines = append(lines, s.Frag(p, "its card: "+cardText[p]))
 		}
 		for _, r := range in.Records {
 			if r.Path == p {
@@ -434,7 +454,7 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 				if r.Kind == "said" {
 					text = "you said: " + text
 				}
-				lines = append(lines, s.frag(p, text))
+				lines = append(lines, s.Frag(p, text))
 			}
 		}
 	}
@@ -443,8 +463,15 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 	return in
 }
 
-func (s *Store) frag(path, text string) string {
+// Frag renders one fragment, prefixed with the domain's display name
+// (RAG §9.1): ⟪the second cook: text⟫, or ⟪kitchen shared: text⟫ unnamed.
+func (s *Store) Frag(path, text string) string {
 	p := strings.ReplaceAll(path, "_", " ")
+	s.mu.Lock()
+	if t, ok := s.tapes[path]; ok && t.Name != "" {
+		p = t.Name
+	}
+	s.mu.Unlock()
 	text = strings.TrimSuffix(strings.TrimSpace(text), ".")
 	if s.Wrap {
 		return "⟪" + p + ": " + text + "⟫"
@@ -455,6 +482,8 @@ func (s *Store) frag(path, text string) string {
 // Status is one domain's line for the UI's rack pane.
 type Status struct {
 	Path     string `json:"path"`
+	Name     string `json:"name,omitempty"`
+	Mirror   string `json:"mirror,omitempty"` // with the beliefs tail (RAG §9.3)
 	Mounted  bool   `json:"mounted"`
 	Records  int    `json:"records"`
 	Tok      int    `json:"tok"`
@@ -470,7 +499,7 @@ func (s *Store) Snapshot() []Status {
 	var out []Status
 	for _, p := range s.order {
 		t := s.tapes[p]
-		st := Status{Path: p, Mounted: t.Mounted, Records: len(t.Recs), Open: len(open(t.Recs)), Dropped: t.Dropped}
+		st := Status{Path: p, Name: t.Name, Mirror: t.Mirror, Mounted: t.Mounted, Records: len(t.Recs), Open: len(open(t.Recs)), Dropped: t.Dropped}
 		for _, r := range t.Recs {
 			st.Tok += r.Tok
 			if r.Kind == "said" {

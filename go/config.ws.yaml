@@ -69,11 +69,16 @@ kernel:
     # Rack phase 1b (docs/RAG.md §5): N runtimes on the one narrator, each its
     # own process; an entry's fields override the ones above. The kitchen pair
     # shares one env through METIS_PAIR_DIR (clear its kitchen-pair.json first).
+    # display / target / says: the domain in the person's words (RAG §9.1–2),
+    # unless the cards op gives them.
     # runtimes:
     #   - {path: kitchen, host: "metis.domains.kitchen.pair:make_pair_kitchen",
-    #      catalog: metis/domains/kitchen/catalogs/kitchen_host.llp, env: [METIS_PAIR_DIR=/tmp/pair]}
+    #      catalog: metis/domains/kitchen/catalogs/kitchen_host.llp, env: [METIS_PAIR_DIR=/tmp/pair],
+    #      display: the first cook}
     #   - {path: kitchen_shared, host: "metis.domains.kitchen.pair:make_pair_shared",
-    #      catalog: metis/domains/kitchen/catalogs/shared/kitchen_shared.llp, env: [METIS_PAIR_DIR=/tmp/pair]}
+    #      catalog: metis/domains/kitchen/catalogs/shared/kitchen_shared.llp, env: [METIS_PAIR_DIR=/tmp/pair],
+    #      display: the second cook, target: kitchen,
+    #      says: {partner_load: "loaded an onion into {target}'s pot"}}
     rack:                        # per-domain tapes + the structural retriever (RAG §2–4)
         enabled: false
         budget: 2500             # tokens per insertion, mirror lines included

@@ -200,11 +200,11 @@ func (h *Host) triage(s Signal) {
 	if settled {
 		next = "Next reading: it matches the model again."
 	}
-	// the facts are on the tape too, but the turn restates this surprise's
-	// difference: with only "close #r" E2B reset a persisting partner diff
-	// it had explained twice before (live, make_partner order 3)
+	// Decide runs on B's context (RAG §9, step 5's C ≈ B): the one prefix
+	// (the cards) and this surprise's fact; the LLM cuts the tape — the
+	// standing region — from the call, it serves narration and asks only
 	user := fmt.Sprintf("Close SURPRISE #%d in %s with exactly one tool call.\n%s\n%s", r, s.Path, SurpriseText(s), next)
-	sys := h.Prompt // the one prefix, tape or no tape (the eval's arms B and C differ only in the tape)
+	sys := h.Prompt
 	if sys == "" {
 		sys = h.Dec.System
 	}

@@ -70,6 +70,7 @@ type LLM struct {
 	// SetTape (compaction) rewrites it.
 	tapeText   string
 	tapeToks   []C.llama_token
+	tapeOut    bool          // a Decide cut the tape from the KV (triage on B's context); the next turn decodes it again
 	firstTok   time.Duration // generate(): time to the first sampled token
 	nDecoded   atomic.Int64
 	nGenerated atomic.Int64
@@ -510,12 +511,20 @@ func (l *LLM) tailTokensWith(user, cont string) []C.llama_token {
 // afterBase tokenizes t in the context of prefix+tape and returns only its
 // own tokens; when the base would re-tokenize, the split tokenization is
 // the fallback and the miss is logged.
-func (l *LLM) afterBase(t string) []C.llama_token {
+func (l *LLM) afterBase(t string) []C.llama_token { return l.after(t, true) }
+
+// after tokenizes t in the context of the prefix, plus the tape when
+// withTape, and returns only its own tokens.
+func (l *LLM) after(t string, withTape bool) []C.llama_token {
 	if t == "" {
 		return nil
 	}
-	base := append(append([]C.llama_token{}, l.preToks...), l.tapeToks...)
-	whole := l.tokenize(l.preText+l.tapeText+t, true)
+	base := append([]C.llama_token{}, l.preToks...)
+	baseText := l.preText
+	if withTape {
+		base, baseText = append(base, l.tapeToks...), baseText+l.tapeText
+	}
+	whole := l.tokenize(baseText+t, true)
 	if n := len(base); len(whole) > n && sameTokens(whole[:n], base) {
 		return whole[n:]
 	}
@@ -594,6 +603,19 @@ func (l *LLM) PrimePrefix(systemPrompt string) (int, error) {
 }
 
 func (l *LLM) primeLocked(systemPrompt string) (int, error) {
+	if l.tapeOut && l.prefix == systemPrompt && l.nPrefix > 0 {
+		// a Decide ran without the tape: put it back after the prefix
+		l.tapeOut = false
+		if err := l.rewind(systemPrompt, l.nPrefix); err != nil {
+			return 0, err
+		}
+		if l.nPast == l.nPrefix && len(l.tapeToks) > 0 { // (a failed rewind re-primed it already)
+			if err := l.decodeTokens(l.tapeToks); err != nil {
+				return 0, err
+			}
+		}
+		return l.nPrefix + len(l.tapeToks), nil
+	}
 	if l.prefix == systemPrompt && l.nPrefix > 0 && l.nPast >= l.nPrefix+len(l.tapeToks) {
 		return l.nPrefix + len(l.tapeToks), nil
 	}
@@ -617,7 +639,7 @@ func (l *LLM) primeLocked(systemPrompt string) (int, error) {
 	}
 	mem := C.llama_get_memory(l.ctx)
 	C.llama_memory_clear(mem, C.bool(true))
-	l.nPast = 0
+	l.nPast, l.tapeOut = 0, false
 	if err := l.decodeTokens(toks); err != nil {
 		return 0, err
 	}
@@ -896,6 +918,11 @@ func (l *LLM) Decide(systemPrompt, user, cont, gbnf string, maxTokens int) (stri
 
 // DecideTimed is Decide plus the time from the call to its first token
 // (the tail's evaluation included): the splice-to-first-token measure.
+//
+// It runs on B's context (RAG §9, runtime-wire step 5: C ≈ B, the tape
+// made the first pick worse): the one prefix and the turn, with the tape
+// cut from the KV — no standing region for triage. The tape stays the
+// narration's and the asks'; the next such turn decodes it back.
 func (l *LLM) DecideTimed(systemPrompt, user, cont, gbnf string, maxTokens int) (string, time.Duration, error) {
 	if l.tmpl != TemplateGemma4 {
 		return "", 0, errors.New("llm: Decide needs the gemma4 template (native tool calls)")
@@ -903,14 +930,18 @@ func (l *LLM) DecideTimed(systemPrompt, user, cont, gbnf string, maxTokens int) 
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	t0 := time.Now() // after the lock: the splice cost, not the wait behind a narration
-	nPrefix, err := l.primeLocked(systemPrompt)
-	if err != nil {
-		return "", 0, err
+	if l.prefix != systemPrompt || l.nPrefix == 0 {
+		if _, err := l.primeLocked(systemPrompt); err != nil {
+			return "", 0, err
+		}
 	}
-	if err := l.rewind(systemPrompt, nPrefix); err != nil {
-		return "", 0, err
+	for try := 0; l.nPast != l.nPrefix && try < 2; try++ { // a failed rewind re-primes with the tape
+		if err := l.rewind(systemPrompt, l.nPrefix); err != nil {
+			return "", 0, err
+		}
 	}
-	if err := l.decodeTokens(l.tailTokensWith(user, cont)); err != nil {
+	l.tapeOut = len(l.tapeToks) > 0
+	if err := l.decodeTokens(l.after(l.tail(user)+cont, false)); err != nil {
 		return "", 0, err
 	}
 	cGbnf, cRoot := C.CString(gbnf), C.CString("root")

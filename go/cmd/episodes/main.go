@@ -7,7 +7,8 @@
 //	   has no tape — the LLM alone
 //	B  the runtime checks (surprise, refusals, bounds); no tape
 //	C  the runtime checks, and the tape (step 4): facts and results in
-//	   the context, compacted at quiescence
+//	   the context, compacted at quiescence. Since RAG §9 (step 5's C ≈ B)
+//	   Decide cuts the tape, so C triages as B does
 //
 //	episodes -episodes ep.jsonl -arms A,B,C -o runs.jsonl -harness harness.jsonl
 //	python -m metis.domains.kitchen.eval score --episodes ep.jsonl runs.jsonl --harness harness.jsonl

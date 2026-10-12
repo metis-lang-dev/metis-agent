@@ -127,8 +127,11 @@ func TestRetrieverMatchesTheE7Reference(t *testing.T) {
 	qs := readJSONL(t, "../../grammar/e7-corpus.jsonl")
 	for _, q := range qs {
 		at := q["at"].(float64)
-		s := New("kitchen", "kitchen_shared")
+			s := New("kitchen", "kitchen_shared")
 		s.Attach("kitchen_shared", "a shared kitchen: a second cook also loads onions into the pot")
+		for _, p := range []string{"kitchen", "kitchen_shared"} {
+			s.Name(p, kernel.DisplayName(p, cards))
+		}
 		feed(s, p, cards, at)
 		trig := q["trigger"].(map[string]any)
 		tr := Trigger{Kind: trig["kind"].(string)}
@@ -177,6 +180,14 @@ func TestRetrieverMatchesTheE7Reference(t *testing.T) {
 		}
 		if w := want["cards"]; w != nil && !sameSet(in.Cards, strs(w)) {
 			t.Errorf("%s: cards %v, want %v", id, in.Cards, strs(w))
+		}
+		for _, line := range strings.Split(in.Text, "\n") {
+			if line != "" && !strings.HasPrefix(line, "⟪the first cook: ") && !strings.HasPrefix(line, "⟪the second cook: ") {
+				t.Errorf("%s: a fragment without the display name (RAG §9.1): %s", id, line)
+			}
+			if strings.Contains(line, "likely within") {
+				t.Errorf("%s: the beliefs tail in an insertion (RAG §9.3): %s", id, line)
+			}
 		}
 		if id == "q13" || testing.Verbose() && (id == "q01" || id == "q05") {
 			t.Logf("%s %v (%d tok):\n%s", id, tr, in.Tok, in.Text)

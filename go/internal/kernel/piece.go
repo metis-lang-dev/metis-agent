@@ -35,6 +35,10 @@ func PiecesNow(s Signal, cards []Card, c *Counts) []Piece {
 	now := c.Now(touched)
 	if s.Kind == "event" && s.F["kind"] == "clause" {
 		name, _ := s.F["name"].(string)
+		if t, ok := says(s.Path, name, cards); ok {
+			ps[0].Text = PlainWords(fmt.Sprintf("%s; now %s.", t, now), cards)
+			return ps
+		}
 		where := words(s.Path)
 		if where == "" {
 			where = "runtime"
@@ -66,6 +70,9 @@ func Pieces(s Signal, cards []Card) []Piece {
 		name, _ := f["name"].(string)
 		switch kind {
 		case "clause":
+			if t, ok := says(s.Path, name, cards); ok {
+				return []Piece{p("event", "progress", t+".")}
+			}
 			return []Piece{p("event", "progress", fmt.Sprintf("In the %s: %s (%s).", where, name, signedRaw(netOf(f))))}
 		case "exo":
 			var ops []string
@@ -141,4 +148,29 @@ func Pieces(s Signal, cards []Card) []Piece {
 		return out
 	}
 	return []Piece{p(s.Kind, "progress", fmt.Sprintf("The %s: %s.", where, s.Kind))}
+}
+
+// says is a move's own words from its domain's card (RAG §9.2): a move
+// that changes another domain's things names who did it and whose things
+// changed — "the second cook loaded an onion into the first cook's pot".
+func says(path, move string, cards []Card) (string, bool) {
+	for _, c := range cards {
+		if c.Name != path {
+			continue
+		}
+		t, ok := c.Says[move]
+		if !ok {
+			return "", false
+		}
+		t = strings.ReplaceAll(t, "{target}", DisplayName(c.Target, cards))
+		return upperFirst(DisplayName(path, cards) + " " + t), true
+	}
+	return "", false
+}
+
+func upperFirst(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }

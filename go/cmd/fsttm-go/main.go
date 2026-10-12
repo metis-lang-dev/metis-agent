@@ -548,6 +548,20 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 			}
 		}
 	}
+	// the domains in the person's words (RAG §9.1–2): on the cards, so the
+	// pieces and mirror lines say them, and on the rack's fragment prefixes
+	name := func(r *runtime) {
+		if r.path == "" {
+			return
+		}
+		kernel.Name(cards, r.path, r.cfg.Display, r.cfg.Target, r.cfg.Says)
+		if rk != nil {
+			rk.Name(r.path, kernel.DisplayName(r.path, cards))
+		}
+	}
+	for _, r := range rts {
+		name(r)
+	}
 	byPath := func(text string) (*runtime, string) {
 		if strings.HasPrefix(text, "@") {
 			p, rest, _ := strings.Cut(text[1:], " ")
@@ -598,6 +612,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 			for _, r := range rts {
 				if r.path == path {
 					if ans, err := r.c.Op("ctx", "--mirror", 3*time.Second); err == nil {
+						rk.SetMirror(path, kernel.MirrorRowsFull(ans, cards)[path]) // the pane's, with beliefs
 						return kernel.MirrorRows(ans, cards)[path]
 					}
 				}
@@ -634,6 +649,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		}
 		if p, ok := ans["path"].(string); ok && r.path == "" {
 			r.path = p
+			name(r)
 		}
 		if rk != nil {
 			rk.Attach(r.path, cardText(r.path))
