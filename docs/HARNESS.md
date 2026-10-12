@@ -561,3 +561,20 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
   interp=system), `-e8-scripts grammar/e8-scripts.json`, `-e8-k` (12),
   `-e7-reps`, `-e7-dry`. Records `e8`, `e8-sentence`, `e8-run` for
   `tools/e8-score.py`.
+- **After E8 (RAG §12).** Defaults: retrieval flat; form policy =
+  progress → N at arrival, surprise / notice / result → R+N, ask → N;
+  narrator thinking off. A result fragment is its own short form ("explain
+  of surprise 0 admitted: card kitchen_shared, move partner_load"; a
+  refusal keeps its reason), not the runtime's reason text.
+- **The orchestrator's noise floor (RAG §12.7).** It is the pass-2
+  sampler, not the narrator's context. The sampler is seeded at random
+  per call at temp 0.4: E7 run 2, with no second context, had different
+  answer text for identical insertions in 38% of its repeated cells, E8
+  47%. With the narrator idle vs busy (sequential and concurrent decodes
+  on the sibling), the main context's greedy output was identical (6/6,
+  12/12), and the E8 bench never overlaps the two (the narration pass
+  ends before the probes). So nothing is serialised. Instead
+  `llm.Pass2.Seed` / `SetSeed` and `llmbench -pass2_seed N` (seed+rep per
+  repeat) give one answer per insertion within a repeat: flat/R-all vs
+  structural/R-all, byte-identical insertions, 24/24 identical answers.
+  Live stays random.

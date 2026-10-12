@@ -487,7 +487,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		if err != nil {
 			log.Fatal(err)
 		}
-		nr := &narr.Narrator{LLM: nl, Scripts: map[string]*narr.Script{}, Think: 64,
+		nr := &narr.Narrator{LLM: nl, Scripts: map[string]*narr.Script{}, // thinking off (RAG §12.4)
 			Name: func(p string) string { return kernel.DisplayName(p, cards) },
 			Tok:  func(s string) int { return len(nl.Tokens(s, false)) }}
 		switch kcfg.Narr.Retrieval {

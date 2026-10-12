@@ -71,8 +71,8 @@ type Config struct {
 type NarrConfig struct {
 	Enabled   bool   `yaml:"enabled"`
 	Retrieval string `yaml:"retrieval"` // flat (default: every script resident in the narrator's prefix) | structural (the referenced entries per fragment)
-	Form      string `yaml:"form"`      // policy (default: progress R, surprise/notice/result R+N, ask N) | N-all | R-all
-	Think     *int   `yaml:"think"`     // the thought cap for surprise-class fragments (default 64; 0 = off)
+	Form      string `yaml:"form"`      // policy (default: progress N at arrival, surprise/notice/result R+N, ask N) | N-all | R-all
+	Think     *int   `yaml:"think"`     // the thought cap for surprise-class fragments (default 0 = off, RAG §12.4)
 	Interp    string `yaml:"interp"`    // system (default: the instructions in the system turn) | cue (folded into every turn, no system turn)
 	NCtx      int    `yaml:"n_ctx"`     // the narrator's context (default 4096)
 }

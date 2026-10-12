@@ -7,8 +7,8 @@ package main
 // narrated as it appears by the per-agent narrator (narr.Narrator on a
 // sibling context of the same model: its own prefix next to the
 // orchestrator's). Each narrated fragment is then passed to the
-// orchestrator in a FORM (narr.Form): the policy (progress → R batched to
-// the agent's quiescence; surprise, notice, result → R+N; ask → N), or
+// orchestrator in a FORM (narr.Form): the policy (progress → N at
+// arrival; surprise, notice, result → R+N; ask → N — RAG §12.3), or
 // every fragment as N (N-all) or as R (R-all).
 //
 // Per corpus question, at its t, the orchestrator — today's main narrator
@@ -16,7 +16,8 @@ package main
 // harness's rack cues — gets the flat insertion the harness makes (RAG
 // §10): the last K passed fragments of both agents in arrival order, each
 // tagged with the agent's display name, the mirror lines for an ask, and
-// the focus line ("Just now: …") for a narration trigger.
+// the focus line ("Just now: …") for a narration trigger. -pass2_seed
+// fixes the sampler per repeat: one insertion, one answer across rows.
 //
 // Rows: -e8-rows "retrieval/form[/setting]", retrieval flat | structural
 // (the narrator's script retrieval), setting "" | think=off|64|256 |
@@ -123,7 +124,7 @@ type e8Narrated struct {
 	guard    string
 }
 
-func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, rowsS, tag string, reps, k int, dry bool, emit func(any)) {
+func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, rowsS, tag string, reps, k int, seed uint32, dry bool, emit func(any)) {
 	pairRows, err := e7Lines(pairF)
 	if err != nil {
 		fail(err)
@@ -185,19 +186,6 @@ func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, rowsS, tag stri
 			frags = append(frags, f)
 		}
 	}
-	// a progress fragment reaches the orchestrator at its agent's next
-	// quiescence under the policy
-	quietAt := make([]float64, len(frags))
-	for i := range frags {
-		quietAt[i] = -1
-		for j := i; j < len(frags); j++ {
-			if frags[j].Path == frags[i].Path && frags[j].Kind == "quiescence" {
-				quietAt[i] = frags[j].T
-				break
-			}
-		}
-	}
-
 	orch := prompt + kernel.NewDecider(cards).System
 	if _, err := l.PrimePrefix(orch); err != nil {
 		fail(err)
@@ -226,13 +214,17 @@ func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, rowsS, tag stri
 	}
 	n, t0 := 0, time.Now()
 	for rep := 0; rep < reps; rep++ {
+		if seed != 0 { // one answer per insertion within a repeat (RAG §12.7)
+			l.SetSeed(seed + uint32(rep))
+			nl.SetSeed(seed + uint32(rep))
+		}
 		for _, pk := range order {
 			nr := &narr.Narrator{LLM: nl, Scripts: scripts, Order: paths, Name: name,
-				Structural: pk.retrieval == "structural", Think: 64, Tok: tok}
+				Structural: pk.retrieval == "structural", Tok: tok} // thinking off by default (RAG §12.4)
 			switch pk.setting {
-			case "", "think=64", "interp=system":
-			case "think=off":
-				nr.Think = 0
+			case "", "think=off", "interp=system":
+			case "think=64":
+				nr.Think = 64
 			case "think=256":
 				nr.Think = 256
 			case "interp=cue":
@@ -278,9 +270,6 @@ func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, rowsS, tag stri
 					}
 					passed[i] = form
 					passedAt[i] = nd.f.T
-					if row.form == "policy" && nd.f.Class() == "progress" && nd.f.Kind != "quiescence" {
-						passedAt[i] = quietAt[i]
-					}
 					text := narr.Render(form, nd.line, nd.sentence)
 					emit(e8Sentence{Kind: "e8-sentence", Tag: tag, Retrieval: row.retrieval, Form: row.form, Setting: row.setting, Rep: rep,
 						T: nd.f.T, Path: nd.f.Path, Seq: nd.f.Seq, Beat: nd.f.Beat, FragKind: nd.f.Kind, Ref: nd.f.Ref,

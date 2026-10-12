@@ -160,12 +160,18 @@ func FromSignal(s kernel.Signal, c *kernel.Counts) []Fragment {
 		verb, _ := f["verb"].(string)
 		status, _ := f["status"].(string)
 		reason, _ := f["reason"].(string)
+		// the result's own short form — verb, status, card, move (RAG
+		// §12.6): the runtime's reason text pulled the wrong move into
+		// every narration; a refusal keeps its reason, the only why
 		fr.Ref = fmt.Sprintf("%s of surprise %d %s", verb, fr.Rec, status)
-		if reason != "" {
-			fr.Ref += ": " + reason
-		}
-		if mv, ok := f["move"].(string); ok {
+		card, _ := f["card"].(string)
+		mv, _ := f["move"].(string)
+		switch {
+		case card != "" && mv != "":
+			fr.Ref += fmt.Sprintf(": card %s, move %s", card, mv)
 			fr.Move = mv
+		case strings.HasPrefix(status, "refused") && reason != "":
+			fr.Ref += ": " + reason
 		}
 		out := []Fragment{fr}
 		if nt, ok := f["notice"].(map[string]any); ok {

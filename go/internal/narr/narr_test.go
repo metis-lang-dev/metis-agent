@@ -116,9 +116,22 @@ func TestScriptAndFragments(t *testing.T) {
 	}
 }
 
+// RAG §12.6: a result is its own short form (verb, status, card, move),
+// not the runtime's reason; a refusal keeps its reason.
+func TestResultShortForm(t *testing.T) {
+	ok := FromSignal(sig(t, `{"signal": "result", "seq": 19, "path": "kitchen", "beat": 31, "verb": "explain", "status": "admitted", "reason": "kitchen_shared explains the reading: partner_load fetch_onion — the reading is adopted (activate is phase 2)", "record": 0, "card": "kitchen_shared", "move": "partner_load", "adopted": {"pot_onion": 1}}`), kernel.NewCounts(nil))
+	if got := ok[0].Ref; got != "explain of surprise 0 admitted: card kitchen_shared, move partner_load" || ok[0].Move != "partner_load" {
+		t.Errorf("admitted: %q (move %q)", got, ok[0].Move)
+	}
+	no := FromSignal(sig(t, `{"signal": "result", "seq": 14, "path": "kitchen", "beat": 8, "verb": "reset", "status": "refused", "reason": "the same surprise came back after a reset", "record": 1}`), nil)
+	if got := no[0].Ref; got != "reset of surprise 1 refused: the same surprise came back after a reset" {
+		t.Errorf("refused: %q", got)
+	}
+}
+
 func TestFormPolicy(t *testing.T) {
 	for _, c := range []struct{ mode, trig, kind, want string }{
-		{"policy", "event", "event", FormR}, {"policy", "quiescence", "quiescence", FormR},
+		{"policy", "event", "event", FormN}, {"policy", "quiescence", "quiescence", FormN},
 		{"policy", "surprise", "surprise", FormRN}, {"policy", "event", "result", FormRN},
 		{"policy", "ask", "event", FormN}, {"N-all", "event", "event", FormN}, {"R-all", "ask", "surprise", FormR},
 	} {

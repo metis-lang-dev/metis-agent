@@ -88,7 +88,7 @@ kernel:
     narr:                        # narration streaming from the script RAG (RAG §11); needs rack
         enabled: false
         retrieval: flat          # flat: every script resident in the narrator's prefix; structural: per fragment
-        form: policy             # policy (progress R, surprise/notice/result R+N, ask N) | N-all | R-all
-        think: 64                # thought cap on surprise-class fragments; 0 = off
+        form: policy             # policy (progress N at arrival, surprise/notice/result R+N, ask N) | N-all | R-all
+        think: 0                 # thought cap on surprise-class fragments; 0 = off (RAG §12.4)
         interp: system           # system: the instructions in the system turn; cue: in every turn
         n_ctx: 4096              # the narrator's own context on the same model

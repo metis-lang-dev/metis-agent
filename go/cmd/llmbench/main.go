@@ -138,6 +138,7 @@ func main() {
 	threads := flag.Int("threads", 6, "CPU threads")
 	temp := flag.Float64("pass2_temp", 0, "pass-2 temperature (0 = default 0.4)")
 	topk := flag.Int("pass2_top_k", 0, "pass-2 top_k (0 = default 40)")
+	seed := flag.Int("pass2_seed", 0, "E7/E8: pass-2 sampler seed, seed+rep per repeat (0 = random per call)")
 	maxtok := flag.Int("pass2_max_tokens", 0, "pass-2 max tokens (0 = default 50)")
 	think := flag.Bool("think", false, "Gemma 4 thinking on (<|think|> in the system turn)")
 	thinkMax := flag.Int("think_max", 512, "max thought tokens with -think")
@@ -164,8 +165,8 @@ func main() {
 	e7Reps := flag.Int("e7-reps", 1, "E7: repeats of the whole corpus (pass-2 sampling is stochastic)")
 	e8F := flag.String("e8", "", "E8 corpus (the E7 corpus): narration streaming from the script RAG (docs/RAG.md §11.2); reuses -e7-pair, -e7-cards, -e7-reps, -e7-dry")
 	e8Scripts := flag.String("e8-scripts", "grammar/e8-scripts.json", "E8: the runtimes' script op answers, by path")
-	e8Rows := flag.String("e8-rows", "flat/policy,flat/N-all,flat/R-all,structural/policy,structural/N-all,structural/R-all,flat/policy/think=off,flat/policy/think=256,flat/policy/interp=cue",
-		"E8: rows retrieval/form[/setting]; the plain flat/policy row is think=64 and interp=system")
+	e8Rows := flag.String("e8-rows", "flat/policy,flat/N-all,flat/R-all,structural/policy,structural/N-all,structural/R-all,flat/policy/think=64,flat/policy/think=256,flat/policy/interp=cue",
+		"E8: rows retrieval/form[/setting]; the plain flat/policy row is think=off and interp=system")
 	e8K := flag.Int("e8-k", 12, "E8: the orchestrator's flat insertion, passed fragments per question (the harness's rack.k)")
 	eventsF := flag.String("events", "", "narrate corpus (intent<TAB>args JSON<TAB>result<TAB>detail): each task outcome through the harness's taskCue + Narrate + guard")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
@@ -283,7 +284,7 @@ func main() {
 		return
 	}
 	if *e8F != "" {
-		runE8(l, string(prompt), *e7Pair, *e8F, *e7Cards, *e8Scripts, *e8Rows, *tag, *e7Reps, *e8K, *e7Dry, emit)
+		runE8(l, string(prompt), *e7Pair, *e8F, *e7Cards, *e8Scripts, *e8Rows, *tag, *e7Reps, *e8K, uint32(*seed), *e7Dry, emit)
 		return
 	}
 	if *e7F != "" {

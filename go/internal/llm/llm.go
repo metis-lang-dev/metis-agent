@@ -140,6 +140,18 @@ type Pass2 struct {
 	Temp      float32
 	TopK      int
 	MaxTokens int
+	// Seed fixes the sampler's seed for every call (0 = a random seed per
+	// call, the live default). A bench sets it so that one insertion gives
+	// one answer: at temp 0.4 the orchestrator's answers to identical
+	// insertions differed in 38% of E7's and 47% of E8's repeated cells.
+	Seed uint32
+}
+
+func (p Pass2) seed() C.uint32_t {
+	if p.Seed == 0 {
+		return C.LLAMA_DEFAULT_SEED
+	}
+	return C.uint32_t(p.Seed)
 }
 
 func (p Pass2) withDefaults() Pass2 {
@@ -262,6 +274,15 @@ func withContext(model *C.struct_llama_model, ctx *C.struct_llama_context, cfg C
 		return l, err
 	}
 	return l, nil
+}
+
+// SetSeed fixes the pass-2 sampler's seed from now on (0 = random per
+// call). A bench sets one per repeat, so identical insertions in one
+// repeat get one answer across its rows.
+func (l *LLM) SetSeed(seed uint32) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.pass2.Seed = seed
 }
 
 // Thinking reports whether the thought channel is on for this model.
@@ -807,7 +828,7 @@ func (l *LLM) twoPassLocked(systemPrompt, gbnf string, evalTail func() (time.Dur
 	chain2 := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
 	C.llama_sampler_chain_add(chain2, C.llama_sampler_init_top_k(C.int32_t(l.pass2.TopK)))
 	C.llama_sampler_chain_add(chain2, C.llama_sampler_init_temp(C.float(l.pass2.Temp)))
-	C.llama_sampler_chain_add(chain2, C.llama_sampler_init_dist(C.LLAMA_DEFAULT_SEED))
+	C.llama_sampler_chain_add(chain2, C.llama_sampler_init_dist(l.pass2.seed()))
 	defer C.llama_sampler_free(chain2)
 
 	t0 = time.Now()
@@ -940,7 +961,7 @@ func (l *LLM) Narrate(systemPrompt, event string) (string, error) {
 	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
 	C.llama_sampler_chain_add(chain, C.llama_sampler_init_top_k(C.int32_t(l.pass2.TopK)))
 	C.llama_sampler_chain_add(chain, C.llama_sampler_init_temp(C.float(l.pass2.Temp)))
-	C.llama_sampler_chain_add(chain, C.llama_sampler_init_dist(C.LLAMA_DEFAULT_SEED))
+	C.llama_sampler_chain_add(chain, C.llama_sampler_init_dist(l.pass2.seed()))
 	defer C.llama_sampler_free(chain)
 	// the few-shot prompt teaches `"utterance" → {json}`; a narration that
 	// starts imitating it is cut at the arrow or the brace
@@ -1100,7 +1121,7 @@ func (l *LLM) SpeakCap(systemPrompt, user string, thinkCap int) (string, time.Du
 	}
 	C.llama_sampler_chain_add(chain, C.llama_sampler_init_top_k(C.int32_t(l.pass2.TopK)))
 	C.llama_sampler_chain_add(chain, C.llama_sampler_init_temp(C.float(l.pass2.Temp)))
-	C.llama_sampler_chain_add(chain, C.llama_sampler_init_dist(C.LLAMA_DEFAULT_SEED))
+	C.llama_sampler_chain_add(chain, C.llama_sampler_init_dist(l.pass2.seed()))
 	defer C.llama_sampler_free(chain)
 	tGen := time.Now()
 	toks, err := l.generate(chain, l.pass2.MaxTokens+20, "\n")

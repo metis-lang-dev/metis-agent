@@ -41,8 +41,9 @@ type Narrator struct {
 	// InCue folds the instructions (and, flat, the scripts) into every
 	// user turn with no system turn (RAG §11.2 sweep: native system role).
 	InCue bool
-	// Think is the thought cap for surprise-class fragments (0 = off;
-	// progress is always off).
+	// Think is the thought cap for surprise-class fragments (0 = off, the
+	// default since E8: off keeps the reading, a 64 cap cut it; progress
+	// is always off).
 	Think int
 	Tok   func(string) int
 
@@ -267,10 +268,9 @@ const (
 	FormNone = "Ø"   // not passed
 )
 
-// Form is the phase-one policy (mode "policy"): progress → R (batched to
-// the agent's quiescence by the caller), surprise / notice / result →
-// R+N, the person's ask → N; the bench rows "N-all" and "R-all" pass every
-// fragment in one form.
+// Form is the phase-one policy (mode "policy", RAG §12.3): progress → N
+// at arrival, surprise / notice / result → R+N, the person's ask → N; the
+// bench rows "N-all" and "R-all" pass every fragment in one form.
 func Form(mode, trigger, kind string) string {
 	switch mode {
 	case "N-all":
@@ -285,7 +285,7 @@ func Form(mode, trigger, kind string) string {
 	case "surprise", "notice", "result":
 		return FormRN
 	}
-	return FormR
+	return FormN
 }
 
 // Render is a fragment in a form: R its line, N its sentence (the line
