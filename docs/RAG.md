@@ -414,11 +414,12 @@ equal attribution.
 (verb, status, card, move) instead of the runtime's reason text, which
 no setting narrated to the second cook.
 
-**7. A noise floor to remove.** With the narrator on a sibling KV
-context, the orchestrator answered identical insertions differently in
-27 of 72 probes; E7's cells were 3/3 or 0/3. Orchestrator gaps under
-about 0.15 are unreadable at 3 reps until this is found. Likely the
-batch composition across the two sequences; nina verifies with the
-narrator idle vs busy, and either serialises the contexts or the next
-bench carries more reps. The agent-side reads above do not depend on
-it.
+**7. The noise floor, found.** Not the sibling context: main-context
+greedy decoding is identical with the narrator idle or busy, and the
+bench never overlaps the two. The cause is Speak's pass-2 sampler,
+seeded at random per call at temperature 0.4; E7 run 2 already had
+different answer text for identical insertions in 38% of repeated
+cells, so "deterministic" held only at the score level. The bench now
+takes `-pass2_seed` (seed + rep per repeat): byte-identical insertions
+give 24/24 identical answers. Live stays random. Closing commit
+325f1f0 (nina): the §12 defaults, the result's short form, the seed.
