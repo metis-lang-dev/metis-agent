@@ -325,6 +325,22 @@ per fragment at the agent narrator; fragment → agent sentence ms;
 tokens passed to the orchestrator per hour of the pair run; the
 orchestrator's first-token ms.
 
+Two Gemma 4 feature checks **(user)**, as sweeps on the policy row
+only (flat retrieval), 3 repeats each, so the row count stays at six:
+
+- **thinking** for the per-agent narrator on surprise-class fragments:
+  off / on capped 64 / on capped 256. Scored on the agent sentence's
+  attribution (the first-cook misattribution is the target) and the
+  fragment → sentence ms. E1 found no gain on intents; this is the
+  first place thinking has a reasoning job.
+- **native system role**: the interpretation instructions (11.1 step 2)
+  in the system turn, the KV-cached prefix, versus folded into the
+  user cue of every call with no system turn. Scored on the agent
+  sentence's attribution and invented, and on tokens per fragment.
+  Reads: a gain ≥ 0.1 on attribution keeps the feature; within 0.1 the
+  cheaper setting is the default (thinking off; system turn, since it
+  is cached).
+
 Pre-registered reads:
 - **the agent narrator is faithful** if its sentences attribute ≥ 0.9
   and invent 0; below 0.8 the script's comments are not enough and the
