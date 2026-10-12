@@ -192,9 +192,9 @@ const (
 )
 
 // rackTrigger is the retriever's trigger for a narration batch (RAG §3).
-func rackTrigger(batch []RuntimeEvent, think bool) string {
+func rackTrigger(batch []RuntimeEvent, surprise bool) string {
 	switch last := batch[len(batch)-1].Kind; {
-	case think && last == "surprise":
+	case surprise && last == "surprise":
 		return "surprise"
 	case last == "quiescence":
 		return "quiescence"
@@ -237,8 +237,11 @@ func (e *Engine) answerFromRack(text string) string {
 // sentence from the model — guarded (unspeakable, forged fact syntax, a
 // number the pieces do not hold), else the last piece itself is said.
 // Returns the sentence and the turn's text (pieces + cue) for the tape.
-func (e *Engine) narratePieces(batch []RuntimeEvent, think bool) (string, string) {
-	said, user := e.narrateCued(batch, think)
+// surprise picks the surprise-class cue; thinking is off for every class
+// (consolidation, RAG §12.4: a 64 cap dropped the pause, 256 gained 2 of
+// 15 sentences at 1.75 s to the first word — MODEL-EXPERIMENTS.md).
+func (e *Engine) narratePieces(batch []RuntimeEvent, surprise bool) (string, string) {
+	said, user := e.narrateCued(batch, surprise)
 	if e.Rack != nil && said != "" && e.Attn.Awake() {
 		// kind=said is what the person heard (asleep, it is parked unsaid)
 		e.Rack.Said(batch[len(batch)-1].Path, said)
@@ -246,7 +249,7 @@ func (e *Engine) narratePieces(batch []RuntimeEvent, think bool) (string, string
 	return said, user
 }
 
-func (e *Engine) narrateCued(batch []RuntimeEvent, think bool) (string, string) {
+func (e *Engine) narrateCued(batch []RuntimeEvent, surprise bool) (string, string) {
 	var lines []string
 	for _, p := range batch {
 		lines = append(lines, cleanText(p.Fact, factCap)+".")
@@ -259,13 +262,13 @@ func (e *Engine) narrateCued(batch []RuntimeEvent, think bool) (string, string) 
 		where = "runtime"
 	}
 	cue := fmt.Sprintf(cueProgress, where)
-	if think {
+	if surprise {
 		cue = fmt.Sprintf(cueSurprise, where)
 	}
 	if e.Rack != nil {
 		// the rack: the retriever's insertion for this trigger stands in
 		// for the bare pieces (they are on the domain's tape already)
-		trig := rackTrigger(batch, think)
+		trig := rackTrigger(batch, surprise)
 		if ins, n, tok := e.Rack.Insert(trig, path); ins != "" {
 			log.Printf("[rack] %s(%s): %d records, %d tok", trig, path, n, tok)
 			// the trigger's own pieces close the insertion as its focus (the
@@ -282,7 +285,7 @@ func (e *Engine) narrateCued(batch []RuntimeEvent, think bool) (string, string) 
 	if !ok {
 		return fallback, user
 	}
-	out, ttft, thought, err := sp.Speak(e.cfg.SystemPrompt, user, think)
+	out, ttft, thought, err := sp.Speak(e.cfg.SystemPrompt, user, false)
 	if err != nil {
 		log.Printf("[runtime] narration failed: %v", err)
 		return fallback, user
@@ -296,8 +299,8 @@ func (e *Engine) narrateCued(batch []RuntimeEvent, think bool) (string, string) 
 		log.Printf("[runtime] narration %q says %s, not in the pieces — the piece", out, inventedNumbers(s, pieces))
 		return fallback, user
 	}
-	log.Printf("[runtime] narrate %d piece(s) (%s, think=%v) → %q (first token %d ms, thought %d chars)",
-		len(batch), batch[len(batch)-1].Kind, think, s, ttft.Milliseconds(), len(thought))
+	log.Printf("[runtime] narrate %d piece(s) (%s, surprise=%v) → %q (first token %d ms, thought %d chars)",
+		len(batch), batch[len(batch)-1].Kind, surprise, s, ttft.Milliseconds(), len(thought))
 	return s, user
 }
 

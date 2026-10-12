@@ -1,8 +1,8 @@
 // Package rack is the main narrator's rack (docs/RAG.md): one tape of
-// rendered records per runtime domain, a STRUCTURAL retriever keyed by the
-// orchestrator's active set and the trigger's path (no embeddings), and the
-// insertion — inline fragments grouped by path, mirror line first — that
-// goes before a cue at the tail of the narrator's turn.
+// records per runtime domain on one arrival clock, and the flat insertion
+// (RAG §10) — the last K records of every mounted tape as inline
+// fragments tagged with the domain's name, the mirror lines for an ask —
+// that goes before a cue at the tail of the narrator's turn.
 package rack
 
 import (

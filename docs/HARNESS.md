@@ -327,8 +327,11 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
     a free floor, is batched (up to 8 pieces per sentence) and runs with
     thinking off.
   - `surprise` (a surprise, a notice, a refused result) takes the floor
-    next, cuts a progress narration and runs with thinking on (capped at
-    64 tokens).
+    next, cuts a progress narration and gets its own cue. Thinking is off
+    for it too (consolidation, RAG §12.4: a 64-token cap dropped the
+    pause; 256 gained 2 of 15 sentences at 1.75 s to the first word,
+    against CML §7's +270 ms premise; MODEL-EXPERIMENTS.md).
+    `llm.SpeakCap` keeps the per-call cap for a future knob.
   - Asleep, nothing is said.
   - The sentence opens with "Spoken response:" and is sampled under a
     one-sentence grammar, so the dog persona does not leak in.

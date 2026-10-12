@@ -58,7 +58,7 @@ type Config struct {
 	// one narrator, each its own process and watch. An entry's set fields
 	// override this config's; empty = this config is the one runtime.
 	Runtimes []Config `yaml:"runtimes"`
-	// Rack: the per-domain tapes and the structural retriever (RAG §2–4).
+	// Rack: the per-domain tapes and their flat insertion (RAG §2, §10).
 	Rack RackConfig `yaml:"rack"`
 	// Narr: narration streaming from the script RAG (RAG §11); needs rack.
 	Narr NarrConfig `yaml:"narr"`

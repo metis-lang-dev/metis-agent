@@ -164,7 +164,7 @@ func main() {
 	e8Reps := flag.Int("e8-reps", 1, "E8: repeats of the whole corpus")
 	e8Scripts := flag.String("e8-scripts", "grammar/e8-scripts.json", "E8: the runtimes' script op answers, by path")
 	e8Forms := flag.String("e8-forms", "policy,N-all,R-all", "E8: the forms passed to the orchestrator (one narration pass per repeat serves them all)")
-	e8OCap := flag.Int("e8-ocap", 64, "E8: the orchestrator's thought cap on a surprise narration (0 = off; the harness's Speak uses 64)")
+	e8OCap := flag.Int("e8-ocap", 0, "E8: the orchestrator's thought cap on a surprise narration (0 = off, as the harness since the consolidation cap check)")
 	e8IDsF := flag.String("e8-ids", "", "E8: only these corpus ids (comma list; empty = all)")
 	capF := flag.String("cap", "", "cap check (consolidation step 1): the orchestrator's surprise narration on the hour's surprise shapes at these thought caps (e.g. 0,64,256); -e8-cards, -e8-reps, -pass2_seed")
 	e8K := flag.Int("e8-k", 12, "E8: the orchestrator's flat insertion, passed fragments per question (the harness's rack.k)")

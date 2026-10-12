@@ -1032,6 +1032,9 @@ func (l *LLM) DecideTimed(systemPrompt, user, cont, gbnf string, maxTokens int) 
 // without <|think|> in the system turn, so the one prefix stays — the
 // thought runs greedily to its close (≤ thinkMax), then the sentence.
 // Returns the sentence, the time to its first spoken token and the thought.
+// The harness passes think=false everywhere since the consolidation cap
+// check (RAG §12.4: 64 dropped the pause, 256 cost 1.75 s to the first
+// word); a cap other than 64 is SpeakCap's.
 func (l *LLM) Speak(systemPrompt, user string, think bool) (string, time.Duration, string, error) {
 	n := 0
 	if think {

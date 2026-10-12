@@ -51,14 +51,14 @@ func TestCuedNarrationIsGuarded(t *testing.T) {
 			t.Errorf("model %q → %q, want %q", out, got, want)
 		}
 		if !strings.HasPrefix(turn, surprisePiece) || !strings.Contains(turn, "not something the person said") ||
-			!strings.Contains(turn, "in the kitchen") || !n.thinks[0] {
+			!strings.Contains(turn, "in the kitchen") || n.thinks[0] {
 			t.Errorf("turn %q think %v", turn, n.thinks)
 		}
 	}
 }
 
 // Progress pieces wait for a free floor and go out as one sentence; a
-// surprise is narrated at once (thinking on) and cuts a progress narration;
+// surprise is narrated at once (thinking off, like every class) and cuts a progress narration;
 // every narration reaches the tape.
 func TestProgressWaitsSurpriseTakesTheFloor(t *testing.T) {
 	spk := newFakeSpeaker(300 * time.Millisecond)
@@ -89,7 +89,7 @@ func TestProgressWaitsSurpriseTakesTheFloor(t *testing.T) {
 		t.Errorf("said %v", said)
 	}
 	n.mu.Lock()
-	if len(n.turns) != 2 || strings.Count(n.turns[0], "In the kitchen:") != 2 || !strings.Contains(n.turns[0], "quiet after 2 moves") || n.thinks[0] || !n.thinks[1] {
+	if len(n.turns) != 2 || strings.Count(n.turns[0], "In the kitchen:") != 2 || !strings.Contains(n.turns[0], "quiet after 2 moves") || n.thinks[0] || n.thinks[1] {
 		t.Errorf("turns %q thinks %v", n.turns, n.thinks)
 	}
 	n.mu.Unlock()

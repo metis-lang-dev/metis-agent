@@ -93,7 +93,7 @@ type e8Run struct {
 }
 
 // the consolidation cap check (MODEL-EXPERIMENTS.md): the orchestrator's
-// thought cap on a surprise narration (-e8-ocap; Speak's own is 64) and the
+// thought cap on a surprise narration (-e8-ocap; the harness's is off) and the
 // probes run (-e8-ids; all when empty)
 var (
 	e8OrchCap = 64
