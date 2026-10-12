@@ -1,0 +1,57 @@
+# metis-agent (docs/FRAMEWORK.md): the agent core + the console backend
+# serving the fsttm-web page. One process owns the model (no llama-server
+# beside it).
+#
+#   ./bin/metis-agent -config config.agent.yaml -ui-dir ../../fsttm-web/web
+#   open http://localhost:8395/          (the page picks the ws backend by itself)
+#
+# The intent turn is config.ws.yaml's (the parity bar: gemma4 E2B Q4 + the
+# gemma4 pass-2 examples, thinking off); talk mode is the free dialog on its
+# own context of the same model.
+llm:
+    model: models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf
+    n_ctx: 4096
+    n_batch: 512
+    n_threads: 6
+    n_gpu_layers: 99
+    template: gemma4
+    pass2: {temperature: 0.4, top_k: 40, max_tokens: 50}
+prompt:  grammar/dog-prompt.txt
+prompt_extra: [grammar/pass2-examples-gemma4.txt]
+grammar: grammar/dog.gbnf
+talk:                            # say_text{mode: talk}: the free dialog (fsttm-web's long replies)
+    prompt: grammar/talk-prompt.txt
+    n_ctx: 4096
+    temperature: 1.0
+    top_k: 64
+    top_p: 0.95
+    min_p: 0.05
+    repeat_penalty: 1.1
+    max_tokens: 160
+    keep_turns: 12
+ws:
+    addr: :8395
+# Domains (FRAMEWORK §4), replacing kernel.runtimes: each entry picks a
+# domain; its cards and script come from the running domain. Fields left
+# out take domain_defaults (the kernel.Config.Each merge). The kitchen pair
+# shares one env through METIS_PAIR_DIR (clear its kitchen-pair.json first).
+domain_defaults:
+    plugin: process
+    cmd: [python3, -m, metis.lang.repl]
+    dir: ../../metispy
+    watch: every=0.5
+    narrate: [surprise, consistent, episode_over]
+    settle_beats: 2.5
+domains:
+    - name: kitchen
+      display: the first cook
+      host: metis.domains.kitchen.pair:make_pair_kitchen
+      catalog: metis/domains/kitchen/catalogs/kitchen_host.llp
+      env: [METIS_PAIR_DIR=/tmp/pair]
+    - name: kitchen_shared
+      display: the second cook
+      host: metis.domains.kitchen.pair:make_pair_shared
+      catalog: metis/domains/kitchen/catalogs/shared/kitchen_shared.llp
+      env: [METIS_PAIR_DIR=/tmp/pair]
+rack: {enabled: true, k: 12, budget: 2500}
+narr: {enabled: true, form: policy, n_ctx: 4096}

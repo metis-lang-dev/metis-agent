@@ -32,8 +32,14 @@ const RuntimeCommand = "RUNTIME"
 // Host is the adapter as a wire host: it turns the runtime's signals into
 // engine events, and runtime intents into pending commands whose outcome
 // is the `result` signal.
+// Opper is what the host needs of its runtime: the ops (*Client, or a
+// metis-agent domain plugin, internal/agent).
+type Opper interface {
+	Op(op, arg string, timeout time.Duration) (map[string]any, error)
+}
+
 type Host struct {
-	C       *Client
+	C       Opper
 	Pend    *wire.Pending
 	OnEvent func(Event)                     // every signal: the UI, and narration when Narrate
 	OnTask  func(id, result, detail string) // a result signal → its pending command's outcome

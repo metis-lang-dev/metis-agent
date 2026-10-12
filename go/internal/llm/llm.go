@@ -1278,3 +1278,121 @@ func (l *LLM) generate(chain *C.struct_llama_sampler, maxTokens int,
 	}
 	return out, nil
 }
+
+// ── free dialog (metis-agent talk mode, FRAMEWORK §5) ───────────────────────
+
+// Sampling is a free-dialog turn's sampler: penalties, top-k, top-p, min-p,
+// temperature, then a seeded draw (Seed 0 = random per call).
+type Sampling struct {
+	Temp    float32
+	TopK    int
+	TopP    float32
+	MinP    float32
+	Repeat  float32 // repeat penalty over the last 64 tokens (≤ 1 = off)
+	Seed    uint32
+	MaxToks int
+}
+
+// Chat is one free-text turn after the cached prefix and the tape (the
+// dialog history, written by AppendTape / SpliceTape): the user turn, then
+// sampled tokens until the end of the turn, MaxToks, or onText returning
+// false. No thought channel, no grammar. onText (may be nil) sees the
+// cleaned text so far after every token, for sentence streaming. Returns
+// the cleaned text and the time to its first token. The turn is rolled back
+// by the next call: the caller tapes it.
+func (l *LLM) Chat(systemPrompt, user string, s Sampling, onText func(string) bool) (string, time.Duration, error) {
+	t0 := time.Now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	base, err := l.primeLocked(systemPrompt)
+	if err != nil {
+		return "", 0, err
+	}
+	if err := l.rewind(systemPrompt, base); err != nil {
+		return "", 0, err
+	}
+	if err := l.decodeTokens(l.tailTokens(user)); err != nil {
+		return "", 0, err
+	}
+	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
+	defer C.llama_sampler_free(chain)
+	if s.Repeat > 1 {
+		C.llama_sampler_chain_add(chain, C.llama_sampler_init_penalties(64, C.float(s.Repeat), 0, 0))
+	}
+	if s.TopK > 0 {
+		C.llama_sampler_chain_add(chain, C.llama_sampler_init_top_k(C.int32_t(s.TopK)))
+	}
+	if s.TopP > 0 && s.TopP < 1 {
+		C.llama_sampler_chain_add(chain, C.llama_sampler_init_top_p(C.float(s.TopP), 1))
+	}
+	if s.MinP > 0 {
+		C.llama_sampler_chain_add(chain, C.llama_sampler_init_min_p(C.float(s.MinP), 1))
+	}
+	if s.Temp <= 0 {
+		C.llama_sampler_chain_add(chain, C.llama_sampler_init_greedy())
+	} else {
+		C.llama_sampler_chain_add(chain, C.llama_sampler_init_temp(C.float(s.Temp)))
+		C.llama_sampler_chain_add(chain, C.llama_sampler_init_dist(Pass2{Seed: s.Seed}.seed()))
+	}
+	max := s.MaxToks
+	if max <= 0 {
+		max = 160
+	}
+	var out []C.llama_token
+	var ttft time.Duration
+	for len(out) < max {
+		tok := C.llama_sampler_sample(chain, l.ctx, -1)
+		if ttft == 0 {
+			ttft = time.Since(t0)
+		}
+		l.nGenerated.Add(1)
+		if bool(C.llama_vocab_is_eog(l.vocab, tok)) || l.stopIDs[tok] {
+			break
+		}
+		out = append(out, tok)
+		if rc := C.decode_one(l.ctx, tok); rc != 0 {
+			return l.clean(l.detokenize(out)), ttft, fmt.Errorf("llama_decode returned %d mid-chat", rc)
+		}
+		l.nPast++
+		if onText != nil && !onText(l.clean(l.detokenize(out))) {
+			break
+		}
+	}
+	return strings.TrimSpace(l.clean(l.detokenize(out))), ttft, nil
+}
+
+// SpliceTape replaces the tape keeping the KV of the longest common token
+// prefix of the old tape and the new one: only the tokens after it are
+// decoded. The dialog's context cut (FRAMEWORK §5): the reply heard up to
+// the cut word keeps the KV up to that word.
+func (l *LLM) SpliceTape(systemPrompt, text string) (Splice, error) {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	t0 := time.Now()
+	if _, err := l.primeLocked(systemPrompt); err != nil {
+		return Splice{}, err
+	}
+	toks := l.after(text, false)
+	if l.nPrefix+len(toks)+l.turnReserve() > l.nCtx {
+		return Splice{}, fmt.Errorf("llm: tape too big (%d tok, n_ctx %d)", len(toks), l.nCtx)
+	}
+	n := 0
+	for n < len(toks) && n < len(l.tapeToks) && toks[n] == l.tapeToks[n] {
+		n++
+	}
+	if err := l.rewind(systemPrompt, l.nPrefix+n); err != nil {
+		return Splice{}, err
+	}
+	if l.nPast != l.nPrefix+n { // the rewind fell back to a clear and re-prime: the tape is gone
+		n = 0
+		l.tapeToks, l.tapeText = nil, ""
+		if err := l.rewind(systemPrompt, l.nPrefix); err != nil {
+			return Splice{}, err
+		}
+	}
+	if err := l.decodeTokens(toks[n:]); err != nil {
+		return Splice{}, err
+	}
+	l.tapeText, l.tapeToks = text, toks
+	return Splice{Tokens: len(toks) - n, Tape: len(toks), Dur: time.Since(t0)}, nil
+}

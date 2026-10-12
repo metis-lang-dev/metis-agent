@@ -245,3 +245,34 @@ cuts; step 3 (natural dialog) is done in substance by d796cca; step 4's
 decision is taken here (the Go backend for metis-agent, llama-server as
 the framework's standalone backend), and opus's E5 ASR row runs unchanged
 against the page.
+
+## 8. As built: iteration 2 (nina, 2026-10-12)
+
+- **`internal/agent`.**
+  - **Agent:** `New(cfg, llm, sink)`, `Attach([]DomainConfig)`, `Utterance(text) (Turn, error)`, `Talk(id, text, out func(sentence)) error`, `Cut(id, heard)`, `Task(Task)`, `Announce(text)`, `Narration() <-chan Narration`, `Domains() []DomainInfo`, `RuntimeIntent`, `MountRack`.
+  - **Events** go through a `Sink`, the console: runtime, rack, command, pending, domains.
+  - **Speech guards** are copied from `pipeline`, so iteration 3 deletes `pipeline` without touching the agent.
+- **Differences from §3–4.**
+  - **The talk callback.** `Talk` takes a sentence callback, not a channel and a context.
+  - **The intent op.** `Domain.Intent` returns the op's answer map.
+  - **The host.** `kernel.Host.C` is now `kernel.Opper` (any runtime with `Op`), so the host runs over a domain.
+- **Domains.**
+  - `domains:` takes a list, and `domain_defaults:` merges under it through `kernel.Config.Each`.
+  - `plugin: process` is `kernel.Client`, registered in `init`.
+  - The domains block (`DomainsBlock`, a template over `Card`) sits between the persona and the runtime section. The intent prefix is re-primed at attach.
+  - With no domains, the prompt is the persona alone: the parity bar.
+- **Talk mode.**
+  - Talk runs on its own sibling context with its own persona (`grammar/talk-prompt.txt`), sampled by `llm.Chat`.
+  - The history is that context's tape. `llm.SpliceTape` rewrites it on a cut, keeping the KV of the common token prefix: a cut at the 7th word re-decodes 6 tokens.
+  - Sentences stream as they complete, split by tts.js's rule, so the page's resume units match.
+  - Cuts go through the talk queue in order with the turns, so a cut sent before a turn shapes that turn's context.
+- **Narration.**
+  - Every fragment goes to the page in its form, through the per-agent narrator (RAG §11, policy forms).
+  - **Gone:** the orchestrator's cued re-narration at a free floor, including the per-order summary at quiescence, because the page decides when to speak. A quiescence is voiced as its own fragment's sentence ("the first cook is waiting for the next order").
+  - **Voiced or shown** is the page's choice: surprise, result, notice, quiescence, task and announce are voiced; a clause event is shown only, per RAG §8.4.
+  - `rack.Said` records a narration when it is sent, not when it is heard.
+- **Console.**
+  - `cmd/metis-agent` serves `-ui-dir` (fsttm-web `web/`) and the fsttm-web library at `/lib/`, from `<ui-dir>/../lib`.
+  - Late viewers get the last domains and rack frames. Narrations are not replayed.
+  - `-wait-viewer` attaches the domains when the first page connects, so the page hears the run from its start. `-no-domains` runs the persona alone.
+- **GPU.** The model with three contexts (intent 4096, talk 4096, narrator 4096) needs about 3.2 GB. Beside the user's fsttm-go on :8392 and llama-server on :8393 (4.6 GB), the narrator's context could not be allocated. So the E8 run had talk off, and the talk check had no domains. Alone on the GPU, all three fit.
