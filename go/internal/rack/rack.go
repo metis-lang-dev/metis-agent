@@ -65,6 +65,12 @@ type Store struct {
 	Wrap bool
 	// Clock overrides the arrival clock (a bench's own t).
 	Clock func() float64
+	// Flat (RAG §10, the default in the harness: S ≈ F in E7): the last K
+	// records of every mounted tape in arrival order, each path's mirror
+	// line in the ask scope only; no scoping, no ranking. Off = the §3
+	// structural retriever, parked until the tree.
+	Flat bool
+	K    int // flat: records per insertion (0 = 12)
 }
 
 // New makes a rack over the paths, all mounted.
@@ -334,17 +340,35 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 
 	in := Insertion{Trigger: tr}
 	mounted := tapes[tr.Path] != nil
+	// what was said is retrieved only to sum up an order (RAG §10: the
+	// model copied a said record as a surprise's narration)
+	notSaid := func(rs []Record) []Record {
+		var out []Record
+		for _, r := range rs {
+			if r.Kind != "said" || tr.Kind == "quiescence" {
+				out = append(out, r)
+			}
+		}
+		return out
+	}
 	var recs []Record
-	switch tr.Kind {
-	case "event":
+	switch {
+	case s.Flat:
+		for _, p := range active {
+			recs = append(recs, notSaid(tapes[p])...)
+		}
+		if tr.Kind == "ask" {
+			in.Mirrors = active
+		}
+	case tr.Kind == "event":
 		if mounted {
 			// records only (RAG §8.3: the model echoed the mirror line
 			// instead of the event)
-			recs = sinceQuiescence(tapes[tr.Path])
+			recs = notSaid(sinceQuiescence(tapes[tr.Path]))
 		}
-	case "surprise":
+	case tr.Kind == "surprise":
 		if mounted {
-			recs = append(recs, sinceQuiescence(tapes[tr.Path])...)
+			recs = append(recs, notSaid(sinceQuiescence(tapes[tr.Path]))...)
 			in.Mirrors = []string{tr.Path}
 		}
 		for _, p := range active {
@@ -361,7 +385,7 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 				}
 			}
 		}
-	case "quiescence":
+	case tr.Kind == "quiescence":
 		in.Mirrors = active
 		for _, p := range active {
 			for i := len(tapes[p]) - 1; i >= 0; i-- {
@@ -371,7 +395,7 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 				}
 			}
 		}
-	case "ask":
+	case tr.Kind == "ask":
 		in.Mirrors = active
 		for _, p := range active {
 			if o := open(tapes[p]); len(o) > 0 {
@@ -385,11 +409,19 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 	}
 	sort.SliceStable(recs, func(i, j int) bool {
 		wi, wj := Weights[recs[i].Kind], Weights[recs[j].Kind]
-		if wi != wj {
+		if wi != wj && !s.Flat { // flat: latest first, nothing else
 			return wi > wj
 		}
-		return recs[i].T > recs[j].T
+		return recs[i].T > recs[j].T || recs[i].T == recs[j].T && recs[i].Path == recs[j].Path && recs[i].Seq > recs[j].Seq
 	})
+	if k := s.K; s.Flat {
+		if k <= 0 {
+			k = 12
+		}
+		if len(recs) > k {
+			recs = recs[:k]
+		}
+	}
 
 	mirrors := map[string]string{}
 	var keepM []string
@@ -426,6 +458,23 @@ func (s *Store) Retrieve(tr Trigger, mirror func(path string) string) Insertion 
 		return a.Path == b.Path && a.Seq < b.Seq
 	})
 
+	if s.Flat {
+		// arrival order across the tapes, each line tagged with its domain
+		var lines []string
+		for _, p := range in.Mirrors {
+			lines = append(lines, s.Frag(p, mirrors[p]))
+		}
+		for _, r := range in.Records {
+			text := r.Text
+			if r.Kind == "said" {
+				text = "you said: " + text
+			}
+			lines = append(lines, s.Frag(r.Path, text))
+		}
+		in.Text = strings.Join(lines, "\n")
+		in.Dur = time.Since(t0)
+		return in
+	}
 	// grouped by path: the trigger's path first, then the active order
 	paths := []string{}
 	if mounted {

@@ -506,3 +506,9 @@ fsttm-go -config config.ws.yaml -ui-dir … -kernel-host metis.domains.kitchen.h
     (`MirrorRowFull`, `Status.mirror`). q13's insertion: 342 → 287 tok.
   - **4. Decide on B's context**, see §9 above. Step 5's arm C now runs
     triage like B.
+- **RAG §10 (E7 closed, S ≈ F).** `kernel.rack.retrieve: flat |
+  structural`, flat by default: the last `k` (12) records of every mounted
+  tape in arrival order, each fragment tagged with its display name, the
+  mirror lines in the ask scope only. `structural` is the §3 retriever,
+  parked until the tree (it and its E7 reference test stay). In both, a
+  `said` record is retrieved only in the quiescence scope.

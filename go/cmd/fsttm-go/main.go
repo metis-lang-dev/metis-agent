@@ -460,6 +460,16 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 		if kcfg.Rack.Wrap != nil {
 			rk.Wrap = *kcfg.Rack.Wrap
 		}
+		switch kcfg.Rack.Retrieve {
+		case "", "flat":
+			rk.Flat, rk.K = true, kcfg.Rack.K
+			if rk.K <= 0 {
+				rk.K = 12
+			}
+		case "structural":
+		default:
+			log.Fatalf("kernel.rack.retrieve %q: flat | structural", kcfg.Rack.Retrieve)
+		}
 	}
 	cardText := func(path string) string {
 		for _, c := range cards {
@@ -633,7 +643,7 @@ func startKernel(ctx context.Context, kcfg kernel.Config, eng *pipeline.Engine, 
 			log.Printf("[rack] mount %s %v (known %v); active %v", path, on, ok, rk.Active())
 			pushRack()
 		}
-		log.Printf("[rack] on: budget %d tok, wrap %v, ask %v", rk.Budget, rk.Wrap, eng.RackAsk)
+		log.Printf("[rack] on: flat %v (k %d), budget %d tok, wrap %v, ask %v", rk.Flat, rk.K, rk.Budget, rk.Wrap, eng.RackAsk)
 	}
 	for _, r := range rts {
 		w := r.cfg.Watch

@@ -127,7 +127,7 @@ func TestRetrieverMatchesTheE7Reference(t *testing.T) {
 	qs := readJSONL(t, "../../grammar/e7-corpus.jsonl")
 	for _, q := range qs {
 		at := q["at"].(float64)
-			s := New("kitchen", "kitchen_shared")
+		s := New("kitchen", "kitchen_shared")
 		s.Attach("kitchen_shared", "a shared kitchen: a second cook also loads onions into the pot")
 		for _, p := range []string{"kitchen", "kitchen_shared"} {
 			s.Name(p, kernel.DisplayName(p, cards))
@@ -231,5 +231,44 @@ func TestCompactionAndMount(t *testing.T) {
 	add("event", -1, false)
 	if st := s.Snapshot()[0]; st.Records != 7 || st.Open != 1 {
 		t.Errorf("thawed: %+v", st)
+	}
+}
+
+// RAG §10: flat = the last K records of every mounted tape in arrival
+// order, mirror lines in the ask scope only; said only to sum up an order
+// (both retrievers).
+func TestFlatAndSaid(t *testing.T) {
+	s := New("a", "b")
+	s.Name("b", "the second cook")
+	at := 0.0
+	s.Clock = func() float64 { at++; return at }
+	add := func(path, kind, text string) {
+		s.Add(Record{Path: path, Kind: kind, Text: text, Rec: -1})
+	}
+	add("a", "event", "a1")
+	add("b", "event", "b1")
+	add("a", "said", "I said a")
+	add("a", "event", "a2")
+	add("b", "event", "b2")
+	mirror := func(p string) string { return "mirror " + p }
+	s.Flat, s.K = true, 3
+	in := s.Retrieve(Trigger{Kind: "surprise", Path: "a"}, mirror)
+	if want := "⟪a: a2⟫\n⟪the second cook: b2⟫"; len(in.Mirrors) != 0 || !strings.HasSuffix(in.Text, want) || strings.Contains(in.Text, "said") {
+		t.Errorf("flat surprise:\n%s", in.Text)
+	}
+	if got := strings.Count(in.Text, "\n") + 1; got != 3 {
+		t.Errorf("flat K=3: %d lines\n%s", got, in.Text)
+	}
+	if in := s.Retrieve(Trigger{Kind: "ask"}, mirror); len(in.Mirrors) != 2 || !strings.HasPrefix(in.Text, "⟪a: mirror a⟫\n⟪the second cook: mirror b⟫") {
+		t.Errorf("flat ask:\n%s", in.Text)
+	}
+	if in := s.Retrieve(Trigger{Kind: "quiescence", Path: "a"}, mirror); !strings.Contains(in.Text, "you said: I said a") || len(in.Mirrors) != 0 {
+		t.Errorf("flat quiescence:\n%s", in.Text)
+	}
+	s.Flat = false
+	for _, k := range []string{"event", "surprise", "ask"} {
+		if in := s.Retrieve(Trigger{Kind: k, Path: "a"}, mirror); strings.Contains(in.Text, "said") {
+			t.Errorf("structural %s retrieved a said record:\n%s", k, in.Text)
+		}
 	}
 }

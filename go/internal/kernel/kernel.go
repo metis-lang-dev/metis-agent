@@ -71,6 +71,11 @@ type RackConfig struct {
 	Budget  int   `yaml:"budget"` // tokens per insertion (default 2500)
 	Wrap    *bool `yaml:"wrap"`   // ⟪path: text⟫ fragments (default true, RAG §4)
 	Ask     *bool `yaml:"ask"`    // the person's chitchat/unknown turns answered from ask() (default true)
+	// Retrieve: flat (default, RAG §10: S ≈ F in E7) = the last K records
+	// of every mounted tape in arrival order, mirror lines for asks only;
+	// structural = the §3 retriever, parked until the tree.
+	Retrieve string `yaml:"retrieve"`
+	K        int    `yaml:"k"` // flat: records per insertion (default 12)
 }
 
 // Each returns the runtimes to attach: the entries merged over this

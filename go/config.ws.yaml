@@ -84,3 +84,5 @@ kernel:
         budget: 2500             # tokens per insertion, mirror lines included
         wrap: true               # ⟪path: text⟫ fragments (false: "path: text.")
         ask: true                # the person's chitchat / off-map questions answered from ask()
+        retrieve: flat           # flat (RAG §10): last k records of every mounted tape; structural: the §3 retriever
+        k: 12
