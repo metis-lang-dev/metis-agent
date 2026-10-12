@@ -174,6 +174,12 @@ FIRST = r"first cook|\bthe cook\b(?!.*second)|main kitchen|kitchen (?!shared)"
 SECOND = r"second cook|other cook|another cook|partner|shared kitchen|kitchen.shared"
 YES = r"^(?!.*\b(no|not|isn't|wasn't|nothing)\b).*\b(yes|it is|it was|accepted|admitted|quiet|idle)\b"
 NO = r"\b(no|not|nothing|none|isn't|is not)\b"
+_Q = r"(quiet|done|over|idle|finished|resting)"
+_A1 = r"(first cook|\bkitchen\b(?! shared))"
+_B1 = r"(second cook|kitchen shared|shared kitchen)"
+BOTH_QUIET = (r"^(?!.*\b(no|not)\b).*(\bboth\b.*%s|yes\b"
+              r"|%s.*%s.*%s.*%s|%s.*%s.*%s.*%s)"
+              % (_Q, _A1, _Q, _B1, _Q, _B1, _Q, _A1, _Q))
 
 
 def Q(id, cls, at, trig, needs, q, expect, evidence, probe="q",
@@ -231,8 +237,11 @@ def questions():
           SECOND, ["kitchen#19", "card:kitchen_shared"]),
         Q("q14", "both", 91, su(A), [A, B], CUE, SECOND,
           ["kitchen#19", "card:kitchen_shared"], probe="cue"),
+        # RAG §9.5: YES failed a correct two-domain answer ("the kitchen is
+        # done, and the kitchen shared is done") and passed a half one —
+        # both kitchens must be said quiet (or "both")
         Q("q15", "both", 249, ask, [A, B], "Are both kitchens quiet now?",
-          YES, ["mirror:kitchen", "mirror:kitchen_shared"], probe="ask"),
+          BOTH_QUIET, ["mirror:kitchen", "mirror:kitchen_shared"], probe="ask"),
         Q("q16", "both", 44, ask, [A, B], "Is a surprise open in either kitchen?",
           NO, ["mirror:kitchen", "mirror:kitchen_shared"], probe="ask"),
         Q("q17", "both", 116, ask, [A, B], "Which cook is busy right now?",

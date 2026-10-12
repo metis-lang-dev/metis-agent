@@ -88,11 +88,26 @@ def table(rows):
     return "\n".join(out)
 
 
+# the names-accepted sensitivity (RAG §9.5, reported beside the primary):
+# an answer naming the first cook's DOMAIN ("the kitchen", "the kitchen's
+# pot") attributes as well as one naming the cook
+_FIRST_NAMED = r"first cook|\bthe cook\b|\bkitchen'?s?\b(?! shared)"
+NAMES_ACCEPTED = {
+    "q22": {"expect": _FIRST_NAMED, "right": _FIRST_NAMED},
+    "q23": {"right": r"first cook|\bthe cook's\b|\bkitchen'?s pot|\bkitchen\b(?! shared)",
+            "wrong": r"second cook's pot|kitchen shared'?s? pot"},
+}
+
+
 def main():
     corpus = {q["id"]: q for q in load(sys.argv[1])}
     recs = [r for p in sys.argv[2:] for r in load(p) if r.get("kind") == "e7"]
     rows = score(corpus, recs)
+    print("pre-registered (primary):\n")
     print(table(rows))
+    named = {k: {**q, **NAMES_ACCEPTED.get(k, {})} for k, q in corpus.items()}
+    print("\nnames accepted (sensitivity: q22, q23):\n")
+    print(table(score(named, recs)))
     misses = [x for x in rows if not x["used"] and x["covered"]]
     if misses:
         print("\nmodel misses with the evidence inserted:")
