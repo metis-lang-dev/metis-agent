@@ -164,6 +164,9 @@ func main() {
 	e8Reps := flag.Int("e8-reps", 1, "E8: repeats of the whole corpus")
 	e8Scripts := flag.String("e8-scripts", "grammar/e8-scripts.json", "E8: the runtimes' script op answers, by path")
 	e8Forms := flag.String("e8-forms", "policy,N-all,R-all", "E8: the forms passed to the orchestrator (one narration pass per repeat serves them all)")
+	e8OCap := flag.Int("e8-ocap", 64, "E8: the orchestrator's thought cap on a surprise narration (0 = off; the harness's Speak uses 64)")
+	e8IDsF := flag.String("e8-ids", "", "E8: only these corpus ids (comma list; empty = all)")
+	capF := flag.String("cap", "", "cap check (consolidation step 1): the orchestrator's surprise narration on the hour's surprise shapes at these thought caps (e.g. 0,64,256); -e8-cards, -e8-reps, -pass2_seed")
 	e8K := flag.Int("e8-k", 12, "E8: the orchestrator's flat insertion, passed fragments per question (the harness's rack.k)")
 	eventsF := flag.String("events", "", "narrate corpus (intent<TAB>args JSON<TAB>result<TAB>detail): each task outcome through the harness's taskCue + Narrate + guard")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
@@ -216,7 +219,7 @@ func main() {
 	for _, u := range flag.Args() {
 		rows = append(rows, row{utt: u})
 	}
-	if len(rows) == 0 && *eventsF == "" && *spliceF == "" && *e8F == "" {
+	if len(rows) == 0 && *eventsF == "" && *spliceF == "" && *e8F == "" && *capF == "" {
 		fail(fmt.Errorf("nothing to run: -corpus, -audio, -events or utterances"))
 	}
 	// a held-out row the prompt now teaches verbatim is no longer held out
@@ -280,7 +283,20 @@ func main() {
 		runEvents(l, string(prompt), *eventsF, *tag, sum.VRAM, emit)
 		return
 	}
+	if *capF != "" {
+		runCap(l, string(prompt), *e8Cards, *capF, *tag, *e8Reps, uint32(*seed), emit)
+		return
+	}
 	if *e8F != "" {
+		e8OrchCap = *e8OCap
+		for _, id := range strings.Split(*e8IDsF, ",") {
+			if id = strings.TrimSpace(id); id != "" {
+				if e8IDs == nil {
+					e8IDs = map[string]bool{}
+				}
+				e8IDs[id] = true
+			}
+		}
 		runE8(l, string(prompt), *e8Pair, *e8F, *e8Cards, *e8Scripts, *e8Forms, *tag, *e8Reps, *e8K, uint32(*seed), *e8Dry, emit)
 		return
 	}

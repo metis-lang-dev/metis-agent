@@ -392,3 +392,106 @@ These are inference distance, not wording: a fact that must be *applied* to a qu
 2. Standing facts go in the mirror region, overwritten in place, never appended.
 3. Compaction deletes superseded facts.
 4. ⟪⟫ in model output is refused (done, 9eba55d).
+
+## The orchestrator's thought cap on surprise speech (consolidation step 1, 2026-10-12, opus)
+
+**Question (RAG §12.4 open item, user decision).** Does the orchestrator
+need its thought cap of 64 on a surprise narration? `narrateCued` calls
+`Speak(think=true)` on a surprise, and `Speak` caps the thought at 64
+tokens. E8 found 64 the worst cap at the agent narrator.
+
+**Run.** One E2B Q4 at 08:22–08:40, co-resident with the user's :8392
+(2391 MiB before and after). Bench: `llmbench -cap` and `-e8-ocap`,
+scored by `tools/cap-score.py`. Thought caps off / 64 / 256, 3 repeats
+seeded per repeat (`-pass2_seed 7`). Two probe sets, on the
+orchestrator's own `Speak` path (not the agent narrator's):
+
+- **hour:** the 4 surprise shapes of the step-4 hour (its 8 surprises),
+  rendered by today's template (`kernel.Pieces`, consequence first,
+  observe-only) + `cueSurprise`, as `narrateCued` builds the turn without
+  the rack:
+  - a: pot onion 2 / 1;
+  - b: pot onion 5 / 4, pot space 1 / 2;
+  - c: hand free 1 / 0, held soup 0 / 1;
+  - d: pot onion 2 / 1, pot space 1 / 2.
+- **pair:** E7's q14, the pair's surprise, through the live path:
+  - rack flat insertion + narrator forms (policy) + "Just now" + the RAG
+    surprise cue;
+  - `llmbench -e8 -e8-ids q14 -e8-ocap N`;
+  - q20 is the same input, so it is not run twice.
+
+**Measures per sentence:**
+
+- **consequence kept:** the pause is said (paused / takes no new orders).
+- **reading kept:** every differing atom's observed value is said.
+- **expected stated:** a model value is said as the expectation
+  (expect / model / should / instead of).
+- **invented:** a number not in the input.
+- **first-token ms.**
+
+| probes | thought cap | n | consequence kept | reading kept | expected stated | invented | first token p50 | total p50 | thought chars |
+|---|---|---|---|---|---|---|---|---|---|
+| hour | off | 12 | **1.00** | 0.83 | 0.75 | 0 | **60 ms** | 1474 ms | 0 |
+| hour | 64 (today) | 12 | **0.42** | 1.00 | 0.58 | 0 | 503 ms | 1132 ms | 284 |
+| hour | 256 | 12 | 1.00 | 1.00 | **0.92** | 0 | 1754 ms | 2860 ms | 1076 |
+| pair | off | 3 | 0.00 | 0.67 | 0.00 | 0 | 109 ms | 1388 ms | 0 |
+| pair | 64 | 3 | 0.00 | 0.67 | 0.00 | 0 | 590 ms | 2227 ms | 281 |
+| pair | 256 | 3 | 0.00 | 0.67 | 0.00 | 0 | 1819 ms | 2921 ms | 925 |
+| all | off | 15 | 0.80 | 0.80 | 0.60 | 0 | 60 ms | 1427 ms | 0 |
+| all | 64 | 15 | 0.33 | 0.93 | 0.47 | 0 | 504 ms | 1527 ms | 284 |
+| all | 256 | 15 | 0.80 | 0.93 | 0.73 | 0 | 1758 ms | 2881 ms | 1045 |
+
+**What the sentences show:**
+
+- **64 cuts the thought mid-way, and the sentence drops the consequence.**
+  For example, "The pot has five onions and one less space than
+  expected." The pause is lost in 7 of 12 hour sentences, as at the agent
+  narrator in E8.
+- **Off keeps the consequence every time.** It states the difference in 3
+  of 4 shapes ("The kitchen is paused and cannot take new orders because
+  the pot has 5 onions instead of the expected 4, and the pot space has 1
+  instead of the expected 2."). It drops the reading on shape c (hand
+  free / held soup) in 2 of 3 repeats: "the kitchen is paused … until
+  surprise 0 is closed."
+- **256 (~250 tokens of thought, effectively uncapped) says consequence,
+  reading and expectation in 11 of 12** ("The kitchen is paused because
+  the onion count is five instead of four, and the space count is one
+  instead of two."). Its first spoken token comes 1.75 s in, against
+  60 ms with thinking off.
+- **The pair:**
+  - With the rack insertion and the agents' sentences above it, no cap
+    keeps the pause. The orchestrator narrates the window, not the
+    surprise.
+  - Who loaded the onion, judged by hand: off 0 of 3 (r0 "the first cook
+    added an onion … then the second cook added another"); 64 2 of 3; 256
+    1 of 3 (r2 "took an onion from a dispenser").
+  - n = 3 per cap: not readable.
+
+**Read (gain ≥ 0.1 over off keeps the feature, else off).**
+
+- **64:** against off, consequence −0.47, reading +0.13, expected −0.13.
+  No gain, and a loss on the consequence. **64 goes either way.**
+- **256:** against off, consequence ±0, reading +0.13, expected +0.13
+  (hour +0.17). It clears the bar as written.
+  - The gain is 2 of 15 sentences on reading, both shape c, and 2 of 15
+    on expected.
+  - With seeded repeats near-identical within a cap, that is about one
+    input of five.
+  - It costs 1.7 s before the first word of a spoken alert (29× off), and
+    2.9 s total.
+- **Proposed default:** by the rule, thinking 256 for surprise speech.
+  The one-line change is `go/internal/llm/llm.go` `Speak`: `n = 64` →
+  `n = 256`. `ThinkMaxTokens` defaults to 512, so 256 binds.
+- **The alternative is the architect's or the user's call:** off, with
+  shape c's reading carried by the template instead of the thought.
+
+**Caveats:**
+
+- The hour shapes run without the rack, as the step-4 hour did. With the
+  rack and the forms (the pair), the surprise is lost under every cap.
+  That is an insertion question, not a cap question.
+- The pass-2 sampler is seeded, but the thought is greedy, so a cap's
+  repeats differ only in sampling. n is small: 5 inputs.
+
+Records: go/results/cap/ (hour.jsonl, pair-{0,64,256}.jsonl, table.md,
+run.log; local).

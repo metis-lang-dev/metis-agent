@@ -20,5 +20,6 @@ func NarrateTemplate(it wire.Item, t Task) string { return narrateTemplate(it, t
 
 func RackAskCue() string                    { return cueRackAsk }
 func RackSurpriseCue(where string) string   { return fmt.Sprintf(cueRackSurprise, where) }
+func SurpriseCue(where string) string       { return fmt.Sprintf(cueSurprise, where) }
 func CleanFact(s string) string             { return cleanText(s, factCap) }
 func InventedNumbers(s, fact string) string { return inventedNumbers(s, fact) }

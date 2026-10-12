@@ -92,6 +92,14 @@ type e8Run struct {
 	Ms          int64   `json:"ms"` // the narration pass
 }
 
+// the consolidation cap check (MODEL-EXPERIMENTS.md): the orchestrator's
+// thought cap on a surprise narration (-e8-ocap; Speak's own is 64) and the
+// probes run (-e8-ids; all when empty)
+var (
+	e8OrchCap = 64
+	e8IDs     map[string]bool
+)
+
 func parseE8Forms(s string) []string {
 	var out []string
 	for _, f := range strings.Split(s, ",") {
@@ -247,6 +255,9 @@ func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, formsS, tag str
 					Beats: beats, BeatS: 0.5, TokTape: tape, TokResident: resident, Fragments: len(frags), Ms: passMs})
 
 				for _, q := range qs {
+					if len(e8IDs) > 0 && !e8IDs[q["id"].(string)] {
+						continue
+					}
 					rec := e8Probe(l, orch, q, narrated, passed, passedAt, mirrors, cards, store, row.form, k, dry, tok)
 					rec.Tag, rec.Rep, rec.Arm = tag, rep, row.retrieval+"/"+row.form+map[bool]string{true: "/" + row.setting, false: ""}[row.setting != ""]
 					rec.Retrieval, rec.Form, rec.Setting = row.retrieval, row.form, row.setting
@@ -353,7 +364,11 @@ func e8Probe(l *llm.LLM, orch string, q map[string]any, nd []e8Narrated, passed 
 		return rec
 	}
 	ts := time.Now()
-	out, ttft, thought, err := l.Speak(orch, inserted+"\n"+cue, think)
+	capN := 0 // the orchestrator's thought on a surprise (Speak: 64)
+	if think {
+		capN = e8OrchCap
+	}
+	out, ttft, thought, err := l.SpeakCap(orch, inserted+"\n"+cue, capN)
 	rec.MsTotal, rec.MsFirst, rec.Thought = time.Since(ts).Milliseconds(), ttft.Milliseconds(), len(thought)
 	if err != nil {
 		rec.Err = err.Error()
