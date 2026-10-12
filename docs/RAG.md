@@ -243,85 +243,112 @@ Open narration findings, not ruled here (a later experiment):
   in the quiescence scope, never in surprise/event/ask.
 - q24 (a stuck state) is unanswerable from the short mirror line.
 
-## 11. E8 — the script in the RAG, the tape as references (user, 2026-10-12)
+## 11. E8 — narration streaming from the script RAG (user, 2026-10-12)
 
-**(user)** Improve the per-agent tape first. The agent's tape narrates,
-but to be efficient the SCRIPT — the catalog with its textual comments
-and their interpretation — lives in the RAG, per agent, and the trace
-narrates with references to it. Once narration comes straight from the
-RAG, check flat against structural insertion again.
+**(user)** Formulate it as narration streaming. There is one RAG whose
+content is the script's comments; the system prompt has to interpret
+them and retrieve the missing part; the trace is narrated piecewise:
+as soon as a fragment appears it is narrated, and then we decide in
+which FORM to pass it to the orchestrator. Improve the per-agent tape
+first; once narration comes straight from the RAG, check flat against
+structural insertion.
 
-### 11.1 What the script is
+### 11.1 The pipeline
 
-Per agent (one catalog served under one path), the RAG holds entries
-the runtime hands over once, at attach, from the catalog itself:
+```
+runtime(path) ──fragment──▶ per-agent narrator ──sentence──▶ form ──▶ orchestrator ──▶ person
+                               ▲ script RAG(path)                      (standing region,
+                               ▲ its tape (refs + counts)               stream, cue, floor)
+```
 
-- the card: display name, provenance text (as today);
-- per clause: name, its `%%` comment (the textual comment: "walk to a
-  dispenser and take an onion"), and its interpretation: the clause's
-  premises and effects in the person's words ("needs a free hand; gives
-  a held onion"), rendered from the atoms' own `%%` docs; a cross-domain
-  clause names its target ("into the first cook's pot");
-- per atom: its `%%` doc ("a free hand", "onions in the pot"), which
-  replaces the harness's provenance-word table;
-- the surprise and result shapes are not script: they stay harness
-  templates (§8).
+1. **The script RAG, one per agent.** Its entries are the catalog's
+   own comments, handed over once at attach: the card (display name,
+   provenance); per clause its name, its `%%` comment ("walk to a
+   dispenser and take an onion"), its premises and effects as atom
+   names, its target; per atom its `%%` doc ("a free hand"). No
+   authored interpretation: interpreting is the model's job (2). The
+   harness's `says` dictionary and provenance-word table go away.
+2. **The system prompt interprets.** The narrator's prefix says what a
+   script entry is and how to read a fragment against it: the comment
+   is what the move means, the premises are what it needs, the effects
+   are what it leaves, the counts are the state after it; speak one
+   sentence in the person's words, naming the agent by its display
+   name, and never a number the fragment does not carry.
+3. **Retrieve the missing part.** A fragment is a reference
+   `{path, seq, beat, kind, ref, counts}`. Before the call the harness
+   pulls from the RAG what the reference needs and the prefix lacks:
+   the clause entry, the atoms it touches, the target's display name;
+   for a surprise the candidate moves' entries (the cards' moves) and
+   the sibling's cross-domain clause. Two knobs:
+   - **flat**: the whole script of every mounted path is resident in
+     the prefix (paid once in the KV); nothing is pulled per fragment;
+   - **structural**: only the referenced entries go in, per fragment,
+     as inline lines before the cue.
+4. **Narrate piecewise, as the fragment appears.** One short call per
+   fragment (think off for progress, on for surprise-class), streaming,
+   not spoken. The sentence is the agent's `said` record on its own
+   tape. The tape stores references and counts; the words live in the
+   RAG and in `said`.
+5. **Decide the form for the orchestrator.** Each narrated fragment is
+   passed to the orchestrator's context in one of four forms:
+   - **R**: the reference with counts, no words ("first cook: load;
+     now pot onion 2");
+   - **N**: the agent's sentence;
+   - **R+N**: both;
+   - **Ø**: not passed (the orchestrator can still ask the tape).
+   Phase one decides by a deterministic policy per kind: progress → R,
+   batched until the agent's quiescence; surprise, notice, result → N
+   (+R); the person's ask → N. A model-decided form is a later
+   experiment, once the policy rows bound what the form is worth.
+6. **The orchestrator** is today's main narrator unchanged: the
+   standing region, the stream at distance zero, the cue, the floor.
+   It speaks to the person from the forms it received.
 
-The `says` dictionary in `kernel.runtimes[]` goes away: the catalog's
-comments are the says. Where a catalog has no comment the entry is the
-interpretation alone, and the report says how many clauses lacked one.
+Separate contexts: phase one keeps ONE prefix for every per-agent
+narrator (the scripts are small; the cue names the agent). A KV
+context per agent is the fallback if the shared prefix collides, as
+the dog persona did in step 4.
 
-### 11.2 The tape as references
+### 11.2 E8
 
-A record no longer stores its sentence. It stores `{path, seq, beat,
-kind, ref, counts, closes}` where `ref` is the clause (or the exo op,
-or the surprise's record id). The sentence is rendered at insertion
-time from the script entry plus the counts. The tape is therefore
-numbers and names; the words live once, in the RAG.
+Corpus: E7's 24 questions and its two narration probes, which get an
+attribution regex (the second cook loaded the onion), plus every
+agent sentence of the run scored for faithfulness (attribution to the
+right agent, invented numbers, `⟪` leaks).
 
-Two rendering shapes for an insertion, both measured:
+Rows: retrieval {flat, structural} × form {policy, N-all, R-all};
+3 repeats; one E2B; the orchestrator's answers scored as E7.
 
-- **expanded**: every selected record rendered through its entry, as
-  today's pieces read ("The first cook walked to a dispenser and took
-  an onion; now hand free 0, held onion 1.");
-- **legend**: the script entries the window uses are inserted once, as
-  the legend ("fetch onion: walk to a dispenser and take an onion. load:
-  drop the onion into the pot …"), then the trace as short references
-  ("The first cook: fetch onion, load, fetch onion, load; now …").
-
-### 11.3 Flat vs structural, again
-
-With the script in the RAG the candidate set is larger than the trace:
-structural selection now also chooses WHICH script entries go in (the
-window's clauses, the surprise's candidate moves, the sibling's
-cross-domain clause), while flat inserts the last K records and the
-whole script of every mounted path. That is the room E7 did not have.
-
-### 11.4 E8
-
-Same corpus as E7 (24 questions + the two narration probes, which now
-get an attribution regex: "who loaded the onion" must name the second
-cook). Rows: (flat, structural) × (expanded, legend), 3 repeats, one
-E2B. Measures as E7 plus: tape tokens stored, script tokens inserted,
-narration attribution.
+Measures, per row: the orchestrator's used / attribution / invented
+(E7's scorer); the agent sentences' attribution and invented; tokens
+per fragment at the agent narrator; fragment → agent sentence ms;
+tokens passed to the orchestrator per hour of the pair run; the
+orchestrator's first-token ms.
 
 Pre-registered reads:
-- legend ≤ expanded on tokens inserted with used within 0.05 → the
-  tape stays references and the legend is the default shape;
-- structural − flat ≥ 0.20 on attribution (questions + narration
-  probes) at ≤ tokens → structural stands; within 0.20 → flat, as E7;
-- narration attribution < 0.8 in every row → the script's words are
-  not enough and the finding goes back to the templates.
+- **the agent narrator is faithful** if its sentences attribute ≥ 0.9
+  and invent 0; below 0.8 the script's comments are not enough and the
+  finding goes back to the catalog's comments, not to templates;
+- **form**: N-all vs R-all bounds the sentence's worth; the policy row
+  must be ≥ the better of the two on the orchestrator's used at fewer
+  tokens passed, else the policy is wrong and the report says which
+  kind to move;
+- **retrieval**: structural − flat ≥ 0.20 on attribution at ≤ tokens
+  per fragment → structural stands; within 0.20 → flat (as E7), and
+  the whole script stays resident.
 
-### 11.5 Steps (one subject)
+### 11.3 Steps (one subject)
 
 1. opus — runtime: the `cards` op (or a `script` op) returns per
-   clause its `%%` comment, premises and effects, and per atom its
-   `%%` doc; `%%` docs added to the kitchen catalogs' atoms and to
-   `partner_load` with its target; the corpus's narration probes get
-   their attribution regex; the scorer reads the new measures.
+   clause {name, doc, premises, effects, target} and per atom {name,
+   doc}; `%%` docs added to the kitchen catalogs' atoms and to
+   `partner_load` with its target; the narration probes' attribution
+   regex; the scorer's new measures (agent-sentence faithfulness,
+   tokens per fragment, tokens passed, fragment → sentence ms).
 2. nina — harness: the script RAG per path from the op; records as
-   references with counts; the two renderers; `says` removed; the
-   structural variant selects script entries; the rack pane shows the
-   script size per path and the tape in tokens.
+   references with counts; the narrator prefix (11.1 step 2); the
+   per-fragment streaming call with the retrieval knob; the form
+   policy and the pass to the orchestrator; `says` removed; the rack
+   pane shows per agent the last fragment, its sentence, the form
+   passed, script size and tape tokens.
 3. both — E8 run, table, read.
