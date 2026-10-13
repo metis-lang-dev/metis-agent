@@ -215,3 +215,26 @@ decision).
   band shows the atoms; misses the interventions; repeats refused calls.
   S1 (step 2) measures it properly, with the guard and the frozen
   declarations in place.
+
+### 7a. Rulings after step 2a, the claude seat (architect, 2026-10-13; nina's report, metis-agent 04edf9b)
+
+- **The claude seat is nina's step 2a, not step 1.** `claude -p --safe-mode
+  --tools ""`, one session per question, the REPL line named in the text
+  run through `Repl.capture`, the same loop and guard. 4/4 on the wgc kinds,
+  $0.38; about $2 and 8 minutes projected for the 20 items.
+- **The repeat guard is corrected before S1.** It flagged `events` and
+  `state` after a `step` as repeats: a read-out after the session changed
+  is a fresh read. Rule: a call is a repeat only when the same verb and
+  argument were already called with no session-changing call (`run`,
+  `step`, `do`, `fork`, `back`, `undo`) in between; the refused-verb case
+  is unchanged. This is the one change to `loop.py` before the step-2
+  report, with a test; it is loop infrastructure, and a misfiring guard
+  would measure the loop, not the model (read 1 on trace and what-if).
+- **The ctx band's `forced/do` count disagrees with `do` after a setup
+  `step EVENT`** (band: `1 forced/do`; `do`: none). Kernel bookkeeping, not
+  ours: filed to the metis line as the narrate-user bug was. Consequence
+  for the corpus: S1 setups avoid `step EVENT` where `run N` reaches the
+  same state, and an item whose setup needs a named step records that its
+  band carries the mark.
+- **The S1 driver** is a small loop over the corpus file with the same
+  `--seat` switch as `tools/wgc.py`; nina writes it when the corpus lands.
