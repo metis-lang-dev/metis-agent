@@ -358,3 +358,120 @@ stands; its rendering stays the JSON text in both directions. The
 `<|tool_response>` turn is not adopted for the executive: the model's
 synchronous tool prior reads a response as completion. Native calls are
 the specialist's shape (SPECIALIST.md §3), where every call is synchronous.**
+
+### Domain usage vs domain management: where the line is (architect, 2026-10-13; answers the user; awaits the user's ruling)
+
+The question: how much of the domain work can the main E2B context carry,
+and where does the specialist's work begin. The answer is drawn from what
+the experiments measured, not from preference.
+
+**The constraint is context, then chaining.** E10: 2.4 k tokens of
+declarations in the executive's prefix cost two held-out rows. E6: a fact
+placed inline is used (0.92), the stream does not carry across turns, and
+compaction deletes; standing facts live in the mirror. E10 C/D: after a
+refusal the model reports and stops. Specialist iteration 1: E2B reaches
+`why` once the ctx band shows the atoms, misses the interventions, and
+repeats refused calls. S1 will give the numbers; the shape follows already.
+
+**Two contexts, one model, one protocol each.**
+
+| | the orchestrator context (main) | a domain strip (specialist act) |
+|---|---|---|
+| holds | the person's dialog; the tree mirror, one line per domain; the journal of calls and outcomes by id; the open exception | the domain's ctx band; the REPL declarations (16 verbs, ≈1 k tokens); the question; the calls and outputs |
+| partner | the world, through the runtime: outcomes arrive later | the kernel, synchronous: every call answers now |
+| format | J: the JSON intent under the domains-block grammar (E10) | T: native sync tool calls (SPECIALIST §3) |
+| may | activate/deactivate, call(domain, verb, args), ask(person), consult(domain, question), escalate, reset/resume | read (state, events, ctx, why, findings, narrate user), simulate in a fork (fork, do, step, back, undo), necessity/sufficiency |
+| may not | see a domain's events, traces or REPL output | act on a port, speak to the person, change the tree |
+| lifetime | the session | one question; thrown away after its response |
+| size | ≈3 k tokens, bounded by the tree | ≈2 k + the calls, bounded by the item's max calls |
+
+The strip may read and simulate; only the orchestrator acts and speaks.
+That is the line.
+
+**1. Loading a domain and its strip.** `activate(domain)` is the
+orchestrator's J intent; the runtime admits it only into a certified
+configuration (the contract above). Everything that follows is the
+harness, not the model: prime the domain's REPL, render its ctx band,
+render its declarations, add its mirror line and its line in the domains
+block, re-prime the orchestrator's prefix (the rewind path, FRAMEWORK §4).
+A strip is opened only when a question is asked of the domain, from that
+prepared material; the orchestrator never pays for the strip's prefix.
+
+**2. The domain's intents.** They come with the domain as its dictionary
+(the dog's eleven verbs are one domain's; the kitchen's are reset, explain,
+escalate, later its moves). They reach the orchestrator as one line in the
+domains block and one alternative in the `domain ::=` grammar, never as a
+schema. E10 D (16/16 on the verb) says E2B can pick the domain and the
+verb from such lines; E10 says it must not be given the declarations.
+
+**3. In which context an intent executes, and why it matters.** A usage
+intent (`call(domain, verb, args)`) is issued in the orchestrator context,
+checked and consumed exactly once by the runtime, and its outcome returns
+by id into the journal. It never executes in a strip: the strip's verbs
+are reads and forked simulations, with no port behind them, so nothing
+the strip does needs the exactly-once check. It matters for three reasons:
+legality and exactly-once are the certified side's and live in one place;
+the outcome's identity (the id) is what prevents cross-wiring (E10 F); and
+the person hears the outcome from the orchestrator's narration (E8's
+narrator over the script), never from a strip transcript.
+
+**4. The orchestrator as the manager of domain agents.** The subject
+pattern, with the small model's limits respected:
+
+| subjects | the orchestrator |
+|---|---|
+| propose + admit | `activate(domain)` |
+| the brief | `consult(domain, question, max_calls)` |
+| the implementer's transcript | the strip; stays with the strip |
+| the report | one response by id: a sentence, the named cause or event, the missing resource if any, the numbers copied |
+| review | shape-checked by the harness with E8's rules (numbers copied never invented, names as the catalog gives them); the model never reviews content |
+| the human gate | `ask(person)` when the answer names a resource missing in the world |
+
+Where the analogy stops: the manager here is E2B. Management is a fixed
+protocol over a handful of verbs chosen by classifying the signal, not a
+dialog. The orchestrator decides what to do next; it never reasons about
+why. Decide (surprise → cards → explain/reset/escalate) is the first
+`consult` we built; the strip generalises it to any refusal or failure.
+
+**Error handling is the orchestrator's main job.** The loop, harness-owned
+because E10 C/D showed the model will not steer by itself:
+
+```
+refused(reason, alternatives) / failed / surprise
+  ├─ alternatives given      → call one of them (J)                  [E10 D steers 3/4 with a cue]
+  ├─ none                    → consult(domain, "why <reason>?")       [strip: why, state, events; what-if only in a fork]
+  │     ├─ names a sibling card's move   → explain(card, move)        [Decide]
+  │     ├─ names a resource missing in the world → ask(person)
+  │     ├─ a one-off reading             → reset
+  │     └─ else                          → escalate(text)             [the revision loop, offline]
+  └─ the same refusal again  → ask(person) or escalate                [the repeat guard, §7a, every seat]
+```
+
+The response of a consult carries a `kind` from that list, so the
+orchestrator's next move is a classification over four values, which is
+within what E2B did on E10 D.
+
+**What E2B is not given.** Formalization (the loop's road, a large model,
+gated); narrating a strip's transcript (templated, or the E8 narrator);
+reviewing an answer's content; joint reasoning over two domains (one strip
+per question; the mirror says which domain the question is about); a long
+strip (the strip is per question; the journal keeps its one-line result).
+
+**Why this resolves J versus T.** T where the partner is the kernel and
+every call is synchronous; J where the partner is the world and outcomes
+arrive later. E9/E10 ruled J for the executive and SPECIALIST §3 keeps T
+for the specialist; this section gives each its context.
+
+**To measure before building (in this order).**
+1. S1 reads 1–2: does E2B reach the instrument and read it faithfully
+   inside a strip, and at how many calls? Sets `max_calls` and says whether
+   the strip runs on E2B or needs E4B.
+2. A consult corpus in E10's shape: refusal → consult → next move, scored on
+   the orchestrator's classification (the four kinds) and on `ask` when a
+   resource is missing. E10's groups C and D, reframed as harness-owned.
+3. The consult response shape, frozen before 2: sentence, kind, cause
+   event or resource, numbers.
+4. One model resident: E2B (2.1 GB) beside the service fits; E4B (5.5 GB)
+   does not fit beside it (SPECIALIST §7). If S1 needs E4B in the strip,
+   that is a serving decision (a window, or a smaller service), not a
+   context decision.
