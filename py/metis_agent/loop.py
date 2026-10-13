@@ -38,12 +38,24 @@ PERSONAS = {"a": PERSONA_A, "b": PERSONA_B, "c": PERSONA_B}
 REFUSAL = re.compile(r"^(refused|error:|usage:|no enabled candidate|nothing to|not forked|.* was never produced|fork K needs)")
 
 
+# the calls that change the session: a read-out after one is a fresh read
+CHANGES = {"run", "step", "do", "fork", "back", "undo"}
+
+
+def changed(calls):
+    """Did any of these calls change the session (a changing verb the kernel
+    did not refuse)?"""
+    return any(c["verb"] in CHANGES and not REFUSAL.match(c["output"]) for c in calls)
+
+
 def guard(calls, verb, arg):
-    """The repeat guard (§7, loop infrastructure, every seat): the same call
-    with the same argument again, or the refused verb called again right
-    after its refusal → the note naming the earlier call and its result."""
+    """The repeat guard (§7, §7a; loop infrastructure, every seat): the same
+    call with the same argument again with no session change since (the
+    earlier call included: a second `step` steps again), or the refused verb
+    called again right after its refusal → the note naming the earlier call
+    and its result."""
     for i, c in enumerate(calls, 1):
-        same = (c["verb"], c["arg"]) == (verb, arg)
+        same = (c["verb"], c["arg"]) == (verb, arg) and not changed(calls[i - 1:])
         again = i == len(calls) and c["verb"] == verb and REFUSAL.match(c["output"])
         if same or again:
             first = c["output"].splitlines()[0] if c["output"] else ""

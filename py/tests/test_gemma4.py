@@ -52,6 +52,26 @@ def test_repeat_guard():
     assert guard(calls, "step", "2") == ""         # not right after the refusal any more
 
 
+def test_repeat_guard_resets_on_session_change():
+    """§7a: a read-out after the session changed is a fresh read."""
+    from metis_agent.loop import guard
+    calls = [{"verb": "events", "arg": "", "output": "  1. row[A=near,B=far]  w=1  p=0.25"},
+             {"verb": "step", "arg": "carry[A=near,X=cabbage,B=far]", "output": "fired: carry[A=near,X=cabbage,B=far]"}]
+    assert guard(calls, "events", "") == ""        # the what-if transcript's misfire (step 2a)
+    calls.append({"verb": "state", "arg": "", "output": "stage ferry"})
+    assert guard(calls, "state", "")               # nothing changed since
+    calls.append({"verb": "step", "arg": "", "output": "fired: tide"})
+    assert guard(calls, "step", "") == ""          # the earlier step changed the session itself
+    assert guard(calls, "state", "") == ""
+    for verb in ("run", "do", "fork", "back", "undo"):
+        assert guard(calls[:1] + [{"verb": verb, "arg": "", "output": "ok"}], "events", "") == ""
+    # a refused session-changing call changed nothing: the re-read is a repeat
+    calls = [{"verb": "state", "arg": "", "output": "stage ferry"},
+             {"verb": "step", "arg": "carry[X=a]", "output": "no enabled candidate 'carry[X=a]' — 'events' lists 1..4"},
+             {"verb": "events", "arg": "", "output": "  1. row"}]
+    assert guard(calls, "state", "").startswith("note: call 1 was state")
+
+
 def test_graph_never_writes():
     k = Kernel(str(WGC))
     assert k.run("graph", "x.dot").startswith("refused")
