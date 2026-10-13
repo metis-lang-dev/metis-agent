@@ -537,3 +537,38 @@ Consequences:
   which is the dog today. To measure, after the consult corpus: the
   routing pass on E2B (domain picked from lines, E10 D's 16/16 is the
   prior) and the added latency.
+
+#### The domain strip, reconciled with the narrator (architect, 2026-10-13; the user's clarification)
+
+The strip was first the per-domain narrator of RAG §11–12: one context per
+domain whose prefix holds the domain's script, the catalog's `%%` comments
+handed over once at attach and resident (E8's flat retrieval won: 36 tokens
+a fragment against 903 for a system turn that repeats it), and which turns
+each runtime fragment into one sentence the orchestrator receives as a
+form (R, N, R+N). That stays, and it is the same object as the strip
+above. What is added is not a second context but two more things the same
+primed prefix is used for:
+
+| mode | in | out | format | since |
+|---|---|---|---|---|
+| narrate | a fragment: `{path, seq, beat, kind, ref, counts}` | one sentence, the agent's `said` | single pass, think off | E8 |
+| map | the person's words, routed here by the orchestrator | the domain's typed intent | J under the domain's grammar | this section |
+| consult | a question from the orchestrator's error loop | one typed response (kind, text, cause or resource) | T, the REPL verbs, capped | this section |
+
+The RAG twist is unchanged and is the reason the strip exists: the domain's
+LLP is encoded once, in the strip's prefix, and never in the orchestrator's.
+With `dog.llp` (metis-catalog `domains/dog`) the dog's narration source
+becomes its catalog's comments too, as the kitchen's already is: the rule
+that fired is the sentence ("I can't go there: the way to it is closed"),
+and the event's bindings carry the command's identity, which closes E10's
+read-4 finding without a cue fix.
+
+One prefix or two per domain is a measurement, not a principle: the
+narrator's prefix is the script (the dog: 56 rules, ≈ 1.5 k tokens); the
+mapper's is the dictionary with its examples (the dog prompt: 2.8 k with
+40 examples, E9 showed the examples are needed); the consult's is the 16
+declarations (≈ 1 k). Together ≈ 5 k, which is what E10 said E2B pays for.
+So the default is two primed prefixes per domain, the narrator's and the
+agent's (map + consult, sharing the ctx band), each a KV swap, and S1 plus
+the routing corpus say whether they can be one. Either way nothing of it
+enters the orchestrator's 3 k.
