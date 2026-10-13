@@ -177,8 +177,17 @@ func main() {
 	toolsRTStatus := flag.String("tools-rt-status", "accepted", "E9: T-rt's result turn, {status:<this>}")
 	toolsGbnf := flag.String("tools-gbnf", "grammar/dog-tools.gbnf", "E9: the call grammar (tools/e9-tools.py)")
 	toolsReps := flag.Int("tools-reps", 5, "E9: pass-2 repeats per row and mode")
+	e10F := flag.String("e10", "", "E10 corpus (tools/e10-corpus.py): the executive's IO round-trip, J-text vs T-api, over scripted dialogs; seeds from -pass2_seed")
+	e10Arms := flag.String("e10-arms", "", "E10: only these arms (J-text,T-api; empty = all)")
+	e10Groups := flag.String("e10-groups", "", "E10: only these groups (A–F; empty = all)")
+	e10IDs := flag.String("e10-ids", "", "E10: only these item ids")
+	e10Dump := flag.String("e10-dump", "", "E10: write the decide seat rendered from -e8-cards (e10-decider.txt/.gbnf) into this directory and exit")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
 	flag.Parse()
+	if *e10Dump != "" {
+		dumpE10(*e8Cards, *e10Dump)
+		return
+	}
 	if *model == "" {
 		fail(fmt.Errorf("-model is required"))
 	}
@@ -227,7 +236,7 @@ func main() {
 	for _, u := range flag.Args() {
 		rows = append(rows, row{utt: u})
 	}
-	if len(rows) == 0 && *eventsF == "" && *spliceF == "" && *e8F == "" && *capF == "" {
+	if len(rows) == 0 && *eventsF == "" && *spliceF == "" && *e8F == "" && *capF == "" && *e10F == "" {
 		fail(fmt.Errorf("nothing to run: -corpus, -audio, -events or utterances"))
 	}
 	// a held-out row the prompt now teaches verbatim is no longer held out
@@ -296,6 +305,10 @@ func main() {
 			fail(fmt.Errorf("-tools needs -corpus"))
 		}
 		runTools(l, rows, *toolsF, *toolsJPrompt, *gbnfF, *toolsTPrompt, *toolsNoex, *toolsRT, *toolsGbnf, *toolsRTStatus, *tag, *toolsReps, uint32(*seed), emit)
+		return
+	}
+	if *e10F != "" {
+		runE10(l, *e10F, *e10Arms, *e10Groups, *e10IDs, *tag, uint32(*seed), emit)
 		return
 	}
 	if *capF != "" {

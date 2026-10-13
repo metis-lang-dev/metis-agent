@@ -1,0 +1,4 @@
+root ::= "{\"call\":\"" call "}"
+call ::= verb "\",\"domain\":\"" domain "\"" | "keep\""
+verb ::= "activate" | "deactivate"
+domain ::= "kitchen" | "nav" | "xtraffic" | "sysadmin" | "social" | "votes"

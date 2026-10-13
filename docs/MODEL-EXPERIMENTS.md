@@ -767,3 +767,62 @@ recorded here.
 -e10` (the two arms over the scripted dialogs, responses injected by the
 bench), `results/e10/`, the table with the five reads here. Opus
 implements; the architect rules.
+
+### E10 run (opus, 2026-10-13)
+
+**Setup.** E2B Q4, on CPU: ngl 0, 4 threads, nice 10, n_ctx 8192. Latency is not a criterion, so no GPU window was needed. The pass-2 seed is 1 + rep. The run took 23 min for 282 items and 1434 generations (`results/e10/run1.jsonl`, scored in `run1-score.md`).
+
+Each arm has one prompt:
+- **J-text:** the dog prompt, pass 2, the IO convention, outcome examples, the decider as text, and the domains section. 2803 prefix tokens.
+- **T-api:** E9's round-trip prompt, the IO convention, the examples by id, and every declaration (dog, decider, E4 activation). 5165 prefix tokens.
+
+`kernel.NewDecider` renders the decider from the kitchen cards (`llmbench -e10-dump`).
+
+**Deviations from the spec, all bench-side:**
+- **J's decide and activate.** These are a new `{"call":…}` JSON under a grammar (`grammar/e10-{decide,activate}-j.gbnf`). Today they exist only as the decide seat's own call.
+- **Outcomes.** All four outcomes go through the model in both arms. Today's harness narrates only failed/refused through the model, and done/expired come from templates.
+- **The "question to the person" in C/D.** There is no ask verb, so this is a "?" in the speech.
+- **C and E's refused second proposal.** The gold explain call is injected, so both arms answer the same refusal.
+- **F's J outcome.** It is the harness's cue with its command phrase ("go to the tag"). There are three same-kind pairs among the ten.
+
+**Results:**
+
+| read | J-text | T-api | margin (T − J) |
+|---|---|---|---|
+| 1 A: class / args | 54/54 / 54/54 | 52/54 / 49/54 | — |
+| 1 A: leaks / claims (270 lines) | 0 / 0 | 3 / 4 | — |
+| 2 B async outcome | 40/48 | 36/48 | −4 (J wins) |
+| 2 C refusal steers | 0/12 | 0/12 | 0 |
+| 2 E surprise → decide | 0/3 | 0/3 | 0 |
+| 3 D load / unload | 15/16 | 12/16 | −3 |
+| 4 F interleaving | 4/10, 1 cross-wired | 9/10, 0 cross-wired | +5 |
+| tokens in context at the answer | ~2.8–3.0 k | ~5.2–5.4 k | |
+
+**Reads.**
+1. **T-api is not admissible.** It fails on all three counts:
+   - **Class 52/54.** "roll over" and "play dead" (held-out) became LOCAL_ACTION LIE_DOWN. E9 saw this already: T-rt's own prompt dropped "play dead". The extra 1.7 k tokens of IO, decider and domain declarations push it to two rows.
+   - **Leaks: 3, on one row.** "The date today is [current date]." This is the same placeholder as E9's T-rewind.
+   - **Completion claims: 4/5 seeds of "what is next to the table".** The line was "I found what is next to the table." against `{status:accepted}`, as with E9's fair T-rt.
+   - **Arguments 49/54.** These add E9's two constraint misses (the goal repeated as a NEXT_TO/NEAR reference, and "thing" near the window).
+
+   J-text holds 54/54 / 54/54 with 0 leaks and 0 claims.
+2. **B, C and E: no T win.** J wins B by 4.
+   - In B, T is weaker on progress (6/12 against 10/12). Its progress lines name a motion ("My legs are extending.") but not the command.
+   - C and E are 0 on both arms, for reasons that are not format:
+     - **C.** After a refused explain, neither arm steers in any of 24 items. Both state the refusal to the person ("I can't explain that: no onion in the dispenser.") and stop. No question, no other call.
+     - **E.** Both arms make exactly one explain call to admission on every seed. Both make an escalate after the refused explain on every seed. Neither narrates the admission notice ("kitchen_shared (partner_load) explained it 3 orders running") on any seed. They say "I explained the reading." / "The surprise is closed." instead.
+3. **D: T-api is below J-text, 12/16 against 15/16.** Both pick the right verb on all 16. After a refused activation, J proposes something else on 3/4 and T on 0/4. T explains the refusal and stops. E4's prediction (T ≥ J) does not hold here.
+4. **F: J-text cross-wires once, and T-api is clean.**
+   - **J's miss is F10.** There were two NAVIGATE TAG commands (five, then three). The outcome for the second ("Your command to go to the tag succeeded") was narrated as "I reached tag five."
+   - **This is read 4's design fault.** J's outcome cue carries the command kind, not its identity. The harness's `commandPhrase` drops the tag id and the target.
+   - **T carries the id.** It names the right command on 9/10, and its one miss is F09, which names neither command.
+   - **J also echoes the signal fragment.** It did so on 8/10 signal turns (the bracketed report text or the ⟪metis…⟫ line). T, whose signals arrive as context, did not.
+5. **Thinking: not run.** Read 2 is a tie on C and E. But read 1 already rules T out, and C and E are 0 on both arms for the same reason (no steering, no notice). A 256-token thinking pass on 12 + 3 items cannot change the decision. It can run on request.
+
+**Under the decision rule.** Read 1 fails for T-api, and T-api wins none of B, C, E. It loses B by the margin. **J-text stays, and responses stay text.**
+
+**Findings to act on, format-independent:**
+- **J's outcome cue needs the command's identity.** The fix is in `commandPhrase`: tag id, target, room. With it, F's one cross-wire and its five "outcome does not name its command" misses become testable again.
+- **J narrates signals by echoing them.** The signal cue's bracketed instruction leaks into speech on 8/10. The cue wants the E8 narrator's framing, or the sanitizer has to strip it.
+- **After a refusal, the model reports and stops (C 0/24, D-T 0/4).** Steering cannot be left to the executive's next turn. The harness owns it: the repeat guard plus an explicit "propose something else or ask" cue, or the decider's escalate as the default after a refused explain.
+- **The admission notice is never narrated (E 0/6).** If the notice matters to the person, it needs its own templated line, not the model's paraphrase.

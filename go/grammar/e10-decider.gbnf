@@ -1,0 +1,5 @@
+root ::= "<|tool_call>call:" call "<tool_call|>"
+call ::= "reset{}" | escalate | explain
+escalate ::= "escalate{text:<|\"|>" text "<|\"|>}"
+text ::= [a-zA-Z0-9 ,.;:'()+-]{8,200}
+explain ::= "explain{card:<|\"|>kitchen_shared<|\"|>,move:<|\"|>partner_load<|\"|>}"

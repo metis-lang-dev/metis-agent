@@ -1,0 +1,3 @@
+root ::= "{\"call\":\"" call
+call ::= "reset\"}" | "explain\",\"card\":\"kitchen_shared\",\"move\":\"partner_load\"}" | "escalate\",\"text\":\"" text "\"}"
+text ::= [a-zA-Z0-9 ,.;:'()+-]{8,200}
