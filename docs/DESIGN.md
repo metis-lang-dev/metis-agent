@@ -1,11 +1,12 @@
 # metis-agent: a small LLM supervising a certified runtime
 
-Oct 10, 2026 · v2 (architect) — rewrite of `System design.md`
+Oct 13, 2026 · v3 (architect, with the user) — the agentic model: two agents and one kernel, their interfaces, and the single-model optimization kept apart. v2 (Oct 10) rewrote `System design.md`
 (@Chief's seed, kept beside this file as the source), verified
 against metis as it stands (metispy e375d9c, metis-lang 8bbfd9d,
 metis-loop 50e709c). Companion: `runtime-answers.md` answers the
 seed's open questions mechanism by mechanism; this document folds
 the answers in and marks every part EXISTS or GAP.
+
 
 ## Vocabulary (replaces the fast/slow framing)
 
@@ -27,6 +28,7 @@ Improvements ship as catalog changes through the revision loop,
 never as weights. A deployed device gets smarter without retraining
 its model.
 
+
 ## Roles
 
 | Concern | Owner | The LLM's part |
@@ -34,49 +36,247 @@ its model.
 | State over a long run | Runtime | Reads a mirror of it |
 | Step-by-step procedure | Domain rules | Picks which domain applies |
 | Uncertainty | Runtime, exact inference | Puts the result into words |
-| Safety and legality | Orchestrator; observe-only on surprise | None; cannot override |
+| Safety and legality | Orchestrator agent; observe-only on surprise | None; cannot override |
 | When to think | Orchestrator signals | Wakes when signalled |
 | Changing the rules | Revision loop, offline, human-approved | Describes what went wrong |
-| Language and intent | LLM | One typed intent per request |
-| Judging a surprise | LLM proposes, runtime checks | Suggests which domain explains it |
+| Language and intent | Orchestrator agent | One typed intent per request |
+| Understanding a domain | Domain agent | Narrates it; answers questions about it |
+| Judging a surprise | Domain agent proposes, runtime checks | Suggests which card explains it |
+| The dialog with the person | Orchestrator agent | Speaks; asks; keeps the floor |
 
-## Architecture
+## Architecture: two agents and one kernel
+
+The design is stated for **two agents on two models**. That is the
+architecture. Running both on one small model with context switching is an
+optimization, described apart (below, "Running it on one small model"), and
+it changes none of the interfaces here.
 
 ```mermaid
-flowchart TB
-    subgraph LLM["LLM — small and local (proposing side)"]
-        N["Narrate<br/>single pass, read-only"]
-        D["Decide<br/>thinking on: requests and signals → intents"]
+flowchart LR
+    P["the person<br/>voice · text"]
+    subgraph O["ORCHESTRATOR AGENT (one per device)"]
+        OL["LLM: dialog, routing,<br/>typed intents, next move"]
+        OC["context: mirror · journal by id · inbox"]
     end
-    CF["Context file<br/>tree mirror + journal"]
-    ORCH["Orchestrator<br/>linear; routes signals up,<br/>checks and consumes intents exactly once"]
-    subgraph RT["Runtime (metis) — certified side: domain tree"]
-        AO["Always-on<br/>state and safety"]
-        TK["Task<br/>the current work"]
-        OD["On-demand<br/>added by intent"]
-        SD["Sub-domain<br/>to any depth"]
-        OD --- SD
+    subgraph D["DOMAIN AGENT (one per loaded domain)"]
+        DL["LLM: narrate · consult"]
+        DM["mapper: intent → atom (table)"]
+        DR["replier: signal → generic reply (table)"]
+        RT["metis runtime (certified):<br/>catalog · state · legality · exactly once"]
+        HP["host / port plugin:<br/>tick (inputs) · on_event (actuation)"]
     end
-    CAT["Catalog<br/>certified domains and<br/>certified tree configurations"]
-    REV["Revision loop<br/>surprise records in,<br/>catalog changes out;<br/>offline, human-approved"]
-    HOST["Host, through ports<br/>robot · appliance · cloud-agent tools"]
-
-    ORCH -- "events · surprise · quiescence" --> LLM
-    LLM -- "intents" --> ORCH
-    ORCH -- "mirrors the tree" --> CF
-    CF <--> LLM
-    ORCH --- RT
-    CAT --> RT
-    RT -- "surprise records (+ LLM description)" --> REV
-    REV -- "updates" --> CAT
-    RT <-- "ports: inputs and actions" --> HOST
+    W["the world"]
+    P <--> OL
+    OL -- "intent interface (J, async)" --> DM
+    OL -- "REPL API (T, sync tools)" --> DL
+    DR -- "generic reply JSON" --> OC
+    DL -- "sentence (N form)" --> OC
+    DM --> RT
+    DL <--> RT
+    RT <--> HP
+    HP <--> W
 ```
 
-The LLM wakes only on orchestrator signals; the runtime never waits
-for it. Signals climb the tree and each level may handle them — only
-what the orchestrator cannot handle wakes the model. Intents are the
-model's sole way to act; each is consumed exactly once or rejected
-with a reason.
+One kernel serves both: the runtime inside every domain agent is the same
+certified interpreter; the orchestrator never touches it directly. The line
+between the two agents is drawn by **who has to understand the domain**:
+atoms, events, bindings and ports are the domain agent's; the orchestrator
+knows a domain by its capability line, its verb list and its mirror line.
+
+### The orchestrator agent
+
+**Role.** The person's counterpart and the manager of the domain agents,
+the way an architect manages implementers over subjects: it briefs, it
+reads reports, it decides the next move, it asks the person when the world
+lacks something. It never reasons about why a domain did what it did; it
+asks the domain agent.
+
+**Context** (CML regions, ordered stable → volatile for the KV):
+
+| region | holds | written by |
+|---|---|---|
+| stable prefix | persona; the two interfaces below; the next-move table; the journal rules | harness, per deployment |
+| domains block | per loaded domain: one capability line (display name, path, what it is for) and its verb list with argument shapes — never a nested schema | harness, at load/unload |
+| journal | the person's requests; intents with their ids and outcomes; consult answers; surprises and how they ended | the model appends, compacts the CML way |
+| mirror | one line per loaded domain: stage, task in flight, surprise state, declared beliefs (`#query`) | harness, from signals, overwritten in place |
+| inbox | the waking item: the person's words, or one generic reply | harness, one wake |
+
+**System prompt** — six parts, all domain-independent:
+
+1. the persona and the floor rules (one voice; progress waits; a surprise or
+   a refusal cuts);
+2. **the intent interface**: how to write one typed intent
+   `{"id", "domain", "verb", "args"}`; the `domain` is one of the loaded
+   domains, the `verb` one of its list; an intent is accepted now and
+   answered later by id; an acceptance is never completion;
+3. **the REPL API**: the tool calls it may make on a domain agent directly
+   (below) and when: to load or unload a domain, to read it, to consult it
+   after a refusal or a surprise;
+4. **the generic reply**: the one JSON shape every domain agent answers in
+   (below), and the **next-move table** over its `kind`;
+5. the person: `ask(question)`; the answer returns bound to the question's
+   id; what to say after each kind of reply, in the person's words, numbers
+   copied never invented;
+6. what it never does: no atoms, no ports, no REPL writes, no formalizing,
+   no judging a domain's content, no retry of a refused call.
+
+**Out, two interfaces, no overlap.**
+
+| | the intent interface | the REPL API |
+|---|---|---|
+| shape | J: one JSON intent under the grammar built from the loaded verb lists | T: native tool calls, synchronous, one per turn |
+| changes the world | yes: `call(domain, verb, args)`; the domain agent maps it to an atom, the runtime fires it under legality, the port actuates | no: it manages and reads |
+| answered | later, by id: `accepted` now; `done` · `refused(reason, alternatives)` · `expired` · `progress` as they happen | now, in the tool response |
+| verbs | the domain's dictionary (the dog: its eleven; the kitchen: its moves) | `activate(domain, bindings)`, `deactivate(domain)`; `state(domain)`, `ctx(domain)`, `events(domain)`, `why(domain, atom)`, `findings(domain)`; `consult(domain, question, max_calls)`; the surprise verbs `reset(domain, record)`, `explain(domain, record, card, move)`, `escalate(domain, record, text)` |
+| the person | — | `ask(question)` is the orchestrator's own, as are `stop` and `cancel`, which fire on the keyword path before any model |
+
+The world is changed only through intents, which are linear and checked;
+everything synchronous and read-only or administrative is the REPL API.
+After experience with both, a function may move from one side to the other
+(a domain's `stop` could become API; a domain's `activate` could become an
+intent of an always-on domain); the two sides keep their semantics.
+
+**In: the generic reply.** One shape, domain-independent, from every domain
+agent, for every kind:
+
+```json
+{"domain": "dog", "kind": "result", "id": "c17", "status": "refused",
+ "reason": "the way to it is closed", "alternatives": ["door", "tag3"],
+ "ref": {"seq": 4, "beat": 3, "event": "go_closed[P=kitchen]"},
+ "text": "I can't go to the kitchen: the way to it is closed."}
+```
+
+| kind | when | fields beyond domain/ref/text |
+|---|---|---|
+| `result` | an intent's outcome, by id | `id`, `status` (accepted · admitted · admitted+notice · applied · done · refused · expired · progress · failed), `reason`, `alternatives` |
+| `event` | progress the domain reports unasked | `counts` (the mirror's numbers) |
+| `quiescence` | nothing left the domain can do | `goal_pending` |
+| `surprise` | a zero-probability reading; the domain is observe-only | `record`, `difference`, `cards` (what could explain it) |
+| `notice` | an admission, an explanation adopted | `record`, `card`, `move` |
+| `error` | the agent itself failed (host down, mapper has no row, budget spent) | `error` |
+| `consult` | the answer to a consult | `answer_kind` (explains · missing · noise · unexplained), `cause {card, move}` or `resource {atom, words}`, `calls` |
+
+`text` is the domain agent's sentence (the N form of RAG §11); `ref` and
+`counts` are the R form. The orchestrator speaks from `text`, decides from
+`kind` and `status`, and never parses the domain's atoms.
+
+**The next-move table** (the error loop; the model classifies, the harness
+owns the steering):
+
+```
+result.refused with alternatives → intent on one of them
+result.refused / failed, none   → REPL consult(domain, "why <reason>?")
+consult.explains                → REPL explain(domain, record, card, move)
+consult.missing                 → ask(person): the resource in the person's words
+consult.noise                   → REPL reset(domain, record)
+consult.unexplained             → REPL escalate(domain, record, text)
+surprise                        → REPL consult(domain, …) with its cards   (Decide, today)
+the same refusal again          → ask(person) or escalate; never the same call   (the repeat guard)
+```
+
+### The domain agent
+
+**Role.** The one party that understands its domain: it narrates what the
+runtime did, answers questions about it through the REPL, carries the
+orchestrator's intents into the runtime as atoms, and reports everything
+back in the generic reply. One domain agent per loaded domain, around one
+runtime serving one catalog, on one host.
+
+**Components.** Two are model work; three are tables and code:
+
+| component | what it does | model? |
+|---|---|---|
+| narrator | a runtime fragment → one sentence in the person's words, read against the catalog's `%%` comments (E8: the flat script RAG, resident) | yes, single pass, thinking off |
+| consultant | a question → a capped loop of REPL verbs (state, events, why, findings; fork/do/back for a what-if) → one typed answer (SPECIALIST.md: this is the specialist) | yes, T, synchronous |
+| mapper | the intent JSON → one command atom from the card's table (`NAVIGATE goal=tag3` → `+cmd_go(tag3)`, dog.llp); open-vocabulary targets resolve to handles in the host's perception table | **no**: a table, token-exact |
+| replier | a runtime signal or an intent's outcome → the generic reply, `text` from the narrator | **no**: a table over the wire's signals |
+| host | the port plugin: `tick` brings inputs as exogenous rows, `on_event` actuates | no: the catalog author's code |
+
+**System prompt of the domain agent's LLM** — four parts, the first two
+domain-independent, the last two generated from the catalog at load:
+
+1. the narration doctrine: what a script entry is and how to read a
+   fragment against it (the comment is what the move means, the premises
+   what it needs, the effects what it leaves, the counts the state after
+   it); one sentence; the agent by its display name; never a number the
+   fragment does not carry;
+2. the consult protocol: the REPL verbs as tools, the repeat guard's note,
+   the typed answer shape; it reads and simulates in a fork and never
+   writes the live session;
+3. **the script**: the catalog's cards and `%%` comments, resident once
+   (the LLP encoded once here and never in the orchestrator — the RAG
+   twist that made the strip);
+4. the ctx band: the mirror of its own runtime (catalog, stage, beat,
+   status, tokens).
+
+It never holds: the person's dialog, other domains, the intent schema (the
+mapper's), ports, the orchestrator's next-move table.
+
+### Who understands what
+
+| layer | knows | never sees |
+|---|---|---|
+| orchestrator agent | capability lines, verb lists, mirror lines, the journal by id, the person | atoms, events, schemas, ports, any domain's transcript |
+| domain agent LLM | the script, the ctx band, the REPL verbs | ports, other domains, the person's dialog |
+| mapper and replier | the card's tables, the wire's signals | the model's text |
+| runtime | the catalog, the state, legality | the person's words |
+| host | real values and time behind the atoms | the LLM |
+
+### The flow of one request
+
+```
+person: "go to the kitchen"
+  orchestrator → intent {"id":"c17","domain":"dog","verb":"NAVIGATE","args":{"goal":"kitchen"}}
+  mapper       → +cmd_go(kitchen)   (the host's tick asserts it as an [env] row)
+  runtime      → go_closed[P=kitchen] fires (the only enabled rule: closed(kitchen) holds)
+  replier      → {"kind":"result","id":"c17","status":"refused","reason":"the way to it is closed", "text": …}
+  orchestrator → no alternatives → REPL consult(dog, "why is the way closed?")
+  consultant   → why refused(go) → closed(kitchen) → {"answer_kind":"missing","resource":{"atom":"closed(kitchen)","words":"the kitchen door"}}
+  orchestrator → ask(person, "The kitchen door is closed. Should I wait, or go somewhere else?")
+```
+
+### Running it on one small model (optimization, not architecture)
+
+On a device with one E2B and one small GPU both agents share the weights.
+Nothing above changes; what changes is how the contexts are served:
+
+- each agent's prefix is primed once and kept as a KV; a turn is a swap
+  to that KV, never a reload; a domain agent has two primed prefixes
+  (the narrator's script; the consultant's declarations with the ctx
+  band) or one, which S1 and E12 decide;
+- the orchestrator's prefix stays near 3 k: verb lists, no nested schema
+  (E10: 2.4 k of declarations cost two held-out rows), and the examples
+  the small model needs (E9) come by retrieval, the k nearest to the
+  utterance inlined at distance zero (E6: used 0.92) — if that holds
+  parity, the intent is one pass; otherwise the domain pick swaps to the
+  domain's primed mapper prefix (E12 decides);
+- one model resident: E2B fits beside the service, E4B does not
+  (SPECIALIST §7); if a consult needs E4B that is a serving window, not a
+  context decision;
+- the formats were chosen by fit, not by size: J where the partner is the
+  world and outcomes arrive later (E9/E10: the tool_response turn invited
+  completion claims), T where the partner is the kernel and every call
+  answers now.
+
+### Open, to be settled by experience
+
+- which functions move between the intent interface and the REPL API;
+- whether the surprise verbs (reset, explain, escalate) stay on the API
+  side or become the consult's own ending;
+- one or two primed prefixes per domain agent;
+- the dialog-control corpus after E12: two domains with live tasks, the
+  person interjecting, an `ask` and its answer, a signal mid-task; scored
+  on ids kept straight, the floor honoured, the answer bound to its
+  question, zero signals read as commands.
+
+### How this section came to be (2026-10-13, the record is in git)
+
+The executive's IO refined (c6ca614; tested by E10, ruled J-text 88a5552);
+domain usage vs management, the line (2dfa37a); the direction of the intent
+schema (4b07570); the strip reconciled with the narrator (3b4c85b); one pass
+and who holds what (b2ed7a6); this consolidation. Experiments: E4, E9, E10,
+E10b in MODEL-EXPERIMENTS.md; the specialist in SPECIALIST.md; the dog as a
+domain in metis-catalog `domains/dog`.
 
 ## One shape, three hosts
 
@@ -92,35 +292,6 @@ with a reason.
 The cloud-agent column is the general case: the small model stops
 being the agent and supervises one.
 
-## Orchestrator contract
-
-Three signals up, each carrying the raising domain's path; any
-ancestor may handle first:
-
-| Signal | Meaning | LLM mode |
-| --- | --- | --- |
-| Event | Progress or a belief change | Narrate |
-| Quiescence | Nothing left the domain can do | Decide, if a goal is pending |
-| Surprise | Zero-probability observation; system now observe-only | Decide |
-
-Intents down (starting vocabulary; the orchestrator's signature is
-the authority): `activate(domain, bindings)`, `deactivate(domain)`,
-`reset(domain)`, `resume(domain)`, `ask(question)`,
-`escalate(record)`.
-
-Four rules for any implementation: **typed** (decoded under a
-grammar built from the signature), **exactly once** (consumed by one
-rule or rejected with a reason that returns as a signal), **checked**
-(legality and cost at the orchestrator; an activation is admitted
-only if the resulting tree is a certified configuration), **no
-deadlines** (a slow or absent model leaves the system observe-only;
-safety never depends on a reply).
-
-A metis orchestrator gives exactly-once natively (an intent is a
-linear resource) and keeps the LLM-facing surface inside the
-certified part. The proven shape exists today: the loop console's
-`run_intent` whitelist — one verb set, every call admitted or
-refused with a reason, no backdoors. **EXISTS (as pattern).**
 
 ## The three cases, verified
 
@@ -166,43 +337,6 @@ Soft surprise: the kernel already grades records `unmodeled`
 default 0.05 — per-domain knob on the card decides wake vs log).
 **EXISTS.**
 
-## Context file
-
-| Region (in order) | Holds | Written by | Lifetime |
-| --- | --- | --- | --- |
-| Stable prefix | Role, intent grammar, journal rules | Harness | Per deployment |
-| Catalog cards | Domains attachable to the current tree | Harness | On tree change |
-| Journal | Requests, intents + results, surprises + outcomes | LLM appends and compacts | Rolling |
-| Tree mirror | One line per active domain: stage, surprise state, declared beliefs | Harness, from signals | Overwritten in place |
-| Inbox | The waking signal or request | Orchestrator or user | One wake |
-
-Properties kept from the seed: activation is an edit; size is
-bounded by the tree, not time; depth by path expansion; the
-hierarchy prunes the choices. Ordered stable→volatile for prefix
-caching. The journal is the only model-written region (the CLM
-paper's own 9B results show small models rarely edit unprompted;
-steering by skill document first, training later). The CLM reference
-code is CC BY-NC 4.0 — it stays out of this tree; the harness is
-written fresh.
-
-**Mirror line contents decided:** a domain's declared beliefs are
-its catalog's `#query` directives — the marginals the case already
-watches. No new syntax; the console band (`ctx` wire) renders the
-same material today. **EXISTS (wire); one-line-per-domain renderer
-is a GAP (small).**
-
-## What the small LLM has to do
-
-| Task | Mode | Reads | Writes |
-| --- | --- | --- | --- |
-| Narrate an event | Single pass | One mirror line + the event | A sentence or two |
-| Map a request | Thinking | Request + a short card list | One grammar-constrained intent |
-| Propose explanations | Thinking | Record + expanded path + cards | Up to three intents |
-| Describe for escalation | Single pass | Record + journal | A short paragraph |
-
-Rewriting, classification with slot filling, summarization. No long
-reasoning chains; the model never writes LLP. Candidate weights:
-Qwen3.5-4B, Gemma 4 E4B (one set of weights, thinking toggled).
 
 ## Verification summary: EXISTS vs GAP
 
@@ -321,323 +455,3 @@ narrator and request-mapper only.
   Programs as Measures over Proofs, draft 0.3 (zero probability as
   the surprise signal; admission-time certificates).
 
-## Two application domains (user, 2026-10-13)
-
-The kernel serves two applications with the roles reversed: the
-**executive** (the runtime in charge, the LLM proposes and narrates; the
-robot; `go/`, FRAMEWORK.md) and the **specialist** (the LLM in charge, the
-kernel its instrument through the REPL; `py/`, SPECIALIST.md). They meet in
-the Decide step. The orchestrator contract above is the executive's IO;
-the specialist's tools are the REPL verbs.
-
-### The executive's IO, refined (user + architect, 2026-10-13; tested by E10)
-
-Everything the model does is a **call**; everything it learns is either
-the **response** to its call or a **signal** it did not ask for. That line
-is the one architectural decision.
-
-| direction | item | shape |
-|---|---|---|
-| down | load / unload a domain | `activate(domain, bindings)`, `deactivate(domain)` |
-| down | a predicate from a domain's dictionary | `call(domain, verb, args)`; the verb set per domain from its cards (the dog: the eleven intents; the kitchen: reset, explain(card, move), escalate; later the domain's moves) |
-| down | ask the person | `ask(question)`; the answer returns as the next user turn |
-| down | the safety verbs | `stop`, `cancel`; the keyword path fires STOP before the model too |
-| up | the response to a call, by id | accepted · admitted · admitted+notice · applied · refused(reason, alternatives) · failed; an async command answers twice: accepted now, the outcome later with the same id: done · refused · expired · progress. "Missing ingredients" is a refusal naming the resource the move could not consume |
-| up | the signals, unsolicited, with the domain path | event · reading · quiescence · surprise · consistent · notice · episode_over; they answer no call and are never rendered as responses |
-| at attach | the declaration side | cards, script, mirror fetched and rendered as the model's declarations; load/unload re-renders and re-primes |
-
-Gemma 4 mapping: declarations generated from the cards, one per verb per
-loaded domain; the call pinned by a grammar built from them; the
-`<|tool_response>` turn for responses only; signals stay pushed context
-(the standing region, narration streaming). Spoken line from the call,
-narration from the outcome: the async shape, so an acceptance is never
-read as completion.
-
-**Ruled by E10 (2026-10-13, MODEL-EXPERIMENTS "E10 ruling"): the IO above
-stands; its rendering stays the JSON text in both directions. The
-`<|tool_response>` turn is not adopted for the executive: the model's
-synchronous tool prior reads a response as completion. Native calls are
-the specialist's shape (SPECIALIST.md §3), where every call is synchronous.**
-
-### Domain usage vs domain management: where the line is (architect, 2026-10-13; answers the user; awaits the user's ruling)
-
-The question: how much of the domain work can the main E2B context carry,
-and where does the specialist's work begin. The answer is drawn from what
-the experiments measured, not from preference.
-
-**The constraint is context, then chaining.** E10: 2.4 k tokens of
-declarations in the executive's prefix cost two held-out rows. E6: a fact
-placed inline is used (0.92), the stream does not carry across turns, and
-compaction deletes; standing facts live in the mirror. E10 C/D: after a
-refusal the model reports and stops. Specialist iteration 1: E2B reaches
-`why` once the ctx band shows the atoms, misses the interventions, and
-repeats refused calls. S1 will give the numbers; the shape follows already.
-
-**Two contexts, one model, one protocol each.**
-
-| | the orchestrator context (main) | a domain strip (specialist act) |
-|---|---|---|
-| holds | the person's dialog; the tree mirror, one line per domain; the journal of calls and outcomes by id; the open exception | the domain's ctx band; the REPL declarations (16 verbs, ≈1 k tokens); the question; the calls and outputs |
-| partner | the world, through the runtime: outcomes arrive later | the kernel, synchronous: every call answers now |
-| format | J: the JSON intent under the domains-block grammar (E10) | T: native sync tool calls (SPECIALIST §3) |
-| may | activate/deactivate, call(domain, verb, args), ask(person), consult(domain, question), escalate, reset/resume | read (state, events, ctx, why, findings, narrate user), simulate in a fork (fork, do, step, back, undo), necessity/sufficiency |
-| may not | see a domain's events, traces or REPL output | act on a port, speak to the person, change the tree |
-| lifetime | the session | one question; thrown away after its response |
-| size | ≈3 k tokens, bounded by the tree | ≈2 k + the calls, bounded by the item's max calls |
-
-The strip may read and simulate; only the orchestrator acts and speaks.
-That is the line.
-
-**1. Loading a domain and its strip.** `activate(domain)` is the
-orchestrator's J intent; the runtime admits it only into a certified
-configuration (the contract above). Everything that follows is the
-harness, not the model: prime the domain's REPL, render its ctx band,
-render its declarations, add its mirror line and its line in the domains
-block, re-prime the orchestrator's prefix (the rewind path, FRAMEWORK §4).
-A strip is opened only when a question is asked of the domain, from that
-prepared material; the orchestrator never pays for the strip's prefix.
-
-**2. The domain's intents.** They come with the domain as its dictionary
-(the dog's eleven verbs are one domain's; the kitchen's are reset, explain,
-escalate, later its moves). They reach the orchestrator as one line in the
-domains block and one alternative in the `domain ::=` grammar, never as a
-schema. E10 D (16/16 on the verb) says E2B can pick the domain and the
-verb from such lines; E10 says it must not be given the declarations.
-
-**3. In which context an intent executes, and why it matters.** A usage
-intent (`call(domain, verb, args)`) is issued in the orchestrator context,
-checked and consumed exactly once by the runtime, and its outcome returns
-by id into the journal. It never executes in a strip: the strip's verbs
-are reads and forked simulations, with no port behind them, so nothing
-the strip does needs the exactly-once check. It matters for three reasons:
-legality and exactly-once are the certified side's and live in one place;
-the outcome's identity (the id) is what prevents cross-wiring (E10 F); and
-the person hears the outcome from the orchestrator's narration (E8's
-narrator over the script), never from a strip transcript.
-
-**4. The orchestrator as the manager of domain agents.** The subject
-pattern, with the small model's limits respected:
-
-| subjects | the orchestrator |
-|---|---|
-| propose + admit | `activate(domain)` |
-| the brief | `consult(domain, question, max_calls)` |
-| the implementer's transcript | the strip; stays with the strip |
-| the report | one response by id: a sentence, the named cause or event, the missing resource if any, the numbers copied |
-| review | shape-checked by the harness with E8's rules (numbers copied never invented, names as the catalog gives them); the model never reviews content |
-| the human gate | `ask(person)` when the answer names a resource missing in the world |
-
-Where the analogy stops: the manager here is E2B. Management is a fixed
-protocol over a handful of verbs chosen by classifying the signal, not a
-dialog. The orchestrator decides what to do next; it never reasons about
-why. Decide (surprise → cards → explain/reset/escalate) is the first
-`consult` we built; the strip generalises it to any refusal or failure.
-
-**Error handling is the orchestrator's main job.** The loop, harness-owned
-because E10 C/D showed the model will not steer by itself:
-
-```
-refused(reason, alternatives) / failed / surprise
-  ├─ alternatives given      → call one of them (J)                  [E10 D steers 3/4 with a cue]
-  ├─ none                    → consult(domain, "why <reason>?")       [strip: why, state, events; what-if only in a fork]
-  │     ├─ names a sibling card's move   → explain(card, move)        [Decide]
-  │     ├─ names a resource missing in the world → ask(person)
-  │     ├─ a one-off reading             → reset
-  │     └─ else                          → escalate(text)             [the revision loop, offline]
-  └─ the same refusal again  → ask(person) or escalate                [the repeat guard, §7a, every seat]
-```
-
-The response of a consult carries a `kind` from that list, so the
-orchestrator's next move is a classification over four values, which is
-within what E2B did on E10 D.
-
-**What E2B is not given.** Formalization (the loop's road, a large model,
-gated); narrating a strip's transcript (templated, or the E8 narrator);
-reviewing an answer's content; joint reasoning over two domains (one strip
-per question; the mirror says which domain the question is about); a long
-strip (the strip is per question; the journal keeps its one-line result).
-
-**Why this resolves J versus T.** T where the partner is the kernel and
-every call is synchronous; J where the partner is the world and outcomes
-arrive later. E9/E10 ruled J for the executive and SPECIALIST §3 keeps T
-for the specialist; this section gives each its context.
-
-**To measure before building (in this order).**
-1. S1 reads 1–2: does E2B reach the instrument and read it faithfully
-   inside a strip, and at how many calls? Sets `max_calls` and says whether
-   the strip runs on E2B or needs E4B.
-2. A consult corpus in E10's shape: refusal → consult → next move, scored on
-   the orchestrator's classification (the four kinds) and on `ask` when a
-   resource is missing. E10's groups C and D, reframed as harness-owned.
-3. The consult response shape, frozen before 2: sentence, kind, cause
-   event or resource, numbers.
-4. One model resident: E2B (2.1 GB) beside the service fits; E4B (5.5 GB)
-   does not fit beside it (SPECIALIST §7). If S1 needs E4B in the strip,
-   that is a serving decision (a window, or a smaller service), not a
-   context decision.
-
-#### The direction of the intent schema (architect, 2026-10-13; the user's clarification)
-
-The line is drawn by who has to understand the domain. The orchestrator
-could `do` an event on the REPL or write to a port directly, but both need
-the domain's atoms, events and bindings, and that knowledge is the domain
-agent's, never the small orchestrator model's. So the schema runs
-downward, the opposite of the dog example, where the orchestrator itself
-produced the intent and a dispatcher turned it into a robot command,
-bypassing the runtime:
-
-```
-person's words
-  │  (1) orchestrator, E2B, J: picks the domain from its display lines
-  ▼      call(domain, text) — one linear intent, with its id
-domain agent strip, E2B, the domain's prefix (dictionary + examples + ctx band)
-  │  (2) text → the domain's typed intent, under the domain's grammar (J)
-  ▼      {"intent":"NAVIGATE","goal":{"type":"REGION","description":"kitchen"}}
-harness, deterministic, no model
-  │  (3) intent → atom: the card's template per verb, event name + bindings;
-  ▼      open-vocabulary payload goes to the port plugin's env table, the atom carries the handle
-runtime, certified: the intent op
-  │  (4) fires the event only if enabled in the current state (legality), consumes the intent once;
-  ▼      refused(reason, alternatives) when not
-port plugin, the catalog author's code
-  │  (5) on_event(name, args) actuates the host: the robot moves
-  ▼
-world → tick() returns do-lines → exo event → event/quiescence/surprise signal → (6) orchestrator narrates by id
-```
-
-What each layer knows, and nothing more:
-
-| layer | knows | never sees |
-|---|---|---|
-| orchestrator | domain display lines, the person, the journal by id | atoms, events, the intent schema, ports |
-| domain agent | the domain's dictionary and examples, its ctx band | ports, other domains, the person's dialog |
-| harness | the intent → atom templates from the cards | the model's reasoning |
-| runtime | the catalog, the state, legality | the person's words |
-| port plugin | real values and time behind the atoms | the LLM |
-
-Consequences:
-- The dog prompt today is already a domain agent's prompt: the eleven
-  intents are the nav domain's dictionary with its examples. What it lacks
-  is the routing layer above (call(domain, text)) and the atom and port
-  below (today's dispatcher emits the robot command directly, without the
-  runtime's legality check). Moving it under the line changes the two
-  ends, not the middle.
-- Legality and exactly-once come for free: the runtime fires an event
-  only when the state enables it, and an intent is a linear resource. The
-  dispatcher gave neither; "the stairs are in front of me" was the robot's
-  refusal after the fact.
-- Usage and consult are the same strip in two modes: text → intent (one
-  pass, J, the domain's grammar) and question → reads in a tool loop (T,
-  capped). The strip never writes to the live session: in usage mode its
-  output is the typed intent the orchestrator's call carries; in consult
-  mode it reads and simulates in a fork.
-- The cost is a second model pass per command. With one model resident
-  it is a KV swap to the domain's primed prefix, not a second load. With
-  one domain loaded the harness routes without the orchestrator's pass,
-  which is the dog today. To measure, after the consult corpus: the
-  routing pass on E2B (domain picked from lines, E10 D's 16/16 is the
-  prior) and the added latency.
-
-#### The domain strip, reconciled with the narrator (architect, 2026-10-13; the user's clarification)
-
-The strip was first the per-domain narrator of RAG §11–12: one context per
-domain whose prefix holds the domain's script, the catalog's `%%` comments
-handed over once at attach and resident (E8's flat retrieval won: 36 tokens
-a fragment against 903 for a system turn that repeats it), and which turns
-each runtime fragment into one sentence the orchestrator receives as a
-form (R, N, R+N). That stays, and it is the same object as the strip
-above. What is added is not a second context but two more things the same
-primed prefix is used for:
-
-| mode | in | out | format | since |
-|---|---|---|---|---|
-| narrate | a fragment: `{path, seq, beat, kind, ref, counts}` | one sentence, the agent's `said` | single pass, think off | E8 |
-| map | the person's words, routed here by the orchestrator | the domain's typed intent | J under the domain's grammar | this section |
-| consult | a question from the orchestrator's error loop | one typed response (kind, text, cause or resource) | T, the REPL verbs, capped | this section |
-
-The RAG twist is unchanged and is the reason the strip exists: the domain's
-LLP is encoded once, in the strip's prefix, and never in the orchestrator's.
-With `dog.llp` (metis-catalog `domains/dog`) the dog's narration source
-becomes its catalog's comments too, as the kitchen's already is: the rule
-that fired is the sentence ("I can't go there: the way to it is closed"),
-and the event's bindings carry the command's identity, which closes E10's
-read-4 finding without a cue fix.
-
-One prefix or two per domain is a measurement, not a principle: the
-narrator's prefix is the script (the dog: 56 rules, ≈ 1.5 k tokens); the
-mapper's is the dictionary with its examples (the dog prompt: 2.8 k with
-40 examples, E9 showed the examples are needed); the consult's is the 16
-declarations (≈ 1 k). Together ≈ 5 k, which is what E10 said E2B pays for.
-So the default is two primed prefixes per domain, the narrator's and the
-agent's (map + consult, sharing the ctx band), each a KV swap, and S1 plus
-the routing corpus say whether they can be one. Either way nothing of it
-enters the orchestrator's 3 k.
-
-#### One pass, and who holds what (user + architect, 2026-10-13)
-
-**One pass stands as the goal.** The orchestrator types the intent itself,
-`{"domain": …, "verb": …, "args": …}`, under a grammar built from the loaded
-domains' verb lists; the routing is the `domain` field, not a second call.
-What E10 forbids is only the way the schema is given: 2.4 k tokens of nested
-declarations in the prefix cost two held-out rows, and E9 showed the model
-needs the examples (no-examples arm: 50/54 class, 32/54 args). So the prefix
-carries, per loaded domain, one capability line and its verb list with
-argument shapes, nothing nested; the examples come by retrieval, the k
-nearest to the utterance from the loaded domains' example stores, inlined at
-distance zero (E6: an inline piece at d0 is used at 0.92), ≈ 150 tokens a
-turn. If that holds parity, one pass wins at a prefix that stays near 3 k
-for several domains. If it does not, the fallback is the strip's map mode, a
-KV swap to the domain's primed prefix after the orchestrator's `domain`
-pick. **E12, the routing corpus, decides:** the 54 dog rows plus the kitchen
-and activation verbs, one prefix with all loaded verb lists, examples by
-retrieval (k = 3, 5, 8) against the 40-example prompt, read 1 parity, prefix
-size, ms to the intent.
-
-**What the domain agent's prompt holds, and what it does not.**
-
-| the domain agent (strip) | holds | does not hold |
-|---|---|---|
-| narrate | how to read a fragment against the script and speak one sentence (E8) | — |
-| consult | the REPL declarations and the consult response shape | the person's dialog |
-| intent → atom | **nothing: this is not the model's.** The card's table maps each verb to its command token (`NAVIGATE goal=tag3` → `+cmd_go(tag3)`, dog.llp), token-exact, run by the harness; open-vocabulary targets resolve to handles in the host's perception table | the schema |
-| surprise / error → the orchestrator | **nothing new: the format exists and is domain-independent.** Signals are the orchestrator contract's (event · surprise · quiescence · notice · result by id, with the domain path and the fragment `{path, seq, beat, kind, ref, counts}`); the consult response is E11's typed shape. The model's part is the N form, the sentence | a format of its own |
-
-The certified surface is the reason: nothing that reaches the runtime or a
-port is model text. The model narrates and answers; tables map.
-
-**What the orchestrator gets at load:** the domain's capability line and
-verb list (the domains block, FRAMEWORK §4), its activation card, its example
-store for retrieval, its mirror line. The domain's JSON goes with every
-intent as the `domain` field; the grammar admits only loaded domains' verbs.
-
-**Keeping the multi-agent and the person's dialog under control: what it
-takes, and what already exists.**
-
-1. *Identity.* Every call has an id; every outcome returns by id into the
-   journal; the orchestrator never infers which outcome is whose (E10 F).
-   Exists on the wire; the journal rendering by id is the build item.
-2. *The floor.* Progress waits, a surprise or a refusal cuts and takes the
-   next turn; one voice at a time (HARNESS, the narration floor). Exists.
-3. *Serialization.* One strip per question; a signal from domain B while A's
-   task runs changes B's mirror line and arrives as a form, never as a user
-   turn; the sanitizer keeps a signal from being read as a command (E10:
-   8/10 echoed without it). Exists in part; the cue is E10's open fix.
-4. *The person's answer to `ask`.* It returns as the next user turn bound
-   to the pending question's id, so it is not classified as a new command.
-   Not built; small.
-5. *Budgets.* One task slot per domain (dog.llp: `idle`), max calls per
-   consult (S1 sets it), the wire's expiry windows. Exist, except the
-   consult cap.
-6. *Memory across turns.* Standing facts in the mirror, never in the stream
-   (E6); the journal compacts the CML way. Designed; the compaction is the
-   long-session read.
-7. *Safety.* STOP and CANCEL fire on the keyword path before any model.
-   Exists.
-8. *What it never does.* Formalize, review content, reason about causes
-   (consult does), touch atoms or ports.
-
-Measured in order: E11 (the error loop), E12 (one pass with retrieved
-examples), then a dialog-control corpus that generalises E10 F: two domains
-with live tasks, the person interjecting, an `ask` and its answer, a signal
-arriving mid-task; scored on ids kept straight, the floor honoured, the
-answer bound to its question, zero signals read as commands.
