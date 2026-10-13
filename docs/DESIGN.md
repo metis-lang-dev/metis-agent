@@ -329,3 +329,26 @@ robot; `go/`, FRAMEWORK.md) and the **specialist** (the LLM in charge, the
 kernel its instrument through the REPL; `py/`, SPECIALIST.md). They meet in
 the Decide step. The orchestrator contract above is the executive's IO;
 the specialist's tools are the REPL verbs.
+
+### The executive's IO, refined (user + architect, 2026-10-13; tested by E10)
+
+Everything the model does is a **call**; everything it learns is either
+the **response** to its call or a **signal** it did not ask for. That line
+is the one architectural decision.
+
+| direction | item | shape |
+|---|---|---|
+| down | load / unload a domain | `activate(domain, bindings)`, `deactivate(domain)` |
+| down | a predicate from a domain's dictionary | `call(domain, verb, args)`; the verb set per domain from its cards (the dog: the eleven intents; the kitchen: reset, explain(card, move), escalate; later the domain's moves) |
+| down | ask the person | `ask(question)`; the answer returns as the next user turn |
+| down | the safety verbs | `stop`, `cancel`; the keyword path fires STOP before the model too |
+| up | the response to a call, by id | accepted · admitted · admitted+notice · applied · refused(reason, alternatives) · failed; an async command answers twice: accepted now, the outcome later with the same id: done · refused · expired · progress. "Missing ingredients" is a refusal naming the resource the move could not consume |
+| up | the signals, unsolicited, with the domain path | event · reading · quiescence · surprise · consistent · notice · episode_over; they answer no call and are never rendered as responses |
+| at attach | the declaration side | cards, script, mirror fetched and rendered as the model's declarations; load/unload re-renders and re-primes |
+
+Gemma 4 mapping: declarations generated from the cards, one per verb per
+loaded domain; the call pinned by a grammar built from them; the
+`<|tool_response>` turn for responses only; signals stay pushed context
+(the standing region, narration streaming). Spoken line from the call,
+narration from the outcome: the async shape, so an acceptance is never
+read as completion.
