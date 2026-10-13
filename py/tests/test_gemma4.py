@@ -39,3 +39,20 @@ def test_kernel_tools_from_help():
     assert "refused" in k.run("formalize", "")
     assert "nothing to narrate" in k.run("narrate")  # never the llm endpoint
     assert "carry" in k.run("events")
+
+
+def test_repeat_guard():
+    from metis_agent.loop import guard
+    calls = [{"verb": "step", "arg": "carry[X=a]", "output": "no enabled candidate 'carry[X=a]' — 'events' lists 1..4"}]
+    assert guard(calls, "step", "carry[X=a]").startswith("note: call 1 was step carry[X=a] and returned: no enabled")
+    assert guard(calls, "step", "carry[X=b]")      # the refused verb again, right after the refusal
+    assert guard(calls, "state", "") == ""
+    calls.append({"verb": "state", "arg": "", "output": "stage ferry"})
+    assert guard(calls, "state", "")               # same call twice
+    assert guard(calls, "step", "2") == ""         # not right after the refusal any more
+
+
+def test_graph_never_writes():
+    k = Kernel(str(WGC))
+    assert k.run("graph", "x.dot").startswith("refused")
+    assert not (ROOT.parent / "metispy/x.dot").exists() and not Path("x.dot").exists()

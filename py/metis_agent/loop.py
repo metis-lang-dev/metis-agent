@@ -8,6 +8,7 @@ No CML regions yet (iteration 3): the system turn is the persona and the
 declarations, the user turn the question, the model turn the calls and
 their results.
 """
+import re
 import time
 
 from . import gemma4
@@ -31,6 +32,24 @@ PERSONA_B = PERSONA_A.replace(
     "Call one tool at a time")
 
 PERSONAS = {"a": PERSONA_A, "b": PERSONA_B, "c": PERSONA_B}
+
+
+# a kernel result that refused the call (the REPL's own wording)
+REFUSAL = re.compile(r"^(refused|error:|usage:|no enabled candidate|nothing to|not forked|.* was never produced|fork K needs)")
+
+
+def guard(calls, verb, arg):
+    """The repeat guard (§7, loop infrastructure, every seat): the same call
+    with the same argument again, or the refused verb called again right
+    after its refusal → the note naming the earlier call and its result."""
+    for i, c in enumerate(calls, 1):
+        same = (c["verb"], c["arg"]) == (verb, arg)
+        again = i == len(calls) and c["verb"] == verb and REFUSAL.match(c["output"])
+        if same or again:
+            first = c["output"].splitlines()[0] if c["output"] else ""
+            return ("note: call %d was %s %s and returned: %s — choose a different tool or answer.\n"
+                    % (i, verb, c["arg"], first))
+    return ""
 
 
 def system_prompt(kernel, persona="b"):
@@ -65,8 +84,10 @@ class Specialist:
             if len(calls) == self.max_calls:
                 break
             tk = time.perf_counter()
-            out = self.kernel.run(r.name, r.args.get("arg", ""))
-            calls.append({"verb": r.name, "arg": r.args.get("arg", ""), "said": r.said,
+            arg = r.args.get("arg", "")
+            note = guard(calls, r.name, arg)
+            out = note + self.kernel.run(r.name, arg)
+            calls.append({"verb": r.name, "arg": arg, "said": r.said, "guard": bool(note),
                           "output": out, "ms_model": round(r.ms), "ms_kernel": round((time.perf_counter() - tk) * 1e3)})
             # the model's turn so far, exactly as the seat decoded it, then the result
             cont = self.seat.cont(question) + gemma4.response_text(r.name, {"output": out})
