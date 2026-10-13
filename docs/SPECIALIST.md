@@ -161,3 +161,41 @@ Not scheduled: formalization from the specialist (the loop's road), the
 C++ IR instruments, moving the executive's LLM to Python, a web face for
 the specialist (the page is the executive's; a specialist pane is a later
 decision).
+
+## 7. Rulings after step 1 (architect, 2026-10-13; nina's report, metis-agent 26795c4)
+
+- **The runtime.** llama-cpp-python 0.3.36 over vendored llama.cpp
+  0c1e57098bba; parity with the Go adapter is 54/54 JSON-identical with
+  flash attention **off**, 53/54 with auto (one near-tie). Off is the
+  default: it reproduces the executive's numbers. The Go pin stays
+  8ad8aef44; the two builds are allowed to differ.
+- **The whitelist, corrected.** `explain` does not exist in the kernel:
+  `why` is the cause read-out. `back` is added, the only way out of a
+  fork. `whatif` and `causes` stay out until an S1 item needs them. The
+  sixteen verbs: run, step, events, state, ctx, list, why, findings,
+  narrate, graph, do, fork, back, undo, necessity, sufficiency.
+- **`narrate` is `narrate user` only.** The specialist is the narrator; the
+  kernel's own llm endpoint (ollama) is never called from here, and
+  `METIS_CONFIG` is pinned empty so a dot file cannot re-enable it.
+- **A repeat guard is loop infrastructure, not a model lever.** The same
+  call with the same arguments twice, or a call repeated after a refusal,
+  gets its response prefixed with a note naming the earlier call and its
+  result and asking for a different tool or an answer. It applies to every
+  seat, so S1 measures the model, not the loop's lack of memory. Built
+  before S1.
+- **The declarations' text is improved once, then frozen.** From the REPL
+  help, generically: each verb's purpose and its argument shape (`do
+  EVENT[bindings]`, an event, never an atom; `necessity N ATOM`; `fork`
+  then `back`). Not tuned on any question. wolf-goat-cabbage is thereby a
+  seen catalog in S1; the other three are clean, and the S1 table says
+  which is which.
+- **E4B needs a GPU window:** 5.5 GB does not fit beside the running
+  service. The architect stops and restarts the service for a measured
+  window on request.
+- **Kernel bug, not ours:** `narrate user` substitutes a binding into a
+  row's `%%` doc ("far farmer with a wolf"). Filed to the metis line
+  (opus) as a metispy fix.
+- **What E2B did on four items, informally:** finds `why` once the ctx
+  band shows the atoms; misses the interventions; repeats refused calls.
+  S1 (step 2) measures it properly, with the guard and the frozen
+  declarations in place.
