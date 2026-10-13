@@ -49,11 +49,13 @@ class Replier:
     def counts(self, counts):
         return {a: counts.get(a, 0) for a in self.mirror}
 
-    def fired(self, ev, seq, beat, counts):
-        """One fired event → its replies (a list, possibly empty)."""
+    def fired(self, ev, seq, beat, counts, text=None):
+        """One fired event → its replies (a list, possibly empty); text =
+        the narrator's sentence for it, else the %% line."""
         rule = ev.name.partition("[")[0]
         base = rule.rsplit("-", 1)[0] if rule.rsplit("-", 1)[-1].isdigit() else rule
         doc = self.docs.get(base, self.docs.get(rule, ""))
+        said = text or doc
         ref = {"seq": seq, "beat": beat, "event": ev.name}
         cmd = None
         for a in ev.consume:
@@ -78,14 +80,14 @@ class Replier:
                 self.tasks[act] = iid
             elif self.tasks.get(act) == iid:
                 del self.tasks[act]
-            f = {"id": iid, "status": status, "ref": ref, "text": doc}
+            f = {"id": iid, "status": status, "ref": ref, "text": said}
             if status in ("refused", "expired", "failed", "cancelled"):
                 f["reason"] = doc_reason(doc)
             if status == "refused":
                 f["alternatives"] = list(self.alternatives(base, counts)) if self.alternatives else []
             out.append(reply(self.domain, "result", **f))
         if not out:
-            out.append(reply(self.domain, "event", ref=ref, text=doc, counts=self.counts(counts)))
+            out.append(reply(self.domain, "event", ref=ref, text=said, counts=self.counts(counts)))
         return out
 
     def untaken(self, counts, beat):

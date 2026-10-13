@@ -5,7 +5,9 @@ names are the table's and nothing else: no domain word reaches a key.
     {"domain", "kind", "ref", "text"} + the kind's own fields
 
 `text` is the domain agent's sentence (the N form); `ref` and `counts`
-are the R form. A field that does not apply is left out, never null.
+are the R form; a `read` carries the kernel's `output` for the
+orchestrator's own use, `text` optional. A field that does not apply is
+left out, never null.
 """
 
 BASE = ("domain", "kind", "ref", "text")
@@ -13,6 +15,7 @@ BASE = ("domain", "kind", "ref", "text")
 # kind -> the fields beyond domain/ref/text (DESIGN.md's table)
 KINDS = {
     "result": ("id", "status", "reason", "alternatives"),
+    "read": ("tool", "output"),
     "event": ("counts",),
     "quiescence": ("goal_pending",),
     "surprise": ("record", "difference", "cards"),
@@ -21,9 +24,8 @@ KINDS = {
     "consult": ("id", "answer_kind", "cause", "resource", "calls"),
 }
 
-# result.status as the table lists it, plus `cancelled` (step-1 finding:
-# the dog's cancelled(ACT) ends a task the person stopped; no listed
-# status says that — the architect rules)
+# result.status as the table lists it (`cancelled`: a task the person
+# ended by stop or cancel, DESIGN 90e8d3e)
 STATUS = ("accepted", "admitted", "admitted+notice", "applied", "done", "refused",
           "expired", "progress", "failed", "cancelled")
 

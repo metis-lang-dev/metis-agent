@@ -8,12 +8,14 @@ commands and outcomes, README's table, dog_host.py's world); the intent
 side is the executive's typed JSON (go/grammar/dog.gbnf), verb = its
 `intent`, args = the rest.
 """
+import copy
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 CATALOG = ROOT.parent / "metis-catalog/domains/dog/dog.llp"
 NAME = "dog"
+DISPLAY = "the dog"      # the agent as the narrator names it
 
 # ── the card's table: verb + args → one command atom (README "The shape") ──
 CARD = {
@@ -30,6 +32,7 @@ CARD = {
         {"verb": "STOP", "atom": "cmd_stop", "act": "stop"},
         {"verb": "CANCEL", "atom": "cmd_cancel", "act": "cancel"},
         {"verb": "QUERY", "atom": "cmd_query({target:thing})", "act": "query"},
+        {"verb": "QUERY", "atom": "cmd_look({target:place})", "act": "look"},     # a query about a place
         {"verb": "TIME", "atom": "cmd_time", "act": "time"},
         {"verb": "DATE", "atom": "cmd_date", "act": "date"},
         {"verb": "CHITCHAT", "atom": "cmd_chat", "act": "chat"},
@@ -46,6 +49,7 @@ CARD = {
             ("window_chair", {"description": ["chair"], "near": ["window"]}),
             ("tag3", {"type": ["TAG"], "tag_id": 3}),
             ("tag5", {"type": ["TAG"], "tag_id": 5}),
+            ("tag_near", {"type": ["TAG"], "tag_id": None}),           # "go to the tag": the nearest
             ("door", {"description": ["door"]}),
             ("kitchen", {"description": ["kitchen"]}),
             ("sofa", {"description": ["sofa", "couch"]}),
@@ -58,6 +62,9 @@ CARD = {
             ("table", {"description": ["table"]}),
         ],
     },
+    # a place the host cannot resolve (tag 7, "the attic"): the catalog
+    # refuses it as not on the map (dog.llp, metis-catalog fd1ec93)
+    "fallback": {"place": "elsewhere"},
 }
 
 # ── the replier's table: outcome predicate → result status ──
@@ -67,13 +74,15 @@ OUTCOMES = {"done": "done", "refused": "refused", "progress": "progress",
 # the refusals whose blocker is the place itself: the catalog can name
 # where the dog can go instead (mapped and open); others name nothing
 PLACE_REFUSALS = {"go_unmapped", "go_closed", "go_blocked"}
+# the standing handles stand for a place, they do not name one: never an alternative
+STANDING = {"tag_near", "elsewhere"}
 
 
 def alternatives(rule, counts):
     if rule not in PLACE_REFUSALS:
         return []
     places = [a[len("mapped("):-1] for a in counts if a.startswith("mapped(") and counts[a] > 0]
-    return sorted(p for p in places if counts.get("open(%s)" % p, 0) > 0)
+    return sorted(p for p in places if counts.get("open(%s)" % p, 0) > 0 and p not in STANDING)
 
 
 # ── the host as the domain agent runs it ──
@@ -81,21 +90,29 @@ class AgentHost:
     """dog_host.py's DogHost with the person's commands taken out of its
     script: the world's answers and changes stay the catalog host's
     (arrived, locked_away, the battery at beat 15), the commands come
-    from the mapper (submit) and are asserted on the next tick."""
+    from the mapper (submit) and are asserted on the next tick.
+
+    The queue holds {id, atom, payload} (DESIGN 90e8d3e): the atom is
+    qualitative, the payload carries what the catalog does not (angle_deg,
+    distance_m, a colour), keyed by the command's id; the port actuates
+    with it when the rule that consumed the command fires. `last_row` is
+    set by the domain agent: the fired row on_event is called for."""
 
     def __init__(self, inner, commands):
-        self.inner, self.commands, self.queue = inner, commands, []
+        self.inner, self.commands = inner, commands
+        self.queue, self.inflight, self.acted = [], {}, []
+        self.last_row = None
         self.beat_stage = getattr(inner, "beat_stage", None)
 
     @property
     def beat(self):
         return self.inner.beat
 
-    def submit(self, atom):
-        self.queue.append("+" + atom)
+    def submit(self, iid, atom, payload=None):
+        self.queue.append({"id": iid, "atom": atom, "payload": dict(payload or {})})
 
     def retract(self, atom):
-        self.queue.append("-" + atom)
+        self.queue.append({"id": None, "atom": atom, "retract": True})
 
     def bind(self, reg):
         self.inner.bind(reg)
@@ -105,18 +122,34 @@ class AgentHost:
         if dos is None:
             return None
         dos = [d for d in dos if not (d.startswith("+") and d[1:].split("(")[0].split()[0] in self.commands)]
-        dos, self.queue = dos + self.queue, []
+        for q in self.queue:
+            if q.get("retract"):
+                dos.append("-" + q["atom"])
+            else:
+                dos.append("+" + q["atom"])
+                self.inflight.setdefault(q["atom"], []).append(q)
+        self.queue = []
         return dos
 
     def on_event(self, name, args):
+        """The OUTPUT face: the catalog host actuates; a command's payload
+        rides with the event that consumed it."""
+        row = self.last_row() if self.last_row else None
+        for atom in (row[2].consume if row else ()):
+            if self.inflight.get(atom):
+                q = self.inflight[atom].pop(0)
+                if not self.inflight[atom]:
+                    del self.inflight[atom]
+                self.acted.append({"beat": self.beat, "event": name, "id": q["id"], "payload": q["payload"]})
+                break
         self.inner.on_event(name, args)
 
     def snapshot(self):
-        return (self.inner.snapshot(), tuple(self.queue))
+        return (self.inner.snapshot(), copy.deepcopy((self.queue, self.inflight, self.acted)))
 
     def restore(self, snap):
         self.inner.restore(snap[0])
-        self.queue = list(snap[1])
+        self.queue, self.inflight, self.acted = copy.deepcopy(snap[1])
 
 
 def make(case):

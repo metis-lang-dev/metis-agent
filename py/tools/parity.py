@@ -78,7 +78,7 @@ def mapper_parity(ref, out_dir):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mapper", action="store_true", help="the dog's mapper on the 54 rows, no model")
-    ap.add_argument("--out-dir", default=str(ROOT / "py/results/domain-agent/step1"))
+    ap.add_argument("--out-dir", default=str(ROOT / "py/results/domain-agent/step2"))
     ap.add_argument("--model", default=str(GO / "models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf"))
     ap.add_argument("--ref", default=str(REF))
     ap.add_argument("--out", default="")

@@ -10,10 +10,15 @@ In, the intent interface (J, async):
         progress · cancelled by id, as the outcome tokens appear
 
 In, the REPL API (T, sync):
-    {"tool", "args", "id"?} → state · ctx · events · why(atom) · findings
-      answer now: a `result`, status `applied`, the kernel's read-out as
-      text (scrubbed, capped); consult and the surprise verbs (reset,
-      explain, escalate) are steps 2–3 and answer `error` here
+    {"tool", "args"} → state · ctx · events · why(atom) · findings
+      answer now: kind `read` {tool, output} — the kernel's read-out,
+      scrubbed and capped, for the orchestrator's own use; consult and the
+      surprise verbs (reset, explain, escalate) are step 3 and answer
+      `error` here
+
+The narrator (step 2, --narrate): every fired move of the catalog becomes a
+fragment read against the resident script, and its sentence is the
+reply's `text`; without it `text` is the fired rule's %% line.
 
 Out, unasked: `event` (a fired rule that answers no intent), `quiescence`
 (the host's episode is over).
@@ -24,7 +29,7 @@ beat (one host tick, then the runtime to quiescence) and is acknowledged
 with {"clock": "beat", "beat": N, "over": bool}. The clock line is the
 test harness's, not part of either interface.
 
-    py/.venv/bin/python -m metis_agent.domain_agent --domain dog     # from metis-agent/py
+    py/.venv/bin/python -m metis_agent.domain_agent --domain dog [--narrate]    # from metis-agent/py
 """
 import argparse
 import importlib
@@ -33,6 +38,7 @@ import os
 import sys
 
 from .mapper import Mapped, Mapper
+from .narrator import Fragment, Narrator, event_ref
 from .repl_tools import scrub
 from .replier import Replier
 from .reply import reply
@@ -53,8 +59,14 @@ def mirror_atoms(text):
     return [l.split(None, 1)[1].strip() for l in text.splitlines() if l.startswith("#query ")]
 
 
+def scripts_of(repl):
+    """The runtime's `script` op, in-process: the cards offerable here."""
+    from metis.loop.cards import script
+    return script(repl)
+
+
 class DomainAgent:
-    def __init__(self, module, seed=1):
+    def __init__(self, module, seed=1, llm=None, counts="left"):
         os.environ.setdefault("METIS_CONFIG", "")   # the kernel's llm endpoint is never called
         from metis.lang.repl import Repl
         self.mod = module
@@ -66,8 +78,16 @@ class DomainAgent:
         self.mapper = Mapper(module.CARD)
         self.replier = Replier(self.name, rule_docs(module.CATALOG), module.OUTCOMES, self.mapper.commands,
                                getattr(module, "alternatives", None), mirror_atoms(self.repl.text))
+        self.host.last_row = lambda: self.repl.fired_rows[-1]
         self.over = False
         self.log = []        # what the mapper did, per intent (the report's table)
+        self.narrated = []   # (fragment, sentence) per narrated move
+        self.display = getattr(module, "DISPLAY", self.name)
+        self.narrator = None
+        self.frag_counts = counts      # "left": the atoms the move produced; "touched": consumed + produced (E8's)
+        if llm is not None:
+            self.narrator = Narrator(llm, {self.name: scripts_of(self.repl)},
+                                     lambda p: self.display if p == self.name else p.replace("_", " "))
 
     # ── the intent interface ──
     def intent(self, msg):
@@ -82,7 +102,7 @@ class DomainAgent:
                             else {"error": m.error})})
         if not isinstance(m, Mapped):
             return [reply(self.name, "error", id=iid, error="mapper: " + m.error)]
-        self.host.submit(m.atom)
+        self.host.submit(iid, m.atom, m.dropped)
         self.replier.submitted(iid, m.atom, m.act)
         return [reply(self.name, "result", id=iid, status="accepted", ref={"beat": self.host.beat},
                       text="Accepted.")]
@@ -114,7 +134,16 @@ class DomainAgent:
             kind, _, ev = self.repl.fired_rows[k]
             if kind == "exo":
                 continue                              # the host's input, not the domain's doing
-            out += self.replier.fired(ev, k + 1, self.host.beat, self.repl.counts)   # seq as `log` numbers it
+            text = None
+            if self.narrator is not None:
+                atoms = sorted(set(ev.produce) if self.frag_counts == "left" else set(ev.consume) | set(ev.produce))
+                f = Fragment(path=self.name, seq=k + 1, beat=self.host.beat, kind="event",
+                             ref=event_ref(ev.name, ev.consume, ev.produce, self.mapper.commands),
+                             counts={a: self.repl.counts.get(a, 0) for a in atoms})
+                sn = self.narrator.narrate(f)
+                self.narrated.append((f, sn))
+                text = sn["text"] or None
+            out += self.replier.fired(ev, k + 1, self.host.beat, self.repl.counts, text)   # seq as `log` numbers it
         return out
 
     # ── the REPL API ──
@@ -122,9 +151,9 @@ class DomainAgent:
         name, args, iid = msg.get("tool"), msg.get("args") or {}, msg.get("id")
         if name in READS:
             arg = args.get("atom") or args.get("arg") or ""
-            text = scrub(self.repl.capture(name, arg) or "(no output)")
-            return [reply(self.name, "result", id=iid, status="applied",
-                          ref={"seq": len(self.repl.fired), "beat": self.host.beat}, text=text)]
+            output = scrub(self.repl.capture(name, arg) or "(no output)")
+            return [reply(self.name, "read", tool=name, output=output,
+                          ref={"seq": len(self.repl.fired), "beat": self.host.beat})]
         if name in LATER:
             return [reply(self.name, "error", id=iid, error="tool %s: not in step 1" % name)]
         return [reply(self.name, "error", id=iid, error="no tool %r" % name)]
@@ -144,8 +173,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--domain", default="dog", help="a module under metis_agent.domains")
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--narrate", action="store_true", help="the narrator writes text (gemma4, thinking off)")
+    ap.add_argument("--model", default="", help="the GGUF (default: E2B Q4 under go/models)")
     a = ap.parse_args()
-    agent = DomainAgent(importlib.import_module("metis_agent.domains." + a.domain), seed=a.seed)
+    llm = None
+    if a.narrate:
+        from pathlib import Path
+        from .llm import LLM
+        model = a.model or str(Path(__file__).resolve().parents[2] / "go/models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf")
+        llm = LLM(model, n_ctx=8192)
+    agent = DomainAgent(importlib.import_module("metis_agent.domains." + a.domain), seed=a.seed, llm=llm)
     print(json.dumps({"clock": "ready", "domain": agent.name, "beat": agent.host.beat}), flush=True)
     for line in sys.stdin:
         if not line.strip():

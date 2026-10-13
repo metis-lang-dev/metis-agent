@@ -11,6 +11,11 @@ The card (a domain module's CARD) is rows and value tables:
     values:  {type: {intent value: atom constant}}             closed vocabularies
     handles: {type: [(handle, {match}), …]}                    open vocabulary → the
              host's perception table; the first matching handle wins
+    fallback: {type: handle}                                  what an unresolved target
+             becomes (the dog: `elsewhere`, a place the host cannot resolve)
+
+Rows of one verb are tried in order: a row whose arguments do not
+resolve gives way to the next (the dog's QUERY: a thing, else a place).
 
 An argument the atom does not carry (an angle, a colour) is reported as
 dropped, never silently lost; an argument no row or handle resolves is an
@@ -67,7 +72,7 @@ class Mapper:
         self.card = card
         self.commands = {r["atom"].split("(")[0] for r in card["rows"]}
 
-    def resolve(self, typ, arg, args, used):
+    def resolve(self, typ, arg, args, used, fallback=True):
         v = args.get(arg)
         if v is None:
             return None, "no %s given" % arg
@@ -83,6 +88,10 @@ class Mapper:
                 used.append(arg)
                 used += [k for k, mk in (("tag_id", "tag_id"), ("constraints", "near")) if mk in m]
                 return handle, None
+        fb = self.card.get("fallback", {}).get(typ)
+        if fb and fallback:
+            used.append(arg)
+            return fb, None
         return None, "no %s for %s %r" % (typ, arg, _desc(v) + (" %s" % args["tag_id"] if "tag_id" in args else ""))
 
     def map(self, intent):
@@ -90,19 +99,23 @@ class Mapper:
         rows = [r for r in self.card["rows"] if r["verb"] == verb]
         if not rows:
             return Unmapped("no row for verb %r" % verb)
-        for r in rows:
-            when = r.get("when", {})
-            if all(str(args.get(k, "")).upper() == v for k, v in when.items()):
-                used, err = list(when), None
+        rows = [r for r in rows if all(str(args.get(k, "")).upper() == v for k, v in r.get("when", {}).items())]
+        first_err = None
+        # strict first (a later row may resolve what this one cannot), then
+        # with the fallback handles
+        for fallback in (False, True):
+            for r in rows:
+                used, err = list(r.get("when", {})), None
 
                 def fill(m):
                     nonlocal err
-                    const, e = self.resolve(m.group(2), m.group(1), args, used)
+                    const, e = self.resolve(m.group(2), m.group(1), args, used, fallback)
                     err = err or e
                     return const or "?"
                 atom = FIELD.sub(fill, r["atom"])
                 if err:
-                    return Unmapped(err)
+                    first_err = first_err or err
+                    continue
                 dropped = {k: v for k, v in args.items() if k not in used}
                 for k in used:   # what a resolved target object carried and the atom does not
                     if isinstance(args.get(k), dict):
@@ -110,4 +123,6 @@ class Mapper:
                             if args[k].get(sub):
                                 dropped[k + "." + sub] = args[k][sub]
                 return Mapped(atom, r["act"], used, dropped)
+        if first_err:
+            return Unmapped(first_err)
         return Unmapped("no row for %s %s" % (verb, " ".join("%s=%s" % kv for kv in sorted(args.items()) if not isinstance(kv[1], (dict, list)))))

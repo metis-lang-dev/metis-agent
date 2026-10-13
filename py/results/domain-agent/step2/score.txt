@@ -1,0 +1,13 @@
+pre-registered (primary):
+
+| model | retrieval | form | setting | orch used | orch attribution | orch narration attribution | orch invented | orch ms first p50 | agent sentences | agent attribution | agent misattributed | agent invented | agent ⟪ | tok / fragment | script tok / fragment | fragment → sentence ms p50 | tok passed / h | tape tok stored | script tok resident |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| dog | flat | policy | – | – | – | – | – | – | 51 | 1.00 | 0.00 | 0.00 | 0.00 | 34 | 0 | 367 | 0 | – | – |
+| kitchen | flat | policy | – | – | – | – | – | – | 231 | 1.00 | 0.00 | 0.00 | 0.00 | 36 | 0 | 424 | 0 | – | – |
+
+names accepted (sensitivity, orchestrator only: q22, q23, q14, q20):
+
+| model | retrieval | form | setting | orch used | orch attribution | orch narration attribution | orch invented | orch ms first p50 | agent sentences | agent attribution | agent misattributed | agent invented | agent ⟪ | tok / fragment | script tok / fragment | fragment → sentence ms p50 | tok passed / h | tape tok stored | script tok resident |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+
+dog target check: 51/51 sentences name only what the fragment carried; wrong: none

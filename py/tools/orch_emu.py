@@ -24,8 +24,9 @@ from metis_agent.reply import check  # noqa: E402
 
 
 class Agent:
-    def __init__(self, domain):
-        self.p = subprocess.Popen([sys.executable, "-m", "metis_agent.domain_agent", "--domain", domain],
+    def __init__(self, domain, narrate=False):
+        self.p = subprocess.Popen([sys.executable, "-m", "metis_agent.domain_agent", "--domain", domain]
+                                  + (["--narrate"] if narrate else []),
                                   cwd=str(ROOT / "py"), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                   stderr=subprocess.PIPE, text=True, bufsize=1)
         self.lines = []
@@ -77,9 +78,38 @@ def reference(md):
     return log, narrated, reads
 
 
-def parity(scn, lines, intents):
-    ref = Path(scn["reference"])
-    log, narrated, reads = reference(ref if ref.is_absolute() else ROOT / ref)
+def hosted(scn):
+    """The reference regenerated live: the catalog's own host runs its day
+    in-process (`metis --plugin HOST dog.llp`, run N, then the reads), so
+    the parity follows the catalog as it changes; the committed transcript
+    is the record of one such run."""
+    import contextlib
+    import io
+    import os
+    os.environ.setdefault("METIS_CONFIG", "")
+    from metis.lang.repl import Repl
+    h = scn["hosted"]
+    cat = Path(h["catalog"]) if Path(h["catalog"]).is_absolute() else ROOT / h["catalog"]
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        r = Repl(str(cat), plugin=h["plugin"], host=True)
+        r.capture("run", str(h.get("run", 60)))
+    log = [(int(n), e) for n, e in re.findall(r"^\s+(\d+)\. (\S.*?)\s*$", r.capture("log", ""), re.M)
+           if not e.startswith("do ")]
+    narrated = re.findall(r"\[host beat \d+\] narrated (\S+)", err.getvalue())
+    reads = {}
+    for m in scn.get("after", []):
+        a = m["args"].get("atom", "")
+        reads[(m["tool"] + " " + a).strip()] = r.capture(m["tool"], a).rstrip()
+    return log, narrated, reads
+
+
+def parity(scn, lines, intents, live=True):
+    if live and scn.get("hosted"):
+        log, narrated, reads = hosted(scn)
+    else:
+        ref = Path(scn["reference"])
+        log, narrated, reads = reference(ref if ref.is_absolute() else ROOT / ref)
     replies = [l["msg"] for l in lines if l["dir"] == "in" and "kind" in l["msg"]]
     outcomes = [r for r in replies if r["kind"] == "result" and r["status"] not in ("accepted", "applied")]
     seen, events = set(), []
@@ -100,7 +130,7 @@ def parity(scn, lines, intents):
     for l, nxt in zip(lines, lines[1:]):
         if l["dir"] == "out" and "tool" in l["msg"]:
             a = l["msg"]["args"].get("atom", "")
-            tool_out[(l["msg"]["tool"] + " " + a).strip()] = nxt["msg"].get("text", "")
+            tool_out[(l["msg"]["tool"] + " " + a).strip()] = nxt["msg"].get("output", "")
     read_match = {}
     for k, v in tool_out.items():
         ref = reads.get(k, "").rstrip()
@@ -130,10 +160,9 @@ def render(scn, lines, par):
             out += ["── the host's episode is over (beat %s); the REPL API after the day" % m.get("beat")
                     if m.get("over") else "── beat %d" % (m.get("beat", 0) + 1)]
         else:
-            t = m.get("text", "")
-            if m.get("status") == "applied":
-                t = t.splitlines()[0] + " …" if "\n" in t else t
-                m = dict(m, text=t)
+            if m.get("kind") == "read":
+                o = m.get("output", "")
+                m = dict(m, output=o.splitlines()[0] + " …" if "\n" in o else o)
             out.append("    ← `%s`" % json.dumps(m))
     if par:
         out += ["", "## parity with the hosted transcript", "", "```", json.dumps(par, indent=1), "```"]
@@ -145,12 +174,13 @@ def main():
     ap.add_argument("scenario")
     ap.add_argument("--out", default=str(ROOT / "py/results/domain-agent/step1"))
     ap.add_argument("--max-beats", type=int, default=200)
+    ap.add_argument("--narrate", action="store_true", help="the agent's narrator writes text (gemma4 E2B)")
     a = ap.parse_args()
     scn = json.loads(Path(a.scenario).read_text())
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
 
-    ag = Agent(scn["domain"])
+    ag = Agent(scn["domain"], a.narrate)
     intents, k, over = {}, 0, False
     for beat in range(1, a.max_beats + 1):
         for m in scn["beats"].get(str(beat), []):

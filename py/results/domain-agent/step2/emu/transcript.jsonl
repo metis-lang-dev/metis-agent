@@ -1,0 +1,94 @@
+{"dir": "in", "msg": {"clock": "ready", "domain": "dog", "beat": 0}}
+{"dir": "out", "msg": {"id": "c1", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 0}, "text": "Accepted.", "id": "c1", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 2, "beat": 1, "event": "sit[P=standing]"}, "text": "The dog sat down.", "id": "c1", "status": "done"}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 1, "over": false}}
+{"dir": "out", "msg": {"id": "c2", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 1}, "text": "Accepted.", "id": "c2", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 4, "beat": 2, "event": "go_closed[P=kitchen]"}, "text": "The dog could not go to the kitchen because the way was closed.", "id": "c2", "status": "refused", "reason": "the way to it is closed", "alternatives": ["door", "tag3"]}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 2, "over": false}}
+{"dir": "out", "msg": {"id": "c3", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "STAND_UP"}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 2}, "text": "Accepted.", "id": "c3", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 6, "beat": 3, "event": "stand[P=sitting]"}, "text": "The dog stood up.", "id": "c3", "status": "done"}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 3, "over": false}}
+{"dir": "out", "msg": {"id": "c4", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "TAG", "description": "april tag"}, "tag_id": 3}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 3}, "text": "Accepted.", "id": "c4", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 8, "beat": 4, "event": "go[P=tag3]"}, "text": "The dog is moving.", "id": "c4", "status": "progress"}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 4, "over": false}}
+{"dir": "out", "msg": {"id": "c5", "domain": "dog", "verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "keys"}}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 4}, "text": "Accepted.", "id": "c5", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 10, "beat": 5, "event": "find_busy[T=keys,P=tag3]"}, "text": "The dog refused to search for the keys because it was already busy.", "id": "c5", "status": "refused", "reason": "I am already busy with a task", "alternatives": []}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 5, "over": false}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 12, "beat": 6, "event": "arrive[P=tag3,Q=door]"}, "text": "The dog has arrived at tag3.", "id": "c4", "status": "done"}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 6, "over": false}}
+{"dir": "out", "msg": {"id": "c6", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "MOVE", "direction": "BACKWARD"}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 6}, "text": "Accepted.", "id": "c6", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 14, "beat": 7, "event": "move_wall[W=backward]"}, "text": "The dog could not move that way because there is a wall right there.", "id": "c6", "status": "refused", "reason": "there is a wall right there", "alternatives": []}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 7, "over": false}}
+{"dir": "out", "msg": {"id": "c7", "domain": "dog", "verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "fire extinguisher"}}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 7}, "text": "Accepted.", "id": "c7", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 16, "beat": 8, "event": "find[T=extinguisher]"}, "text": "The dog started looking for the extinguisher.", "id": "c7", "status": "progress"}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 8, "over": false}}
+{"dir": "out", "msg": {"id": "c8", "domain": "dog", "verb": "QUERY", "args": {"target": {"type": "OBJECT", "description": "chair"}}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 8}, "text": "Accepted.", "id": "c8", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 18, "beat": 9, "event": "query_seen[T=chair]"}, "text": "The dog told you where it is.", "id": "c8", "status": "done"}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 9, "over": false}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 20, "beat": 10, "event": "find_locked[T=extinguisher]"}, "text": "The dog could not reach the locked item.", "id": "c7", "status": "refused", "reason": "it is locked away", "alternatives": []}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 10, "over": false}}
+{"dir": "out", "msg": {"id": "c9", "domain": "dog", "verb": "FOLLOW", "args": {"target": {"type": "PERSON", "description": "the person"}}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 10}, "text": "Accepted.", "id": "c9", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 22, "beat": 11, "event": "follow"}, "text": "The dog is following you.", "id": "c9", "status": "progress"}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 11, "over": false}}
+{"dir": "out", "msg": {"id": "c10", "domain": "dog", "verb": "STOP", "args": {}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 11}, "text": "Accepted.", "id": "c10", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 24, "beat": 12, "event": "stop_follow"}, "text": "The dog stopped following you.", "id": "c9", "status": "cancelled", "reason": "I stop following you"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 24, "beat": 12, "event": "stop_follow"}, "text": "The dog stopped following you.", "id": "c10", "status": "done"}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 12, "over": false}}
+{"dir": "out", "msg": {"id": "c11", "domain": "dog", "verb": "UNKNOWN", "args": {}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 12}, "text": "Accepted.", "id": "c11", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 26, "beat": 13, "event": "unknown"}, "text": "The dog refused to do something unknown.", "id": "c11", "status": "refused", "reason": "it is not something I can or may do", "alternatives": []}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 13, "over": false}}
+{"dir": "out", "msg": {"id": "c12", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "SHAKE"}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 13}, "text": "Accepted.", "id": "c12", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 28, "beat": 14, "event": "paw"}, "text": "The dog gave its paw.", "id": "c12", "status": "done"}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 14, "over": false}}
+{"dir": "out", "msg": {"id": "c13", "domain": "dog", "verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "bottle", "attributes": {"color": "blue"}}}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 14}, "text": "Accepted.", "id": "c13", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 30, "beat": 15, "event": "find_low[T=bottle]"}, "text": "The dog refused to search for the bottle.", "id": "c13", "status": "refused", "reason": "the battery is too low to search", "alternatives": []}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 15, "over": false}}
+{"dir": "out", "msg": {"id": "c14", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 15}, "text": "Accepted.", "id": "c14", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 32, "beat": 16, "event": "sit[P=standing]"}, "text": "The dog sat down.", "id": "c14", "status": "done"}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 16, "over": false}}
+{"dir": "out", "msg": {"id": "c15", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "TURN", "direction": "LEFT", "angle_deg": 90}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"beat": 16}, "text": "Accepted.", "id": "c15", "status": "accepted"}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "result", "ref": {"seq": 34, "beat": 17, "event": "turn_down[S=left,P=sitting]"}, "text": "The dog refused to turn down.", "id": "c15", "status": "refused", "reason": "I have to stand up first", "alternatives": []}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 17, "over": false}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 18, "over": false}}
+{"dir": "out", "msg": {"clock": "beat"}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "quiescence", "ref": {"beat": 18}, "text": "the day is over", "goal_pending": false}}
+{"dir": "in", "msg": {"clock": "beat", "beat": 18, "over": true}}
+{"dir": "out", "msg": {"id": "t1", "domain": "dog", "tool": "why", "args": {"atom": "done(go)"}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "read", "ref": {"seq": 35, "beat": 18}, "tool": "why", "output": "why done(go) (last produced by event 12) \u2014 not present now: 13 of 36 occurrences\n   0 |  0 #init  (the base state)\n   1 |  1 do +cmd_sit\n   2 |  2 sit[P=standing]  L114: sit [dyn] : cmd_sit * posture(P) * other(P, sitting) * $floor_dry -o posture(sitting) * done(sit).\n   3 |  3 do -done(sit) +cmd_go(kitchen)\n   4 |  4 go_closed[P=kitchen]  L146: go_closed [dyn] : cmd_go(P) * $mapped(P) * $closed(P) -o refused(go).\n   5 |  5 do -refused(go) +cmd_stand\n   6 |  6 stand[P=sitting]  L108: stand [dyn] : cmd_stand * posture(P) * other(P, standing) * $battery_ok -o posture(standing) * done(stand).\n   7 |  7 do -done(stand) +cmd_go(tag3)\n   8 |  8 go[P=tag3]  L142: go [dyn] : cmd_go(P) * idle * $posture(standing) * $mapped(P) * $open(P) -o moving(P) * progress(go).\n   9 |  9 do -progress(go) +cmd_find(keys)\n  10 | 10 find_busy[T=keys,P=tag3]  L168: find_busy [dyn] : cmd_find(T) * $moving(P) -o refused(find).\n  11 | 11 do -refused(find) +arrived(tag3)\n  12 | 12 arrive[P=tag3,Q=door]  L156: arrive [dyn] : moving(P) * arrived(P) * at(Q) -o at(P) * idle * done(go).\n  pruned: 23 irrelevant events: 13 do -done(go) +cmd_move(backward), 14 move_wall[W=backward], 15 do -refused(move) +cmd_find(extinguisher), 16 find[T=extinguisher], 17 do -progress(find) +cmd_query(chair), 18 query_seen[T=chair], 19 do -done(query) +locked_away(extinguisher), 20 find_locked[T=extinguisher], 21 do -refused(find) +cmd_follow, 22 follow, 23 do -progress(follow) +cmd_stop, 24 stop_follow, 25 do -cancelled(follow) -done(stop) +cmd_unknown, 26 unknown, 27 do -refused(unknown) +cmd_paw, 28 paw, 29 do -done(paw) -battery_ok +battery_low +cmd_find(bottle), 30 find_low[T=bottle], 31 do -refused(find) +cmd_sit, 32 sit[P=standing], 33 do -done(sit) +cmd_turn(left), 34 turn_down[S=left,P=sitting], 35 do -refused(turn)"}}
+{"dir": "out", "msg": {"id": "t2", "domain": "dog", "tool": "why", "args": {"atom": "refused(find)"}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "read", "ref": {"seq": 35, "beat": 18}, "tool": "why", "output": "why refused(find) (last produced by event 30) \u2014 not present now: 31 of 36 occurrences\n   0 |  0 #init  (the base state)\n   1 |  1 do +cmd_sit\n   2 |  2 sit[P=standing]  L114: sit [dyn] : cmd_sit * posture(P) * other(P, sitting) * $floor_dry -o posture(sitting) * done(sit).\n   3 |  3 do -done(sit) +cmd_go(kitchen)\n   4 |  4 go_closed[P=kitchen]  L146: go_closed [dyn] : cmd_go(P) * $mapped(P) * $closed(P) -o refused(go).\n   5 |  5 do -refused(go) +cmd_stand\n   6 |  6 stand[P=sitting]  L108: stand [dyn] : cmd_stand * posture(P) * other(P, standing) * $battery_ok -o posture(standing) * done(stand).\n   7 |  7 do -done(stand) +cmd_go(tag3)\n   8 |  8 go[P=tag3]  L142: go [dyn] : cmd_go(P) * idle * $posture(standing) * $mapped(P) * $open(P) -o moving(P) * progress(go).\n   9 |  9 do -progress(go) +cmd_find(keys)\n  10 | 10 find_busy[T=keys,P=tag3]  L168: find_busy [dyn] : cmd_find(T) * $moving(P) -o refused(find).\n  11 | 11 do -refused(find) +arrived(tag3)\n  12 | 12 arrive[P=tag3,Q=door]  L156: arrive [dyn] : moving(P) * arrived(P) * at(Q) -o at(P) * idle * done(go).\n  13 | 13 do -done(go) +cmd_move(backward)\n  14 | 14 move_wall[W=backward]  L132: move_wall [dyn] : cmd_move(W) * $posture(standing) * $wall(W) -o refused(move).\n  15 | 15 do -refused(move) +cmd_find(extinguisher)\n  16 | 16 find[T=extinguisher]  L164: find [dyn] : cmd_find(T) * idle * $battery_ok -o searching(T) * progress(find).\n  17 | 17 do -progress(find) +cmd_query(chair)\n  18 | 18 query_seen[T=chair]  L218: query_seen [dyn] : cmd_query(T) * $seen(T) -o done(query).\n  19 | 19 do -done(query) +locked_away(extinguisher)\n  20 | 20 find_locked[T=extinguisher]  L178: find_locked [dyn] : searching(T) * locked_away(T) -o idle * refused(find).\n  21 | 21 do -refused(find) +cmd_follow\n  22 | 22 follow  L184: follow [dyn] : cmd_follow * idle * $posture(standing) * $person_in_view -o following * progress(follow).\n  23 | 23 do -progress(follow) +cmd_stop\n  24 | 24 stop_follow  L204: stop_follow [dyn] : cmd_stop * followin\n\u2026 [613 more characters cut]"}}
+{"dir": "out", "msg": {"id": "t3", "domain": "dog", "tool": "state", "args": {}}}
+{"dir": "in", "msg": {"domain": "dog", "kind": "read", "ref": {"seq": 35, "beat": 18}, "tool": "state", "output": "stage (done)\n  at              (tag3)\n  battery_low     \u00b7\n  clear           (forward)\n  closed          (kitchen) (window_chair)\n  floor_dry       \u00b7\n  free            (around) (left) (right)\n  idle            \u00b7\n  leg_ok          \u00b7\n  mapped          (door) (kitchen) (tag3) (tag_near) (window_chair)\n  open            (door) (tag3) (tag_near)\n  person_in_view  \u00b7\n  posture         (sitting)\n  seen            (chair) (table)\n  unmapped        (elsewhere) (sofa) (tag5)\n  unseen          (bottle) (extinguisher) (keys)\n  wall            (backward)"}}

@@ -1,0 +1,39 @@
+[
+ {
+  "name": "kitchen",
+  "file": "/home/axadmin/repo/perotheia-packages/metispy/metis/domains/kitchen/catalogs/kitchen_host.llp",
+  "text": "a one-cook kitchen: onions into the pot, cook, plate and serve each order",
+  "relation": "served",
+  "moves": [],
+  "effects": [],
+  "slots": [],
+  "display": "the first cook"
+ },
+ {
+  "name": "kitchen_shared",
+  "file": "/home/axadmin/repo/perotheia-packages/metispy/metis/domains/kitchen/catalogs/kitchen_shared.llp",
+  "text": "a shared kitchen: a second cook also loads onions into the pot",
+  "relation": "sibling",
+  "slots": [],
+  "moves": [
+   "partner_load"
+  ],
+  "effects": [
+   {
+    "name": "partner_load",
+    "consume": {
+     "pot_space": 1
+    },
+    "produce": {
+     "pot_onion": 1
+    },
+    "persist": {}
+   }
+  ],
+  "display": "the second cook"
+ },
+ {
+  "name": "dog",
+  "display": "the dog"
+ }
+]
