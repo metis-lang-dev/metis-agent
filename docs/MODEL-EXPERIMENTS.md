@@ -974,3 +974,117 @@ text); parameterless tools declared with an empty properties object gain
 E2B on the dog corpus whose examples were tuned on E2B (52/54 against
 54/54), so a model change is an example re-tuning; and on E4B the J lead
 on async outcomes grows (42 against 36).
+
+## E11 — the consult loop on the orchestrator (architect, 2026-10-13; s-a0477202)
+
+**Question.** After a refusal or a failure, does E2B make the right next move? Here the harness owns the steering and the consult response is typed: call an alternative, consult, explain, ask, reset or escalate, and never repeat the refused call. DESIGN.md "Domain usage vs domain management" and "The direction of the intent schema" are the design. J-text on E2B Q4.
+
+**The consult response, frozen before the corpus:** `{kind: explains | missing | noise | unexplained, text, cause {card, move} (explains), resource {atom, words} (missing), evidence [...] (journal only, never spoken), calls}`. Each kind names a move:
+- explains → explain(card, move)
+- missing → ask(person), naming the resource in the person's words
+- noise → reset
+- unexplained → escalate(text)
+- the same refusal again → ask or escalate, never the same call
+
+**Groups:**
+- **G1 (12):** refused with alternatives (1, 2 or 3; the dog and the kitchen) → one of the alternatives.
+- **G2 (12):** refused or failed without alternatives → consult(domain, "why …").
+- **G3 (24, the four kinds × 6):** a consult answered → the move its kind names, then a spoken line that names what happened.
+- **G4 (6):** the same refusal returns after the move → ask or escalate.
+- **G5 (6 × 3 seeds):** kind missing → the ask names the resource in the person's words.
+
+**Pre-registered reads:**
+1. The next move is right: G1 ≥ 11/12, G2 ≥ 11/12, G3 ≥ 22/24 (≥ 5/6 per kind), G4 6/6.
+2. ask fires on every G5 item and on no item of another kind.
+3. The refused call is never repeated.
+4. 0 leaks and 0 completion claims over every spoken line.
+5. Thinking (256 cap) only on a read that fails by ≤ 2.
+
+**Decision rule.** The loop is adopted if reads 1–4 hold. If read 1 fails on G3 alone, the move is templated from `kind`. If G1/G2 fail, the cue text is the lever, not the model.
+
+### E11 run (opus, 2026-10-13)
+
+**Setup.** E2B Q4 on the GPU (ngl 99, n_ctx 8192, pass-2 seed 1 + rep). The 66 items ran in 56 s.
+- **Prompt.** The prompt is `grammar/e11-prompt-j.txt`: E10's J prompt plus a loop section, which states the table and gives seven examples from another world (the garden). 3502 prefix tokens.
+- **The move.** Every next move is one JSON call, greedy under `grammar/e11-next.gbnf`: the dog intents (`dog.gbnf`), or `{"call":…}` of consult, ask, explain, reset, escalate, activate, deactivate or keep.
+- **History.** Each item's history is scripted from E10's fixtures (the dog rows, the pair's surprise, E4's changes) with gold calls and lines. Only the scored moves and lines are generated.
+- **Harness pieces, all on the bench side** (`tools/e11-corpus.py`, `llmbench -e10` with two new step forms):
+  - **The loop cue** after every refusal and every consult answer.
+  - **The repeat guard,** ported from py/ §7a. It covers the same-call case only: the refused call again, matched as canonical JSON (the new `by: canon`), brings a note and the move asked again, at most twice. §7a's refused-verb case does not port, because an alternative may share the refused call's verb (NAVIGATE refused → NAVIGATE elsewhere).
+  - **commandPhrase with identity:** "your command to go to tag 5 (c1)", "turn left 90 degrees".
+  - **The explain admission** answered with a fixed runtime line.
+- **G5s (information).** G5's move is greedy, so its three seeds differ only in the sampled lines, and G5 has none, because the ask is the line. G5s repeats the six items with the move sampled (temp 0.4, seed 1 + rep).
+- **J-state (information, after run1).** The same corpus with the cue naming the branch of the loop the harness knows it is in: alternatives offered, none, a consult answered, or the same refusal again. The move stays the model's.
+
+| read | run1 (the generic cue) | J-state (the cue names the branch) |
+|---|---|---|
+| 1 G1 alternatives (needs ≥ 11) | **10/12** (1 alt 4/4, 2 alts 3/4, 3 alts 3/4) | **10/12** (the same two items) |
+| 1 G2 consult (≥ 11) | **7/12** | 11/12 |
+| 1 G3 by kind (≥ 22, ≥ 5 each) | 23/24: explains 6, missing 5, noise 6, unexplained 6 | 24/24 |
+| 1 G4 ask/escalate (6/6) | **1/6** | 6/6 |
+| 2 ask on all of G5, nowhere else | 18/18, **1 stray** (G2-07) | 18/18, 0 stray |
+| 3 the refused call repeated | 0 (the guard never fired) | 0 |
+| 4 leaks / claims over the lines | 0 / 0 (67 lines) | 0 / **1** (70 lines) |
+| G3 line names what happened (beside read 1) | 11/18 | 10/18 |
+| G5s ask / names the resource | 18/18 / 18/18 | 18/18 / 18/18 |
+
+**Every miss, run1:**
+- **G1-03** ("walk to the sofa" refused; alternatives FIND sofa, NAVIGATE living room) and **G1-05** ("find a fire extinguisher" refused; alternatives QUERY, NAVIGATE hallway, CANCEL): it consulted the dog domain instead.
+- **G2-01:** it consulted, but with the kitchen domain for the dog's blocked path.
+- **G2-03, G2-05, G2-10:** escalate ("no person is in view", "the way to tag five is blocked", "the move partner load did not fire").
+- **G2-07:** ask ("Could you put some onions in the dispenser?"), the guess at the resource that the consult would have found. This is also read 2's stray.
+- **G3-07-missing:** escalate "Nobody is in front of the camera." instead of asking.
+- **G4-01 to 04 and G4-06:** consult again with the same question. That repeats the consult, not the refused call, so the guard does not see it. G4-05 escalated.
+- **G3 lines** that do not name what happened:
+  - All six explains: "The kitchen is now back to normal." The second cook is never named.
+  - G3-23: "The model has been updated with the new information." for an escalation.
+
+**Every miss, J-state:**
+- **G1-03, G1-05:** the same, consult.
+- **G2-01:** the kitchen domain again.
+- **Read 4:** G3-23's "…will see what I found" is a hit of E9's CLAIM pattern on "found". The line reports an escalation and claims no task.
+- **G3 lines:**
+  - The explains lines: "I have adopted that information." ×5, "The kitchen is now back to normal."
+  - G3-15: "The floor is now dry."
+  - G3-20: "The situation is being reviewed by the system."
+
+**Reads.**
+1. **Read 1 fails on G1, G2 and G4 with the generic cue; G3 holds.**
+   - The model classifies a consult answer into its move almost perfectly: 23/24, then 24/24.
+   - What it does not do is tell the three states apart from the generic cue alone. It consults when alternatives were offered (G1, 2 items), escalates or asks when it should consult (G2, 5 items), and consults again when the same refusal returns (G4, 5 items).
+   - With the cue naming the branch, G2 reaches 11/12 and G4 6/6. G1 stays at 10/12 on the same two items: told to call an offered alternative, it consults anyway. Both items offer FIND/QUERY alternatives to a NAVIGATE/FIND the model would rather ask about.
+2. **Read 2 fails by one stray ask** (G2-07) with the generic cue and holds with the state cue. G5 asks on every item and names the resource in the person's words 18/18, greedy and sampled alike.
+3. **Read 3 holds in both runs.** No move repeated the refused call, so the repeat guard never had to act. The one repeat that did happen is G4's second consult, which repeats a question, not a refused call.
+4. **Read 4 holds with the generic cue** (0 / 0 over 67 lines). With the state cue it fails by one claim, the pattern's "found" in a line that reports an escalation.
+5. **Thinking: not run.**
+   - G1 fails by one item in both runs, and read 2 by one in run1, so read 5 applies.
+   - The scripted-dialog bench cannot think, though. `llm.Gen` has no thought pass (llmbench's `-think` primes `<|think|>`, but only the one-shot paths, the two-pass turn, `Narrate`, `Propose` and `Answer`, run the thought channel). Adding one is a `go/internal/llm` change, which E11's brief excludes.
+   - It can run when that change is allowed.
+
+**Under the decision rule:** read 1 fails on G1 and G2 (and G4), so **the cue text is the lever, not the model**, and the loop is not adopted as is. The J-state run is that lever pulled once. It brings G2, G3 and G4 over their bars and read 2 with them. It leaves G1 one item short and read 4 one pattern hit over.
+
+**Findings to act on:**
+- **The harness knows the branch; the model should be told it,** or not asked. With alternatives offered, the harness can restrict the move's grammar to the alternatives, and G1's two consults become impossible. With the same refusal back, it can restrict the grammar to ask | escalate. Then the model's choice is left where it is reliable: the kind → move classification (G3) and the words of an ask (G5).
+- **The explains line is never the cause** (0/6 in both runs: "back to normal", "adopted that information"). The admission notice and its cause belong in a templated line, as E10 E found for the notice.
+- **A second consult with the same question is the repeat to guard in G4,** not the refused call. The guard's key should include the consult's question.
+
+**What would move into go/internal/agent if adopted:**
+- The loop cue per branch (speech.go's cues).
+- The repeat guard on the canonical call, plus the consult's question.
+- commandPhrase with identity.
+- The consult response's rendering into the runtime text turn.
+- The next-move grammar (dog intents + the loop's calls), restricted per branch.
+- The templated explain line.
+
+None of it changes the model's prompt beyond the loop section.
+
+**Reproduce** (from `go/`; results gitignored on taycann):
+
+```
+python3 tools/e11-corpus.py && python3 tools/e11-corpus.py --state-cues
+./bin/llmbench -model models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf -ngl 99 -threads 4 -n_ctx 8192 -pass2_seed 1 \
+  -prompt grammar/e11-prompt-j.txt -e10 grammar/e11-corpus.jsonl -tag e11-e2b-gpu -jsonl results/e11/run1.jsonl
+./bin/llmbench … -e10 grammar/e11-corpus-state.jsonl -tag e11-e2b-gpu-state -jsonl results/e11/run1-state.jsonl
+python3 tools/e11-score.py results/e11/run1.jsonl
+python3 tools/e11-score.py results/e11/run1-state.jsonl --corpus grammar/e11-corpus-state.jsonl
+```

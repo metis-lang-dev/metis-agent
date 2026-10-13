@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,6 +33,13 @@ import (
 //	 "else":text}                         call] or else (key: verb:arg:arg…)
 //	{"op":"loop","max":n,"until":key,     run body until the last call's
 //	 "body":[steps]}                      key is until, at most n times
+//	{"op":"while","keys":[…],"max":n,     run body while the last call's key
+//	 "by":…,"body":[steps]}               is one of keys, at most n times (E11:
+//	                                      the repeat guard; max 1 is an if)
+//
+// "by" picks what respond and while match (E11): "" the key above, "canon"
+// the call as canonical JSON (sorted keys, compact: nested arguments count,
+// so two NAVIGATEs to different goals differ), "name" the call's name.
 
 type e10Step struct {
 	Op      string            `json:"op"`
@@ -44,6 +52,8 @@ type e10Step struct {
 	Match   map[string]string `json:"match,omitempty"`
 	Else    string            `json:"else,omitempty"`
 	Until   string            `json:"until,omitempty"`
+	Keys    []string          `json:"keys,omitempty"`
+	By      string            `json:"by,omitempty"`
 	Body    []e10Step         `json:"body,omitempty"`
 }
 
@@ -253,6 +263,7 @@ type e10Run struct {
 	emit      func(any)
 	load      func(string) string
 	name, key string    // the last call
+	canon     string    // the last call as canonical JSON (J calls only)
 	since     time.Time // the end of the model's last output: what was injected since counts to the first token
 }
 
@@ -264,7 +275,7 @@ func (r *e10Run) steps(steps []e10Step, try int) error {
 				return err
 			}
 		case "respond":
-			text, ok := st.Match[r.key]
+			text, ok := st.Match[r.by(st.By)]
 			if !ok {
 				text = st.Else
 			}
@@ -290,6 +301,7 @@ func (r *e10Run) steps(steps []e10Step, try int) error {
 			}
 			if name, key := callOf(text); name != "" {
 				r.name, r.key, g.Key = name, key, key
+				r.canon = canonJSON(text)
 			}
 			r.emit(g)
 			if r.rep == 0 {
@@ -304,11 +316,48 @@ func (r *e10Run) steps(steps []e10Step, try int) error {
 					break
 				}
 			}
+		case "while":
+			for k := 1; k <= max(st.Max, 1) && slices.Contains(st.Keys, r.by(st.By)); k++ {
+				if err := r.steps(st.Body, k); err != nil {
+					return err
+				}
+			}
 		default:
 			return fmt.Errorf("e10: unknown step %q", st.Op)
 		}
 	}
 	return nil
+}
+
+func (r *e10Run) by(how string) string {
+	switch how {
+	case "canon":
+		return r.canon
+	case "name":
+		return r.name
+	}
+	return r.key
+}
+
+// canonJSON is the first JSON object in a generation with its keys sorted,
+// compact, HTML characters unescaped: tools/e11-corpus.py writes the same
+// with json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=False).
+func canonJSON(text string) string {
+	i := strings.IndexByte(text, '{')
+	if i < 0 {
+		return ""
+	}
+	var v any
+	if err := json.NewDecoder(strings.NewReader(text[i:])).Decode(&v); err != nil {
+		return ""
+	}
+	var b strings.Builder
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return ""
+	}
+	return strings.TrimSuffix(b.String(), "\n")
 }
 
 // dumpE10 writes the decide seat as the harness renders it from the cards
