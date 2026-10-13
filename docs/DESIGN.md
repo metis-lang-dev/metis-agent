@@ -320,3 +320,12 @@ narrator and request-mapper only.
 - [metis-lang org](https://github.com/metis-lang-dev); Behavior
   Programs as Measures over Proofs, draft 0.3 (zero probability as
   the surprise signal; admission-time certificates).
+
+## Two application domains (user, 2026-10-13)
+
+The kernel serves two applications with the roles reversed: the
+**executive** (the runtime in charge, the LLM proposes and narrates; the
+robot; `go/`, FRAMEWORK.md) and the **specialist** (the LLM in charge, the
+kernel its instrument through the REPL; `py/`, SPECIALIST.md). They meet in
+the Decide step. The orchestrator contract above is the executive's IO;
+the specialist's tools are the REPL verbs.
