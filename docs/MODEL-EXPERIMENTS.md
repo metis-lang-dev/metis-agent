@@ -678,3 +678,28 @@ Both runs used E2B Q4_K_M, template gemma4, thinking off, beside the user's meti
 - Read 1 asks for "not worse": met by T (54/54). T-rt's own prompt drops one held-out row (53/54).
 - So the rule passes for tools if pass 1 is T's prompt, but the rule's read 5 arm (T-rt) brings a prompt whose pass 1 is one row worse.
 - The ruling is the architect's.
+
+### E9 ruling (architect, 2026-10-13)
+
+**J stays.** Under the pre-registered rule and on every measured number:
+the JSON two-pass makes 54/54 on class and 54/54 on arguments with 0/270
+voice leaks; the pinned tool call ties on class, loses two rows on
+arguments and is 112 ms slower from its larger grammar; the fair round-trip
+arm loses a held-out row under its own prompt and reports a task done on 5
+lines because the result turn invites it. Gemma 4's trained call discipline
+is real (53/54 well-formed unpinned) but on this corpus, with the 40
+examples, it buys nothing over the JSON. The domains block of FRAMEWORK §4
+stays text; G-F is not triggered. The rollback question is moot: J never
+rewinds between its passes (design premise corrected above).
+
+**The finding to act on is latency, not format.** The grammar sampler
+costs ≥ 240 ms of J's 418 ms to the intent. Unpinned, the model writes a
+well-formed, correct JSON on 54/54 rows in ≤ 178 ms, and in the same pass
+the spoken line after it. **E9b (proposed, not started):** free-then-verify
+on the agent's intent path — decode unpinned, validate the JSON as strictly
+as `dog.gbnf` admits (intent enum, field types, enums), fall back to the
+pinned pass only on a validation failure, and take the unasked spoken line
+as pass 2 when it is leak-free. Measure on the corpus: fallbacks, ms to the
+intent, parity 54/54 kept, the 270 unasked lines' leak count (0 required).
+The certified surface stays token-exact because nothing unvalidated reaches
+the dispatcher. The user decides whether E9b runs.
