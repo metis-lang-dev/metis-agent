@@ -13,6 +13,8 @@ admits for it) this writes:
                                  (<|tool>declaration:…<tool|>, the GGUF template's
                                  format_function_declaration, ported below)
   grammar/dog-tools-prompt-noex.txt   the same without the intent examples (read 4)
+  grammar/dog-tools-prompt-rt.txt     T with the pass-2 examples as round-trips: the
+                                 call, <|tool_response> {status:accepted}, the line (T-rt)
 
 The intent examples are converted from grammar/dog-prompt.txt and
 grammar/pass2-examples-gemma4.txt by json_to_call, the inverse of
@@ -233,15 +235,44 @@ def convert_examples(text, keep_examples, n):
     return "\n".join(out)
 
 
-def t_prompt(tools, keep_examples):
+RT_STATUS = "accepted"  # the dispatcher's acknowledgement: handed over, not done
+
+
+def rt_response(call):
+    """The result turn after a call (the template's format_tool_response_block)."""
+    name = re.search(r"call:([A-Za-z_]+)\{", call).group(1)
+    return "<|tool_response>response:%s{status:%s}<tool_response|>" % (name, fmt_arg(RT_STATUS))
+
+
+def rt_pass2(p2):
+    """The pass-2 section rendered as round-trips (E9 rerun, T-rt): the call,
+    the result turn, then the spoken line in the same model turn."""
+    lines, out = p2.splitlines(), []
+    k = 0
+    while k < len(lines):
+        m = EX.match(lines[k])
+        if m and k + 1 < len(lines) and lines[k + 1].startswith("Spoken response: "):
+            call = json_to_call(json.loads(m.group(2)))
+            out.append("%s → %s%s%s" % (m.group(1), call, rt_response(call), lines[k + 1][len("Spoken response: "):]))
+            k += 2
+            continue
+        out.append(lines[k].replace("## Spoken response (after the JSON)", "## Spoken response (after the robot's answer)")
+                   .replace('After the JSON comes "Spoken response:" and one short sentence',
+                            "After the call the robot answers it; then comes one short sentence")
+                   .replace("never JSON and never an intent name", "never a call and never an intent name"))
+        k += 1
+    return "\n".join(out)
+
+
+def t_prompt(tools, keep_examples, rt=False):
     dog = (GO / "grammar/dog-prompt.txt").read_text()
     p2 = (GO / "grammar/pass2-examples-gemma4.txt").read_text()
     ex = dog[dog.index("## Examples"):]
     n = [0]
     body = PERSONA + "\n" + convert_examples(ex, keep_examples, n).rstrip("\n") + "\n"
     # the pass-2 section keeps its three examples in both prompts: they teach
-    # the spoken line, not the intent
-    body += convert_examples(p2, True, [0])
+    # the spoken line, not the intent; T-rt's shows them as round-trips
+    body += rt_pass2(p2) if rt else convert_examples(p2, True, [0])
     if not keep_examples:
         body = body.replace("## Examples (utterance → call)\n", "## Rules\n")
     return body.rstrip() + "".join(declaration(t) for t in tools), n[0]
@@ -255,6 +286,8 @@ def main():
     noex, _ = t_prompt(tools, False)
     (GO / "grammar/dog-tools-prompt.txt").write_text(full)
     (GO / "grammar/dog-tools-prompt-noex.txt").write_text(noex)
+    rt, _ = t_prompt(tools, True, rt=True)
+    (GO / "grammar/dog-tools-prompt-rt.txt").write_text(rt)
     # round trip: every example's call maps back to its JSON
     sys.path.insert(0, str(GO / "tools"))
     score = __import__("e9-score")

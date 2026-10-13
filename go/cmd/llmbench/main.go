@@ -169,10 +169,12 @@ func main() {
 	capF := flag.String("cap", "", "cap check (consolidation step 1): the orchestrator's surprise narration on the hour's surprise shapes at these thought caps (e.g. 0,64,256); -e8-cards, -e8-reps, -pass2_seed")
 	e8K := flag.Int("e8-k", 12, "E8: the orchestrator's flat insertion, passed fragments per question (the harness's rack.k)")
 	eventsF := flag.String("events", "", "narrate corpus (intent<TAB>args JSON<TAB>result<TAB>detail): each task outcome through the harness's taskCue + Narrate + guard")
-	toolsF := flag.String("tools", "", "E9: the dog intents as native tool calls — arms J,T,T-free,T-noex (T-think with -think) on -corpus; -tools-reps seeded pass-2 repeats from -pass2_seed")
+	toolsF := flag.String("tools", "", "E9: the dog intents as native tool calls — arms J,J-free,T,T-rt,T-free,T-noex (T-think with -think) on -corpus; -tools-reps seeded pass-2 repeats from -pass2_seed")
 	toolsJPrompt := flag.String("tools-j-prompt", "grammar/dog-prompt.txt,grammar/pass2-examples-gemma4.txt", "E9: arm J's prompt files, concatenated (the harness's prompt + prompt_extra)")
 	toolsTPrompt := flag.String("tools-prompt", "grammar/dog-tools-prompt.txt", "E9: the T prompt (tools/e9-tools.py)")
 	toolsNoex := flag.String("tools-prompt-noex", "grammar/dog-tools-prompt-noex.txt", "E9: the T prompt without the intent examples")
+	toolsRT := flag.String("tools-prompt-rt", "grammar/dog-tools-prompt-rt.txt", "E9: the T-rt prompt (pass-2 examples as round-trips)")
+	toolsRTStatus := flag.String("tools-rt-status", "accepted", "E9: T-rt's result turn, {status:<this>}")
 	toolsGbnf := flag.String("tools-gbnf", "grammar/dog-tools.gbnf", "E9: the call grammar (tools/e9-tools.py)")
 	toolsReps := flag.Int("tools-reps", 5, "E9: pass-2 repeats per row and mode")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
@@ -293,7 +295,7 @@ func main() {
 		if len(rows) == 0 {
 			fail(fmt.Errorf("-tools needs -corpus"))
 		}
-		runTools(l, rows, *toolsF, *toolsJPrompt, *gbnfF, *toolsTPrompt, *toolsNoex, *toolsGbnf, *tag, *toolsReps, uint32(*seed), emit)
+		runTools(l, rows, *toolsF, *toolsJPrompt, *gbnfF, *toolsTPrompt, *toolsNoex, *toolsRT, *toolsGbnf, *toolsRTStatus, *tag, *toolsReps, uint32(*seed), emit)
 		return
 	}
 	if *capF != "" {

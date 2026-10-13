@@ -7,7 +7,7 @@ reference answers (fsttm-web test/fixtures/harness-e2b.jsonl).
 
 Records (cmd/llmbench -tools):
 
-  e9-call   one pass 1 per row and arm (J | T | T-free | T-noex):
+  e9-call   one pass 1 per row and arm (J | J-free | T | T-rt | T-free | T-noex):
             arm, utt, want, src, text (special tokens rendered), ms_intent
             (the tail's evaluation + the generation), n_prefix, n_out
   e9-voice  one pass 2 per row, mode and repeat (J | T-rewind | T-rt):
@@ -193,11 +193,41 @@ def well_formed(text, tools):
     return (not errs), "; ".join(errs)
 
 
+def json_first(text):
+    """The first JSON object in text and what follows it (J-free parses
+    after the fact, as T-free does)."""
+    t = text.strip()
+    j, end = json.JSONDecoder().raw_decode(t)
+    if not isinstance(j, dict):
+        raise json.JSONDecodeError("not an object", t, 0)
+    return j, t[end:].strip()
+
+
+def json_well_formed(text, tools):
+    """J-free: one JSON object, then nothing or the prompt's own "Spoken
+    response:" line (J-free decodes on into its pass 2 unasked), a declared
+    intent, its fields within that intent's declared types (the T-free
+    check)."""
+    try:
+        j, rest = json_first(text)
+    except json.JSONDecodeError as e:
+        return False, "unparsable JSON: %s" % e
+    if rest and not CUE.match(rest):  # its own pass 2 after the JSON is the prompt's convention, not malformed
+        return False, "text after the JSON: %r" % rest[:60]
+    j = dict(j)
+    name = j.pop("intent", None)
+    if name not in tools:
+        return False, "undeclared intent %r" % name
+    p = tools[name].get("parameters")
+    errs = check(j, p, name) if p else (["%s: takes no fields" % name] if j else [])
+    return (not errs), "; ".join(errs)
+
+
 def to_json(rec):
     """(intent class, parsed JSON or None, error) through the one mapping."""
-    if rec["arm"] == "J":
+    if rec["arm"] in ("J", "J-free"):
         try:
-            j = json.loads(rec["text"])
+            j, _ = json_first(rec["text"])
             return j.get("intent", "?"), j, ""
         except json.JSONDecodeError as e:
             return "?", None, "unparsable JSON: %s" % e
@@ -210,6 +240,8 @@ def to_json(rec):
 
 # E1's check (cmd/llmbench voiceBad) plus the "Nina" address
 BARE = re.compile(r'^"?[A-Z_]+"?$')
+# a spoken line that reports the task done when it was only handed over
+CLAIM = re.compile(r"\b(found|arrived|i am at|i'm at|i'm here|i am here|done)\b", re.I)
 CUE = re.compile(r"^\W*spoken response\s*:", re.I)
 NINA = re.compile(r"^(hi|hello|hey|okay|ok)?,?\s*nina\b|,\s*nina\b", re.I)
 
@@ -262,7 +294,7 @@ def main():
     print("| arm | class | prompt | heldout | JSON identical | well-formed | ms to intent p50 | prefix tok |")
     print("|---|---|---|---|---|---|---|---|")
     misses = defaultdict(list)
-    for arm in ("J", "T", "T-free", "T-noex", "T-think"):
+    for arm in ("J", "J-free", "T", "T-rt", "T-free", "T-noex", "T-think"):
         rs = calls.get(arm)
         if not rs:
             continue
@@ -284,19 +316,19 @@ def main():
             hit += ok_cls
             by[src][0] += ok_cls
             ident += ok_id
-            wfo, why = well_formed(r["text"], tools) if arm != "J" else (True, "")
+            wfo, why = (True, "") if arm == "J" else json_well_formed(r["text"], tools) if arm == "J-free" else well_formed(r["text"], tools)
             wf += wfo
             if not (ok_cls and ok_id and wfo):
                 misses[arm].append((utt, r["src"], cls, want["want"], "CLASS %s want %s" % (cls, want["want"]) if not ok_cls else ("args" if not ok_id else "form"), r["text"], want["json"], err or why))
-        wfcol = "%d/%d" % (wf, n) if arm == "T-free" else "—"
+        wfcol = "%d/%d" % (wf, n) if arm in ("T-free", "J-free") else "—"
         pref = sorted({r["n_prefix"] for r in rs.values()})
         print("| %s | %d/%d | %d/%d | %d/%d | %d/%d | %s | %d | %s |" % (
             arm, hit, n, by["prompt"][0], by["prompt"][1], by["heldout"][0], by["heldout"][1],
             ident, n, wfcol, p50(ms), ",".join(map(str, pref))))
 
     print("\n## Pass 2 (the spoken line), all repeats\n")
-    print("| mode | lines | leaks | echo | ms to first spoken token p50 | p90 | tokens decoded before speaking (mean) |")
-    print("|---|---|---|---|---|---|---|")
+    print("| mode | lines | leaks | echo | completion claims | ms to first spoken token p50 | p90 | tokens decoded before speaking (mean) |")
+    print("|---|---|---|---|---|---|---|---|")
     leaks = defaultdict(list)
     for arm in ("J", "T-rewind", "T-rt"):
         vs = voices.get(arm)
@@ -311,8 +343,8 @@ def main():
             if v["voice"].strip().lower().rstrip(".!?") == v["utt"].lower():
                 ne += 1
         fs = sorted(v["ms_first"] for v in vs)
-        print("| %s | %d | %d | %d | %d | %d | %.1f |" % (
-            arm, len(vs), nl, ne, p50(fs), fs[int(len(fs) * 0.9)] if fs else 0,
+        print("| %s | %d | %d | %d | %d | %d | %d | %.1f |" % (
+            arm, len(vs), nl, ne, sum(1 for v in vs if CLAIM.search(v["voice"])), p50(fs), fs[int(len(fs) * 0.9)] if fs else 0,
             statistics.mean(v["n_cont"] for v in vs)))
 
     print("\n## Misses (class, JSON identical, or well-formed), with the call the model made\n")

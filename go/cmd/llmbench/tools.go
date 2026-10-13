@@ -18,10 +18,16 @@ import (
 //	J       pass 1: JSON under dog.gbnf, the harness's prompt (dog prompt +
 //	        the gemma4 pass-2 examples); pass 2 "J": the bare "\nSpoken
 //	        response:" after the JSON, as TwoPass does
+//	J-free  pass 1: J's prompt, no grammar; parsed after (the grammar's
+//	        cost apart from the format's)
 //	T       pass 1: one native call under dog-tools.gbnf, the T prompt;
-//	        pass 2 "T-rewind": the bare cue after the call, as J;
-//	        pass 2 "T-rt": the call stays, a <|tool_response> carries
-//	        {status:ok}, the model speaks on in its turn
+//	        pass 2 "T-rewind": the bare cue after the call, as J
+//	T-rt    pass 1: as T under the T-rt prompt (its pass-2 examples are
+//	        round-trips); pass 2 "T-rt": the call stays, a <|tool_response>
+//	        carries {status:<-tools-rt-status>}, the model speaks on in its
+//	        turn. (Step 1's first run put T-rt after T's own prompt with
+//	        {status:ok}: the prompt's bare-cue convention leaked into every
+//	        line — results/e9/run1.)
 //	T-free  pass 1: the T prompt, no grammar; parsed after (e9-score.py)
 //	T-noex  pass 1: T without the intent examples (read 4)
 //	T-think pass 1: T with the thought channel (read 6; needs -think)
@@ -60,12 +66,12 @@ var callName = regexp.MustCompile(`<\|tool_call>call:([A-Za-z_]+)\{`)
 
 // rtResponse is the dispatcher's acknowledgement as the template's
 // format_tool_response_block renders a mapping.
-func rtResponse(call string) string {
+func rtResponse(call, status string) string {
 	name := "unknown"
 	if m := callName.FindStringSubmatch(call); m != nil {
 		name = m[1]
 	}
-	return `<|tool_response>response:` + name + `{status:<|"|>ok<|"|>}<tool_response|>`
+	return `<|tool_response>response:` + name + `{status:<|"|>` + status + `<|"|>}<tool_response|>`
 }
 
 func readPrompt(list string) (string, error) {
@@ -80,7 +86,7 @@ func readPrompt(list string) (string, error) {
 	return b.String(), nil
 }
 
-func runTools(l *llm.LLM, rows []row, arms, jPrompt, jGbnf, tPrompt, tNoex, tGbnf, tag string, reps int, seed uint32, emit func(any)) {
+func runTools(l *llm.LLM, rows []row, arms, jPrompt, jGbnf, tPrompt, tNoex, tRT, tGbnf, rtStatus, tag string, reps int, seed uint32, emit func(any)) {
 	type arm struct {
 		name, prompt, gbnf string
 		pass2              []string // pass-2 modes after this pass 1
@@ -96,7 +102,9 @@ func runTools(l *llm.LLM, rows []row, arms, jPrompt, jGbnf, tPrompt, tNoex, tGbn
 	jg, tg := load(jGbnf), load(tGbnf)
 	all := map[string]arm{
 		"J":       {"J", load(jPrompt), jg, []string{"J"}, 80},
-		"T":       {"T", load(tPrompt), tg, []string{"T-rewind", "T-rt"}, 120},
+		"J-free":  {"J-free", load(jPrompt), "", nil, 160},
+		"T":       {"T", load(tPrompt), tg, []string{"T-rewind"}, 120},
+		"T-rt":    {"T-rt", load(tRT), tg, []string{"T-rt"}, 120},
 		"T-free":  {"T-free", load(tPrompt), "", nil, 160},
 		"T-noex":  {"T-noex", load(tNoex), tg, nil, 120},
 		"T-think": {"T-think", load(tPrompt), tg, nil, 120},
@@ -107,7 +115,7 @@ func runTools(l *llm.LLM, rows []row, arms, jPrompt, jGbnf, tPrompt, tNoex, tGbn
 	for _, name := range strings.Split(arms, ",") {
 		a, ok := all[strings.TrimSpace(name)]
 		if !ok {
-			fail(fmt.Errorf("-tools: unknown arm %q (J, T, T-free, T-noex, T-think)", name))
+			fail(fmt.Errorf("-tools: unknown arm %q (J, J-free, T, T-rt, T-free, T-noex, T-think)", name))
 		}
 		if a.name == "T-think" && !l.Thinking() {
 			fail(fmt.Errorf("-tools T-think needs -think"))
@@ -133,7 +141,7 @@ func runTools(l *llm.LLM, rows []row, arms, jPrompt, jGbnf, tPrompt, tNoex, tGbn
 			for _, mode := range a.pass2 {
 				cont := "\nSpoken response:"
 				if mode == "T-rt" {
-					cont = rtResponse(text)
+					cont = rtResponse(text, rtStatus)
 				}
 				for rep := 0; rep < reps; rep++ {
 					s := uint32(0)
