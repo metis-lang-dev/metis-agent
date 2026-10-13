@@ -1145,3 +1145,50 @@ python3 tools/e11-corpus.py --run2
   -prompt grammar/e11-prompt-j2.txt -e10 grammar/e11-corpus-run2.jsonl -tag e11-e2b-gpu-run2 -jsonl results/e11/run2.jsonl
 python3 tools/e11-score.py results/e11/run2.jsonl --corpus grammar/e11-corpus-run2.jsonl
 ```
+
+### E11 ruling (architect, 2026-10-13)
+
+**Adopted.** Under the pre-registered rule, reads 1–4 hold on E2B for the
+configuration run as one in run 2: G1 12/12, G2 11/12, G3 23/24 with every
+kind ≥ 5, G4 6/6; ask on all of G5 and nowhere else; the refused call never
+repeated; 0 leaks and 0 claims over 66 lines. The harness-owned loop with
+the typed consult answer, inside DESIGN v3's generic reply, is the
+orchestrator's error loop.
+
+**What the two runs settled about the division of labour.** Run 1 showed
+the small model will not steer by itself: given the generic cue it consults
+when alternatives are offered, escalates instead of consulting, and repeats
+a consult. Run 2 showed the fix is structural, not a better prompt: the
+harness knows the branch from the generic reply (alternatives offered ·
+none · a consult answered · the same refusal again), names it in the cue and
+restricts the next-move grammar to the branch's moves. G1 and G4 then hold
+by construction; what remains the model's is the consult's domain and
+question (G2), the arguments of the move the answer fixes (G3), the words
+to the person (G5), and the sentence. That is the right split for E2B and
+it is now DESIGN v3's wording: the harness owns the branch, the model
+chooses within it and speaks.
+
+**Rulings on the misses.**
+- G2-01: the consult's domain is fixed to the refused call's domain in the
+  none-branch grammar. The harness knows it; the model reading "kitchen" in
+  a command as a domain is the kind of error the grammar exists to remove.
+- G3-07 and G5-02: the ask fires on the right branch but names the door, or
+  asks where the person is, instead of the resource in the person's words.
+  The ask's grammar gets the resource's `words` from the consult answer as a
+  required literal; the model writes the sentence around it.
+- The escalate and noise lines ("The model has been updated.", "The runtime
+  has returned to its model.") are unfaithful about what an escalation does.
+  Templated, as the explains line was: the escalate line names the people
+  who revise the model; the reset line says the reading was noise.
+- The J-state read-4 hit is a scorer pattern false positive (E9's CLAIM
+  pattern on "found" in an escalation line); the pattern gets an exclusion
+  for lines that report an escalation, and run 2 has 0 hits anyway.
+
+**What this does not cover, and goes to phase 2.** Run 2 rendered consult,
+explain, reset and escalate as E11's J calls; DESIGN v3 puts them on the
+REPL API as T tool calls. The T rendering of the API side is phase 2's first
+corpus, on the same items. The pieces that move into `go/internal/agent`
+are phase 2's step 1: the branch from the generic reply, the per-branch cue
+and grammar (consult domain fixed, ask words required), the repeat guard on
+the canonical call and the consult, commandPhrase with identity, the consult
+reply's rendering, the templated explains/escalate/reset lines.

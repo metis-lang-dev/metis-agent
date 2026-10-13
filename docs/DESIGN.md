@@ -160,8 +160,13 @@ agent, for every kind:
 `counts` are the R form. The orchestrator speaks from `text`, decides from
 `kind` and `status`, and never parses the domain's atoms.
 
-**The next-move table** (the error loop; the model classifies, the harness
-owns the steering):
+**The next-move table** (the error loop). E11 settled who does what: the
+harness knows the branch from the generic reply, names it in the cue and
+restricts the next move's grammar to that branch's moves; the model chooses
+within the branch (which alternative, the consult's question, the move's
+arguments, the words to the person) and speaks. With the generic cue alone
+E2B consulted when alternatives were offered and repeated consults; with the
+branch structural, reads hold (MODEL-EXPERIMENTS "E11 ruling"):
 
 ```
 result.refused with alternatives → intent on one of them
