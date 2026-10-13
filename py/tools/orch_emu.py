@@ -1,9 +1,24 @@
 #!/usr/bin/env python3
 """The orchestrator emulator (DESIGN.md v3 "Build order", phase 1): a
-scripted driver for one domain agent process over JSON lines. It sends the
-scenario's intents beat by beat, owns the clock, then makes the scenario's
-REPL API calls, and records every line both ways — the domain agent's test
-loop.
+scripted driver for domain agent processes over JSON lines. It sends the
+scenario's intents beat by beat, owns the clock (one beat, or one watch
+step for an interleaved pair: the agents in turn), applies DESIGN's
+next-move table to what comes back when the scenario asks for it, then
+makes the scenario's REPL API calls, and records every line both ways —
+the domain agent's test loop.
+
+The next-move table, as the emulator applies it (the harness owns the
+branch; DESIGN "The orchestrator agent"):
+
+    result.refused                → REPL consult(domain, "Why <reason>?")
+    surprise                      → REPL consult(domain, "Surprise N: what explains it?")
+    consult.explains              → REPL explain(domain, record, card, move)
+    consult.noise                 → REPL reset(domain, record)
+    consult.unexplained           → REPL escalate(domain, record, text)
+    consult.missing               → ask(person): logged, the emulator has no person
+
+(`refused with alternatives → an intent on one of them` is not applied: it
+would change the scripted day the parity reads.)
 
     py/.venv/bin/python py/tools/orch_emu.py py/tools/scenarios/dog-day.json [--out DIR]   # from metis-agent/
 
@@ -24,12 +39,14 @@ from metis_agent.reply import check  # noqa: E402
 
 
 class Agent:
-    def __init__(self, domain, narrate=False):
+    def __init__(self, domain, narrate=False, consult="", env=None, lines=None):
+        import os
+        self.domain = domain
         self.p = subprocess.Popen([sys.executable, "-m", "metis_agent.domain_agent", "--domain", domain]
-                                  + (["--narrate"] if narrate else []),
+                                  + (["--narrate"] if narrate else []) + (["--consult", consult] if consult else []),
                                   cwd=str(ROOT / "py"), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                  stderr=subprocess.PIPE, text=True, bufsize=1)
-        self.lines = []
+                                  stderr=subprocess.PIPE, text=True, bufsize=1, env=dict(os.environ, **(env or {})))
+        self.lines = lines if lines is not None else []
         self.ready = self._read()
 
     def _read(self):
@@ -37,14 +54,14 @@ class Agent:
         if not line:
             raise RuntimeError("domain agent died: " + self.p.stderr.read()[-800:])
         msg = json.loads(line)
-        self.lines.append({"dir": "in", "msg": msg})
+        self.lines.append({"dir": "in", "agent": self.domain, "msg": msg})
         return msg
 
     def send(self, msg, until=None):
         """Send one line; read the replies: until the clock's ack for a
         clock line, else exactly one reply per intent/tool line (the sync
         answer; the intent's later outcomes come with the beats)."""
-        self.lines.append({"dir": "out", "msg": msg})
+        self.lines.append({"dir": "out", "agent": self.domain, "msg": msg})
         self.p.stdin.write(json.dumps(msg) + "\n")
         self.p.stdin.flush()
         out = []
@@ -52,7 +69,7 @@ class Agent:
             r = self._read()
             out.append(r)
             if "clock" in msg:
-                if r.get("clock") == "beat":
+                if r.get("clock") == msg["clock"]:
                     return out
             else:
                 return out
@@ -147,15 +164,20 @@ def parity(scn, lines, intents, live=True):
 
 
 def render(scn, lines, par):
-    out = ["# orchestrator emulator — %s" % scn.get("about", scn["domain"]), ""]
+    out = ["# orchestrator emulator — %s" % scn.get("about", scn.get("domain", "")), ""]
+    many = len({l.get("agent") for l in lines}) > 1
+    who = (lambda l: "[%s] " % l.get("agent")) if many else (lambda l: "")
     for l in lines:
         m = l["msg"]
         if l["dir"] == "out":
             if "clock" in m:
                 continue
-            out.append("→ `%s`" % json.dumps(m))
+            out.append("→ %s`%s`" % (who(l), json.dumps(m)))
         elif m.get("clock") == "ready":
-            out += ["── beat 1 (intents sent now are asserted at its tick)"]
+            out += ["── %sready; beat 1 (intents sent now are asserted at its tick)" % who(l)]
+        elif m.get("clock") == "step":
+            if m.get("over"):
+                out += ["── %sthe host's episode is over (beat %s)" % (who(l), m.get("beat"))]
         elif "clock" in m:
             out += ["── the host's episode is over (beat %s); the REPL API after the day" % m.get("beat")
                     if m.get("over") else "── beat %d" % (m.get("beat", 0) + 1)]
@@ -163,48 +185,109 @@ def render(scn, lines, par):
             if m.get("kind") == "read":
                 o = m.get("output", "")
                 m = dict(m, output=o.splitlines()[0] + " …" if "\n" in o else o)
-            out.append("    ← `%s`" % json.dumps(m))
+            out.append("    ← %s`%s`" % (who(l), json.dumps(m)))
     if par:
         out += ["", "## parity with the hosted transcript", "", "```", json.dumps(par, indent=1), "```"]
     return "\n".join(out) + "\n"
 
 
+class Orchestrator:
+    """The scripted orchestrator: the next-move table over the replies."""
+
+    def __init__(self, agents, on=False):
+        self.agents, self.on, self.k = agents, on, 0
+        self.moves = []          # (trigger, the call made, its replies)
+
+    def call(self, ag, tool, args):
+        self.k += 1
+        msg = {"id": "o%d" % self.k, "domain": ag.domain, "tool": tool, "args": args}
+        out = ag.send(msg)
+        self.moves.append({"agent": ag.domain, "call": msg, "replies": out})
+        return out
+
+    def react(self, ag, replies):
+        if not self.on:
+            return
+        for r in replies:
+            if r.get("kind") == "result" and r.get("status") == "refused" and r.get("id", "").startswith("c"):
+                self.consulted(ag, self.call(ag, "consult", {"question": "Why %s?" % r.get("reason", "was it refused"),
+                                                             "max_calls": 6}), None)
+            elif r.get("kind") == "surprise":
+                self.consulted(ag, self.call(ag, "consult", {"question": "Surprise %d in your domain: what explains it?"
+                                                             % r["record"], "max_calls": 6}), r["record"])
+
+    def consulted(self, ag, out, record):
+        c = next((r for r in out if r.get("kind") == "consult"), None)
+        if c is None or record is None:
+            return
+        kind = c["answer_kind"]
+        if kind == "explains":
+            self.react(ag, self.call(ag, "explain", {"record": record, **c.get("cause", {})}))
+        elif kind == "noise":
+            self.call(ag, "reset", {"record": record})
+        elif kind == "unexplained":
+            self.call(ag, "escalate", {"record": record, "text": c.get("text", "")})
+        else:
+            self.moves.append({"agent": ag.domain, "call": {"ask": c.get("resource", {}).get("words", "")}, "replies": []})
+
+
 def main():
+    import tempfile
     ap = argparse.ArgumentParser()
     ap.add_argument("scenario")
     ap.add_argument("--out", default=str(ROOT / "py/results/domain-agent/step1"))
     ap.add_argument("--max-beats", type=int, default=200)
+    ap.add_argument("--max-steps", type=int, default=2000)
     ap.add_argument("--narrate", action="store_true", help="the agent's narrator writes text (gemma4 E2B)")
+    ap.add_argument("--consult", default="", choices=["", "gemma4", "claude"], help="the consultant's seat")
+    ap.add_argument("--next-move", action="store_true", help="apply the next-move table (also: scenario next_move)")
     a = ap.parse_args()
     scn = json.loads(Path(a.scenario).read_text())
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
 
-    ag = Agent(scn["domain"], a.narrate)
+    names = scn.get("agents") or [scn["domain"]]
+    pair_dir = tempfile.mkdtemp(prefix="pair-")     # the shared env of a pair (METIS_PAIR_DIR), removed at the end
+    lines = []
+    agents = [Agent(n, a.narrate, a.consult, {"METIS_PAIR_DIR": pair_dir}, lines) for n in names]
+    orch = Orchestrator(agents, a.next_move or scn.get("next_move", False))
     intents, k, over = {}, 0, False
-    for beat in range(1, a.max_beats + 1):
-        for m in scn["beats"].get(str(beat), []):
-            k += 1
-            msg = {"id": "c%d" % k, "domain": scn["domain"], **m}
-            intents[msg["id"]] = msg
-            ag.send(msg)
-        ack = ag.send({"clock": "beat"})[-1]
-        if ack.get("over"):
+    clock = scn.get("clock", "beat")
+    for tick in range(1, (a.max_steps if clock == "step" else a.max_beats) + 1):
+        for ag in agents:
+            for m in (scn.get("beats") or {}).get(str(tick), []) if ag is agents[0] else []:
+                k += 1
+                msg = {"id": "c%d" % k, "domain": ag.domain, **m}
+                intents[msg["id"]] = msg
+                ag.send(msg)
+            rs = ag.send({"clock": clock})
+            orch.react(ag, rs)
+        if all(l["msg"].get("over") for ag in agents
+               for l in [next(l for l in reversed(lines) if l["agent"] == ag.domain and "clock" in l["msg"])]):
             over = True
             break
     for j, m in enumerate(scn.get("after", []), 1):
-        ag.send({"id": "t%d" % j, "domain": scn["domain"], **m})
-    ag.close()
+        agents[0].send({"id": "t%d" % j, "domain": agents[0].domain, **m})
+    for ag in agents:
+        ag.close()
+    import shutil
+    shutil.rmtree(pair_dir, ignore_errors=True)
 
-    par = parity(scn, ag.lines, intents) if scn.get("reference") else None
+    mine = [l for l in lines if l["agent"] == names[0]]
+    par = parity(scn, mine, intents) if scn.get("reference") and len(names) == 1 and not orch.on else None
     with open(out / "transcript.jsonl", "w") as f:
-        for l in ag.lines:
+        for l in lines:
             f.write(json.dumps(l) + "\n")
-    (out / "transcript.md").write_text(render(scn, ag.lines, par))
+    with open(out / "moves.jsonl", "w") as f:
+        for m in orch.moves:
+            f.write(json.dumps(m) + "\n")
+    (out / "transcript.md").write_text(render(scn, lines, par))
     if par:
         (out / "parity.json").write_text(json.dumps(par, indent=1) + "\n")
         print(json.dumps({k: v for k, v in par.items() if k not in ("first_event_diff", "first_outcome_diff")}))
-    print("episode over: %s; %d lines; wrote %s" % (over, len(ag.lines), out))
+    bad = [e for l in lines if l["dir"] == "in" and "kind" in l["msg"] for e in check(l["msg"])]
+    print("episode over: %s; %d lines; %d next moves; field violations %d; wrote %s" % (
+        over, len(lines), len(orch.moves), len(bad), out))
     return 0 if not par or (par["events_match"] and par["outcomes_match"] and not par["field_violations"]) else 1
 
 

@@ -56,8 +56,14 @@ def declarations(tools):
     """The declarations as text: name, its help, its argument's shape."""
     out = []
     for t in tools:
-        arg = t["parameters"]["properties"]["arg"]["description"]
-        out.append("- %s: %s\n  argument: %s" % (t["name"], t["description"], arg))
+        props = t["parameters"]["properties"]
+        if "arg" in props:
+            out.append("- %s: %s\n  argument: %s" % (t["name"], t["description"], props["arg"]["description"]))
+        else:   # a tool of named fields (the consultant's answer): one JSON object on the line
+            fields = "; ".join("%s%s: %s" % (k, " (one of %s)" % "/".join(v["enum"]) if v.get("enum") else "",
+                                             v.get("description", "")) for k, v in props.items())
+            out.append("- %s: %s\n  argument: one JSON object on the line, e.g. REPL: %s {\"kind\": …}; fields: %s"
+                       % (t["name"], t["description"], t["name"], fields))
     return "\n".join(out)
 
 

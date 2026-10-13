@@ -55,10 +55,10 @@ def _quote(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def clause_entry(card, cl, name):
-    head = "move " + words(cl["name"])
+def clause_entry(card, cl, name, w=words):
+    head = "move " + w(cl["name"])
     if card["relation"] != "served":
-        head += " (sibling card " + words(card["name"]) + ")"
+        head += " (sibling card " + w(card["name"]) + ")"
     if cl.get("target"):
         head += ", acts on " + name(cl["target"])
     parts = []
@@ -75,11 +75,14 @@ def atom_entry(a):
     return words(a["name"]) + (" = " + a["doc"] if a.get("doc") else "")
 
 
-def script_text(path, cards, name):
-    """The whole script as the flat retrieval keeps it resident."""
+def script_text(path, cards, name, exact=False):
+    """The whole script as the flat retrieval keeps it resident. exact:
+    move and card names as the kernel spells them (the consultant names
+    them back in an explain), not in words (the narrator's)."""
+    w = (lambda s: s) if exact else words
     sv = next((c for c in cards if c["relation"] == "served"), cards[0])
-    out = ["Script of %s (%s): %s" % (name(path), words(path), sv["text"])]
-    out += ["- " + clause_entry(sv, cl, name) for cl in sv["clauses"]]
+    out = ["Script of %s (%s): %s" % (name(path), w(path), sv["text"])]
+    out += ["- " + clause_entry(sv, cl, name, w) for cl in sv["clauses"]]
     things, seen = [], set()
     for c in cards:
         for a in c.get("atoms", []):
@@ -91,8 +94,8 @@ def script_text(path, cards, name):
     for c in cards:
         if c is sv:
             continue
-        out.append("Sibling card %s of %s (an explanation it may use): %s" % (words(c["name"]), name(path), c["text"]))
-        out += ["- " + clause_entry(c, cl, name) for cl in c["clauses"]]
+        out.append("Sibling card %s of %s (an explanation it may use): %s" % (w(c["name"]), name(path), c["text"]))
+        out += ["- " + clause_entry(c, cl, name, w) for cl in c["clauses"]]
     return "\n".join(out)
 
 
@@ -257,10 +260,12 @@ def _args(atom):
     return atom[atom.index("(") + 1:-1].split(",") if "(" in atom else []
 
 
-def event_ref(name, consume=(), produce=(), commands=()):
+def event_ref(name, consume=(), produce=(), commands=(), persist=()):
     """A ground event as a fragment's ref: the move, then the values of the
-    bindings its outcome carries — those in what it produced or in the
-    command it took ('arrive[P=tag3,Q=door]' → 'arrive: tag3': Q is where
+    bindings its outcome carries — those in what it produced, what it kept
+    (a $-premise: still true after it) or in the command it took
+    ('query_seen[T=chair,P=kitchen]' → 'query_seen: chair, kitchen',
+    from the kept where(chair,kitchen); 'arrive[P=tag3,Q=door]' → 'arrive: tag3': Q is where
     the dog came from, not where it is; 'turn_down[S=left,P=sitting]' →
     'turn_down: left'). Every binding when no atoms are given. Values only:
     a variable letter in the ref leaked into the sentence ('going with the
@@ -270,7 +275,7 @@ def event_ref(name, consume=(), produce=(), commands=()):
         return name
     binds = [b.split("=", 1) for b in m.group(2).split(",") if "=" in b]
     if consume or produce:
-        outs = list(produce) + [a for a in consume if a.split("(")[0] in commands]
+        outs = list(produce) + list(persist) + [a for a in consume if a.split("(")[0] in commands]
         vals = {x for a in outs for x in _args(a)}
         binds = [(k, v) for k, v in binds if v in vals]
     return m.group(1) + (": " + ", ".join(v for _, v in binds) if binds else "")

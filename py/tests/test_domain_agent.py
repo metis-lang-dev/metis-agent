@@ -106,4 +106,6 @@ def test_event_ref_carries_the_outcome():
     assert event_ref("go_closed[P=kitchen]", {"cmd_go(kitchen)": 1}, {"refused(go)": 1}, cmds) == "go_closed: kitchen"
     assert event_ref("turn_down[S=left,P=sitting]", {"cmd_turn(left)": 1}, {"refused(turn)": 1}, cmds) == "turn_down: left"
     assert event_ref("stand[P=sitting]", {"cmd_stand": 1, "posture(sitting)": 1}, {"posture(standing)": 1, "done(stand)": 1}, cmds) == "stand"
+    assert event_ref("query_seen[T=chair,P=kitchen]", {"cmd_query(chair)": 1}, {"done(query)": 1}, {"cmd_query"},
+                     {"seen(chair)": 1, "where(chair,kitchen)": 1}) == "query_seen: chair, kitchen"
     assert event_ref("load") == "load"

@@ -1,0 +1,6 @@
+{
+  "about": "the kitchen pair (metispy metis/domains/kitchen/pair.py): two domain agents, the first and the second cook, on one shared kitchen (METIS_PAIR_DIR), stepped in turn as run_pair steps them; the second cook's partner_load surprises the first cook; the orchestrator's next-move table: consult, then the surprise verb the answer names",
+  "agents": ["kitchen", "kitchen_shared"],
+  "clock": "step",
+  "next_move": true
+}
