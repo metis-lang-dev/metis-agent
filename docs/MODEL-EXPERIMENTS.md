@@ -576,3 +576,82 @@ stays a text line).
 grammar `grammar/dog-tools.gbnf`, the mapping in `tools/e9-score.py`, the
 run under `results/e9/`, and the table with the six reads in this section.
 Opus implements; the architect reviews; the user reads the ten cue pairs.
+
+### E9 findings (opus, 2026-10-13, measured)
+
+Run: `results/e9/run1.jsonl` (gitignored; scored by `tools/e9-score.py`). E2B Q4_K_M, template gemma4, thinking off, beside the user's metis-agent on :8395. The pass-2 sampler is the harness's (temp 0.4, top_k 40, 50 tokens), seeds 1–5, one greedy pass 1 per row and arm. Reproduce from `go/`:
+
+    python3 tools/e9-tools.py      # dog-tools.json → dog-tools.gbnf + the T prompts
+    bin/llmbench -model models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf -template gemma4 \
+        -corpus grammar/dog-corpus.tsv -tools J,T,T-free,T-noex -tools-reps 5 -pass2_seed 1 \
+        -jsonl results/e9/run1.jsonl
+    python3 tools/e9-score.py results/e9/run1.jsonl
+
+**As built.**
+- **Tools.** There are eleven tools, one per intent, in `grammar/dog-tools.json`. Each intent's parameters are the fields the dog prompt's table gives it, which are exactly the fields the reference answers use:
+  - LOCAL_ACTION: action, direction, angle_deg, duration, distance_m;
+  - NAVIGATE: goal, tag_id, constraints;
+  - QUERY, FIND and FOLLOW: target, constraints;
+  - the other six take no arguments.
+  - (dog.gbnf itself admits every field on every intent.)
+- **Declarations.** They are rendered by a port of the GGUF template's `format_function_declaration`.
+- **Call grammar.** It follows the template's dictsort argument order.
+- **Examples.** The T prompt's examples are the dog prompt's, rendered as calls. There are **40 intent examples, not 30.** The three pass-2 examples are kept in both T prompts.
+- **J matches the harness.** J's prefix is the harness's, byte for byte (1491 tokens, as in the reference).
+- **J has no KV rewind between its passes.** The design table says it has one; the harness's `TwoPass` keeps the JSON in the KV and appends the bare cue. The rewind is at the start of each turn. So T-rewind is "the call stays, then the bare cue": it re-decodes nothing.
+
+**Pass 1 (the intent), 54 rows:**
+
+| arm | class | prompt / heldout | JSON identical | well-formed | ms to intent p50 / mean / p90 | prefix tokens |
+|---|---|---|---|---|---|---|
+| J (control) | 54/54 | 34/34, 20/20 | 54/54 | — | 433 / 419 / 705 | 1491 |
+| T | 54/54 | 34/34, 20/20 | 52/54 | — | 531 / 519 / 790 | 3481 |
+| T-free | 53/54 | 33/34, 20/20 | 52/54 | 53/54 | 144 / 141 / 217 | 3481 |
+| T-noex | 50/54 | 33/34, 17/20 | 32/54 | — | 493 / 467 / 744 | 2461 |
+
+**Pass 2 (the spoken line), 54 rows × 5 seeds:**
+
+| mode | lines | voice leaks | ms to first spoken token (mean) | tokens decoded before speaking | completion claims |
+|---|---|---|---|---|---|
+| J | 270 | 0 | 10.5 | 5 (the cue) | 0 |
+| T-rewind | 270 | 1 | 11.0 | 5 (the cue) | 0 |
+| T-rt | 270 | **270** | 9.5 | 13 (the result turn) | 15 |
+
+**Reads.**
+1. **Class: T = J, 54/54.** No T miss.
+2. **Arguments: T 52/54 against J's 54/54.** Both misses add a constraint the reference lacks:
+   - "go to the chair next to the window": T gave constraints [NEXT_TO window, NEXT_TO **chair**], goal chair.
+   - "what do you see near the window" (held-out): T gave QUERY target "thing" plus constraints [NEAR window]. The reference has the target only. Arguably T is closer to what was said here.
+3. **Discipline: T-free is well-formed on 53/54, which meets the ≥ 52 bar.** The training carries the call format. The one malformed call is the chair row, where a `]` is missing after the constraints array. Its class is right, but the call does not parse.
+   - **Timing:** without the grammar, pass 1 takes **141 ms mean, against 519 ms for T and 419 ms for J.** The pinned call costs ~375 ms per turn in grammar sampling, not in tokens: T-free's call is byte-identical to T's on 53 of 54 rows (all but the malformed chair row).
+   - E4's ruling stands: the certified surface stays grammar-pinned. This number is the price of that.
+4. **Examples: they are needed.** Without the 40 examples:
+   - class falls to 50/54;
+   - arguments fall to 32/54.
+
+   The prefix would shrink by 1020 tokens (3481 → 2461), but at that cost the standing region does not gain them. The arguments miss in one way: they lose the house conventions, not the meaning:
+   - descriptions as said ("the door", "my keys") instead of the head noun;
+   - REGION→ROOM for the kitchen;
+   - tag numbers left in the description with no tag_id;
+   - directions and attributes dropped.
+
+   The class misses:
+   - "where is the chair" and "is there a chair around here" became FIND;
+   - "come with me" became MOVE;
+   - "play dead" became LIE_DOWN.
+5. **The rollback.** T-rewind and T-rt both start speaking within ~10 ms of the call. T-rt decodes 13 tokens before speaking, against T-rewind's 5; neither re-decodes the tail.
+   - **T-rt leaks on 270/270.** Every line opens with "Spoken response:" which the harness's `sanitizeAck` does not strip, so TTS would say it. The prompt's pass-2 section teaches that label after the call, and in T-rt the model writes the label itself after the result turn.
+   - **T-rt also reads `{status:ok}` as done.** 15 of its lines claim completion ("I found the fire extinguisher.", "I found a blue bottle."), against 0 for T-rewind and J.
+   - **T-rewind leaked once:** "The date today is [date]." (1/270, the bracket; `sanitizeAck` would turn it into "Okay.").
+   - The ten cue pairs are in the step-1 report for the user to mark, with the label cut so the arm is blind.
+6. **Thinking: not run.** Read 1 shows no held-out miss.
+
+**Under the decision rule.**
+- Read 1 is not worse: met.
+- Read 2 is ≥ 50/54: met (52/54).
+- Read 5 asks for zero leaks in the arm chosen: **neither arm meets it.** T-rewind has 1/270; T-rt has 270/270, and that count is the prompt's doing.
+- By the letter, **J stays.**
+- Two things the ruling may want to weigh:
+  - T-rewind's single leak is the kind `sanitizeAck` already catches.
+  - T-rt as run is not a fair test of the round-trip, because its prompt teaches the bare-cue convention. A fair T-rt needs pass-2 examples rendered as round-trips (call, result turn, line). It also needs a result that does not read as "done" (e.g. `{status:<|"|>accepted<|"|>}`).
+- That would be one more ~5 min GPU run; not done without a ruling.
