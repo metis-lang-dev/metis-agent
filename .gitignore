@@ -1,2 +1,4 @@
 go/bin/
 go/models/
+py/.venv/
+__pycache__/
