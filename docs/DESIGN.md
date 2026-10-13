@@ -148,7 +148,8 @@ agent, for every kind:
 
 | kind | when | fields beyond domain/ref/text |
 |---|---|---|
-| `result` | an intent's outcome, by id | `id`, `status` (accepted · admitted · admitted+notice · applied · done · refused · expired · progress · failed), `reason`, `alternatives` |
+| `result` | an intent's outcome, by id; also the answer to activate/deactivate and to the surprise verbs | `id`, `status` (accepted · admitted · admitted+notice · applied · done · refused · expired · progress · cancelled · failed), `reason`, `alternatives` |
+| `read` | the answer to a REPL API read (state, ctx, events, why, findings), synchronous | `tool`, `output` (the kernel's read-out, scrubbed and capped), `text` optional |
 | `event` | progress the domain reports unasked | `counts` (the mirror's numbers) |
 | `quiescence` | nothing left the domain can do | `goal_pending` |
 | `surprise` | a zero-probability reading; the domain is observe-only | `record`, `difference`, `cards` (what could explain it) |
@@ -157,7 +158,10 @@ agent, for every kind:
 | `consult` | the answer to a consult | `answer_kind` (explains · missing · noise · unexplained), `cause {card, move}` or `resource {atom, words}`, `calls` |
 
 `text` is the domain agent's sentence (the N form of RAG §11); `ref` and
-`counts` are the R form. The orchestrator speaks from `text`, decides from
+`counts` are the R form. `cancelled` is a task the person ended by stop or
+cancel, distinct from refused and expired. A `read` carries the kernel's
+output for the orchestrator's own use (a consult, not a read, is what it
+asks when it wants an answer). The orchestrator speaks from `text`, decides from
 `kind` and `status`, and never parses the domain's atoms.
 
 **The next-move table** (the error loop). E11 settled who does what: the
@@ -193,7 +197,7 @@ runtime serving one catalog, on one host.
 |---|---|---|
 | narrator | a runtime fragment → one sentence in the person's words, read against the catalog's `%%` comments (E8: the flat script RAG, resident) | yes, single pass, thinking off |
 | consultant | a question → a capped loop of REPL verbs (state, events, why, findings; fork/do/back for a what-if) → one typed answer (SPECIALIST.md: this is the specialist) | yes, T, synchronous |
-| mapper | the intent JSON → one command atom from the card's table (`NAVIGATE goal=tag3` → `+cmd_go(tag3)`, dog.llp); open-vocabulary targets resolve to handles in the host's perception table | **no**: a table, token-exact |
+| mapper | the intent JSON → one command atom from the card's table (`NAVIGATE goal=tag3` → `+cmd_go(tag3)`, dog.llp); open-vocabulary targets resolve to handles in the host's table (`elsewhere` when it cannot); quantities (`angle_deg`, `distance_m`, `duration`) never enter the catalog: they ride with the command in the host's queue, keyed by the command's id, and the port actuates with them; a verb with no row → `error` | **no**: a table, token-exact |
 | replier | a runtime signal or an intent's outcome → the generic reply, `text` from the narrator | **no**: a table over the wire's signals |
 | host | the port plugin: `tick` brings inputs as exogenous rows, `on_event` actuates | no: the catalog author's code |
 
