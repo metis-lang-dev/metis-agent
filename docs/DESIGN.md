@@ -572,3 +572,72 @@ So the default is two primed prefixes per domain, the narrator's and the
 agent's (map + consult, sharing the ctx band), each a KV swap, and S1 plus
 the routing corpus say whether they can be one. Either way nothing of it
 enters the orchestrator's 3 k.
+
+#### One pass, and who holds what (user + architect, 2026-10-13)
+
+**One pass stands as the goal.** The orchestrator types the intent itself,
+`{"domain": …, "verb": …, "args": …}`, under a grammar built from the loaded
+domains' verb lists; the routing is the `domain` field, not a second call.
+What E10 forbids is only the way the schema is given: 2.4 k tokens of nested
+declarations in the prefix cost two held-out rows, and E9 showed the model
+needs the examples (no-examples arm: 50/54 class, 32/54 args). So the prefix
+carries, per loaded domain, one capability line and its verb list with
+argument shapes, nothing nested; the examples come by retrieval, the k
+nearest to the utterance from the loaded domains' example stores, inlined at
+distance zero (E6: an inline piece at d0 is used at 0.92), ≈ 150 tokens a
+turn. If that holds parity, one pass wins at a prefix that stays near 3 k
+for several domains. If it does not, the fallback is the strip's map mode, a
+KV swap to the domain's primed prefix after the orchestrator's `domain`
+pick. **E12, the routing corpus, decides:** the 54 dog rows plus the kitchen
+and activation verbs, one prefix with all loaded verb lists, examples by
+retrieval (k = 3, 5, 8) against the 40-example prompt, read 1 parity, prefix
+size, ms to the intent.
+
+**What the domain agent's prompt holds, and what it does not.**
+
+| the domain agent (strip) | holds | does not hold |
+|---|---|---|
+| narrate | how to read a fragment against the script and speak one sentence (E8) | — |
+| consult | the REPL declarations and the consult response shape | the person's dialog |
+| intent → atom | **nothing: this is not the model's.** The card's table maps each verb to its command token (`NAVIGATE goal=tag3` → `+cmd_go(tag3)`, dog.llp), token-exact, run by the harness; open-vocabulary targets resolve to handles in the host's perception table | the schema |
+| surprise / error → the orchestrator | **nothing new: the format exists and is domain-independent.** Signals are the orchestrator contract's (event · surprise · quiescence · notice · result by id, with the domain path and the fragment `{path, seq, beat, kind, ref, counts}`); the consult response is E11's typed shape. The model's part is the N form, the sentence | a format of its own |
+
+The certified surface is the reason: nothing that reaches the runtime or a
+port is model text. The model narrates and answers; tables map.
+
+**What the orchestrator gets at load:** the domain's capability line and
+verb list (the domains block, FRAMEWORK §4), its activation card, its example
+store for retrieval, its mirror line. The domain's JSON goes with every
+intent as the `domain` field; the grammar admits only loaded domains' verbs.
+
+**Keeping the multi-agent and the person's dialog under control: what it
+takes, and what already exists.**
+
+1. *Identity.* Every call has an id; every outcome returns by id into the
+   journal; the orchestrator never infers which outcome is whose (E10 F).
+   Exists on the wire; the journal rendering by id is the build item.
+2. *The floor.* Progress waits, a surprise or a refusal cuts and takes the
+   next turn; one voice at a time (HARNESS, the narration floor). Exists.
+3. *Serialization.* One strip per question; a signal from domain B while A's
+   task runs changes B's mirror line and arrives as a form, never as a user
+   turn; the sanitizer keeps a signal from being read as a command (E10:
+   8/10 echoed without it). Exists in part; the cue is E10's open fix.
+4. *The person's answer to `ask`.* It returns as the next user turn bound
+   to the pending question's id, so it is not classified as a new command.
+   Not built; small.
+5. *Budgets.* One task slot per domain (dog.llp: `idle`), max calls per
+   consult (S1 sets it), the wire's expiry windows. Exist, except the
+   consult cap.
+6. *Memory across turns.* Standing facts in the mirror, never in the stream
+   (E6); the journal compacts the CML way. Designed; the compaction is the
+   long-session read.
+7. *Safety.* STOP and CANCEL fire on the keyword path before any model.
+   Exists.
+8. *What it never does.* Formalize, review content, reason about causes
+   (consult does), touch atoms or ports.
+
+Measured in order: E11 (the error loop), E12 (one pass with retrieved
+examples), then a dialog-control corpus that generalises E10 F: two domains
+with live tasks, the person interjecting, an `ask` and its answer, a signal
+arriving mid-task; scored on ids kept straight, the floor honoured, the
+answer bound to its question, zero signals read as commands.
