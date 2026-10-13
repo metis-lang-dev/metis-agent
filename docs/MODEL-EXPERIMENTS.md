@@ -881,3 +881,72 @@ as an addendum, and does not reopen it.
    propose-or-ask cue after a refusal; rerun C and D.
 4. The admission notice as a templated line, not a paraphrase.
 5. E9b free-then-verify, when the user says so.
+
+### E10b — the template's rendering, and E2B vs E4B on tool calling (opus, 2026-10-13)
+
+Addendum to E10 (s-de466019). It answers two questions the user asked after E10, and the E10 ruling for E2B stands.
+
+**Question 1: are T-api's declarations the template's JSON Schema rendering?** Yes, byte for byte.
+- **How it was checked.** `tools/e10b-template.py` reads `tokenizer.chat_template` from the GGUF. E2B and E4B carry the same 18 810-byte template. The script renders it with jinja2 on the 17 T-api tools as JSON in the OpenAI function shape: `dog-tools.json` with its `$defs` expanded, and the decider and activation declarations written as JSON with the same fields. llama.cpp's own `llama-server --jinja` `/apply-template` (at 8ad8aef44, thinking off) gives the same system turn plus `<|turn>model\n`.
+- **Declarations.** All 17 are identical: field order (dictsort), `type` upper-cased, enums, `required` placement, the nested `items`/`properties`, and the three hand-built decider declarations from `kernel.NewDecider`. The order of the tools is the same too.
+- **The system turn differs by one byte.** The bench's prompt has a `\n` between the system text and the first `<|tool>`, and the template's `| trim` drops it: 5165 against 5164 prefix tokens. `grammar/e10-prompt-t-tmpl.txt` is the system text as the template renders it.
+- **Turn shapes.**
+  - The sync ack is the template's own: call, response and line in one model turn.
+  - So is an async outcome after a user turn: `<|turn>model\n<|tool_response>…`.
+  - So is the generation prompt after a bare call, which ends in `<|tool_response>`.
+  - **B's corpus shape cannot come from the template.** In the corpus, the async outcome opens a new model turn right after the model's turn. The template merges two consecutive assistant messages into one turn: no `<turn|>\n<|turn>model\n` between them.
+- **Two shapes a client would change.**
+  - **`role:tool` messages with JSON-string content** (the OpenAI convention) render as `response:NAME{value:<|"|>{"id": "c1", "status": "accepted"}<|"|>}`: one quoted string, not typed fields. Only a mapping in `tool_responses` gives `{id:…,status:…}`.
+  - **Parameterless tools sent as `{"type":"object","properties":{}}`** gain `,parameters:{type:<|"|>OBJECT<|"|>}`. Today they have no parameters at all.
+- **What the rendering costs.** On E2B, T-api on the template's prompt (arm T-tmpl, group A, 5 seeds, CPU as run1) matches run1 within sampling noise:
+  - Class 52/54 and args 49/54, the same as run1. The class misses are the same rows, "roll over" and "play dead".
+  - Leaks 4 against 3, all on "what's the date today".
+  - Claims 1 against 4, all on "what is next to the table".
+  - Args: A22 fixed, A37 ("turn right" given angle 90) new.
+
+  On E4B, T-tmpl and T-api have identical A numbers and both pass 36/48 on B.
+
+**What would change in the runtime if the executive took the template path.** The model's input would change by exactly one token: the newline between the system text and the first declaration. Nothing else changes in the prefix, because the declarations are already the template's JSON Schema rendering, byte for byte. The executive would hand over a tool list and stop concatenating strings. Measured on E2B and E4B, that newline moves no result beyond seed noise. Two cautions apply if the path ever goes through an OpenAI-style client rather than our own renderer:
+- Responses must be passed as mappings (the template's `tool_responses`), not as JSON strings in `role:tool` messages, or the model sees one quoted `value` instead of `id` and `status`.
+- Consecutive model messages fuse into one turn. A later outcome then reads as a continuation of the ack, not as a new turn the way the bench injects it today.
+
+Neither caution touches J-text, the ruled format.
+
+**Question 2: is T-api's read-1 miss an E2B artifact?** Groups A and B, both arms, E4B Q4 on the GPU (ngl 99, n_ctx 8192, pass-2 seed 1 + rep), 15 min 36 s. E2B is run1 (CPU) plus the T-tmpl run above, so the two models also differ in backend.
+
+| model | arm | A class | A args | A leaks | A claims | read 1 | B passing | B done · refused · expired · progress | tokens A / B | ms first spoken A / B |
+|---|---|---|---|---|---|---|---|---|---|---|
+| E2B | J-text | 54/54 | 54/54 | 0/270 | 0/270 | pass | 40/48 | 10 · 11 · 9 · 10 | 2824 / 2875 | 103 / 187 |
+| E2B | T-api | 52/54 | 49/54 | 3/270 | 4/270 | **fail** | 36/48 | 11 · 11 · 8 · 6 | 5196 / 5237 | 311 / 266 |
+| E2B | T-tmpl | 52/54 | 49/54 | 4/270 | 1/270 | **fail** | — | — | 5195 / — | 312 / — |
+| E4B | J-text | 52/54 | 51/54 | 0/270 | 0/270 | **fail** | 42/48 | 12 · 9 · 11 · 10 | 2824 / 2876 | 19 / 43 |
+| E4B | T-api | 53/54 | 51/54 | 0/270 | 2/270 | **fail** | 36/48 | 10 · 10 · 11 · 5 | 5196 / 5237 | 19 / 36 |
+| E4B | T-tmpl | 53/54 | 51/54 | 0/270 | 2/270 | **fail** | 36/48 | 9 · 10 · 9 · 8 | 5195 / 5237 | 19 / 36 |
+
+**E4B misses** (all of them are in `results/e10/run2-score.md`):
+- **J-text.**
+  - Class: "is there a chair around here" → FIND, and "play dead" → LOCAL_ACTION LIE_DOWN.
+  - Args: "what do you see near the window" with an empty target.
+- **T-api and T-tmpl.**
+  - Class: the same "is there a chair around here" → FIND.
+  - Args: "what do you see near the window" (target "what" / "window"), and "look for my keys" as "my keys".
+  - Two claims, both "I'm here for you." to "hi there buddy". These are hits of E9's CLAIM pattern (`i'm here`) on a greeting, not task claims, but they count under the pre-registered scorer.
+- **B.** T is again weakest on progress (5/12; T-tmpl 8/12): "I'm making progress toward the sofa." names no status word the rule reads. J's B misses are the commands not named on refused and expired.
+
+**The pre-registered reading.** T-api still fails read 1 on E4B (53/54 class, 2 claims), so **the gap is not distillation**.
+- **What E4B does remove.** Every T-api failure specific to E2B is gone: the `[current date]` leak, "I found what is next to the table", roll over and play dead as LIE_DOWN, and the goal repeated as a constraint.
+- **What it does not.** E4B adds misses that J-text shares: "is there a chair around here" → FIND, the near-the-window target. J-text on E4B loses read 1 as well (52/54). So the two arms meet on A at E4B, at a level neither passes.
+- **B does not close.** J leads by 6 (42 against 36) on E4B, against 4 on E2B. T's progress narration stays the weakest cell on both models.
+- **For the record.** T-api is not admissible from E4B up. The E10 ruling's reasons are format-level (the sync result prior, the cost of the declarations), not an E2B artifact, and the ruling for the deployed E2B stands.
+
+**Reproduce** (from `go/`; results gitignored on taycann):
+
+```
+python3 tools/e10b-template.py                 # Q1: the diff; writes grammar/e10-prompt-t-tmpl.txt, grammar/e10b-corpus.jsonl
+./bin/llmbench -model models/gemma4/gemma-4-E4B-it-Q4_K_M.gguf -ngl 99 -threads 4 -n_ctx 8192 -pass2_seed 1 \
+  -e10 grammar/e10b-corpus.jsonl -tag e10b-e4b-gpu -jsonl results/e10/run2-e4b.jsonl
+./bin/llmbench -model models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf -ngl 0 -threads 4 -n_ctx 8192 -pass2_seed 1 \
+  -e10 grammar/e10b-corpus.jsonl -e10-arms T-tmpl -e10-groups A -tag e10b-e2b-cpu -jsonl results/e10/run2-e2b-tmpl.jsonl
+python3 tools/e10b-table.py E2B=results/e10/run1.jsonl,results/e10/run2-e2b-tmpl.jsonl E4B=results/e10/run2-e4b.jsonl
+python3 tools/e10-score.py results/e10/run2-e4b.jsonl --corpus grammar/e10b-corpus.jsonl --arms J-text,T-api,T-tmpl
+```

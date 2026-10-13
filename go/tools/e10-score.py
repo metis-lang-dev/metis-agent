@@ -225,10 +225,13 @@ def mean(xs):
 
 
 def main():
+    global ARMS
     ap = argparse.ArgumentParser()
     ap.add_argument("jsonl", nargs="+")
     ap.add_argument("--corpus", default=str(GO / "grammar/e10-corpus.jsonl"))
+    ap.add_argument("--arms", default=",".join(ARMS), help="arms in the per-arm tables (E10b adds T-tmpl)")
     a = ap.parse_args()
+    ARMS = tuple(a.arms.split(","))
     items, gens = load(a.jsonl, a.corpus)
     tools = e9.load_tools()
     res = defaultdict(list)  # (group, arm) -> [(item, rep, score)]
