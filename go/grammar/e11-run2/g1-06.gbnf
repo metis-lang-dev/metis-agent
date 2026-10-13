@@ -1,0 +1,2 @@
+# E11 run 2: the next move restricted to the branch g1-06 (tools/e11-corpus.py --run2)
+root ::= "{\"intent\":\"LOCAL_ACTION\",\"action\":\"MOVE\",\"direction\":\"FORWARD\",\"distance_m\":0.5}" | "{\"intent\":\"LOCAL_ACTION\",\"action\":\"TURN\",\"direction\":\"AROUND\"}" | "{\"intent\":\"STOP\"}"

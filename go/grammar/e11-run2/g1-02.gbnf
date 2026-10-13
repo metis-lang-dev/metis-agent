@@ -1,0 +1,2 @@
+# E11 run 2: the next move restricted to the branch g1-02 (tools/e11-corpus.py --run2)
+root ::= "{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"TAG\",\"description\":\"tag\"},\"tag_id\":3}"

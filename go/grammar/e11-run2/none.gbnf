@@ -1,0 +1,4 @@
+# E11 run 2: the next move restricted to the branch none (tools/e11-corpus.py --run2)
+root ::= "{\"call\":\"consult\",\"domain\":\"" domain "\",\"question\":\"" text "\"}"
+domain ::= "dog" | "kitchen"
+text ::= [a-zA-Z0-9 ,.;:'()?!+-]{8,200}

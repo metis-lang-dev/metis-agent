@@ -44,7 +44,14 @@ with --state-cues grammar/e11-corpus-state.jsonl instead (J-state, information:
 the cue names the loop's branch the harness is in — alternatives offered,
 none, a consult answered, the same refusal again; the move stays the model's)
 
-    python3 tools/e11-corpus.py [--state-cues]          # from go/
+with --run2 grammar/e11-corpus-run2.jsonl and grammar/e11-prompt-j2.txt (the
+architect's CHANGES on step 1: the adopted configuration as one — the state
+cues; the next-move grammar restricted per branch, grammar/e11-run2/; the
+consult answer in DESIGN v3's generic reply envelope, kind consult +
+answer_kind; the explains line templated; the guard keyed on the refused
+call and the earlier consult)
+
+    python3 tools/e11-corpus.py [--state-cues | --run2]          # from go/
 """
 import json
 import re
@@ -90,6 +97,8 @@ STATE_CUES = {
 
 
 def cue(state):
+    if RUN2 and state == "answer":
+        return STATE_CUES[state].replace("its kind names", "its answer_kind names")
     return STATE_CUES[state] if STATE else CUE
 
 
@@ -137,6 +146,11 @@ def consult_open(domain, cid):
 
 
 def consult_answer(domain, cid, r):
+    if RUN2:  # DESIGN v3: the consult answer inside the generic reply envelope
+        env = {"domain": domain, "kind": "consult", "id": cid, "answer_kind": r["kind"]}
+        env.update({k: r[k] for k in ("cause", "resource") if k in r})
+        env.update({"evidence": r["evidence"], "calls": r["calls"], "ref": {"id": cid}, "text": r["text"]})
+        return RESP + "Reply: " + jcall(env)
     return RESP + "Consult %s (%s) answered: %s" % (cid, domain, jcall(r))
 
 
@@ -174,7 +188,66 @@ Examples (another world, for the pattern only):
 - Your command to open the gate (c9) failed again: the gate did not move. → {"call":"ask","text":"The gate still won't open; could you check it?"}
 """
 
+LOOP2 = """
+
+## When a call is refused or fails
+The robot and the runtime answer a call with a reply: refused or failed and
+the reason; a refusal may offer alternatives. Then you choose the next move,
+exactly one JSON call:
+- Alternatives offered: call one of them, exactly as offered.
+- Refused or failed with no alternatives: {"call":"consult","domain":<domain>,"question":"why <the reason>?"}. The domain's agent looks into it; its reply comes later, with kind consult, by the consult's id.
+- A consult reply carries an answer_kind, and the answer_kind names the move:
+  - explains: a sibling card's move caused it → {"call":"explain","card":<card>,"move":<move>}, as the cause names them.
+  - missing: the world lacks something → {"call":"ask","text":<one short question to the person that names the thing in the person's words>}.
+  - noise: a one-off misread → {"call":"reset"}.
+  - unexplained: nothing explains it → {"call":"escalate","text":<one plain sentence of what was seen>}.
+- The same refusal again after your move: ask the person or escalate.
+Never make a refused call again. A reply's evidence and atoms are for the
+record: never say them aloud. Domains you can consult: dog (my own body and
+moves), kitchen.
+
+Examples (another world, for the pattern only):
+- Your command to water the roses (c3) was refused: the hose is tangled. Alternatives: {"intent":"WATER","target":"tulips"}. → {"intent":"WATER","target":"tulips"}
+- Your command to open the gate (c4) failed: the gate did not move. → {"call":"consult","domain":"garden","question":"why did the gate not move?"}
+- Reply: {"domain":"garden","kind":"consult","id":"c5","answer_kind":"missing","resource":{"atom":"key_gate","words":"the gate key"},"evidence":["key_gate 0"],"calls":2,"ref":{"id":"c5"},"text":"The gate is locked and no key is in the shed."} → {"call":"ask","text":"Could you bring me the gate key?"}
+- Reply: {"domain":"garden","kind":"consult","id":"c6","answer_kind":"explains","cause":{"card":"garden_shared","move":"neighbour_pick"},"evidence":["ripe -2","basket +2"],"calls":3,"ref":{"id":"c6"},"text":"The neighbour picked the two ripe tomatoes."} → {"call":"explain","card":"garden_shared","move":"neighbour_pick"}
+- Reply: {"domain":"garden","kind":"consult","id":"c7","answer_kind":"noise","evidence":["moisture 9 then 4"],"calls":2,"ref":{"id":"c7"},"text":"One soil sensor misread once; the next reading matches."} → {"call":"reset"}
+- Reply: {"domain":"garden","kind":"consult","id":"c8","answer_kind":"unexplained","evidence":["hose -1"],"calls":4,"ref":{"id":"c8"},"text":"The hose is gone and no move removes it."} → {"call":"escalate","text":"the hose is gone and nothing in the garden removes it"}
+- Your command to open the gate (c9) failed again: the gate did not move. → {"call":"ask","text":"The gate still won't open; could you check it?"}
+"""
+
 TEXT = r"[a-zA-Z0-9 ,.;:'()?!+-]{8,200}"
+RUN2 = False
+BRANCH_DIR = "grammar/e11-run2"
+
+
+def lit(s):
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def branch_grammar(name, alts=None):
+    """Run 2: the next-move grammar restricted to the branch the harness
+    derives from the reply (the next-move table): the offered alternatives
+    as literals; consult; the move of the answer_kind (its arguments the
+    model's); ask | escalate on the same refusal again."""
+    if not RUN2:
+        return GRAMMAR
+    t = 'text ::= ' + TEXT
+    body = {
+        "none": ['root ::= "{\\"call\\":\\"consult\\",\\"domain\\":\\"" domain "\\",\\"question\\":\\"" text "\\"}"',
+                 "domain ::= " + " | ".join('"%s"' % d for d in DOMAINS), t],
+        "explains": ['root ::= "{\\"call\\":\\"explain\\",\\"card\\":\\"" ident "\\",\\"move\\":\\"" ident "\\"}"',
+                     "ident ::= [a-z_]{3,32}"],
+        "missing": ['root ::= "{\\"call\\":\\"ask\\",\\"text\\":\\"" text "\\"}"', t],
+        "noise": ['root ::= "{\\"call\\":\\"reset\\"}"'],
+        "unexplained": ['root ::= "{\\"call\\":\\"escalate\\",\\"text\\":\\"" text "\\"}"', t],
+        "again": ['root ::= "{\\"call\\":\\"" verb "\\",\\"text\\":\\"" text "\\"}"', 'verb ::= "ask" | "escalate"', t],
+    }.get(name) or ["root ::= " + " | ".join(lit(jcall(a)) for a in alts)]
+    path = "%s/%s.gbnf" % (BRANCH_DIR, name)
+    (GO / BRANCH_DIR).mkdir(exist_ok=True)
+    (GO / path).write_text("# E11 run 2: the next move restricted to the branch %s (tools/e11-corpus.py --run2)\n" % name
+                           + "\n".join(body) + "\n")
+    return path
 
 
 def grammar():
@@ -270,7 +343,7 @@ def gen(label, grammar="", sampled=False, stop="", mx=0):
     return g
 
 
-def move(label, refused):
+def move(label, refused, grammar=None, also=()):
     """The next move under the grammar, then the repeat guard: the refused
     call again → the note naming it and its refusal, the move asked again
     (at most twice). §7a's same-call case only: its refused-verb case does not
@@ -278,20 +351,33 @@ def move(label, refused):
     call's verb (NAVIGATE refused → NAVIGATE elsewhere)."""
     note = ("[Runtime note — not something the person said.] Your last call repeats the call that was just "
             "refused (%s). Choose a different move. " % refused["why"]) + CUE
-    return [gen(label, GRAMMAR),
-            {"op": "while", "by": "canon", "keys": [canon(refused["call"])], "max": 2,
-             "body": [inject(END + user(note) + MODEL), gen(label, GRAMMAR)]}]
+    g = grammar or GRAMMAR
+    return [gen(label, g),
+            {"op": "while", "by": "canon", "keys": [canon(refused["call"])] + list(also), "max": 2,
+             "body": [inject(END + user(note) + MODEL), gen(label, g)]}]
 
 
 def speak_after(responses, by="name", label="voice"):
     """The runtime's answer to the move (by the call's name, or by the call
     itself), then the spoken line; an ask is itself the spoken line: no
     response, no line."""
+    out = []
+    if RUN2 and "explain" in responses:  # the explains line templated with card and move: the harness speaks it
+        responses = dict(responses)
+        out.append({"op": "while", "by": "name", "keys": ["explain"], "max": 1,
+                    "body": [{"op": "respond", "by": "name",
+                              "match": {"explain": END + user(responses.pop("explain").split(" Tell the person")[0])
+                                        + MODEL + SPEAK + " " + EXPLAIN_LINE}}]})
     names = sorted(responses)
-    return [{"op": "while", "by": by, "keys": names, "max": 1,
+    return out + [{"op": "while", "by": by, "keys": names, "max": 1,
              "body": [{"op": "respond", "by": by, "match": {n: END + user(responses[n]) + MODEL + SPEAK for n in names}},
                       gen(label, sampled=True, stop="\n")]},
             inject(END)]
+
+
+# the explains line the harness speaks (run 2): kitchen-cards.json's display
+# for the card, the card and the move as the catalog names them, in words
+EXPLAIN_LINE = "The second cook explains it: kitchen shared, partner load. The kitchen carries on."
 
 
 def answer_responses(cid, dom):
@@ -308,10 +394,12 @@ def answer_responses(cid, dom):
 
 
 def main():
-    global STATE, CORPUS
+    global STATE, CORPUS, RUN2, PROMPT
     if "--state-cues" in sys.argv[1:]:
         STATE, CORPUS = True, "grammar/e11-corpus-state.jsonl"
-    prompt = (GO / "grammar/e10-prompt-j.txt").read_text().rstrip("\n") + LOOP
+    if "--run2" in sys.argv[1:]:
+        STATE, RUN2, CORPUS, PROMPT = True, True, "grammar/e11-corpus-run2.jsonl", "grammar/e11-prompt-j2.txt"
+    prompt = (GO / "grammar/e10-prompt-j.txt").read_text().rstrip("\n") + (LOOP2 if RUN2 else LOOP)
     (GO / PROMPT).write_text(prompt)
     (GO / GRAMMAR).write_text(grammar())
     items = []
@@ -348,7 +436,8 @@ def main():
         refused = {"call": j, "why": reason}
         acc = {canon(a): accepted(a, "c2") + " Tell the person in one short first-person sentence what you are doing now."
                for a in alts}
-        steps += [inject(user(refusal(j, "c1", "refused", reason, alts) + "\n" + cue("alts")) + MODEL)] + move("move", refused) \
+        steps += [inject(user(refusal(j, "c1", "refused", reason, alts) + "\n" + cue("alts")) + MODEL)] \
+            + move("move", refused, branch_grammar("g1-%02d" % n, alts)) \
             + speak_after(acc, by="canon")
         add("G1", "G1-%02d" % n, steps, {"domain": dom, "refused": canon(j), "alts": [canon(a) for a in alts],
                                          "reason": reason, "n_alts": len(alts)})
@@ -371,7 +460,8 @@ def main():
     for n, (dom, ctx, j, status, reason) in enumerate(g2, 1):
         steps = dog_context(ctx, j, "c1") if dom == "dog" else kitchen_context(ctx, n)
         refused = {"call": j, "why": reason}
-        steps += [inject(user(refusal(j, "c1", status, reason) + "\n" + cue("none")) + MODEL)] + move("move", refused) \
+        steps += [inject(user(refusal(j, "c1", status, reason) + "\n" + cue("none")) + MODEL)] \
+            + move("move", refused, branch_grammar("none")) \
             + speak_after({"consult": consult_open(dom, "c2")})
         add("G2", "G2-%02d" % n, steps, {"domain": dom, "refused": canon(j), "reason": reason, "status": status})
 
@@ -382,7 +472,8 @@ def main():
         steps += [inject(user(refusal(j, "c1", status, reason) + "\n" + cue("none")) + MODEL + jcall(q)
                          + END + user(consult_open(dom, "c2")) + MODEL + SPEAK + " I'm looking into why." + END),
                   inject(user(consult_answer(dom, "c2", resp) + "\n" + cue("answer")) + MODEL)]
-        steps += move("move", {"call": j, "why": reason}) + speak_after(answer_responses("c3", dom))
+        steps += move("move", {"call": j, "why": reason}, branch_grammar(resp["kind"]), [canon(q)] if RUN2 else []) \
+            + speak_after(answer_responses("c3", dom))
         if sampled:  # G5s: the move under the grammar with the pass-2 sampler, seed 1 + rep
             for st in steps:
                 if st["op"] == "gen" and st["label"] == "move":
@@ -503,7 +594,9 @@ def main():
     def g4_item(iid, dom, history, j, reason, again_ctx):
         steps = history + again_ctx
         steps += [inject(user(refusal(j, "c5", "refused", reason) + " The same refusal as before.\n" + cue("again")) + MODEL)]
-        steps += move("move", {"call": j, "why": reason}) + speak_after(answer_responses("c6", dom))
+        q = {"call": "consult", "domain": dom, "question": "why " + reason + "?"}  # the history's consult
+        steps += move("move", {"call": j, "why": reason}, branch_grammar("again"), [canon(q)] if RUN2 else []) \
+            + speak_after(answer_responses("c6", dom))
         add("G4", iid, steps, {"domain": dom, "refused": canon(j), "reason": reason, "earlier": [canon(j)]})
 
     def hist(dom, ctx, j, status, reason, resp, gold_move, k=0, said=""):

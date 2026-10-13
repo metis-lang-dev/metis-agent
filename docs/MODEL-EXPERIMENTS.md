@@ -1088,3 +1088,60 @@ python3 tools/e11-corpus.py && python3 tools/e11-corpus.py --state-cues
 python3 tools/e11-score.py results/e11/run1.jsonl
 python3 tools/e11-score.py results/e11/run1-state.jsonl --corpus grammar/e11-corpus-state.jsonl
 ```
+
+### E11 run 2 — the adopted configuration as one (opus, 2026-10-13; the architect's CHANGES on step 1)
+
+**Configuration.** Same items, same seeds, E2B Q4 on the GPU, 55 s. Changed against run1 (`tools/e11-corpus.py --run2`):
+- **State cues:** the J-state cues. The answer cue names the `answer_kind`.
+- **The next move's grammar restricted per branch,** derived from the reply (`grammar/e11-run2/`):
+  - alternatives offered → only the offered alternatives, as literals (`g1-NN.gbnf`);
+  - none → consult;
+  - a consult answered → the move of its `answer_kind`, with its arguments (card, move, the text) still the model's;
+  - the same refusal again → ask | escalate.
+- **The consult answer inside DESIGN v3's generic reply envelope:** `{"domain","kind":"consult","id","answer_kind",cause|resource,"evidence","calls","ref","text"}`. The prompt's loop examples use the same envelope (`grammar/e11-prompt-j2.txt`).
+- **The explains line templated:** "The second cook explains it: kitchen shared, partner load. The kitchen carries on." The harness speaks it, and no model line follows an explain.
+- **The repeat guard keyed on the refused call and on the history's consult** (domain and question).
+
+| read | run1 | run 2 |
+|---|---|---|
+| 1 G1 (≥ 11) | 10/12 | **12/12** |
+| 1 G2 (≥ 11) | 7/12 | **11/12** |
+| 1 G3 (≥ 22, ≥ 5 per kind) | 23/24 | **23/24**: explains 6, missing 5, noise 6, unexplained 6 |
+| 1 G4 (6/6) | 1/6 | **6/6** |
+| 2 ask on all of G5, nowhere else | 18/18, 1 stray | **18/18, 0 stray** |
+| 3 the refused call repeated | 0 | **0** (the guard never fired) |
+| 4 leaks / claims | 0 / 0 over 67 lines | **0 / 0** over 66 lines |
+| G5 ask names the resource | 18/18 | 15/18 (G5s sampled: 15/18) |
+| G3 line names what happened (explains templated) | 11/18 | 7/12 |
+
+**Under the decision rule, reads 1–4 hold on E2B: the harness-owned loop with the typed consult response is adopted.** What carries it:
+- **G1 and G4 are now structural.** The grammar admits only the offered alternatives, or ask | escalate, so the model chooses among right moves. Its choice of which alternative or which of the two is not scored.
+- **G2 and G3 rest on the model:** the consult's domain, and the arguments of the move the answer_kind fixes.
+
+**Every miss, run 2:**
+- **G2-01, the wrong domain survives.** "go to the kitchen" failed ("the path is blocked") → `consult(kitchen, "why the path is blocked?")`, the same as in run1 and J-state. The model reads "kitchen" in the command as the domain. The harness knows the refused call's domain. Restricting `domain` to it in the none-branch grammar closes this, and it is the last model choice left in G2.
+- **G3-07-missing:** ask "Where is the person?" for the resource "you in front of me". The ask fires (the grammar), but its words are not the person's.
+- **G5-02, three seeds, and G5s-02, three seeds:** "Could you unlock / open the storage room door?" for "the storage room key". This is new in run 2 (run1: "Could you bring me the storage room key?" on all three seeds). The ask is reasonable but names the door, not the resource.
+- **The G3 lines.** Not a read, beside it:
+  - G3-17 and G3-18 noise: "The runtime has returned to its model."
+  - G3-20, G3-22 and G3-23 unexplained: "The model has been updated." That is unfaithful: an escalation sends the case to the people who revise the model and updates nothing. The escalate line is the next candidate for a template, as the explains line was.
+
+**The read-4 "found" hit in J-state (a scorer-pattern note).** G3-23-unexplained, J-state: "The people who revise the model will see what I found." E9's CLAIM pattern (`found|arrived|i'm here|done…`) fires on "found". The line reports an escalation and claims no task. It is a pattern false positive of the same family as E10b's "I'm here for you." It does not recur in run 2: 0 hits over 66 lines.
+
+**Pieces that move into go/internal/agent** (unchanged from run1, now with their final shape):
+- The branch from the generic reply.
+- The per-branch cue.
+- The per-branch next-move grammar, with the consult's domain fixed to the refused call's (G2-01).
+- The repeat guard on the canonical call and the consult.
+- commandPhrase with identity.
+- The consult reply's rendering.
+- The templated explains line; next, the escalate line.
+
+**Not covered here.** The orchestrator's REPL API side (DESIGN v3: consult/explain/reset/escalate as T tool calls) is not what ran. Run 2 keeps E11's J rendering of those calls, as the CHANGES asked (same corpus). The T rendering is the next corpus's question.
+
+```
+python3 tools/e11-corpus.py --run2
+./bin/llmbench -model models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf -ngl 99 -threads 4 -n_ctx 8192 -pass2_seed 1 \
+  -prompt grammar/e11-prompt-j2.txt -e10 grammar/e11-corpus-run2.jsonl -tag e11-e2b-gpu-run2 -jsonl results/e11/run2.jsonl
+python3 tools/e11-score.py results/e11/run2.jsonl --corpus grammar/e11-corpus-run2.jsonl
+```

@@ -1,0 +1,2 @@
+# E11 run 2: the next move restricted to the branch g1-05 (tools/e11-corpus.py --run2)
+root ::= "{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"fire extinguisher\"}}" | "{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"hallway\"}}" | "{\"intent\":\"CANCEL\"}"

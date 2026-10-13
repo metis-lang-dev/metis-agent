@@ -1,0 +1,4 @@
+# E11 run 2: the next move restricted to the branch again (tools/e11-corpus.py --run2)
+root ::= "{\"call\":\"" verb "\",\"text\":\"" text "\"}"
+verb ::= "ask" | "escalate"
+text ::= [a-zA-Z0-9 ,.;:'()?!+-]{8,200}

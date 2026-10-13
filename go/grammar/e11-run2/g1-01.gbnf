@@ -1,0 +1,2 @@
+# E11 run 2: the next move restricted to the branch g1-01 (tools/e11-corpus.py --run2)
+root ::= "{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"ROOM\",\"description\":\"living room\"}}"
