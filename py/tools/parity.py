@@ -8,6 +8,13 @@ Q4, the agent's persona = dog-prompt + the gemma4 pass-2 examples).
     py/.venv/bin/python py/tools/parity.py [--out rows.jsonl]     # from metis-agent/
 
 No specialist number counts before this prints 54/54 identical.
+
+    py/.venv/bin/python py/tools/parity.py --mapper [--out-dir DIR]     # no model
+
+--mapper (domain-agent step 1): the same 54 rows' Go pass-1 JSON as
+intents (verb = its "intent", args = the rest) through the dog's mapper
+→ one command atom each, or the mapper's error; writes DIR/mapper.jsonl
+and DIR/mapper.md (the table).
 """
 import argparse
 import json
@@ -30,13 +37,55 @@ def intent_of(js):
         return ""
 
 
+def mapper_parity(ref, out_dir):
+    from metis_agent.domains import dog
+    from metis_agent.mapper import Mapped, Mapper
+    m = Mapper(dog.CARD)
+    rows = [json.loads(l) for l in Path(ref).read_text().splitlines() if l.strip()]
+    recs = []
+    for r in (r for r in rows if r.get("kind") == "turn"):
+        js = json.loads(r["json"])
+        intent = {"verb": js.pop("intent"), "args": js}
+        got = m.map(intent)
+        recs.append({"utt": r["utt"], "src": r["src"], "intent": intent,
+                     **({"atom": got.atom, "act": got.act, "dropped": got.dropped} if isinstance(got, Mapped)
+                        else {"error": got.error})})
+    out = Path(out_dir)
+    out.mkdir(parents=True, exist_ok=True)
+    with open(out / "mapper.jsonl", "w") as f:
+        for rec in recs:
+            f.write(json.dumps(rec) + "\n")
+    n = sum("atom" in rec for rec in recs)
+    md = ["# the dog's mapper on the 54 corpus rows (no model)", "",
+          "The Go pass-1 JSON of each row (fsttm-web test/fixtures/harness-e2b.jsonl) as an intent: "
+          "verb = its `intent`, args = the rest. **%d/%d mapped to a command atom**, %d the mapper's error." % (
+              n, len(recs), len(recs) - n), "",
+          "| # | utterance | src | verb | args | command atom | dropped |", "|---|---|---|---|---|---|---|"]
+    for i, rec in enumerate(recs, 1):
+        args = json.dumps(rec["intent"]["args"], separators=(",", ":")).replace("|", "\\|")
+        md.append("| %d | %s | %s | %s | `%s` | %s | %s |" % (
+            i, rec["utt"], rec["src"], rec["intent"]["verb"], args,
+            "`%s`" % rec["atom"] if "atom" in rec else "**error**: " + rec["error"],
+            ", ".join("%s=%s" % (k, json.dumps(v, separators=(",", ":"))) for k, v in rec.get("dropped", {}).items())))
+    (out / "mapper.md").write_text("\n".join(md) + "\n")
+    print("mapper: %d/%d rows → a command atom, %d errors; wrote %s" % (n, len(recs), len(recs) - n, out))
+    for rec in recs:
+        if "error" in rec:
+            print("  error %-36r %s" % (rec["utt"], rec["error"]))
+    return 0 if n == len(recs) else 1
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--mapper", action="store_true", help="the dog's mapper on the 54 rows, no model")
+    ap.add_argument("--out-dir", default=str(ROOT / "py/results/domain-agent/step1"))
     ap.add_argument("--model", default=str(GO / "models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf"))
     ap.add_argument("--ref", default=str(REF))
     ap.add_argument("--out", default="")
     ap.add_argument("--flash-attn", type=int, default=0, help="-1 auto, 0 off (default, the parity setting), 1 on")
     a = ap.parse_args()
+    if a.mapper:
+        return mapper_parity(a.ref, a.out_dir)
 
     persona = (GO / "grammar/dog-prompt.txt").read_text() + (GO / "grammar/pass2-examples-gemma4.txt").read_text()
     gbnf = (GO / "grammar/dog.gbnf").read_text()

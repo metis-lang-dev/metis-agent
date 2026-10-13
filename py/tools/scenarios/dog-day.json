@@ -1,0 +1,27 @@
+{
+  "domain": "dog",
+  "about": "dog_host.py's SCRIPT as intents: the person's command of each beat, typed as the executive types it (go/grammar/dog.gbnf); the world's changes and answers stay the host's. After the day, the REPL API reads of dog-transcript.md.",
+  "reference": "../metis-catalog/domains/dog/dog-transcript.md",
+  "beats": {
+    "1":  [{"verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}],
+    "2":  [{"verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}],
+    "3":  [{"verb": "LOCAL_ACTION", "args": {"action": "STAND_UP"}}],
+    "4":  [{"verb": "NAVIGATE", "args": {"goal": {"type": "TAG", "description": "april tag"}, "tag_id": 3}}],
+    "5":  [{"verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "keys"}}}],
+    "7":  [{"verb": "LOCAL_ACTION", "args": {"action": "MOVE", "direction": "BACKWARD"}}],
+    "8":  [{"verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "fire extinguisher"}}}],
+    "9":  [{"verb": "QUERY", "args": {"target": {"type": "OBJECT", "description": "chair"}}}],
+    "11": [{"verb": "FOLLOW", "args": {"target": {"type": "PERSON", "description": "the person"}}}],
+    "12": [{"verb": "STOP", "args": {}}],
+    "13": [{"verb": "UNKNOWN", "args": {}}],
+    "14": [{"verb": "LOCAL_ACTION", "args": {"action": "SHAKE"}}],
+    "15": [{"verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "bottle", "attributes": {"color": "blue"}}}}],
+    "16": [{"verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}],
+    "17": [{"verb": "LOCAL_ACTION", "args": {"action": "TURN", "direction": "LEFT", "angle_deg": 90}}]
+  },
+  "after": [
+    {"tool": "why", "args": {"atom": "done(go)"}},
+    {"tool": "why", "args": {"atom": "refused(find)"}},
+    {"tool": "state", "args": {}}
+  ]
+}
