@@ -27,15 +27,16 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "py"))
 sys.path.insert(0, str(ROOT / "py/tools"))
 
-# rule → (answer_kind, the atoms that name its blocker), stated before the runs
+# rule → (answer_kind, the atoms that name its blocker), stated before the
+# runs; step 4 (DESIGN 0429470): every blocker the host's pair can flip is
+# `missing` (find_locked included); the refusals with no blocker (busy,
+# must stand, unknown) are not consulted — the replier offers the catalog's
+# alternative instead, recorded below
 DOG_EXPECT = {
     "go_closed": ("missing", {"closed(kitchen)", "open(kitchen)"}),
-    "find_busy": ("missing", {"idle", "moving(tag3)"}),
     "move_wall": ("missing", {"wall(backward)", "clear(backward)"}),
     "find_locked": ("missing", {"locked_away(extinguisher)"}),
-    "unknown": ("unexplained", set()),
     "find_low": ("missing", {"battery_low", "battery_ok"}),
-    "turn_must_stand": ("missing", {"posture(standing)", "posture(sitting)"}),
 }
 
 
@@ -46,6 +47,7 @@ def norm(a):
 def rec_of(r, extra):
     c = r["consult"]
     return {**extra, "answer_kind": c.get("answer_kind"), "cause": c.get("cause"), "resource": c.get("resource"),
+            "evidence": c.get("evidence"), "situation": r["full"].get("situation"),
             "calls": c.get("calls"), "text": c.get("text"),
             "trace": [(x["verb"], x["arg"], x.get("guard", False)) for x in r["full"]["calls"]],
             "pinned": r["full"].get("pinned"), "live_unchanged": r["full"].get("live_unchanged"),
@@ -72,6 +74,11 @@ def dog(seat, llm):
         for r in rs:
             if r.get("kind") == "result" and r.get("status") == "refused":
                 rule = r["ref"]["event"].partition("[")[0]
+                if rule in mod.NO_BLOCKER:
+                    recs.append({"domain": "dog", "rule": rule, "event": r["ref"]["event"], "consulted": False,
+                                 "alternatives": r.get("alternatives"), "answer_kind": None, "calls": 0, "text": r["text"],
+                                 "live_unchanged": True, "pinned": None})
+                    continue
                 c = consult(ag, "Why %s?" % r["reason"])
                 kind, atoms = DOG_EXPECT.get(rule, ("?", set()))
                 got = (c["consult"].get("resource") or {}).get("atom", "")
@@ -130,7 +137,8 @@ def wgc(seat):
             ag.repl.capture(verb, arg)
         c = consult(ag, it["question"], 8)
         rec = rec_of(c, {"domain": "wgc", "kind": it["kind"], "question": it["question"], "expect": it["expect"],
-                         "instruments": it["instruments"]})
+                         "instruments": it["instruments"], "expect_kind": "answer"})
+        rec["kind_ok"] = rec["answer_kind"] == "answer"
         rec["reached"] = any(v in it["instruments"] for v, _, _ in rec["trace"])
         recs.append(rec)
     return recs
@@ -140,7 +148,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seat", default="gemma4", choices=["gemma4", "claude"])
     ap.add_argument("--model", default=str(ROOT / "go/models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf"))
-    ap.add_argument("--out", default=str(ROOT / "py/results/domain-agent/step3"))
+    ap.add_argument("--out", default=str(ROOT / "py/results/domain-agent/step4"))
     ap.add_argument("--only", default="dog,kitchen,wgc")
     a = ap.parse_args()
     os.environ.setdefault("METIS_CONFIG", "")
@@ -174,6 +182,9 @@ def main():
         f.write(json.dumps({"kind": "summary", **summ}) + "\n")
     for r in recs:
         tag = r.get("rule") or r.get("kind") or r["domain"]
+        if r.get("consulted") is False:
+            print("%-8s %-16s not a consult: alternatives %s | %s" % (r["domain"], tag, r["alternatives"], r["text"]))
+            continue
         print("%-8s %-16s %-11s %-5s %-5s %s calls=%s live=%s pinned=%s | %s" % (
             r["domain"], tag, r["answer_kind"], r.get("kind_ok", ""), r.get("atom_ok", r.get("reached", "")),
             r.get("cause") or r.get("resource") or "", r["calls"], r["live_unchanged"], r["pinned"],

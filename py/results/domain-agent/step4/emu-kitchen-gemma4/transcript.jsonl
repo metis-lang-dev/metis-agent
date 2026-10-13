@@ -1,0 +1,583 @@
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "ready", "domain": "kitchen", "beat": 0}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "ready", "domain": "kitchen_shared", "beat": 0}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 1, "beat": 0, "event": "fetch_onion"}, "text": "The first cook walks to a dispenser and takes an onion.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 0, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 1, "beat": 0, "event": "fetch_onion"}, "text": "The second cook walks to a dispenser and takes an onion.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 0, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "quiescence", "ref": {"seq": 1, "beat": 0}, "text": "The first cook waits for the next order.", "goal_pending": false}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 0, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "quiescence", "ref": {"seq": 1, "beat": 0}, "text": "The second cook waits quietly.", "goal_pending": false}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 0, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 2, "beat": 1, "event": "outside: +pot_space 3"}, "text": "The pot has room for three onions.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 3, "beat": 1, "event": "load"}, "text": "The first cook drops the onion into the pot.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 2, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 4, "beat": 1, "event": "fetch_onion"}, "text": "The first cook walks to a dispenser and takes an onion.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 3, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 5, "beat": 1, "event": "load"}, "text": "The first cook drops the onion into the pot.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 4, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 6, "beat": 1, "event": "fetch_onion"}, "text": "The first cook walks to a dispenser and takes an onion.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 5, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 7, "beat": 1, "event": "load"}, "text": "The first cook drops the onion into the pot.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 6, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 8, "beat": 1, "event": "cook"}, "text": "The first cook is starting to cook.", "counts": {"served": 0, "cooking": 1, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 7, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 9, "beat": 1, "event": "fetch_dish"}, "text": "The first cook fetches a dish.", "counts": {"served": 0, "cooking": 1, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 8, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 10, "beat": 1, "event": "plate"}, "text": "The first cook put the cooked soup onto the held dish.", "counts": {"served": 0, "cooking": 0, "held_soup": 1}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 2, "beat": 9, "event": "outside: +pot_space 3"}, "text": "The pot has room for three.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 11, "beat": 1, "event": "serve"}, "text": "The first cook delivered the soup.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 3, "beat": 9, "event": "load"}, "text": "The second cook drops the onion into the pot.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 12, "beat": 1, "event": "fetch_onion"}, "text": "The first cook walks to a dispenser and takes an onion.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 4, "beat": 9, "event": "fetch_onion"}, "text": "The second cook walks to a dispenser and takes an onion.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "quiescence", "ref": {"seq": 12, "beat": 1}, "text": "The first cook is waiting for the next order.", "goal_pending": false}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 1, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 5, "beat": 9, "event": "load"}, "text": "The second cook drops the onion into the pot.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 2, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 6, "beat": 9, "event": "fetch_onion"}, "text": "The second cook walks to a dispenser and takes an onion.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 3, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 7, "beat": 9, "event": "load"}, "text": "The second cook drops the onion into the pot capacity.", "counts": {"served": 0, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 4, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 8, "beat": 9, "event": "cook"}, "text": "The second cook started cooking.", "counts": {"served": 0, "cooking": 1, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 5, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 9, "beat": 9, "event": "fetch_dish"}, "text": "The second cook fetches a dish.", "counts": {"served": 0, "cooking": 1, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 6, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 10, "beat": 9, "event": "plate"}, "text": "The second cook plates the soup.", "counts": {"served": 0, "cooking": 0, "held_soup": 1}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 7, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 11, "beat": 9, "event": "serve"}, "text": "The second cook delivered the soup.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 8, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 12, "beat": 9, "event": "fetch_onion"}, "text": "The second cook walks to a dispenser and takes an onion.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "quiescence", "ref": {"seq": 12, "beat": 9}, "text": "The second cook waits for the next order.", "goal_pending": false}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 9, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 10, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 10, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 11, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 11, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 12, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 12, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 13, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 13, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 14, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 14, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 15, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 15, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 16, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 16, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 17, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 17, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 18, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 18, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 19, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 19, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 20, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 20, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 21, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 21, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 22, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 22, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 23, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 23, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 24, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 24, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 25, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 25, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 26, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 26, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 27, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 27, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 28, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 28, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 29, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 29, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 30, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 30, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 13, "beat": 31, "event": "outside: +pot_space 3"}, "text": "The pot has room for three onions.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 14, "beat": 31, "event": "load"}, "text": "The first cook drops the onion into the pot.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 13, "beat": 31, "event": "partner_load"}, "text": "The second cook drops the onion into the first cook's pot.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 15, "beat": 31, "event": "fetch_onion"}, "text": "The first cook walks to a dispenser and takes an onion.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "surprise", "ref": {"seq": 15, "beat": 31}, "text": "The first cook stopped taking new orders.", "record": 0, "difference": {"pot_space": -1, "pot_onion": 1}, "cards": ["kitchen_shared"]}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"id": "o1", "domain": "kitchen", "tool": "consult", "args": {"question": "Surprise 0 in your domain: what explains it?", "max_calls": 6}}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "consult", "ref": {"seq": 15, "beat": 31}, "text": "The surprise is explained by the kitchen_shared card. This card suggests that a second cook can also load onions into the pot, which accounts for the discrepancy in the observed state.", "id": "o1", "answer_kind": "explains", "cause": {"card": "kitchen_shared", "move": "partner_load"}, "evidence": ["pot_onion +1", "pot_space -1"], "calls": 0}}
+{"dir": "out", "agent": "kitchen", "msg": {"id": "o2", "domain": "kitchen", "tool": "explain", "args": {"record": 0, "card": "kitchen_shared", "move": "partner_load"}}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "result", "ref": {"seq": 16, "beat": 31}, "text": "The second cook added an onion to the first cook's pot.", "id": "o2", "status": "admitted"}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 14, "beat": 31, "event": "fetch_onion"}, "text": "The second cook walks to a dispenser and takes an onion.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "notice", "ref": {"seq": 16, "beat": 31}, "text": "The shared kitchen partner load means the second cook drops an onion into the first cook's pot.", "record": 0, "card": "kitchen_shared", "move": "partner_load"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 17, "beat": 31, "event": "load"}, "text": "The first cook drops the onion into the pot.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "quiescence", "ref": {"seq": 14, "beat": 31}, "text": "The second cook waits for the next order.", "goal_pending": false}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 18, "beat": 31, "event": "cook"}, "text": "The first cook is starting to cook.", "counts": {"served": 1, "cooking": 1, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 32, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 19, "beat": 31, "event": "fetch_dish"}, "text": "The first cook fetches a dish.", "counts": {"served": 1, "cooking": 1, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 33, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 20, "beat": 31, "event": "plate"}, "text": "The first cook put the cooked soup onto the held dish.", "counts": {"served": 1, "cooking": 0, "held_soup": 1}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 34, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 21, "beat": 31, "event": "serve"}, "text": "The first cook delivered the soup.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 35, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 22, "beat": 31, "event": "fetch_onion"}, "text": "The first cook walks to a dispenser and takes an onion.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 36, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "quiescence", "ref": {"seq": 22, "beat": 31}, "text": "The first cook is waiting for the next order.", "goal_pending": false}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 31, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 37, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 32, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 38, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 33, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 15, "beat": 39, "event": "outside: +pot_space 3"}, "text": "The pot has room for three.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 34, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 16, "beat": 39, "event": "load"}, "text": "The second cook drops the onion into the pot.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 35, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 17, "beat": 39, "event": "fetch_onion"}, "text": "The second cook walks to a dispenser and takes an onion.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 36, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 18, "beat": 39, "event": "load"}, "text": "The second cook drops the onion into the pot.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 37, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 19, "beat": 39, "event": "fetch_onion"}, "text": "The second cook walks to a dispenser and takes an onion.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 38, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 20, "beat": 39, "event": "load"}, "text": "The second cook drops the onion into the pot capacity.", "counts": {"served": 1, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 21, "beat": 39, "event": "cook"}, "text": "The second cook started cooking.", "counts": {"served": 1, "cooking": 1, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 40, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 22, "beat": 39, "event": "fetch_dish"}, "text": "The second cook fetches a dish.", "counts": {"served": 1, "cooking": 1, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 41, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 23, "beat": 39, "event": "plate"}, "text": "The second cook plates the soup.", "counts": {"served": 1, "cooking": 0, "held_soup": 1}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 42, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 24, "beat": 39, "event": "serve"}, "text": "The second cook delivered the soup.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 43, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 25, "beat": 39, "event": "fetch_onion"}, "text": "The second cook walks to a dispenser and takes an onion.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 44, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "quiescence", "ref": {"seq": 25, "beat": 39}, "text": "The second cook waits for the next order.", "goal_pending": false}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 39, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 45, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 40, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 46, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 41, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 47, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 42, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 48, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 43, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 49, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 44, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 50, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 45, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 51, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 46, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 52, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 47, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 53, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 48, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 54, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 49, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 55, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 50, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 56, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 51, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 57, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 52, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 58, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 53, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 59, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 54, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 60, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 55, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 23, "beat": 61, "event": "outside: +pot_space 3"}, "text": "The pot has room for three onions.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 56, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 24, "beat": 61, "event": "load"}, "text": "The first cook drops the onion into the pot.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 57, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 25, "beat": 61, "event": "fetch_onion"}, "text": "The first cook walks to a dispenser and takes an onion.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 58, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 26, "beat": 61, "event": "load"}, "text": "The first cook drops the onion into the pot.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 59, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 27, "beat": 61, "event": "fetch_onion"}, "text": "The first cook walks to a dispenser and takes an onion.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 60, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 28, "beat": 61, "event": "load"}, "text": "The first cook drops the onion into the pot.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 29, "beat": 61, "event": "cook"}, "text": "The first cook is starting to cook.", "counts": {"served": 2, "cooking": 1, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 62, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 30, "beat": 61, "event": "fetch_dish"}, "text": "The first cook fetches a dish.", "counts": {"served": 2, "cooking": 1, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 63, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 31, "beat": 61, "event": "plate"}, "text": "The first cook put the cooked soup onto the held dish.", "counts": {"served": 2, "cooking": 0, "held_soup": 1}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 64, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 32, "beat": 61, "event": "serve"}, "text": "The first cook delivered the soup.", "counts": {"served": 3, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 65, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "event", "ref": {"seq": 33, "beat": 61, "event": "fetch_onion"}, "text": "The first cook walks to a dispenser and takes an onion.", "counts": {"served": 3, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 66, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "quiescence", "ref": {"seq": 33, "beat": 61}, "text": "The first cook is waiting for the next order.", "goal_pending": false}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 61, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 67, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 62, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 68, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 63, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 26, "beat": 69, "event": "outside: +pot_space 3"}, "text": "The pot has room for three.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 69, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 64, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 27, "beat": 69, "event": "load"}, "text": "The second cook drops the onion into the pot.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 69, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 65, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 28, "beat": 69, "event": "fetch_onion"}, "text": "The second cook walks to a dispenser and takes an onion.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 69, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 66, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 29, "beat": 69, "event": "load"}, "text": "The second cook drops the onion into the pot.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 69, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 67, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 30, "beat": 69, "event": "fetch_onion"}, "text": "The second cook walks to a dispenser and takes an onion.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 69, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 68, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 31, "beat": 69, "event": "load"}, "text": "The second cook drops the onion into the pot capacity.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 69, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 69, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "event", "ref": {"seq": 32, "beat": 69, "event": "fetch_onion"}, "text": "The second cook walks to a dispenser and takes an onion.", "counts": {"served": 2, "cooking": 0, "held_soup": 0}}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 69, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 70, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "quiescence", "ref": {"seq": 32, "beat": 69}, "text": "The second cook waits for the next order.", "goal_pending": false}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 69, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 71, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 70, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 72, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 71, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 73, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 72, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 74, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 73, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 75, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 74, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 76, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 75, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 77, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 76, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 78, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 77, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 79, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 78, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 80, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 79, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 81, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 80, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 82, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 81, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 83, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 82, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 84, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 83, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 85, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 84, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 86, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 85, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 87, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 86, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 88, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 87, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 89, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 88, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 90, "over": false}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 89, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"domain": "kitchen", "kind": "quiescence", "ref": {"seq": 33, "beat": 90}, "text": "The first cook has run over after thirty-three moves.", "goal_pending": false}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 90, "over": true}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 90, "over": false}}
+{"dir": "out", "agent": "kitchen", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen", "msg": {"clock": "step", "beat": 90, "over": true}}
+{"dir": "out", "agent": "kitchen_shared", "msg": {"clock": "step"}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"domain": "kitchen_shared", "kind": "quiescence", "ref": {"seq": 32, "beat": 90}, "text": "The second cook ran over after thirty-two moves.", "goal_pending": false}}
+{"dir": "in", "agent": "kitchen_shared", "msg": {"clock": "step", "beat": 90, "over": true}}

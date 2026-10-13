@@ -23,13 +23,11 @@ from .loop import PERSONA_B, Specialist
 from .repl_tools import Kernel, tools as repl_tools
 from .seat import Call, Text
 
-ANSWER_KINDS = ["explains", "missing", "noise", "unexplained"]
+ANSWER_KINDS = ["explains", "missing", "noise", "unexplained", "answer"]
 
 ANSWER_TOOL = {
     "name": "answer",
-    "description": "End the consult with the typed answer, once: explains (a move of a card explains it), "
-                   "missing (the world lacks a resource), noise (a one-off misreading the next reading will not "
-                   "repeat), unexplained (none of these).",
+    "description": "End the consult with the typed answer, once.",
     "parameters": {"type": "OBJECT", "required": ["kind", "text"], "properties": {
         "kind": {"type": "STRING", "enum": ANSWER_KINDS, "description": "the answer's kind"},
         "card": {"type": "STRING", "description": "explains: the card, as the cards name it"},
@@ -39,6 +37,10 @@ ANSWER_TOOL = {
         "text": {"type": "STRING", "description": "one to three plain sentences for the orchestrator"},
     }},
 }
+
+FIRST_READ = ("Never answer before you have called at least one tool: start by looking (state, events, list), then act. ",
+              "The first read is made for you: it is in the session below (FIRST READ). Look further only if you "
+              "need to (state, events, why), then answer. ")
 
 PERSONA = PERSONA_B.replace(
     "You answer questions about a formal model that is loaded in the metis kernel's REPL.",
@@ -111,24 +113,27 @@ class AnsweringSeat:
     """A seat around a seat: the `answer` call becomes the loop's text
     answer (the loop ends there) and its typed fields are kept.
 
-    The harness owns the consult's shape on gemma4 (E2B ended its first
-    turn with no token, or wrote code, step 3): the first turn is pinned
-    to a REPL call (the persona's "never answer before you have called a
-    tool"), and an ending without the answer tool is closed by one pinned
-    `answer` call. The claude seat is not pinned."""
+    The harness owns the consult's shape on gemma4 (DESIGN 0429470): the
+    turn at max_calls is pinned to the answer, and an ending without the
+    answer tool (E2B ended turns with no token, step 3) is closed by one
+    pinned `answer` call. The first read is the harness's own (in the
+    context), so the first turn is the model's. The claude seat is not
+    pinned: at max_calls it gets the closing turn (Consultant)."""
 
     def __init__(self, inner):
         self.inner, self.typed, self.pinned = inner, None, []
         self.last = None            # (system, tools, question, the last Call)
+        self.turns, self.max_calls = 0, None
 
     def __getattr__(self, k):
         return getattr(self.inner, k)
 
     def turn(self, system, tools, question, cont=""):
         gemma = hasattr(self.inner, "open_id")
-        if gemma and not cont:                       # the first turn: a REPL call
-            r = pinned_call(self.inner, system, tools, question, cont, [t for t in tools if t["name"] != "answer"])
-            self.pinned.append("first")
+        self.turns += 1
+        if gemma and self.max_calls is not None and self.turns > self.max_calls:   # the last turn: the answer
+            r = pinned_call(self.inner, system, tools, question, cont, [t for t in tools if t["name"] == "answer"])
+            self.pinned.append("max-calls")
         else:
             r = self.inner.turn(system, tools, question, cont)
             if gemma and isinstance(r, Text):        # ended without the answer tool
@@ -149,14 +154,29 @@ class AnsweringSeat:
         return r
 
 
-def answer_kinds(surprise, offered):
-    """The kinds the situation admits (the harness restricts the grammar
-    per branch, E11): `explains` needs a card that could explain, `noise`
-    a reading to set aside — both only with a surprise open; a refusal or
-    a question is `missing` or `unexplained`."""
-    if not surprise:
-        return ["missing", "unexplained"]
-    return (["explains"] if offered else []) + ["missing", "noise", "unexplained"]
+# the kinds' meanings as DESIGN 0429470 rules them (explains keeps step 3's
+# wording: a rewrite of it regressed E2B's kitchen answer)
+KIND_TEXT = {
+    "explains": "explains (a move of a card explains it)",
+    "missing": "missing (a blocker the person can change: a closed door, a lock, a low battery, nobody in view, "
+               "even when it held from the start; atom: the blocker, words: as a person says it)",
+    "noise": "noise (a one-off misreading the next reading will not repeat)",
+    "unexplained": "unexplained (nobody can account for it)",
+    "answer": "answer (the person's own question, answered in text)",
+}
+
+
+def answer_kinds(situation, offered):
+    """The kinds the situation admits (DESIGN 0429470; the harness
+    restricts the grammar per branch, E11): after a refusal missing ·
+    unexplained · answer; after a surprise explains (when a card could) ·
+    noise · unexplained; the person's own question routed by the
+    orchestrator: answer."""
+    if situation == "refusal":
+        return ["missing", "unexplained", "answer"]
+    if situation == "surprise":
+        return (["explains"] if offered else []) + ["noise", "unexplained"]
+    return ["answer"]
 
 
 def answer_tool(offered, kinds=ANSWER_KINDS):
@@ -167,11 +187,7 @@ def answer_tool(offered, kinds=ANSWER_KINDS):
     t = json.loads(json.dumps(ANSWER_TOOL))
     props = t["parameters"]["properties"]
     props["kind"]["enum"] = list(kinds)
-    t["description"] = "End the consult with the typed answer, once: " + ", ".join(
-        {"explains": "explains (a move of a card explains it)",
-         "missing": "missing (the world lacks a resource the move needed)",
-         "noise": "noise (a one-off misreading the next reading will not repeat)",
-         "unexplained": "unexplained (none of these)"}[k] for k in kinds) + "."
+    t["description"] = "End the consult with the typed answer, once: " + ", ".join(KIND_TEXT[k] for k in kinds) + "."
     if offered:
         props["card"]["enum"] = sorted(offered)
         moves = sorted({m for ms in offered.values() for m in ms})
@@ -180,10 +196,14 @@ def answer_tool(offered, kinds=ANSWER_KINDS):
     return t
 
 
-def envelope(typed):
-    """The typed answer → the consult fields (answer_kind, cause | resource)."""
+def envelope(typed, kinds=ANSWER_KINDS):
+    """The typed answer → the consult fields (answer_kind, cause | resource).
+    A kind outside the situation's set (an unpinned seat) is clamped: to the
+    one kind when the situation admits one, else unexplained."""
     t = typed or {}
-    kind = t.get("kind") if t.get("kind") in ANSWER_KINDS else "unexplained"
+    kind = t.get("kind")
+    if kind not in kinds:
+        kind = kinds[0] if len(kinds) == 1 else "unexplained"
     f = {"answer_kind": kind}
     if kind == "explains":
         f["cause"] = {"card": t.get("card", ""), "move": t.get("move", "")}
@@ -196,23 +216,31 @@ CLOSE = "note: the calls are spent — answer now with the answer tool."
 
 
 class Consultant:
-    def __init__(self, repl, seat, display, script, max_calls=8, offered=None, surprise=False):
+    def __init__(self, repl, seat, display, script, max_calls=8, offered=None):
         self.repl, self.seat, self.max_calls = repl, AnsweringSeat(seat), max_calls
         self.display, self.script, self.offered = display, script, offered or {}
-        self.kinds = answer_kinds(surprise, self.offered)
+        self.kinds = ["answer"]
 
-    def consult(self, question, max_calls=None, band_extra=""):
-        """band_extra: what the session's own band does not print — the
-        open surprise (in the question, E2B wrote code instead of calling
-        a tool; in the band, it reads the state first)."""
+    def consult(self, question, max_calls=None, band_extra="", situation="question"):
+        """band_extra: the harness's first read (the refusal's why, or the
+        open surprise's difference and cards) — in the band, not the
+        question (in the question E2B wrote code instead of calling a tool).
+        A fresh context per consult: the strip is per question (carried
+        context broke the kitchen answer after dog consults, step 3)."""
+        self.kinds = answer_kinds(situation, self.offered)
+        if hasattr(self.seat.inner, "llm"):
+            self.seat.inner._kv = ""
+            self.seat.inner.llm.prefix = None        # the next prime clears the KV
         kernel = LiveKernel(self.repl)
         sp = Specialist.__new__(Specialist)         # the loop as is, on the live kernel
         sp.kernel, sp.seat, sp.persona = kernel, self.seat, "b"
         sp.max_calls = max_calls or self.max_calls
         sp.tools = repl_tools(self.repl) + [answer_tool(self.offered if self.kinds[0] == "explains" else {}, self.kinds)]
         band = self.repl.capture("ctx", "").split("\n── ", 1)[0] + band_extra
-        sp.system = PERSONA.format(display=self.display, intro=band, script=self.script)
+        persona = PERSONA.replace(*FIRST_READ) if band_extra else PERSONA     # only when there is a first read
+        sp.system = persona.format(display=self.display, intro=band, script=self.script)
         self.seat.typed, self.seat.pinned, self.seat.last = None, [], None
+        self.seat.turns, self.seat.max_calls = 0, sp.max_calls
         try:
             r = sp.ask(question)
             if self.seat.typed is None and r["stop"] == "max-calls" and self.seat.last:
@@ -223,7 +251,8 @@ class Consultant:
         typed = self.seat.typed
         r["typed"] = typed
         r["pinned"] = list(self.seat.pinned)
-        r["envelope"] = envelope(typed)
+        r["envelope"] = envelope(typed, self.kinds)
+        r["clamped"] = bool(typed) and typed.get("kind") != r["envelope"]["answer_kind"]
         r["kinds"] = self.kinds
         r["text"] = (typed or {}).get("text") or r["answer"]
         return r

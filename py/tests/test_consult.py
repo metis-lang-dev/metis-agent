@@ -58,14 +58,25 @@ def test_consult_never_writes_the_live_session():
     # the day goes on as if no consult had happened
     out = ag.handle({"clock": "beat"})
     assert [x["status"] for x in out if x.get("kind") == "result"] == []      # beat 3: only the retraction
-    assert "explains" not in json.dumps(ag.consults[-1]["kinds"])             # no surprise: missing | unexplained
+    assert ag.consults[-1]["kinds"] == ["missing", "unexplained", "answer"]  # after a refusal
+    # the harness's first read: the refusal's why, its blocker, and the evidence
+    fr = ag.consults[-1]["first_read"]
+    assert "why refused(go)" in fr and "go_closed[P=kitchen]" in fr and "it rested on closed(kitchen) (kept)" in fr
+    assert r["evidence"] == ["closed(kitchen) 1", "mapped(kitchen) 1"]
+    # consulted once: the next consult is the person's own question
+    ag.consults.clear()
+    seat.i, seat.answer = len(seat.calls), {"kind": "answer", "text": "I am standing."}
+    r2 = ag.handle({"tool": "consult", "id": "k2", "args": {"question": "How are you standing?"}})[0]
+    assert r2["answer_kind"] == "answer" and "evidence" not in r2 and ag.consults[-1]["kinds"] == ["answer"]
 
 
 def test_answer_kinds_follow_the_situation():
-    assert answer_kinds(False, {"kitchen_shared": ["partner_load"]}) == ["missing", "unexplained"]
-    assert answer_kinds(True, {}) == ["missing", "noise", "unexplained"]
-    assert answer_kinds(True, {"kitchen_shared": ["partner_load"]})[0] == "explains"
-    t = answer_tool({"kitchen_shared": ["partner_load"]}, answer_kinds(True, {"kitchen_shared": ["partner_load"]}))
+    off = {"kitchen_shared": ["partner_load"]}
+    assert answer_kinds("refusal", off) == ["missing", "unexplained", "answer"]
+    assert answer_kinds("surprise", {}) == ["noise", "unexplained"]
+    assert answer_kinds("surprise", off) == ["explains", "noise", "unexplained"]
+    assert answer_kinds("question", off) == ["answer"]
+    t = answer_tool(off, answer_kinds("surprise", off))
     p = t["parameters"]["properties"]
     assert p["card"]["enum"] == ["kitchen_shared"] and p["move"]["enum"] == ["partner_load"]
     assert envelope({"kind": "explains", "card": "c", "move": "m"}) == {"answer_kind": "explains", "cause": {"card": "c", "move": "m"}}
@@ -106,3 +117,15 @@ def test_kitchen_surprise_verbs():
         assert again[0]["status"] == "refused"                          # nothing open to reset
     finally:
         del os.environ["METIS_PAIR_DIR"]
+
+
+def test_no_blocker_refusals_offer_the_catalogs_alternative():
+    """DESIGN 0429470: must stand first → stand; busy → cancel; already → none (not a consult)."""
+    ag = DomainAgent(dog)
+    out = []
+    for m in ({"id": "c1", "verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}},
+              {"id": "c2", "verb": "LOCAL_ACTION", "args": {"action": "TURN", "direction": "LEFT"}},
+              {"id": "c3", "verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}):
+        ag.handle(m)
+        out += [r for r in ag.handle({"clock": "beat"}) if r.get("status") == "refused"]
+    assert [(r["id"], r["alternatives"]) for r in out] == [("c2", ["stand"]), ("c3", [])]

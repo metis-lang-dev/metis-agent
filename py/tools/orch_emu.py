@@ -10,7 +10,7 @@ the domain agent's test loop.
 The next-move table, as the emulator applies it (the harness owns the
 branch; DESIGN "The orchestrator agent"):
 
-    result.refused                → REPL consult(domain, "Why <reason>?")
+    result.refused, none          → REPL consult(domain, "Why <reason>?")
     surprise                      → REPL consult(domain, "Surprise N: what explains it?")
     consult.explains              → REPL explain(domain, record, card, move)
     consult.noise                 → REPL reset(domain, record)
@@ -209,7 +209,8 @@ class Orchestrator:
         if not self.on:
             return
         for r in replies:
-            if r.get("kind") == "result" and r.get("status") == "refused" and r.get("id", "").startswith("c"):
+            if r.get("kind") == "result" and r.get("status") == "refused" and r.get("id", "").startswith("c") \
+                    and not r.get("alternatives"):     # with alternatives: an intent on one of them (not applied)
                 self.consulted(ag, self.call(ag, "consult", {"question": "Why %s?" % r.get("reason", "was it refused"),
                                                              "max_calls": 6}), None)
             elif r.get("kind") == "surprise":

@@ -113,6 +113,7 @@ class DomainAgent:
         self.log = []        # what the mapper did, per intent (the report's table)
         self.narrated = []   # (fragment, sentence) per narrated fragment
         self.consults = []   # every consult's full record (the report's transcripts)
+        self.last_refusal = None   # the latest refusal not yet consulted: the consult's situation
         self.display = getattr(module, "DISPLAY", self.name)
         displays = dict(getattr(module, "DISPLAYS", {}), **{self.name: self.display})
         self.names = lambda p: displays.get(p, words(p))
@@ -189,7 +190,13 @@ class DomainAgent:
             text = self.narrate(Fragment(path=self.name, seq=k, beat=beat, kind="event",
                                          ref=event_ref(ev.name, ev.consume, ev.produce, self.mapper.commands, ev.persist),
                                          counts={a: self.repl.counts.get(a, 0) for a in atoms}))
-            return self.replier.fired(ev, k, beat, self.repl.counts, text)   # seq as `log` numbers it
+            out = self.replier.fired(ev, k, beat, self.repl.counts, text)   # seq as `log` numbers it
+            for r in out:
+                if r.get("status") == "refused":
+                    self.last_refusal = {"id": r["id"], "seq": k, "event": ev.name, "persist": dict(ev.persist),
+                                         "act": next((a[len("refused("):-1] for a in ev.produce
+                                                      if a.startswith("refused(")), "")}
+            return out
         if kind == "event":
             if s.get("kind") == "exo" and not self.exo_events:
                 return []                     # the host's own input (commands, retractions): not news
@@ -228,6 +235,21 @@ class DomainAgent:
             return [reply(self.name, "error", id=iid, error="tool %s: not in phase 1" % name)]
         return [reply(self.name, "error", id=iid, error="no tool %r" % name)]
 
+    def first_read(self, lr):
+        """The harness's first read after a refusal (DESIGN 0429470): `why
+        refused(ACT)` — its header and the refusing event's row — and, per
+        kept premise of the refusing rule (the blocker), where it came from
+        (`why ATOM`'s first line). -> (text for the band, evidence)."""
+        out = self.repl.capture("why", "refused(%s)" % lr["act"]).splitlines()
+        row = next((l for l in reversed(out) if ("| %d %s" % (lr["seq"], lr["event"])) in " ".join(l.split())), "")
+        lines = ["FIRST READ (made by the harness): why refused(%s)" % lr["act"], "  " + (out[0] if out else ""),
+                 "  the refusing event: " + " ".join(row.split())]
+        for a in sorted(lr["persist"]):
+            w = self.repl.capture("why", a).splitlines()
+            lines.append("  it rested on %s (kept): %s" % (a, w[0] if w else ""))
+        evidence = ["%s %d" % (a, self.repl.counts.get(a, 0)) for a in sorted(lr["persist"])]
+        return "\n" + "\n".join(scrub(l) for l in lines), evidence
+
     def surprise_context(self):
         """The open surprise in words, for the consultant's question: the
         reading against the model, and the cards that could explain it."""
@@ -237,7 +259,7 @@ class DomainAgent:
         rec = self.repl.loop.records[w.open]
         diff = rec["meta"].get("diff", {})
         model = {a: rec["observed"].get(a, 0) - d for a, d in diff.items()}
-        return ("\nSURPRISE %d open (the domain is observe-only until it is closed): the reading differs from the "
+        return ("\nFIRST READ (made by the harness): SURPRISE %d open (the domain is observe-only until it is closed): the reading differs from the "
                 "model: %s. Cards that could explain it: %s." % (
                     w.open, ", ".join("%s %d (the model expected %d)" % (a, rec["observed"].get(a, 0), model[a])
                                       for a in sorted(diff)),
@@ -252,9 +274,22 @@ class DomainAgent:
             return [reply(self.name, "error", id=iid, error="consult needs a question")]
         from .narrator import script_text
         c = Consultant(self.repl, self.consult_seat, self.display, script_text(self.name, self.script, self.names, exact=True),
-                       offered=offered_moves(self.repl), surprise=self.watch.open is not None)
+                       offered=offered_moves(self.repl))
+        # the situation: an open surprise, else the latest refusal not yet
+        # consulted, else the person's own question (args.situation overrides)
+        situation = args.get("situation") or ("surprise" if self.watch.open is not None
+                                              else "refusal" if self.last_refusal else "question")
+        band, evidence = "", []
+        if situation == "surprise" and self.watch.open is not None:
+            band = self.surprise_context()
+            rec = self.repl.loop.records[self.watch.open]
+            evidence = ["%s %+d" % (a, d) for a, d in sorted(rec["meta"].get("diff", {}).items())]
+        elif situation == "refusal" and self.last_refusal:
+            band, evidence = self.first_read(self.last_refusal)
+            self.last_refusal = None
         before = (self.repl.stage, dict(self.repl.counts), len(self.repl.fired))
-        r = c.consult(q, int(args.get("max_calls", 8)), band_extra=self.surprise_context())
+        r = c.consult(q, int(args.get("max_calls", 8)), band_extra=band, situation=situation)
+        r["situation"], r["first_read"] = situation, band
         r["live_unchanged"] = before == (self.repl.stage, dict(self.repl.counts), len(self.repl.fired))
         cause = r["envelope"].get("cause")
         if cause:   # the names as the cards spell them ('partner load' → partner_load)
@@ -263,7 +298,7 @@ class DomainAgent:
             if not cause["move"] and len(moves) == 1:      # the card's only move: an explain needs one
                 cause["move"], r["filled_move"] = moves[0], True
         self.consults.append(r)
-        return [reply(self.name, "consult", id=iid, calls=len(r["calls"]), text=r["text"],
+        return [reply(self.name, "consult", id=iid, calls=len(r["calls"]), text=r["text"], evidence=evidence or None,
                       ref={"seq": len(self.repl.fired), "beat": self.beat_no()}, **r["envelope"])]
 
     def card_names(self, card, move):

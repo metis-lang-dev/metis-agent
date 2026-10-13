@@ -21,7 +21,7 @@ KINDS = {
     "surprise": ("record", "difference", "cards"),
     "notice": ("record", "card", "move"),
     "error": ("id", "error"),
-    "consult": ("id", "answer_kind", "cause", "resource", "calls"),
+    "consult": ("id", "answer_kind", "cause", "resource", "evidence", "calls"),
 }
 
 # result.status as the table lists it (`cancelled`: a task the person
@@ -29,7 +29,7 @@ KINDS = {
 STATUS = ("accepted", "admitted", "admitted+notice", "applied", "done", "refused",
           "expired", "progress", "failed", "cancelled")
 
-ANSWER_KINDS = ("explains", "missing", "noise", "unexplained")
+ANSWER_KINDS = ("explains", "missing", "noise", "unexplained", "answer")
 
 FIELDS = set(BASE).union(*KINDS.values())
 

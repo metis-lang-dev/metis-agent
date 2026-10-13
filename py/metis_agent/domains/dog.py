@@ -77,8 +77,21 @@ PLACE_REFUSALS = {"go_unmapped", "go_closed", "go_blocked"}
 # the standing handles stand for a place, they do not name one: never an alternative
 STANDING = {"tag_near", "elsewhere"}
 
+# the refusals with no blocker (DESIGN 0429470): the dog's own state, not a
+# fact of the world the person can change — not a consult; the replier
+# offers the catalog's alternative (stand first; cancel the running task)
+# or none, and the orchestrator speaks the reason
+NO_BLOCKER = {
+    **{r: ["stand"] for r in ("turn_must_stand", "move_must_stand", "go_must_stand", "follow_must_stand")},
+    **{r: ["cancel"] for r in ("go_busy", "go_busy_find", "go_busy_follow", "find_busy", "find_busy_find",
+                               "find_busy_follow", "follow_busy", "follow_busy_find")},
+    **{r: [] for r in ("stand_already", "sit_already", "lie_already", "follow_already", "stop_still", "unknown")},
+}
+
 
 def alternatives(rule, counts):
+    if rule in NO_BLOCKER:
+        return list(NO_BLOCKER[rule])
     if rule not in PLACE_REFUSALS:
         return []
     places = [a[len("mapped("):-1] for a in counts if a.startswith("mapped(") and counts[a] > 0]
