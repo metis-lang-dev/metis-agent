@@ -352,3 +352,9 @@ loaded domain; the call pinned by a grammar built from them; the
 (the standing region, narration streaming). Spoken line from the call,
 narration from the outcome: the async shape, so an acceptance is never
 read as completion.
+
+**Ruled by E10 (2026-10-13, MODEL-EXPERIMENTS "E10 ruling"): the IO above
+stands; its rendering stays the JSON text in both directions. The
+`<|tool_response>` turn is not adopted for the executive: the model's
+synchronous tool prior reads a response as completion. Native calls are
+the specialist's shape (SPECIALIST.md §3), where every call is synchronous.**

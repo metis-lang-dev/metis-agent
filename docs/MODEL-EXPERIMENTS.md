@@ -826,3 +826,58 @@ Each arm has one prompt:
 - **J narrates signals by echoing them.** The signal cue's bracketed instruction leaks into speech on 8/10. The cue wants the E8 narrator's framing, or the sanitizer has to strip it.
 - **After a refusal, the model reports and stops (C 0/24, D-T 0/4).** Steering cannot be left to the executive's next turn. The harness owns it: the repeat guard plus an explicit "propose something else or ask" cue, or the decider's escalate as the default after a refused explain.
 - **The admission notice is never narrated (E 0/6).** If the notice matters to the person, it needs its own templated line, not the model's paraphrase.
+
+### E10 ruling (architect, 2026-10-13; user confirmed)
+
+**J-text stays, and responses stay text.** Under the pre-registered rule:
+T-api fails read 1 (class 52/54 on two held-out rows, 3 leaks, 4 completion
+claims against `accepted`), wins none of B, C, E and loses B by the margin
+(36 against 40). The IO architecture of DESIGN.md (calls down, responses by
+id, signals pushed and never rendered as responses) stands as tested; only
+its rendering is decided, and it is the JSON text in both directions. The
+`<|tool_response>` turn is not adopted; G-F is not triggered. This ruling
+is for E2B Q4, the deployed executive model; E10b (s-de466019) checks the
+declaration rendering against the GGUF template and the same reads on E4B
+as an addendum, and does not reopen it.
+
+**What the three tool-call experiments taught, taken together (E4, E9, E10).**
+
+- *Accuracy does not depend on the format.* With the same examples, the
+  native call and the JSON tie on class on 12, 54 and 54 rows; where they
+  differ it is by one or two rows, in the JSON's favour on arguments. The
+  rows a small model gets right are decided by the examples it is shown,
+  not by the markup it answers in.
+- *Declarations cost context, and the small model pays for it.* T-api's
+  prefix is 5.2 k tokens against J's 2.8 k; the two read-1 class misses
+  are held-out rows that E9's shorter T prompt still got right. On E2B the
+  2.4 k tokens of schema buy nothing the examples do not already give.
+- *The response turn carries a trained prior: call, result, done.* Every
+  tool-call arm that saw a result turn reported a task complete on some
+  acceptances (E9 T-rt 15 then 5, E10 T-api 4) and the JSON path never did.
+  Gemma 4's tool-use training is synchronous. An API whose outcomes arrive
+  later fights that prior; the text rendering does not invite it.
+- *Where the protocol is synchronous, the native call is the right shape.*
+  The specialist (SPECIALIST.md §3: REPL verbs, call → captured output →
+  next call) is exactly the trained pattern, with no async outcome to be
+  misread. That is why the specialist uses native calls and the executive
+  does not, on the same model, with the same renderer.
+- *Identity in the outcome, not the format, prevents cross-wiring.* T-api's
+  only win (F 9/10 against 4/10) came from the response carrying the call
+  id. J's cue carries only the command kind. The fix belongs to J's cue.
+- *The grammar sampler, not the markup, is the latency.* E9: ≥ 240 ms of
+  J's 418 ms; unpinned the model is well-formed on 54/54 in ≤ 178 ms. E9b
+  (free-then-verify) remains the proposal that acts on it.
+- *After a refusal the model reports and stops, in both formats* (C 0/24,
+  D-T 0/4, the specialist's informal E2B items). Steering is loop
+  infrastructure: the specialist's repeat guard (§7) and an explicit
+  "propose something else or ask" cue, owned by the harness.
+
+**Actions, in order, none of which changes the format:**
+1. `commandPhrase` carries the command's identity (tag id, target, room);
+   rerun F to confirm the cross-wire is gone.
+2. The signal cue stops echoing: the E8 narrator's framing, or the
+   sanitizer strips the bracketed instruction.
+3. The repeat guard ported from py/ to the executive, plus the
+   propose-or-ask cue after a refusal; rerun C and D.
+4. The admission notice as a templated line, not a paraphrase.
+5. E9b free-then-verify, when the user says so.
