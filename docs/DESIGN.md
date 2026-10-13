@@ -155,10 +155,14 @@ agent, for every kind:
 | `surprise` | a zero-probability reading; the domain is observe-only | `record`, `difference`, `cards` (what could explain it) |
 | `notice` | an admission, an explanation adopted | `record`, `card`, `move` |
 | `error` | the agent itself failed (host down, mapper has no row, budget spent) | `error` |
-| `consult` | the answer to a consult | `answer_kind` (explains · missing · noise · unexplained), `cause {card, move}` or `resource {atom, words}`, `calls` |
+| `consult` | the answer to a consult | `answer_kind` (explains · missing · noise · unexplained · answer), `cause {card, move}` or `resource {atom, words}`, `evidence`, `calls` |
 
 `text` is the domain agent's sentence (the N form of RAG §11); `ref` and
-`counts` are the R form. `cancelled` is a task the person ended by stop or
+`counts` are the R form. `answer_kind: answer` is a consult asked outside the
+error loop, the person's own question about a domain routed by the
+orchestrator ("why did the pot overflow?"); its next move is to speak the
+`text`. A question of fact ("how many onions are in the pot?") is a `read`,
+not a consult. `cancelled` is a task the person ended by stop or
 cancel, distinct from refused and expired. A `read` carries the kernel's
 output for the orchestrator's own use (a consult, not a read, is what it
 asks when it wants an answer). The orchestrator speaks from `text`, decides from
@@ -211,7 +215,21 @@ domain-independent, the last two generated from the catalog at load:
    fragment does not carry;
 2. the consult protocol: the REPL verbs as tools, the repeat guard's note,
    the typed answer shape; it reads and simulates in a fork and never
-   writes the live session;
+   writes the live session. **The harness pins what the situation fixes**
+   (domain-agent step 3, E2B): a fresh context per consult (the strip is
+   per question; carried context broke the kitchen answers after dog
+   consults); the first read made by the harness, not the model (`why
+   refused(ACT)` after a refusal; the record's difference and its cards
+   after a surprise) and placed in the context; the `answer_kind` enum
+   restricted by situation (after a refusal: missing · unexplained · answer;
+   after a surprise: explains · noise · unexplained) and the card/move
+   enums to the cards offered; the last turn at `max_calls` pinned to the
+   answer shape. `missing` is any blocker the host's complementary pair can
+   flip (closed, locked, battery low, nobody in view): the person can
+   change the world; `unexplained` is what nobody can account for. A
+   refusal with no blocker ("already stopped", "must stand first") is not
+   a consult: the replier offers the alternative from the catalog (stand)
+   or the orchestrator speaks the reason;
 3. **the script**: the catalog's cards and `%%` comments, resident once
    (the LLP encoded once here and never in the orchestrator — the RAG
    twist that made the strip);
