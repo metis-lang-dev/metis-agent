@@ -475,3 +475,65 @@ for the specialist; this section gives each its context.
    does not fit beside it (SPECIALIST §7). If S1 needs E4B in the strip,
    that is a serving decision (a window, or a smaller service), not a
    context decision.
+
+#### The direction of the intent schema (architect, 2026-10-13; the user's clarification)
+
+The line is drawn by who has to understand the domain. The orchestrator
+could `do` an event on the REPL or write to a port directly, but both need
+the domain's atoms, events and bindings, and that knowledge is the domain
+agent's, never the small orchestrator model's. So the schema runs
+downward, the opposite of the dog example, where the orchestrator itself
+produced the intent and a dispatcher turned it into a robot command,
+bypassing the runtime:
+
+```
+person's words
+  │  (1) orchestrator, E2B, J: picks the domain from its display lines
+  ▼      call(domain, text) — one linear intent, with its id
+domain agent strip, E2B, the domain's prefix (dictionary + examples + ctx band)
+  │  (2) text → the domain's typed intent, under the domain's grammar (J)
+  ▼      {"intent":"NAVIGATE","goal":{"type":"REGION","description":"kitchen"}}
+harness, deterministic, no model
+  │  (3) intent → atom: the card's template per verb, event name + bindings;
+  ▼      open-vocabulary payload goes to the port plugin's env table, the atom carries the handle
+runtime, certified: the intent op
+  │  (4) fires the event only if enabled in the current state (legality), consumes the intent once;
+  ▼      refused(reason, alternatives) when not
+port plugin, the catalog author's code
+  │  (5) on_event(name, args) actuates the host: the robot moves
+  ▼
+world → tick() returns do-lines → exo event → event/quiescence/surprise signal → (6) orchestrator narrates by id
+```
+
+What each layer knows, and nothing more:
+
+| layer | knows | never sees |
+|---|---|---|
+| orchestrator | domain display lines, the person, the journal by id | atoms, events, the intent schema, ports |
+| domain agent | the domain's dictionary and examples, its ctx band | ports, other domains, the person's dialog |
+| harness | the intent → atom templates from the cards | the model's reasoning |
+| runtime | the catalog, the state, legality | the person's words |
+| port plugin | real values and time behind the atoms | the LLM |
+
+Consequences:
+- The dog prompt today is already a domain agent's prompt: the eleven
+  intents are the nav domain's dictionary with its examples. What it lacks
+  is the routing layer above (call(domain, text)) and the atom and port
+  below (today's dispatcher emits the robot command directly, without the
+  runtime's legality check). Moving it under the line changes the two
+  ends, not the middle.
+- Legality and exactly-once come for free: the runtime fires an event
+  only when the state enables it, and an intent is a linear resource. The
+  dispatcher gave neither; "the stairs are in front of me" was the robot's
+  refusal after the fact.
+- Usage and consult are the same strip in two modes: text → intent (one
+  pass, J, the domain's grammar) and question → reads in a tool loop (T,
+  capped). The strip never writes to the live session: in usage mode its
+  output is the typed intent the orchestrator's call carries; in consult
+  mode it reads and simulates in a fork.
+- The cost is a second model pass per command. With one model resident
+  it is a KV swap to the domain's primed prefix, not a second load. With
+  one domain loaded the harness routes without the orchestrator's pass,
+  which is the dog today. To measure, after the consult corpus: the
+  routing pass on E2B (domain picked from lines, E10 D's 16/16 is the
+  prior) and the added latency.

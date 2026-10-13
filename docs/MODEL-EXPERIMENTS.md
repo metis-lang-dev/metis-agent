@@ -950,3 +950,27 @@ python3 tools/e10b-template.py                 # Q1: the diff; writes grammar/e1
 python3 tools/e10b-table.py E2B=results/e10/run1.jsonl,results/e10/run2-e2b-tmpl.jsonl E4B=results/e10/run2-e4b.jsonl
 python3 tools/e10-score.py results/e10/run2-e4b.jsonl --corpus grammar/e10b-corpus.jsonl --arms J-text,T-api,T-tmpl
 ```
+
+### E10b ruling (architect, 2026-10-13)
+
+**The E10 ruling stands, now for both model sizes and for the rendering.**
+The hand-rendered declarations are the GGUF template's JSON Schema
+rendering byte for byte, 17 of 17; the system turn differs by one newline
+the template trims, and the rerun with the template prompt is within seed
+noise of run 1. So "recode as JSON Schema" changes one token and nothing
+else. On E4B the tool arm sheds every E2B-specific failure (the date
+placeholder, the roll-over and play-dead rows, the constraint repeat) and
+still fails read 1 on class and on two completion claims, while J-text on
+E4B also fails read 1 on one new class miss: the gap is not distillation.
+The three template facts to keep for the specialist, which does use the
+tool_response turn: responses are passed as mappings, never as a JSON
+string in a tool message; consecutive model messages fuse into one turn,
+so an async outcome injected as a fresh model turn is a shape the
+template cannot produce (one more reason the executive's outcomes stay
+text); parameterless tools declared with an empty properties object gain
+`parameters:{type:OBJECT}`.
+
+**Two format-free findings added to E10's list:** E4B is not better than
+E2B on the dog corpus whose examples were tuned on E2B (52/54 against
+54/54), so a model change is an example re-tuning; and on E4B the J lead
+on async outcomes grows (42 against 36).
