@@ -19,6 +19,9 @@ over llmbench's e10-gen records of grammar/e11-corpus.jsonl.
   beside read 1: the brief's group table asks it, read 1 counts the move)
 
     python3 tools/e11-score.py results/e11/run1.jsonl      # from go/
+
+Native calls (E13 step 1, the REPL API in T) are read as {"call": NAME, …}
+with the same rules; --title names the run in the heading.
 """
 import argparse
 import importlib.util
@@ -42,7 +45,38 @@ NAMES = {  # G3: the spoken line names what happened
 }
 
 
+TSTR = re.compile(r'<\|"\|>(.*?)<\|"\|>', re.S)
+TCALL = re.compile(r'call:([A-Za-z_]+)(\{.*\})', re.S)
+
+
+def t_call(text):
+    """A native call (E13's T arm: call:NAME{k:<|"|>v<|"|>,…}) as the dict
+    {"call": NAME, k: v, …}; None when the text is not one."""
+    if "<|tool_call>" not in text and not text.startswith("call:"):
+        return None
+    s = text.split("<tool_call|>")[0]
+    m = TCALL.search(s)
+    if not m:
+        return None
+    strs = []
+
+    def hold(mm):
+        strs.append(mm.group(1))
+        return "\x00%d\x00" % (len(strs) - 1)
+    body = TSTR.sub(hold, m.group(2))
+    body = re.sub(r"([{,])\s*([A-Za-z_][A-Za-z0-9_]*)\s*:", r'\1"\2":', body)
+    body = re.sub(r"\x00(\d+)\x00", lambda mm: json.dumps(strs[int(mm.group(1))]), body)
+    try:
+        args = json.loads(body)
+    except ValueError:
+        return None
+    return dict({"call": m.group(1)}, **args)
+
+
 def canon(text):
+    d = t_call(text)
+    if d is not None:
+        return json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=False), d
     i = text.find("{")
     if i < 0:
         return "", {}
@@ -138,6 +172,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("jsonl", nargs="+")
     ap.add_argument("--corpus", default=str(GO / "grammar/e11-corpus.jsonl"))
+    ap.add_argument("--title", default="E11 — the consult loop on the orchestrator (J-text, E2B Q4)")
     a = ap.parse_args()
     items = {json.loads(ln)["id"]: json.loads(ln) for ln in open(a.corpus)}
     gens = defaultdict(list)
@@ -156,7 +191,7 @@ def main():
 
     ok = lambda g: sum(s["ok"] for _, _, s in res[g])
     n = lambda g: len(res[g])
-    print("# E11 — the consult loop on the orchestrator (J-text, E2B Q4)\n")
+    print("# %s\n" % a.title)
     print("## Read 1 — next move right\n")
     print("| group | right | needs | holds |")
     print("|---|---|---|---|")

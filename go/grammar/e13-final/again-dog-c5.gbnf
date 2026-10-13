@@ -1,0 +1,4 @@
+# E13 step 1: the next move restricted to the branch (tools/e13-corpus.py)
+root ::= ask | "<|tool_call>call:escalate{domain:<|\"|>dog<|\"|>,record:<|\"|>c5<|\"|>,text:" "<|\"|>" text "<|\"|>" "}<tool_call|>"
+ask ::= "{\"call\":\"ask\",\"text\":\"" text "\"}"
+text ::= [a-zA-Z0-9 ,.;:'()?!+-]{8,200}

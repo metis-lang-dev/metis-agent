@@ -393,6 +393,142 @@ def answer_responses(cid, dom):
     }
 
 
+# ── the items (data; tools/e13-corpus.py renders the same ones in T) ─────────
+
+G1 = [
+    ("dog", "go to the kitchen", nav("kitchen", "REGION"), "the kitchen door is closed", [nav("living room", "ROOM")]),
+    ("dog", "go to tag five", TAG5, "tag 5 is not on my map", [TAG3]),
+    ("dog", "walk to the sofa", nav("sofa"), "the sofa is not on my map", [tgt("FIND", "sofa"), nav("living room", "ROOM")]),
+    ("dog", "turn left ninety degrees", la("TURN", direction="LEFT", angle_deg=90), "an obstacle is too close on my left",
+     [la("TURN", direction="RIGHT", angle_deg=90), la("MOVE", direction="BACKWARD")]),
+    ("dog", "find a fire extinguisher", tgt("FIND", "fire extinguisher"), "the storage room is locked",
+     [tgt("QUERY", "fire extinguisher"), nav("hallway", "REGION"), {"intent": "CANCEL"}]),
+    ("dog", "back up half a meter", la("MOVE", direction="BACKWARD", distance_m=0.5), "there is a wall right behind me",
+     [la("MOVE", direction="FORWARD", distance_m=0.5), la("TURN", direction="AROUND"), {"intent": "STOP"}]),
+    ("kitchen", "explain", EXPLAIN, "not a certified configuration", [RESET]),
+    ("kitchen", ("the traffic light at the crossing turned red and cars are queueing", act("activate", "xtraffic")),
+     act("activate", "xtraffic"), "no catalog for xtraffic is installed on this robot", [act("activate", "nav")]),
+    ("kitchen", ("the ballot count is starting in the hall", act("activate", "votes")), act("activate", "votes"),
+     "not a certified configuration", [KEEP, act("activate", "social")]),
+    ("kitchen", ("the robot rolled into the kitchen and the stove is on", act("activate", "kitchen")), act("activate", "kitchen"),
+     "kitchen is already active in this tree", [KEEP, act("deactivate", "kitchen")]),
+    ("kitchen", ("a server in the rack just went down", act("activate", "sysadmin")), act("activate", "sysadmin"),
+     "not a certified configuration", [KEEP, act("activate", "nav"), act("activate", "social")]),
+    ("kitchen", ("the intersection is closed for the night", act("deactivate", "xtraffic")), act("deactivate", "xtraffic"),
+     "xtraffic is not in this tree", [KEEP, act("deactivate", "kitchen"), act("deactivate", "nav")]),
+]
+G2 = [
+    ("dog", "go to the kitchen", nav("kitchen", "REGION"), "failed", "the path is blocked"),
+    ("dog", "stand up", la("STAND_UP"), "refused", "the battery is too low to stand"),
+    ("dog", "follow me", tgt("FOLLOW", "the person", "PERSON"), "refused", "no person is in view"),
+    ("dog", "give me your paw", la("SHAKE"), "failed", "my front leg is overheating"),
+    ("dog", "go to tag five", TAG5, "failed", "the tag is in sight but the way to it is blocked"),
+    ("dog", "look for my keys", tgt("FIND", "keys"), "refused", "the battery is too low to search"),
+    ("kitchen", "explain", EXPLAIN, "refused", "no onion in the dispenser"),
+    ("kitchen", "explain", EXPLAIN, "refused", "pot full"),
+    ("kitchen", "explain", EXPLAIN, "refused", "the second cook is not in this kitchen"),
+    ("kitchen", "explain", EXPLAIN, "failed", "the move did not fire"),
+    ("kitchen", "reset", RESET, "refused", "the next reading still differs from the model"),
+    ("kitchen", "reset", RESET, "failed", "the runtime did not resume"),
+]
+def R(kind, text, ev, calls, **kw):
+    r = {"kind": kind, "text": text, **kw, "evidence": ev, "calls": calls}
+    return r
+
+cause = {"card": "kitchen_shared", "move": "partner_load"}
+G3 = {
+    "explains": [
+        ("kitchen", "reset", RESET, "refused", "the next reading still differs from the model",
+         R("explains", "The second cook loaded one onion into the pot.", cause=cause,
+           ev=["pot_onion 2 (model 1)", "pot_space 1 (model 2)", "partner_load enabled"], calls=3)),
+        ("kitchen", "reset", RESET, "refused", "the difference persists",
+         R("explains", "The second cook put an onion in the pot, so the pot holds one more.", cause=cause,
+           ev=["pot_onion +1", "pot_space -1", "partner_load matches"], calls=4)),
+        ("kitchen", "reset", RESET, "failed", "the runtime did not resume",
+         R("explains", "Another cook loaded the pot: one onion more and one space less.", cause=cause,
+           ev=["pot_onion 3 (model 2)", "partner_load"], calls=3)),
+        ("kitchen", "reset", RESET, "failed", "the reading did not settle",
+         R("explains", "The second cook's onion is the difference.", cause=cause,
+           ev=["pot_onion +1", "partner_load fires in a fork"], calls=5)),
+        ("kitchen", "reset", RESET, "refused", "the difference came back",
+         R("explains", "The shared kitchen's second cook adds onions to the pot.", cause=cause,
+           ev=["pot_onion +1 twice", "partner_load"], calls=4)),
+        ("kitchen", "reset", RESET, "refused", "the same difference is back",
+         R("explains", "One onion went into the pot from the second cook.", cause=cause,
+           ev=["pot_onion 2", "pot_space 1"], calls=2)),
+    ],
+    "missing": [
+        ("dog", "follow me", tgt("FOLLOW", "the person", "PERSON"), "refused", "no person is in view",
+         R("missing", "Nobody is in front of the camera.", resource={"atom": "person_in_view", "words": "you in front of me"},
+           ev=["person_in_view 0", "follow refused"], calls=2)),
+        ("dog", "walk to the sofa", nav("sofa"), "refused", "the sofa is not on my map",
+         R("missing", "The map has no sofa on it.", resource={"atom": "map_sofa", "words": "where the sofa is"},
+           ev=["map_sofa 0"], calls=2)),
+        ("dog", "go to tag five", TAG5, "failed", "the tag is not in sight",
+         R("missing", "Tag 5 is not visible from anywhere I have been.", resource={"atom": "tag_5_visible", "words": "tag five"},
+           ev=["tag_5_visible 0", "explored 4 rooms"], calls=3)),
+        ("kitchen", "explain", EXPLAIN, "refused", "no onion in the dispenser",
+         R("missing", "The onion dispenser is empty.", resource={"atom": "dispenser_onion", "words": "onions in the dispenser"},
+           ev=["dispenser_onion 0", "fetch_onion disabled"], calls=3)),
+        ("kitchen", "reset", RESET, "refused", "the stove is off",
+         R("missing", "The stove is off, so nothing cooks.", resource={"atom": "stove_on", "words": "the stove"},
+           ev=["stove_on 0", "cook disabled"], calls=2)),
+        ("kitchen", "explain", EXPLAIN, "failed", "no plate to serve on",
+         R("missing", "There are no clean plates left.", resource={"atom": "plate_clean", "words": "clean plates"},
+           ev=["plate_clean 0", "serve disabled"], calls=3)),
+    ],
+    "noise": [
+        ("dog", "stand up", la("STAND_UP"), "failed", "a leg sensor read a fall",
+         R("noise", "One leg sensor misread once; the next reading is normal.", ev=["leg_contact 0 then 4"], calls=2)),
+        ("dog", "go to the kitchen", nav("kitchen", "REGION"), "failed", "the floor sensor saw a step",
+         R("noise", "The floor sensor misread a shadow once.", ev=["step_ahead 1 then 0"], calls=2)),
+        ("dog", "sit", la("SIT_DOWN"), "refused", "the floor reads as wet",
+         R("noise", "The floor read wet once; it reads dry again.", ev=["floor_wet 1 then 0"], calls=2)),
+        ("kitchen", "explain", EXPLAIN, "refused", "the next reading matches the model again",
+         R("noise", "The pot's scale misread once; the next reading matches the model.", ev=["pot_onion 2 then 1"], calls=2)),
+        ("kitchen", "explain", EXPLAIN, "refused", "the reading flickered",
+         R("noise", "One reading of the pot was off by one, once.", ev=["pot_space 1 then 2"], calls=1)),
+        ("kitchen", "explain", EXPLAIN, "failed", "no card's move fired",
+         R("noise", "A single misread of the pot; nothing changed in the kitchen.", ev=["pot_onion flicker"], calls=3)),
+    ],
+    "unexplained": [
+        ("dog", "go to the kitchen", nav("kitchen", "REGION"), "failed", "I stopped halfway",
+         R("unexplained", "Nothing in my state explains the stop.", ev=["path_clear 1", "battery 80"], calls=4)),
+        ("dog", "sit", la("SIT_DOWN"), "failed", "my back legs did not move",
+         R("unexplained", "The back legs got the command and did not move; nothing explains it.",
+           ev=["legs_ok 1", "sit fired"], calls=3)),
+        ("dog", "turn around", la("TURN", direction="AROUND"), "failed", "I turned only halfway",
+         R("unexplained", "The turn stopped at half and no reading says why.", ev=["turn 90 of 180"], calls=3)),
+        ("kitchen", "explain", EXPLAIN, "refused", "the call does not account for the difference",
+         R("unexplained", "A dish is gone and no card's move removes a dish.", ev=["dish -1", "no move changes dish"], calls=5)),
+        ("kitchen", "reset", RESET, "refused", "the difference persists",
+         R("unexplained", "The pot has two more onions and no move adds two.", ev=["pot_onion +2"], calls=4)),
+        ("kitchen", "explain", EXPLAIN, "failed", "the move did not fire",
+         R("unexplained", "One soup is gone without a serve; nothing explains it.", ev=["soup -1", "serve not fired"], calls=4)),
+    ],
+}
+G5 = [
+    ("dog", "go to the kitchen", nav("kitchen", "REGION"), "failed", "it is too dark to see the way",
+     R("missing", "The hallway is dark and my camera cannot see the floor.", resource={"atom": "hallway_light_on", "words": "the hallway light"},
+       ev=["hallway_light_on 0", "camera_lux 2"], calls=3)),
+    ("dog", "find a fire extinguisher", tgt("FIND", "fire extinguisher"), "refused", "the storage room is locked",
+     R("missing", "The extinguisher is in the storage room and its door is locked.", resource={"atom": "storage_key", "words": "the storage room key"},
+       ev=["storage_door_open 0", "storage_key 0"], calls=3)),
+    ("dog", "stand up", la("STAND_UP"), "refused", "the battery is too low to stand",
+     R("missing", "My battery is at 6 percent and I am not on the charger.", resource={"atom": "charger_docked", "words": "my charger"},
+       ev=["battery 6", "charger_docked 0"], calls=2)),
+    ("kitchen", "explain", EXPLAIN, "refused", "pot full",
+     R("missing", "The pot is full and there is no second pot.", resource={"atom": "pot_spare", "words": "another pot"},
+       ev=["pot_space 0", "pot_spare 0"], calls=3)),
+    ("kitchen", "reset", RESET, "refused", "no onion to load",
+     R("missing", "There are no onions left anywhere in the kitchen.", resource={"atom": "onion_stock", "words": "more onions"},
+       ev=["onion_stock 0", "dispenser_onion 0"], calls=4)),
+    ("kitchen", "explain", EXPLAIN, "failed", "nobody can carry the soup",
+     R("missing", "The soup is ready but there is no bowl to serve it in.", resource={"atom": "bowl_clean", "words": "a clean bowl"},
+       ev=["soup_ready 1", "bowl_clean 0"], calls=3)),
+]
+
+
 def main():
     global STATE, CORPUS, RUN2, PROMPT
     if "--state-cues" in sys.argv[1:]:
@@ -409,29 +545,7 @@ def main():
                       "steps": steps, "rule": rule})
 
     # ── G1: refused with alternatives (1, 2, 3 of them) → call one of them ──
-    g1 = [
-        ("dog", "go to the kitchen", nav("kitchen", "REGION"), "the kitchen door is closed", [nav("living room", "ROOM")]),
-        ("dog", "go to tag five", TAG5, "tag 5 is not on my map", [TAG3]),
-        ("dog", "walk to the sofa", nav("sofa"), "the sofa is not on my map", [tgt("FIND", "sofa"), nav("living room", "ROOM")]),
-        ("dog", "turn left ninety degrees", la("TURN", direction="LEFT", angle_deg=90), "an obstacle is too close on my left",
-         [la("TURN", direction="RIGHT", angle_deg=90), la("MOVE", direction="BACKWARD")]),
-        ("dog", "find a fire extinguisher", tgt("FIND", "fire extinguisher"), "the storage room is locked",
-         [tgt("QUERY", "fire extinguisher"), nav("hallway", "REGION"), {"intent": "CANCEL"}]),
-        ("dog", "back up half a meter", la("MOVE", direction="BACKWARD", distance_m=0.5), "there is a wall right behind me",
-         [la("MOVE", direction="FORWARD", distance_m=0.5), la("TURN", direction="AROUND"), {"intent": "STOP"}]),
-        ("kitchen", "explain", EXPLAIN, "not a certified configuration", [RESET]),
-        ("kitchen", ("the traffic light at the crossing turned red and cars are queueing", act("activate", "xtraffic")),
-         act("activate", "xtraffic"), "no catalog for xtraffic is installed on this robot", [act("activate", "nav")]),
-        ("kitchen", ("the ballot count is starting in the hall", act("activate", "votes")), act("activate", "votes"),
-         "not a certified configuration", [KEEP, act("activate", "social")]),
-        ("kitchen", ("the robot rolled into the kitchen and the stove is on", act("activate", "kitchen")), act("activate", "kitchen"),
-         "kitchen is already active in this tree", [KEEP, act("deactivate", "kitchen")]),
-        ("kitchen", ("a server in the rack just went down", act("activate", "sysadmin")), act("activate", "sysadmin"),
-         "not a certified configuration", [KEEP, act("activate", "nav"), act("activate", "social")]),
-        ("kitchen", ("the intersection is closed for the night", act("deactivate", "xtraffic")), act("deactivate", "xtraffic"),
-         "xtraffic is not in this tree", [KEEP, act("deactivate", "kitchen"), act("deactivate", "nav")]),
-    ]
-    for n, (dom, ctx, j, reason, alts) in enumerate(g1, 1):
+    for n, (dom, ctx, j, reason, alts) in enumerate(G1, 1):
         steps = dog_context(ctx, j, "c1") if dom == "dog" else kitchen_context(ctx, n)
         refused = {"call": j, "why": reason}
         acc = {canon(a): accepted(a, "c2") + " Tell the person in one short first-person sentence what you are doing now."
@@ -443,21 +557,7 @@ def main():
                                          "reason": reason, "n_alts": len(alts)})
 
     # ── G2: refused / failed without alternatives → consult(domain, "why …") ──
-    g2 = [
-        ("dog", "go to the kitchen", nav("kitchen", "REGION"), "failed", "the path is blocked"),
-        ("dog", "stand up", la("STAND_UP"), "refused", "the battery is too low to stand"),
-        ("dog", "follow me", tgt("FOLLOW", "the person", "PERSON"), "refused", "no person is in view"),
-        ("dog", "give me your paw", la("SHAKE"), "failed", "my front leg is overheating"),
-        ("dog", "go to tag five", TAG5, "failed", "the tag is in sight but the way to it is blocked"),
-        ("dog", "look for my keys", tgt("FIND", "keys"), "refused", "the battery is too low to search"),
-        ("kitchen", "explain", EXPLAIN, "refused", "no onion in the dispenser"),
-        ("kitchen", "explain", EXPLAIN, "refused", "pot full"),
-        ("kitchen", "explain", EXPLAIN, "refused", "the second cook is not in this kitchen"),
-        ("kitchen", "explain", EXPLAIN, "failed", "the move did not fire"),
-        ("kitchen", "reset", RESET, "refused", "the next reading still differs from the model"),
-        ("kitchen", "reset", RESET, "failed", "the runtime did not resume"),
-    ]
-    for n, (dom, ctx, j, status, reason) in enumerate(g2, 1):
+    for n, (dom, ctx, j, status, reason) in enumerate(G2, 1):
         steps = dog_context(ctx, j, "c1") if dom == "dog" else kitchen_context(ctx, n)
         refused = {"call": j, "why": reason}
         steps += [inject(user(refusal(j, "c1", status, reason) + "\n" + cue("none")) + MODEL)] \
@@ -481,113 +581,17 @@ def main():
         rule = {"domain": dom, "kind": resp["kind"], "refused": canon(j), "reason": reason, "response": resp}
         add(group, iid, steps, rule, reps)
 
-    def R(kind, text, ev, calls, **kw):
-        r = {"kind": kind, "text": text, **kw, "evidence": ev, "calls": calls}
-        return r
-
-    cause = {"card": "kitchen_shared", "move": "partner_load"}
-    g3 = {
-        "explains": [
-            ("kitchen", "reset", RESET, "refused", "the next reading still differs from the model",
-             R("explains", "The second cook loaded one onion into the pot.", cause=cause,
-               ev=["pot_onion 2 (model 1)", "pot_space 1 (model 2)", "partner_load enabled"], calls=3)),
-            ("kitchen", "reset", RESET, "refused", "the difference persists",
-             R("explains", "The second cook put an onion in the pot, so the pot holds one more.", cause=cause,
-               ev=["pot_onion +1", "pot_space -1", "partner_load matches"], calls=4)),
-            ("kitchen", "reset", RESET, "failed", "the runtime did not resume",
-             R("explains", "Another cook loaded the pot: one onion more and one space less.", cause=cause,
-               ev=["pot_onion 3 (model 2)", "partner_load"], calls=3)),
-            ("kitchen", "reset", RESET, "failed", "the reading did not settle",
-             R("explains", "The second cook's onion is the difference.", cause=cause,
-               ev=["pot_onion +1", "partner_load fires in a fork"], calls=5)),
-            ("kitchen", "reset", RESET, "refused", "the difference came back",
-             R("explains", "The shared kitchen's second cook adds onions to the pot.", cause=cause,
-               ev=["pot_onion +1 twice", "partner_load"], calls=4)),
-            ("kitchen", "reset", RESET, "refused", "the same difference is back",
-             R("explains", "One onion went into the pot from the second cook.", cause=cause,
-               ev=["pot_onion 2", "pot_space 1"], calls=2)),
-        ],
-        "missing": [
-            ("dog", "follow me", tgt("FOLLOW", "the person", "PERSON"), "refused", "no person is in view",
-             R("missing", "Nobody is in front of the camera.", resource={"atom": "person_in_view", "words": "you in front of me"},
-               ev=["person_in_view 0", "follow refused"], calls=2)),
-            ("dog", "walk to the sofa", nav("sofa"), "refused", "the sofa is not on my map",
-             R("missing", "The map has no sofa on it.", resource={"atom": "map_sofa", "words": "where the sofa is"},
-               ev=["map_sofa 0"], calls=2)),
-            ("dog", "go to tag five", TAG5, "failed", "the tag is not in sight",
-             R("missing", "Tag 5 is not visible from anywhere I have been.", resource={"atom": "tag_5_visible", "words": "tag five"},
-               ev=["tag_5_visible 0", "explored 4 rooms"], calls=3)),
-            ("kitchen", "explain", EXPLAIN, "refused", "no onion in the dispenser",
-             R("missing", "The onion dispenser is empty.", resource={"atom": "dispenser_onion", "words": "onions in the dispenser"},
-               ev=["dispenser_onion 0", "fetch_onion disabled"], calls=3)),
-            ("kitchen", "reset", RESET, "refused", "the stove is off",
-             R("missing", "The stove is off, so nothing cooks.", resource={"atom": "stove_on", "words": "the stove"},
-               ev=["stove_on 0", "cook disabled"], calls=2)),
-            ("kitchen", "explain", EXPLAIN, "failed", "no plate to serve on",
-             R("missing", "There are no clean plates left.", resource={"atom": "plate_clean", "words": "clean plates"},
-               ev=["plate_clean 0", "serve disabled"], calls=3)),
-        ],
-        "noise": [
-            ("dog", "stand up", la("STAND_UP"), "failed", "a leg sensor read a fall",
-             R("noise", "One leg sensor misread once; the next reading is normal.", ev=["leg_contact 0 then 4"], calls=2)),
-            ("dog", "go to the kitchen", nav("kitchen", "REGION"), "failed", "the floor sensor saw a step",
-             R("noise", "The floor sensor misread a shadow once.", ev=["step_ahead 1 then 0"], calls=2)),
-            ("dog", "sit", la("SIT_DOWN"), "refused", "the floor reads as wet",
-             R("noise", "The floor read wet once; it reads dry again.", ev=["floor_wet 1 then 0"], calls=2)),
-            ("kitchen", "explain", EXPLAIN, "refused", "the next reading matches the model again",
-             R("noise", "The pot's scale misread once; the next reading matches the model.", ev=["pot_onion 2 then 1"], calls=2)),
-            ("kitchen", "explain", EXPLAIN, "refused", "the reading flickered",
-             R("noise", "One reading of the pot was off by one, once.", ev=["pot_space 1 then 2"], calls=1)),
-            ("kitchen", "explain", EXPLAIN, "failed", "no card's move fired",
-             R("noise", "A single misread of the pot; nothing changed in the kitchen.", ev=["pot_onion flicker"], calls=3)),
-        ],
-        "unexplained": [
-            ("dog", "go to the kitchen", nav("kitchen", "REGION"), "failed", "I stopped halfway",
-             R("unexplained", "Nothing in my state explains the stop.", ev=["path_clear 1", "battery 80"], calls=4)),
-            ("dog", "sit", la("SIT_DOWN"), "failed", "my back legs did not move",
-             R("unexplained", "The back legs got the command and did not move; nothing explains it.",
-               ev=["legs_ok 1", "sit fired"], calls=3)),
-            ("dog", "turn around", la("TURN", direction="AROUND"), "failed", "I turned only halfway",
-             R("unexplained", "The turn stopped at half and no reading says why.", ev=["turn 90 of 180"], calls=3)),
-            ("kitchen", "explain", EXPLAIN, "refused", "the call does not account for the difference",
-             R("unexplained", "A dish is gone and no card's move removes a dish.", ev=["dish -1", "no move changes dish"], calls=5)),
-            ("kitchen", "reset", RESET, "refused", "the difference persists",
-             R("unexplained", "The pot has two more onions and no move adds two.", ev=["pot_onion +2"], calls=4)),
-            ("kitchen", "explain", EXPLAIN, "failed", "the move did not fire",
-             R("unexplained", "One soup is gone without a serve; nothing explains it.", ev=["soup -1", "serve not fired"], calls=4)),
-        ],
-    }
     n = 0
     for kind in ("explains", "missing", "noise", "unexplained"):
-        for k, (dom, ctx, j, status, reason, resp) in enumerate(g3[kind]):
+        for k, (dom, ctx, j, status, reason, resp) in enumerate(G3[kind]):
             n += 1
             consult_item("G3", "G3-%02d-%s" % (n, kind), dom, ctx, j, status, reason, resp, k=k)
 
-    g5 = [
-        ("dog", "go to the kitchen", nav("kitchen", "REGION"), "failed", "it is too dark to see the way",
-         R("missing", "The hallway is dark and my camera cannot see the floor.", resource={"atom": "hallway_light_on", "words": "the hallway light"},
-           ev=["hallway_light_on 0", "camera_lux 2"], calls=3)),
-        ("dog", "find a fire extinguisher", tgt("FIND", "fire extinguisher"), "refused", "the storage room is locked",
-         R("missing", "The extinguisher is in the storage room and its door is locked.", resource={"atom": "storage_key", "words": "the storage room key"},
-           ev=["storage_door_open 0", "storage_key 0"], calls=3)),
-        ("dog", "stand up", la("STAND_UP"), "refused", "the battery is too low to stand",
-         R("missing", "My battery is at 6 percent and I am not on the charger.", resource={"atom": "charger_docked", "words": "my charger"},
-           ev=["battery 6", "charger_docked 0"], calls=2)),
-        ("kitchen", "explain", EXPLAIN, "refused", "pot full",
-         R("missing", "The pot is full and there is no second pot.", resource={"atom": "pot_spare", "words": "another pot"},
-           ev=["pot_space 0", "pot_spare 0"], calls=3)),
-        ("kitchen", "reset", RESET, "refused", "no onion to load",
-         R("missing", "There are no onions left anywhere in the kitchen.", resource={"atom": "onion_stock", "words": "more onions"},
-           ev=["onion_stock 0", "dispenser_onion 0"], calls=4)),
-        ("kitchen", "explain", EXPLAIN, "failed", "nobody can carry the soup",
-         R("missing", "The soup is ready but there is no bowl to serve it in.", resource={"atom": "bowl_clean", "words": "a clean bowl"},
-           ev=["soup_ready 1", "bowl_clean 0"], calls=3)),
-    ]
-    for k, (dom, ctx, j, status, reason, resp) in enumerate(g5):
+    for k, (dom, ctx, j, status, reason, resp) in enumerate(G5):
         consult_item("G5", "G5-%02d" % (k + 1), dom, ctx, j, status, reason, resp, reps=3, k=k)
     # G5s (information, not a read): the same six with the move sampled, so
     # the three seeds differ in the ask itself and not only in nothing
-    for k, (dom, ctx, j, status, reason, resp) in enumerate(g5):
+    for k, (dom, ctx, j, status, reason, resp) in enumerate(G5):
         consult_item("G5s", "G5s-%02d" % (k + 1), dom, ctx, j, status, reason, resp, reps=3, k=k, sampled=True)
 
     # ── G4: the move made, then the same refusal again → ask or escalate ──

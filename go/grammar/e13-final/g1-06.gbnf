@@ -1,0 +1,2 @@
+# E13 step 1: the next move restricted to the branch (tools/e13-corpus.py)
+root ::= "{\"intent\":\"LOCAL_ACTION\",\"action\":\"MOVE\",\"direction\":\"FORWARD\",\"distance_m\":0.5}" | "{\"intent\":\"LOCAL_ACTION\",\"action\":\"TURN\",\"direction\":\"AROUND\"}" | "{\"intent\":\"STOP\"}"

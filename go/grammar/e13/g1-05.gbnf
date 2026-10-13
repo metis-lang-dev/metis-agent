@@ -1,0 +1,2 @@
+# E13 step 1: the next move restricted to the branch (tools/e13-corpus.py)
+root ::= "{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"fire extinguisher\"}}" | "{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"hallway\"}}" | "{\"intent\":\"CANCEL\"}"

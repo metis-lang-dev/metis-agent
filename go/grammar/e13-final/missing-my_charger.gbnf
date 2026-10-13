@@ -1,0 +1,4 @@
+# E13 step 1: the next move restricted to the branch (tools/e13-corpus.py)
+root ::= "{\"call\":\"ask\",\"text\":\"" pre "my charger" post "\"}"
+pre ::= [a-zA-Z0-9 ,;:'+-]{0,100}
+post ::= [a-zA-Z0-9 ,;:'+-]{0,40} "?"

@@ -1,0 +1,2 @@
+# E13 step 1: the next move restricted to the branch (tools/e13-corpus.py)
+root ::= "<|tool_call>call:reset{domain:<|\"|>kitchen<|\"|>,record:<|\"|>#1<|\"|>}<tool_call|>"

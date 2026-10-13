@@ -1,0 +1,3 @@
+# E13 step 1: the next move restricted to the branch (tools/e13-corpus.py)
+root ::= "<|tool_call>call:explain{card:" "<|\"|>" ident "<|\"|>" ",domain:<|\"|>kitchen<|\"|>,move:" "<|\"|>" ident "<|\"|>" ",record:<|\"|>#0<|\"|>}<tool_call|>"
+ident ::= [a-z_]{3,32}

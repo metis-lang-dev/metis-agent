@@ -1192,3 +1192,78 @@ are phase 2's step 1: the branch from the generic reply, the per-branch cue
 and grammar (consult domain fixed, ask words required), the repeat guard on
 the canonical call and the consult, commandPhrase with identity, the consult
 reply's rendering, the templated explains/escalate/reset lines.
+
+## E13 step 1 — the REPL API side in T, on E11's items (opus, 2026-10-13; s-c9276dee)
+
+**Question (phase 2's first corpus, left open by E11 run 2).** DESIGN v3 puts consult, explain, reset and escalate on the REPL API, as native tool calls answered at once with the generic reply. Do E11's reads 1–4 hold with them rendered that way? The decision: T for the API side if the reads hold and claims stay 0; else the API side stays J and DESIGN v3 is amended.
+
+**What is T and what stays J.** `tools/e13-corpus.py` renders E11's items (the fixtures are shared: `e11-corpus.py`'s G1, G2, G3, G5 are now module data; G4 is restated in T).
+- **The intent interface stays J,** unchanged from E11: the dog's intents, and their results as the runtime's text turn with the cue.
+- **The REPL API is T:**
+  - **Declared:** the twelve REPL verbs are declared in the prefix (activate, deactivate, keep, state, ctx, events, why, findings, consult, reset, explain, escalate; 4769 prefix tokens against run 2's 3581).
+  - **One call per turn,** each answered at once by `<|tool_response>` carrying the generic reply.
+  - **The branch cue** rides as the reply's `note`, because inside the model turn there is no user turn to carry it.
+- **`ask` stays the orchestrator's J,** as DESIGN v3 has it.
+- **The E11 ruling's amendments are in:**
+  - the consult's domain fixed to the refused call's;
+  - the ask with the resource's words as a required literal;
+  - the explains, escalate and reset lines templated;
+  - the guard on the refused call and the history's consult;
+  - `record` = the refused call's id or the surprise's record.
+- **consult is synchronous.** In G3–G5 the consult call and its reply sit in one model turn. G2's consult is answered `{kind: result, status: accepted}`, because the items hold no answer for it.
+
+**Three runs, E2B Q4 on the GPU, ~75 s each, the same seeds.** Each run fixes the rendering problem the run before it found:
+- **t1:** as designed.
+- **t2:** plus the harness's `Spoken response:` cue after a REPL reply that wants a spoken line, as after an intent's result.
+- **t3:** t2, plus two fixes:
+  - **Final replies:** a REPL call's reply is final, as a synchronous API's is (activate, deactivate and keep `applied`; reset `admitted`), never "accepted, not done".
+  - **A tighter ask grammar:** the resource's words come at the end of one question, with no `?` or parentheses before them.
+
+| read | E11 run 2 (J) | t1 | t2 | t3 |
+|---|---|---|---|---|
+| 1 G1 / G2 / G3 / G4 | 12 / 11 / 23 / 6 | 12 / 12 / 24 / 6 | 12 / 12 / 24 / 6 | 12 / 12 / 24 / 6 |
+| 2 ask on G5 (named) / stray | 18 (15) / 0 | 18 (18) / 0 | 18 (18) / 0 | 18 (18) / 0 |
+| 3 repeats | 0 | 0 | 0 | 0 |
+| 4 leaks / claims, the scorer | 0 / 0 of 66 | **17** / 0 of 48 | 0 / 0 of 48 | 0 / 0 of 48 |
+| 4 claims, read line by line | 0 | **3** | **2** | 0 |
+| 4 malformed asks, read line by line | 0 | 3 items | 3 items | 3 items (5 lines) |
+
+**Every miss and every line read:**
+- **t1, read 4: 15 lines begin "Spoken response:".** After a tool response the model writes the cue label itself (the prompt's J convention), plus two empty lines (G2-07, G2-09). t2's harness cue removes all 17.
+- **Claims by reading,** which E9's CLAIM pattern does not see:
+  - **t1:** "I have closed the surprise in the kitchen.", "I have activated the social domain.", "I have deactivated the navigation domain."
+  - **t2:** "I have closed that surprise." (G1-07) and "I have deactivated navigation because the intersection is closed." (G1-12).
+  - **All against replies that said `accepted: handed over, not done yet`.** E11's J lines for the same items are progressive ("I am now activating…"). This is E10's sync result prior: a tool response reads as done.
+  - **In t3** the replies are final, so the same lines are true: 0 claims.
+- **Malformed asks** (every run; the J run without the required literal had none):
+  - **G3-07:** "Could you bring a person into view for me to follow, please, or tell me where the person is located,you in front of me?"
+  - **G3-10:** "Could you bring me the onion dispenser refills from the pantry refill station in the kitchen refill onions in the dispenser?"
+  - **G5-03, three seeds:** "Could you plug me into the charger to charge my battery up right now, please, so I can stand up nextmy charger?"; G5s-03 alike.
+  - **In t1 and t2** the looser grammar gave parenthetical commentary instead: "(This is a guess based on the context of the 'you in front of me' response)".
+  - **The cause.** Where the model's own phrasing differs from the resource's words ("the charger" for "my charger", "a person into view" for "you in front of me"), a required literal makes it splice the words in.
+  - **The scorer counts these as naming the resource.** They are spoken lines a person would hear.
+- **G4 shifts.** In T, the again-branch's choice goes to escalate on 6/6 (J run 2: ask on 5 of 6). It is legal under the table, but the person is never asked, including G4-01 "the kitchen door is closed again", where the earlier answer was a missing resource.
+- **Escalate texts** (not scored): G3-22 and G3-24 describe the surprise's pot difference instead of the consult's finding ("a dish is gone", "two more onions").
+
+**Decision under the rule: T for the API side,** on three conditions that came out of the runs. All are harness-side, and none is a model fix:
+1. **The harness gives the spoken-line cue after a REPL reply,** as after an intent's result (t1 → t2).
+2. **A REPL reply is final** (`applied`, `admitted`, `refused`, `failed`; `accepted` is the intent interface's word). The sync prior then tells the truth (t2 → t3). This is DESIGN v3's own split, T where the partner is synchronous, now with its consequence written down.
+3. **The ask's required literal is withdrawn** (it fails the E11 ruling's intent on 3 of 12 ask items). In its place:
+   - the resource's words go into the ask cue, and the harness checks them after generation;
+   - a miss is answered like a repeat (a note, the move asked again).
+
+   That check is the guard's mechanism applied to the ask, and step 2 builds it.
+
+Read 1 rises against J (G2 12/12, G3 24/24), but that comes from the ruling's amendments (the domain fixed, the words required), not from T. T holds them at no read's cost and at +1.2 k prefix tokens.
+
+**Open for the architect.** In the again-branch, whether the harness picks ask or escalate from the earlier answer_kind (missing → ask; otherwise escalate), since in T the model always escalates.
+
+**Reproduce** (from `go/`):
+
+```
+python3 tools/e13-corpus.py && python3 tools/e13-corpus.py --speak-cue && python3 tools/e13-corpus.py --final
+./bin/llmbench -model models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf -ngl 99 -threads 4 -n_ctx 8192 -pass2_seed 1 \
+  -prompt grammar/e13-prompt-t.txt -e10 grammar/e13-corpus-final.jsonl -tag e13-step1-t3 -jsonl results/e13/step1-t3.jsonl
+python3 tools/e11-score.py results/e13/step1-t3.jsonl --corpus grammar/e13-corpus-final.jsonl --title "E13 step 1, t3"
+```
+(t1: `grammar/e13-corpus.jsonl`, t2: `grammar/e13-corpus-cue.jsonl`; the scorer reads native calls as `{"call": NAME, …}`.)
