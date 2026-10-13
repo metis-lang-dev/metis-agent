@@ -298,6 +298,11 @@ Nothing above changes; what changes is how the contexts are served:
 
 ### Open, to be settled by experience
 
+- the `resource.words` of a missing answer: E2B writes usable words on 1/4
+  (domain-agent step 5; claude 4/4); the candidate is to template them from
+  the refusing rule's `%%` line and the handle's display name, leaving the
+  model the sentence only — decided in phase 2 with the ask's wording;
+
 - which functions move between the intent interface and the REPL API;
 - whether the surprise verbs (reset, explain, escalate) stay on the API
   side or become the consult's own ending;
