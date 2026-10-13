@@ -17,7 +17,7 @@ The same certified kernel serves two applications with the roles reversed:
 | its tools | calls with async outcomes (E10's IO) | the REPL verbs, synchronous |
 | latency | matters; a small model | secondary; any model |
 | output | behaviour: the robot, navigation, interaction | understanding: an explanation, a what-if, a formalization proposal |
-| where | metis-agent `go/` (FRAMEWORK.md), as built | metis-agent `py/`, this doc |
+| where | metis-agent `go/` today (FRAMEWORK.md): the wrapper around the C++ IR runtime; whether it stays in metis-agent is decided later | metis-agent `py/`, this doc |
 
 They intersect in the Decide step: a surprise wakes the executive's model
 with cards, it proposes explanations, the runtime scores them. That is a
@@ -34,8 +34,11 @@ formalization, its stable design and tests; nothing here imports it.
 
 ## 2. The boundary, so the halves do not rot
 
-- `go/` is the executive: the service, the wire, the domains, the page.
-  Stable; E10 is its protocol test. It does not gain specialist code.
+- `go/` is the executive today: the service, the wire, the domains, the
+  page, over the C++ IR runtime it wraps. E10 was its protocol test (J-text
+  stays). It does not gain specialist code. Whether `go/` stays in
+  metis-agent or moves beside the runtime it wraps is a later decision
+  (user, 2026-10-13); nothing here depends on the answer.
 - `py/` is the specialist: the Python LLM runtime, the CML tape, the REPL
   tool loop, its benches. Experimental until §6's reads are in.
 - Shared: the kernel (metispy `metis.lang`, imported in-process), the
@@ -69,6 +72,19 @@ question ──► tape: [standing: catalog ctx band · mirror] [journal: calls 
   `<|tool_response>` turn carrying the captured output, scrubbed of paths
   and capped. No async outcomes here, so E9's completion-claim risk does
   not arise.
+  **Stays T after E10** (architect, 2026-10-13; E10 ruled J-text for the
+  executive). The three reasons E10 gave for J do not transfer: the
+  executive's declarations cost 2.4 k tokens of nested schema, the
+  specialist's are sixteen flat verbs (iteration 1 prefix 1 941 tokens,
+  ctx band included, against the executive's 2.8 k for J); the executive's
+  outcomes are asynchronous and the result turn invited completion claims,
+  here every call is synchronous and the result turn carries exactly the
+  REPL output the model must read next; accuracy was format-free on every
+  corpus, so the format is chosen by fit, and call → output → call is
+  Gemma 4's trained shape. Pre-registered fallback: if S1 read 1 fails
+  (< 16/20) after the declarations' text has had its one improvement, a J
+  arm (a `{"call":verb,"arg":…}` under a grammar, the output fed back as a
+  user turn) is the comparison to run before any model or runtime change.
 - **The kernel in-process.** `metis.lang.repl.Repl` on the catalog, one
   per session, `capture(cmd, arg)` for every call: the same entry the loop
   console uses, called directly, no JSON pipe.
