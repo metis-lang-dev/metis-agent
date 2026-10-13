@@ -495,3 +495,84 @@ orchestrator's own `Speak` path (not the agent narrator's):
 
 Records: go/results/cap/ (hour.jsonl, pair-{0,64,256}.jsonl, table.md,
 run.log; local).
+
+## E9 — the dog intents as Gemma 4 native tools (user, 2026-10-13)
+
+**Question (user).** The intent path works by translating the utterance
+into our JSON under `dog.gbnf`, two passes with a KV rewind between them
+and a bare "Spoken response:" continuation. Gemma 4 is not trained for
+that shape; it is trained for function calling. Does the native tool call
+beat the JSON intent on the corpus we already have, and what do the
+rollback tricks cost or buy?
+
+**What exists.** E4 (above) rendered tool declarations by hand in the
+GGUF template's format (`<|tool>declaration:…<tool|>`, strings quoted
+with `<|"|>`) and pinned the model's turn with a GBNF over the native
+call markup (`<|tool_call>call:…<tool_call|>`); on 12 activation rows the
+call was at least as accurate as the JSON, about 40 ms slower. Tokens in
+the vocabulary: `<|tool>`, `<|tool_call>`, `<|tool_response>` and their
+closers. The 54-row corpus `grammar/dog-corpus.tsv` with the harness's
+reference answers on E2B Q4 (fsttm-web `test/fixtures/harness-e2b.jsonl`,
+54/54, JSON identical) is the control.
+
+**Design.** One bench run, `llmbench -tools`, over the 54 rows on E2B
+Q4_K_M, template gemma4, thinking off unless swept. Three proposal
+formats, same persona text (the dog prompt minus its JSON table and
+examples when the declarations carry them):
+
+| arm | pass 1 | pass 2 (the spoken line) |
+|---|---|---|
+| **J** (control) | JSON under `dog.gbnf`, as today | KV rewind to the prefix, bare "Spoken response:" continuation, as today |
+| **T** | one native tool call pinned by a GBNF over the call markup; the eleven intents are eleven tools, their parameters typed from the JSON schema (enums for action, direction, relation, type; numbers for angle, distance, tag) | **T-rewind:** as J (rewind, bare cue) |
+| **T-rt** | same call as T | **round-trip:** the call stays in context, a `<|tool_response>` turn carries the dispatcher's acknowledgement (`{"status":"ok"}`), the model's next turn is the spoken line; no rewind |
+| **T-free** | the native call **unconstrained** (no grammar), parsed after the fact | none |
+
+The tools are declared from one table (`grammar/dog-tools.json`): name
+= intent, parameters = the fields `dog.gbnf` admits for it. The call is
+mapped back to the intent JSON by a fixed function so that every arm is
+scored by the same comparator against the reference.
+
+**Measured, per row and per arm:** intent class; JSON identical to the
+reference after mapping; well-formed (T-free only: parses, names a
+declared tool, arguments within the declared types); voice leak in the
+spoken line (the E1 check: no JSON, no markup, no "Nina:" address); ms to
+the intent; ms to the first spoken token; prompt tokens primed. Five
+repeats of pass 2 per row with `-pass2_seed` (RAG §12.7).
+
+**Pre-registered reads.**
+1. **Class.** T ≥ J on intent class (the bar is 54/54). A T miss is
+   listed row by row with the call the model made.
+2. **Arguments.** JSON-identical after mapping: T versus J. Description
+   strings are compared as written (open vocabulary stays as said).
+3. **Discipline.** T-free well-formed ≥ 52/54 means the trained discipline
+   is real and the grammar costs nothing it does not pay back; below that,
+   the grammar is doing the work. Either way the certified surface stays
+   grammar-pinned (E4's ruling); this read says how much the training
+   carries.
+4. **Examples.** T with the 30 few-shot examples removed from the prompt
+   versus T with them: if class and arguments hold, the prefix shrinks (report
+   the primed token count both ways) and the standing region gains the
+   difference.
+5. **The rollback.** T-rewind versus T-rt on voice leaks, ms to the first
+   spoken token, and the user's read of ten cues from each (the lines
+   printed side by side, the user marks the better one). T-rt costs the
+   result turn's tokens; T-rewind costs the re-decode of the tail. Report
+   both as numbers.
+6. **Thinking** (optional, held-out rows only): T with `-think -think_max
+   128` versus T. Run only if read 1 shows a miss on a held-out row.
+
+**Decision rule.** Tools replace the JSON intent as the proposal format if
+read 1 is not worse, read 2 is at least 50/54, and read 5 has zero voice
+leaks in the arm chosen. Then FRAMEWORK §4's domains block becomes tool
+declarations generated from the cards (G-F), and the intent path drops the
+rewind if T-rt wins read 5. Otherwise J stays and the finding is recorded
+here.
+
+**Not in scope.** Multi-call turns, tool results that change the next
+proposal (E4's open round-trip), E4B, the runtime intents (`runtime_intent`
+stays a text line).
+
+**Deliverable.** `llmbench -tools`, `grammar/dog-tools.json`, the call
+grammar `grammar/dog-tools.gbnf`, the mapping in `tools/e9-score.py`, the
+run under `results/e9/`, and the table with the six reads in this section.
+Opus implements; the architect reviews; the user reads the ten cue pairs.
