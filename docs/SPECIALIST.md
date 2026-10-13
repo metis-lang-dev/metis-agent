@@ -230,6 +230,12 @@ decision).
   is unchanged. This is the one change to `loop.py` before the step-2
   report, with a test; it is loop infrastructure, and a misfiring guard
   would measure the loop, not the model (read 1 on trace and what-if).
+  Two readings fixed with the implementation (cee9fa1): the earlier call
+  itself counts as the session change, so `step X` twice or `run 4` twice
+  are two actions, not a repeat (a model that loops on a changing verb is
+  stopped by the item's max calls, not by the guard); and a refused
+  changing call changed nothing, so `state`, refused `step`, `state` is
+  still a repeat.
 - **The ctx band's `forced/do` count disagrees with `do` after a setup
   `step EVENT`** (band: `1 forced/do`; `do`: none). Kernel bookkeeping, not
   ours: filed to the metis line as the narrate-user bug was. Consequence
