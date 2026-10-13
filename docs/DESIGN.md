@@ -269,6 +269,27 @@ Nothing above changes; what changes is how the contexts are served:
   on ids kept straight, the floor honoured, the answer bound to its
   question, zero signals read as commands.
 
+### Build order (user, 2026-10-13): the architecture first, the optimization later
+
+Build the two agents as stated, each on its own model instance, and defer
+the single-model optimization to its own task. Reasons: the domain agent
+gets a test loop in isolation (an emulated orchestrator drives it over the
+JSON interfaces); the orchestrator's multi-domain and person-dialog work
+is done against emulated domain agents; both agents fit in memory on
+separate E2B instances (≈ 2.4 GB each on the 8 GB card; the service today
+is 2.7 GB with one); and putting the two on one model later is a serving
+change behind interfaces that do not move.
+
+| phase | what | where | driven by | gate |
+|---|---|---|---|---|
+| 1 | **the domain agent in isolation**: mapper, replier, narrator, consultant, host around one runtime; the intent JSON, the REPL API and the generic reply as JSON lines | `py/` (the specialist runtime; metispy in-process) | an emulated orchestrator: scripted intents and tool calls | the dog's day (dog.llp) and the kitchen pair answer over the interfaces with faithful narration (E8's scorer) and the dog corpus mapped 54/54 |
+| 2 | **the orchestrator agent against emulated domain agents**: the two interfaces, the generic reply, the next-move table, the person's dialog, ids, the floor | `go/` (the executive) | scripted domain agents (E11's bench is the first) | E11's reads; then the dialog-control corpus (two domains, interjections, ask bound to its answer, a signal mid-task) |
+| 3 | **integration**: the two agents on two model instances over the wire; the dog on the robot through its catalog (the dispatcher replaced by mapper + runtime) | `go/` ↔ `py/` | the person | the E10 round-trip corpus live; quiet cost near zero |
+| 4 | **one model** (optimization): KV swap per context, examples by retrieval, one pass (E12) | both | — | parity with phase 3 at the smaller footprint |
+
+The v2 build plan below stays as the record; its phases 1–3 are these,
+re-cut along the two agents.
+
 ### How this section came to be (2026-10-13, the record is in git)
 
 The executive's IO refined (c6ca614; tested by E10, ruled J-text 88a5552);
