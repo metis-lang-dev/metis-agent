@@ -53,12 +53,13 @@ def test_consult_never_writes_the_live_session():
     before = live(ag)
     r = ag.handle({"tool": "consult", "id": "k1", "args": {"question": "Why is the way closed?", "max_calls": 12}})[0]
     assert live(ag) == before and ag.consults[-1]["live_unchanged"]
+    # the kind and the atom are the harness's (the host's pairs); the words the model's
     assert (r["kind"], r["answer_kind"], r["resource"], r["calls"]) == ("consult", "missing",
-                                                                       {"atom": "open(kitchen)", "words": "an open door"}, 10)
+                                                                       {"atom": "closed(kitchen)", "words": "an open door"}, 10)
     # the day goes on as if no consult had happened
     out = ag.handle({"clock": "beat"})
     assert [x["status"] for x in out if x.get("kind") == "result"] == []      # beat 3: only the retraction
-    assert ag.consults[-1]["kinds"] == ["missing", "unexplained", "answer"]  # after a refusal
+    assert ag.consults[-1]["kinds"] == ["missing"]                           # computed: closed(kitchen) flips
     # the harness's first read: the refusal's why, its blocker, and the evidence
     fr = ag.consults[-1]["first_read"]
     assert "why refused(go)" in fr and "go_closed[P=kitchen]" in fr and "it rested on closed(kitchen) (kept)" in fr
@@ -72,7 +73,7 @@ def test_consult_never_writes_the_live_session():
 
 def test_answer_kinds_follow_the_situation():
     off = {"kitchen_shared": ["partner_load"]}
-    assert answer_kinds("refusal", off) == ["missing", "unexplained", "answer"]
+    assert answer_kinds("refusal", off) == ["missing", "unexplained"]
     assert answer_kinds("surprise", {}) == ["noise", "unexplained"]
     assert answer_kinds("surprise", off) == ["explains", "noise", "unexplained"]
     assert answer_kinds("question", off) == ["answer"]
@@ -129,3 +130,23 @@ def test_no_blocker_refusals_offer_the_catalogs_alternative():
         ag.handle(m)
         out += [r for r in ag.handle({"clock": "beat"}) if r.get("status") == "refused"]
     assert [(r["id"], r["alternatives"]) for r in out] == [("c2", ["stand"]), ("c3", [])]
+
+
+def test_refusal_blocker():
+    """DESIGN f590c3d: result.refused carries the blocker — the premise on a
+    host pair's blocking side — or null when the refusal is not about the world."""
+    ag = DomainAgent(dog)
+    seen = {}
+    script = {1: {"verb": "NAVIGATE", "args": {"goal": "kitchen"}},
+              2: {"verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}},
+              3: {"verb": "LOCAL_ACTION", "args": {"action": "TURN", "direction": "LEFT"}},
+              4: {"verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}}
+    for beat, m in script.items():
+        ag.handle({"id": "c%d" % beat, **m})
+        for r in ag.handle({"clock": "beat"}):
+            if r.get("status") == "refused":
+                seen[r["ref"]["event"].partition("[")[0]] = r
+    assert seen["go_closed"]["blocker"] == "closed(kitchen)"
+    assert "blocker" in seen["turn_must_stand"] and seen["turn_must_stand"]["blocker"] is None
+    assert seen["sit_already"]["blocker"] is None and json.dumps(seen["sit_already"]).count('"blocker": null') == 1
+    assert dog.flips("closed(kitchen)") == "open(kitchen)" and dog.flips("posture(sitting)") is None

@@ -74,8 +74,8 @@ def dog(seat, llm):
         for r in rs:
             if r.get("kind") == "result" and r.get("status") == "refused":
                 rule = r["ref"]["event"].partition("[")[0]
-                if rule in mod.NO_BLOCKER:
-                    recs.append({"domain": "dog", "rule": rule, "event": r["ref"]["event"], "consulted": False,
+                if not r.get("blocker"):          # not about the world: no consult (DESIGN f590c3d)
+                    recs.append({"domain": "dog", "rule": rule, "event": r["ref"]["event"], "consulted": False, "blocker": None,
                                  "alternatives": r.get("alternatives"), "answer_kind": None, "calls": 0, "text": r["text"],
                                  "live_unchanged": True, "pinned": None})
                     continue
@@ -86,6 +86,8 @@ def dog(seat, llm):
                                  "expect_kind": kind, "expect_atoms": sorted(atoms)})
                 rec["kind_ok"] = rec["answer_kind"] == kind
                 rec["atom_ok"] = (not atoms) or norm(got) in {norm(a) for a in atoms}
+                rec["blocker"], rec["words"] = r.get("blocker"), (c["consult"].get("resource") or {}).get("words")
+                rec["fixed"] = c["full"].get("fixed")
                 recs.append(rec)
         if rs[-1].get("over"):
             break
@@ -148,7 +150,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seat", default="gemma4", choices=["gemma4", "claude"])
     ap.add_argument("--model", default=str(ROOT / "go/models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf"))
-    ap.add_argument("--out", default=str(ROOT / "py/results/domain-agent/step4"))
+    ap.add_argument("--out", default=str(ROOT / "py/results/domain-agent/step5"))
     ap.add_argument("--only", default="dog,kitchen,wgc")
     a = ap.parse_args()
     os.environ.setdefault("METIS_CONFIG", "")

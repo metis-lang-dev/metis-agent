@@ -106,8 +106,10 @@ class DomainAgent:
             self.host = _NoHost()            # a catalog with no host (wgc): consult and reads only
         self.watch = Watch(self.repl, beats=getattr(module, "BEATS", None))
         self.mapper = Mapper(module.CARD)
+        self.flips = getattr(module, "flips", lambda a: None)
         self.replier = Replier(self.name, rule_docs(module.CATALOG), module.OUTCOMES, self.mapper.commands,
-                               getattr(module, "alternatives", None), mirror_atoms(self.repl.text))
+                               getattr(module, "alternatives", None), mirror_atoms(self.repl.text),
+                               getattr(module, "PAIRS", ()))
         self.host.last_row = lambda: self.repl.fired_rows[-1]
         self.over = False
         self.log = []        # what the mapper did, per intent (the report's table)
@@ -194,6 +196,7 @@ class DomainAgent:
             for r in out:
                 if r.get("status") == "refused":
                     self.last_refusal = {"id": r["id"], "seq": k, "event": ev.name, "persist": dict(ev.persist),
+                                         "blocker": r.get("blocker"),
                                          "act": next((a[len("refused("):-1] for a in ev.produce
                                                       if a.startswith("refused(")), "")}
             return out
@@ -286,6 +289,10 @@ class DomainAgent:
             evidence = ["%s %+d" % (a, d) for a, d in sorted(rec["meta"].get("diff", {}).items())]
         elif situation == "refusal" and self.last_refusal:
             band, evidence = self.first_read(self.last_refusal)
+            # the kind is computed, not chosen (DESIGN f590c3d): missing when the
+            # blocker flips in one of the host's pairs, unexplained otherwise
+            b = self.last_refusal.get("blocker")
+            c.fixed = {"kind": "missing" if b and self.flips(b) else "unexplained", "atom": b}
             self.last_refusal = None
         before = (self.repl.stage, dict(self.repl.counts), len(self.repl.fired))
         r = c.consult(q, int(args.get("max_calls", 8)), band_extra=band, situation=situation)

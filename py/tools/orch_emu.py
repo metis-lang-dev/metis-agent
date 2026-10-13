@@ -10,7 +10,11 @@ the domain agent's test loop.
 The next-move table, as the emulator applies it (the harness owns the
 branch; DESIGN "The orchestrator agent"):
 
-    result.refused, none          → REPL consult(domain, "Why <reason>?")
+    result.refused, alternatives  → an intent on one (logged, not sent: it would change the
+                                    scripted day) — unless it cancels a live task (busy →
+                                    cancel): ask(person), the person decides what to drop
+    result.refused, none, blocker → REPL consult(domain, "Why <reason>?")
+    result.refused, none, null    → speak the reason; nothing to consult
     surprise                      → REPL consult(domain, "Surprise N: what explains it?")
     consult.explains              → REPL explain(domain, record, card, move)
     consult.noise                 → REPL reset(domain, record)
@@ -209,10 +213,17 @@ class Orchestrator:
         if not self.on:
             return
         for r in replies:
-            if r.get("kind") == "result" and r.get("status") == "refused" and r.get("id", "").startswith("c") \
-                    and not r.get("alternatives"):     # with alternatives: an intent on one of them (not applied)
-                self.consulted(ag, self.call(ag, "consult", {"question": "Why %s?" % r.get("reason", "was it refused"),
-                                                             "max_calls": 6}), None)
+            if r.get("kind") == "result" and r.get("status") == "refused" and r.get("id", "").startswith("c"):
+                alts = r.get("alternatives") or []
+                if alts:
+                    move = {"ask": r.get("text", "")} if "cancel" in alts else {"intent_on": alts[0]}
+                    self.moves.append({"agent": ag.domain, "trigger": r["id"], "call": move, "replies": []})
+                elif r.get("blocker"):
+                    self.consulted(ag, self.call(ag, "consult", {"question": "Why %s?" % r.get("reason", "was it refused"),
+                                                                 "max_calls": 6}), None)
+                else:
+                    self.moves.append({"agent": ag.domain, "trigger": r["id"], "call": {"speak": r.get("text", "")},
+                                       "replies": []})
             elif r.get("kind") == "surprise":
                 self.consulted(ag, self.call(ag, "consult", {"question": "Surprise %d in your domain: what explains it?"
                                                              % r["record"], "max_calls": 6}), r["record"])

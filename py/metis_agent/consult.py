@@ -173,7 +173,7 @@ def answer_kinds(situation, offered):
     noise · unexplained; the person's own question routed by the
     orchestrator: answer."""
     if situation == "refusal":
-        return ["missing", "unexplained", "answer"]
+        return ["missing", "unexplained"]
     if situation == "surprise":
         return (["explains"] if offered else []) + ["noise", "unexplained"]
     return ["answer"]
@@ -220,6 +220,7 @@ class Consultant:
         self.repl, self.seat, self.max_calls = repl, AnsweringSeat(seat), max_calls
         self.display, self.script, self.offered = display, script, offered or {}
         self.kinds = ["answer"]
+        self.fixed = None       # after a refusal: {kind, atom} computed by the harness from the host's pairs
 
     def consult(self, question, max_calls=None, band_extra="", situation="question"):
         """band_extra: the harness's first read (the refusal's why, or the
@@ -228,6 +229,8 @@ class Consultant:
         A fresh context per consult: the strip is per question (carried
         context broke the kitchen answer after dog consults, step 3)."""
         self.kinds = answer_kinds(situation, self.offered)
+        if self.fixed:          # the kind is computed: the model writes resource.words and the sentence
+            self.kinds = [self.fixed["kind"]]
         if hasattr(self.seat.inner, "llm"):
             self.seat.inner._kv = ""
             self.seat.inner.llm.prefix = None        # the next prime clears the KV
@@ -235,7 +238,10 @@ class Consultant:
         sp = Specialist.__new__(Specialist)         # the loop as is, on the live kernel
         sp.kernel, sp.seat, sp.persona = kernel, self.seat, "b"
         sp.max_calls = max_calls or self.max_calls
-        sp.tools = repl_tools(self.repl) + [answer_tool(self.offered if self.kinds[0] == "explains" else {}, self.kinds)]
+        at = answer_tool(self.offered if self.kinds[0] == "explains" else {}, self.kinds)
+        if self.fixed and self.fixed.get("atom"):
+            at["parameters"]["properties"]["atom"]["enum"] = [self.fixed["atom"]]
+        sp.tools = repl_tools(self.repl) + [at]
         band = self.repl.capture("ctx", "").split("\n── ", 1)[0] + band_extra
         persona = PERSONA.replace(*FIRST_READ) if band_extra else PERSONA     # only when there is a first read
         sp.system = persona.format(display=self.display, intro=band, script=self.script)
@@ -252,6 +258,9 @@ class Consultant:
         r["typed"] = typed
         r["pinned"] = list(self.seat.pinned)
         r["envelope"] = envelope(typed, self.kinds)
+        if self.fixed and r["envelope"]["answer_kind"] == "missing":    # the atom is the harness's, too
+            r["envelope"]["resource"] = {"atom": self.fixed["atom"], "words": (typed or {}).get("words", "")}
+        r["fixed"] = self.fixed
         r["clamped"] = bool(typed) and typed.get("kind") != r["envelope"]["answer_kind"]
         r["kinds"] = self.kinds
         r["text"] = (typed or {}).get("text") or r["answer"]

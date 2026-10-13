@@ -165,9 +165,21 @@ class AgentHost:
         self.queue, self.inflight, self.acted = copy.deepcopy(snap[1])
 
 
-def make(case):
+def _host_module():
     sys.path.insert(0, str(CATALOG.parent))
     import dog_host
+    return dog_host
+
+
+# the host's complementary pairs, handed to the agent at load (dog_host.py
+# PAIRS, flips; metis-catalog 229440f): a refusal's blocker is the premise
+# on a pair's second side — PAIRS lists (what a rule needs, what blocks it)
+PAIRS = _host_module().PAIRS
+flips = _host_module().flips
+
+
+def make(case):
+    dog_host = _host_module()
     commands = {r["atom"].split("(")[0] for r in CARD["rows"]}
     return AgentHost(dog_host.make(case), commands)
 

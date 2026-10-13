@@ -14,7 +14,7 @@ BASE = ("domain", "kind", "ref", "text")
 
 # kind -> the fields beyond domain/ref/text (DESIGN.md's table)
 KINDS = {
-    "result": ("id", "status", "reason", "alternatives"),
+    "result": ("id", "status", "reason", "alternatives", "blocker"),
     "read": ("tool", "output"),
     "event": ("counts",),
     "quiescence": ("goal_pending",),
@@ -50,6 +50,8 @@ def reply(domain, kind, **fields):
     for k in BASE[2:] + KINDS[kind]:
         if k in fields and fields[k] is not None:
             out[k] = fields[k]
+    if kind == "result" and fields.get("status") == "refused" and "blocker" in fields:
+        out["blocker"] = fields["blocker"]      # null is information: the refusal is not about the world
     return out
 
 

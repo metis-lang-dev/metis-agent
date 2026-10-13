@@ -33,13 +33,14 @@ def atom_args(atom):
 
 
 class Replier:
-    def __init__(self, domain, docs, outcomes, commands, alternatives=None, mirror=()):
+    def __init__(self, domain, docs, outcomes, commands, alternatives=None, mirror=(), pairs=()):
         """docs: rule → %% line; outcomes: outcome predicate → result
         status; commands: the card's command predicates; alternatives:
         f(rule, counts) → list, or None; mirror: the atoms the
         mirror line counts (the catalog's #query)."""
         self.domain, self.docs, self.outcomes = domain, docs, outcomes
         self.commands, self.alternatives, self.mirror = commands, alternatives, tuple(mirror)
+        self.blocking = {b for _, b in pairs}       # the pairs' blocking sides (DESIGN f590c3d)
         self.pending = {}    # command atom -> [(id, act)], FIFO
         self.tasks = {}      # act -> id of the intent whose task runs
 
@@ -85,10 +86,20 @@ class Replier:
                 f["reason"] = doc_reason(doc)
             if status == "refused":
                 f["alternatives"] = list(self.alternatives(base, counts)) if self.alternatives else []
+                f["blocker"] = self.blocker(ev)
             out.append(reply(self.domain, "result", **f))
         if not out:
             out.append(reply(self.domain, "event", ref=ref, text=said, counts=self.counts(counts)))
         return out
+
+    def blocker(self, ev):
+        """The atom the refusing rule rested on: a premise (kept or used,
+        never the command) on a pair's blocking side; None when the refusal
+        is not about the world (busy, already, must stand)."""
+        for a in sorted(set(ev.persist) | set(ev.consume)):
+            if atom_args(a)[0] in self.blocking:
+                return a
+        return None
 
     def untaken(self, counts, beat):
         """Commands still in the state after the runtime went quiet: no
