@@ -148,7 +148,7 @@ agent, for every kind:
 
 | kind | when | fields beyond domain/ref/text |
 |---|---|---|
-| `result` | an intent's outcome, by id; also the answer to activate/deactivate and to the surprise verbs | `id`, `status` (accepted · admitted · admitted+notice · applied · done · refused · expired · progress · cancelled · failed), `reason`, `alternatives` |
+| `result` | an intent's outcome, by id; also the answer to activate/deactivate and to the surprise verbs | `id`, `status` (accepted · admitted · admitted+notice · applied · done · refused · expired · progress · cancelled · failed), `reason`, `alternatives`, `blocker` (on refused: the atom the refusing rule rested on, or null when the refusal is not about the world: busy, already, must stand) |
 | `read` | the answer to a REPL API read (state, ctx, events, why, findings), synchronous | `tool`, `output` (the kernel's read-out, scrubbed and capped), `text` optional |
 | `event` | progress the domain reports unasked | `counts` (the mirror's numbers) |
 | `quiescence` | nothing left the domain can do | `goal_pending` |
@@ -178,7 +178,10 @@ branch structural, reads hold (MODEL-EXPERIMENTS "E11 ruling"):
 
 ```
 result.refused with alternatives → intent on one of them
-result.refused / failed, none   → REPL consult(domain, "why <reason>?")
+   …unless the alternative cancels a live task (busy → cancel) → ask(person): the person decides what to drop
+result.refused, no alternatives, blocker set   → REPL consult(domain, "why <reason>?")
+result.refused, no alternatives, blocker null  → speak the reason; nothing to consult (already stopped)
+result.failed                   → REPL consult(domain, "why <reason>?")
 consult.explains                → REPL explain(domain, record, card, move)
 consult.missing                 → ask(person): the resource in the person's words
 consult.noise                   → REPL reset(domain, record)
@@ -221,12 +224,20 @@ domain-independent, the last two generated from the catalog at load:
    consults); the first read made by the harness, not the model (`why
    refused(ACT)` after a refusal; the record's difference and its cards
    after a surprise) and placed in the context; the `answer_kind` enum
-   restricted by situation (after a refusal: missing · unexplained · answer;
-   after a surprise: explains · noise · unexplained) and the card/move
+   restricted by situation (after a refusal: missing · unexplained; after a
+   surprise: explains · noise · unexplained; `answer` only for the person's
+   own question, never in the loop: both seats escaped into it) and the card/move
    enums to the cards offered; the last turn at `max_calls` pinned to the
    answer shape. `missing` is any blocker the host's complementary pair can
    flip (closed, locked, battery low, nobody in view): the person can
-   change the world; `unexplained` is what nobody can account for. A
+   change the world; `unexplained` is what nobody can account for. **After
+   a refusal the kind is computed, not chosen:** the host hands its pairs
+   to the agent at load (dog_host.py `PAIRS`, `flips`); the replier puts
+   the blocker on the result; the consultant's kind is `missing` when the
+   blocker flips and `unexplained` otherwise, and the model's whole task is
+   the `resource.words` and the sentence. A blocker that held from the
+   start (in the base state, no producer) is still `missing`; "nobody put
+   it there" is not a reason, the pair is. A
    refusal with no blocker ("already stopped", "must stand first") is not
    a consult: the replier offers the alternative from the catalog (stand)
    or the orchestrator speaks the reason;
