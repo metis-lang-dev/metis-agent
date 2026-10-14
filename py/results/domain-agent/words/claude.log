@@ -1,0 +1,31 @@
+  [host beat 2] narrated done(sit)
+  [host beat 3] narrated refused(go)
+  [host beat 4] narrated done(stand)
+  [host beat 5] narrated progress(go)
+  [host beat 6] narrated refused(find)
+  [host beat 7] narrated done(go)
+  [host beat 8] narrated refused(move)
+  [host beat 9] narrated progress(find)
+  [host beat 10] narrated done(query)
+  [host beat 11] narrated refused(find)
+  [host beat 12] narrated progress(follow)
+  [host beat 13] narrated cancelled(follow)
+  [host beat 13] narrated done(stop)
+  [host beat 14] narrated refused(unknown)
+  [host beat 15] narrated done(paw)
+  [host beat 16] narrated refused(find)
+  [host beat 17] narrated done(sit)
+  [host beat 18] narrated refused(turn)
+dog      go_closed        missing     True  True  {'atom': 'closed(kitchen)', 'words': 'open the way to the kitchen'} calls=0 live=True pinned=[] | The dog refused to go to the kitchen (event 4, go_closed[P=kitchen]) because closed(kitchen) holds: the kitchen is on its map, but the way to it is cl
+dog      find_busy        not a consult: alternatives ['cancel'] | I can't take that now: I am already busy with a task.
+dog      move_wall        missing     True  True  {'atom': 'wall(backward)', 'words': 'turn me away from the wall'} calls=0 live=True pinned=[] | The dog refused to move backward (event 14, move_wall[W=backward]) because wall(backward) holds: there is a wall directly behind it. That wall was the
+dog      find_locked      missing     True  True  {'atom': 'locked_away(extinguisher)', 'words': 'unlock where the fire extinguisher is kept'} calls=1 live=True pinned=[] | The model has no rule that explains why the extinguisher is locked away. It is an outside fact: locked_away(extinguisher) was added by intervention 19
+dog      unknown          not a consult: alternatives [] | I can't do that: it is not something I can or may do.
+dog      find_low         missing     True  True  {'atom': 'battery_low', 'words': 'put me on my charger'} calls=0 live=True pinned=[] | The dog refused to search for the bottle at event 30 (find_low[T=bottle]) because battery_low holds. The search needs the battery to be ok, so chargin
+dog      turn_must_stand  not a consult: alternatives ['stand'] | I can't turn: I have to stand up first.
+kitchen  kitchen          explains    True  True  {'card': 'kitchen_shared', 'move': 'partner_load'} calls=0 live=True pinned=[] | The pot holds one more onion than the model expected (pot_onion 2, expected 1) and has one less room (pot_space 1, expected 2). That matches one partn
+wgc      trace            answer      True  True   calls=3 live=True pinned=[] | Right after carrying the goat across, the state shows farmer(far) and on(goat,far), so the farmer and the goat are on the far bank. It also shows on(w
+wgc      why              answer      True  True   calls=3 live=True pinned=[] | The cabbage was eaten at event 3, eat[Y=cabbage,A=near,X=goat,B=far]. At event 1, carry[A=near,X=wolf,B=far], the farmer took the wolf across and left
+wgc      what-if          answer      True  True   calls=8 live=True pinned=[] | If the farmer carries the cabbage across first (carry[A=near,X=cabbage,B=far]), the wolf and the goat are left together on the near bank. Once the sta
+wgc      necessity        answer      True  True   calls=2 live=True pinned=[] | Mostly, but not strictly. Carrying the wolf across first (event 1, carry[A=near,X=wolf,B=far]) left the goat alone with the cabbage on the near shore,
+{"seat": "claude", "dog_day_unchanged": true, "events": 17, "cost_usd": 0.8378, "model": "claude-opus-5-5"}

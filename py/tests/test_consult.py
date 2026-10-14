@@ -19,10 +19,11 @@ class ScriptedSeat:
     """Plays a fixed list of calls, then the answer."""
 
     def __init__(self, calls, answer):
-        self.calls, self.answer, self.i, self.seen = calls, answer, 0, []
+        self.calls, self.answer, self.i, self.seen, self.answer_props = calls, answer, 0, [], None
 
     def turn(self, system, tools, question, cont=""):
         self.seen.append([t["name"] for t in tools])
+        self.answer_props = sorted(tools[-1]["parameters"]["properties"])
         if self.i < len(self.calls):
             verb, arg = self.calls[self.i]
             self.i += 1
@@ -53,9 +54,11 @@ def test_consult_never_writes_the_live_session():
     before = live(ag)
     r = ag.handle({"tool": "consult", "id": "k1", "args": {"question": "Why is the way closed?", "max_calls": 12}})[0]
     assert live(ag) == before and ag.consults[-1]["live_unchanged"]
-    # the kind and the atom are the harness's (the host's pairs); the words the model's
-    assert (r["kind"], r["answer_kind"], r["resource"], r["calls"]) == ("consult", "missing",
-                                                                       {"atom": "closed(kitchen)", "words": "an open door"}, 10)
+    # the kind and the atom are the harness's (the host's pairs), the words the host's (dog_host WORDS):
+    # the model's "an open door" is not asked for, and not used
+    assert (r["kind"], r["answer_kind"], r["resource"], r["calls"]) == (
+        "consult", "missing", {"atom": "closed(kitchen)", "words": "open the way to the kitchen"}, 10)
+    assert "words" not in seat.answer_props and "text" in seat.answer_props
     # the day goes on as if no consult had happened
     out = ag.handle({"clock": "beat"})
     assert [x["status"] for x in out if x.get("kind") == "result"] == []      # beat 3: only the retraction
@@ -150,3 +153,29 @@ def test_refusal_blocker():
     assert "blocker" in seen["turn_must_stand"] and seen["turn_must_stand"]["blocker"] is None
     assert seen["sit_already"]["blocker"] is None and json.dumps(seen["sit_already"]).count('"blocker": null') == 1
     assert dog.flips("closed(kitchen)") == "open(kitchen)" and dog.flips("posture(sitting)") is None
+
+
+class _NoWords:
+    """The dog with no words table on its host: the model's words are the fallback."""
+    def __getattr__(self, k):
+        if k in ("words", "HANDLE_NAMES"):
+            raise AttributeError(k)
+        return getattr(dog, k)
+
+
+def test_missing_words_are_the_hosts():
+    """DESIGN 9c7e84a: a computed missing takes resource.words from the
+    host's words(atom) with the handle's display name; a host with no
+    table leaves them to the model."""
+    assert dog.words("locked_away(extinguisher)", dog.HANDLE_NAMES) == "unlock where the fire extinguisher is kept"
+    answer = {"kind": "missing", "atom": "closed(kitchen)", "words": "the door", "text": "The kitchen is closed."}
+    got = {}
+    for name, mod in (("host", dog), ("model", _NoWords())):
+        seat = ScriptedSeat([("state", "")], answer)
+        ag = DomainAgent(mod, consult_seat=seat)
+        ag.handle({"id": "c1", "verb": "NAVIGATE", "args": {"goal": "kitchen"}})
+        ag.handle({"clock": "beat"})
+        r = ag.handle({"tool": "consult", "id": "k", "args": {"question": "Why?"}})[0]
+        got[name] = (r["resource"]["words"], "words" in seat.answer_props, r["text"])
+    assert got["host"] == ("open the way to the kitchen", False, "The kitchen is closed.")
+    assert got["model"] == ("the door", True, "The kitchen is closed.")

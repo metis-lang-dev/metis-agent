@@ -176,6 +176,13 @@ def _host_module():
 # on a pair's second side — PAIRS lists (what a rule needs, what blocks it)
 PAIRS = _host_module().PAIRS
 flips = _host_module().flips
+# what the person does to flip a blocking side (dog_host.py WORDS, words;
+# metis-catalog dd7e40b): a missing answer's resource.words, templated with
+# the handle's display name — the domain's words, not the model's
+words = _host_module().words
+HANDLE_NAMES = {h: ("the " + m["description"][0]) if m.get("description") else
+                ("tag %d" % m["tag_id"]) if m.get("tag_id") is not None else "the nearest tag"
+                for kind in CARD["handles"].values() for h, m in kind}
 
 
 def make(case):

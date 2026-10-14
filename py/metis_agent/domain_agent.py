@@ -107,6 +107,8 @@ class DomainAgent:
         self.watch = Watch(self.repl, beats=getattr(module, "BEATS", None))
         self.mapper = Mapper(module.CARD)
         self.flips = getattr(module, "flips", lambda a: None)
+        # the host's words for a blocker (None: the host has no table, the model writes them)
+        self.host_words, self.handle_names = getattr(module, "words", None), getattr(module, "HANDLE_NAMES", {})
         self.replier = Replier(self.name, rule_docs(module.CATALOG), module.OUTCOMES, self.mapper.commands,
                                getattr(module, "alternatives", None), mirror_atoms(self.repl.text),
                                getattr(module, "PAIRS", ()))
@@ -293,6 +295,9 @@ class DomainAgent:
             # blocker flips in one of the host's pairs, unexplained otherwise
             b = self.last_refusal.get("blocker")
             c.fixed = {"kind": "missing" if b and self.flips(b) else "unexplained", "atom": b}
+            # and so are its words, when the host has a table (DESIGN 9c7e84a)
+            if c.fixed["kind"] == "missing" and self.host_words:
+                c.fixed["words"] = self.host_words(b, self.handle_names)
             self.last_refusal = None
         before = (self.repl.stage, dict(self.repl.counts), len(self.repl.fired))
         r = c.consult(q, int(args.get("max_calls", 8)), band_extra=band, situation=situation)

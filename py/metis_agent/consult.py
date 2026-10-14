@@ -220,7 +220,7 @@ class Consultant:
         self.repl, self.seat, self.max_calls = repl, AnsweringSeat(seat), max_calls
         self.display, self.script, self.offered = display, script, offered or {}
         self.kinds = ["answer"]
-        self.fixed = None       # after a refusal: {kind, atom} computed by the harness from the host's pairs
+        self.fixed = None       # after a refusal: {kind, atom, words?} computed by the harness from the host's pairs and words
 
     def consult(self, question, max_calls=None, band_extra="", situation="question"):
         """band_extra: the harness's first read (the refusal's why, or the
@@ -229,7 +229,7 @@ class Consultant:
         A fresh context per consult: the strip is per question (carried
         context broke the kitchen answer after dog consults, step 3)."""
         self.kinds = answer_kinds(situation, self.offered)
-        if self.fixed:          # the kind is computed: the model writes resource.words and the sentence
+        if self.fixed:          # the kind is computed: the model writes the sentence (and the words, for a host with no table)
             self.kinds = [self.fixed["kind"]]
         if hasattr(self.seat.inner, "llm"):
             self.seat.inner._kv = ""
@@ -241,6 +241,9 @@ class Consultant:
         at = answer_tool(self.offered if self.kinds[0] == "explains" else {}, self.kinds)
         if self.fixed and self.fixed.get("atom"):
             at["parameters"]["properties"]["atom"]["enum"] = [self.fixed["atom"]]
+        if self.fixed and self.fixed.get("words"):     # the host's words: the model writes the sentence only
+            del at["parameters"]["properties"]["words"]
+            at["description"] = at["description"].replace(", words: as a person says it", "")
         sp.tools = repl_tools(self.repl) + [at]
         band = self.repl.capture("ctx", "").split("\n── ", 1)[0] + band_extra
         persona = PERSONA.replace(*FIRST_READ) if band_extra else PERSONA     # only when there is a first read
@@ -259,7 +262,8 @@ class Consultant:
         r["pinned"] = list(self.seat.pinned)
         r["envelope"] = envelope(typed, self.kinds)
         if self.fixed and r["envelope"]["answer_kind"] == "missing":    # the atom is the harness's, too
-            r["envelope"]["resource"] = {"atom": self.fixed["atom"], "words": (typed or {}).get("words", "")}
+            r["envelope"]["resource"] = {"atom": self.fixed["atom"],
+                                         "words": self.fixed.get("words") or (typed or {}).get("words", "")}
         r["fixed"] = self.fixed
         r["clamped"] = bool(typed) and typed.get("kind") != r["envelope"]["answer_kind"]
         r["kinds"] = self.kinds

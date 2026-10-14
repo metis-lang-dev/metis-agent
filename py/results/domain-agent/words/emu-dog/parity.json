@@ -1,0 +1,16 @@
+{
+ "events_match": true,
+ "events": 17,
+ "reference_events": 17,
+ "outcomes_match": true,
+ "outcomes": 18,
+ "reference_outcomes": 18,
+ "first_event_diff": null,
+ "first_outcome_diff": null,
+ "reads_match": {
+  "why done(go)": true,
+  "why refused(find)": true,
+  "state": true
+ },
+ "field_violations": []
+}

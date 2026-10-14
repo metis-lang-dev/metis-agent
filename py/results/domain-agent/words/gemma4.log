@@ -1,0 +1,38 @@
+load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: control-looking token:      1 '<eos>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: '</s>' is a normal token here, removing it from EOG list
+llama_kv_cache_iswa: using full-size SWA cache (ref: https://github.com/ggml-org/llama.cpp/pull/13194#issuecomment-2868343055)
+llama_kv_cache: the V embeddings have different sizes across layers and FA is not enabled - padding V cache to 512
+llama_kv_cache: the V embeddings have different sizes across layers and FA is not enabled - padding V cache to 512
+  [host beat 2] narrated done(sit)
+  [host beat 3] narrated refused(go)
+  [host beat 4] narrated done(stand)
+  [host beat 5] narrated progress(go)
+  [host beat 6] narrated refused(find)
+  [host beat 7] narrated done(go)
+  [host beat 8] narrated refused(move)
+  [host beat 9] narrated progress(find)
+  [host beat 10] narrated done(query)
+  [host beat 11] narrated refused(find)
+  [host beat 12] narrated progress(follow)
+  [host beat 13] narrated cancelled(follow)
+  [host beat 13] narrated done(stop)
+  [host beat 14] narrated refused(unknown)
+  [host beat 15] narrated done(paw)
+  [host beat 16] narrated refused(find)
+  [host beat 17] narrated done(sit)
+  [host beat 18] narrated refused(turn)
+dog      go_closed        missing     True  True  {'atom': 'closed(kitchen)', 'words': 'open the way to the kitchen'} calls=1 live=True pinned=[] | The way to the location is closed because the event `go_closed[P=kitchen]` fired. This event indicates that the path to the kitchen is closed.
+dog      find_busy        not a consult: alternatives ['cancel'] | I can't take that now: I am already busy with a task.
+dog      move_wall        missing     True  True  {'atom': 'wall(backward)', 'words': 'turn me away from the wall'} calls=1 live=True pinned=[] | The wall is not explicitly mentioned as a reason for refusal, but the state indicates that the kitchen is closed. You cannot move through a closed are
+dog      find_locked      missing     True  True  {'atom': 'locked_away(extinguisher)', 'words': 'unlock where the fire extinguisher is kept'} calls=1 live=True pinned=[] | The extinguisher is locked away. This is indicated by the event `find_locked[T=extinguisher]`, which means the dog cannot reach it.
+dog      unknown          not a consult: alternatives [] | I can't do that: it is not something I can or may do.
+dog      find_low         missing     True  True  {'atom': 'battery_low', 'words': 'put me on my charger'} calls=1 live=True pinned=['answer'] | The dog cannot search because the battery is too low. This prevents the `find_low` action from being executed. You will need to charge the battery to 
+dog      turn_must_stand  not a consult: alternatives ['stand'] | I can't turn: I have to stand up first.
+kitchen  kitchen          explains    True  True  {'card': 'kitchen_shared', 'move': 'partner_load'} calls=0 live=True pinned=['answer'] | The surprise is explained by the kitchen_shared card. This card suggests that a second cook can also load onions into the pot, which accounts for the 
+wgc      trace            answer      True  True   calls=5 live=True pinned=[] | After the farmer carries the goat across, the farmer and the goat are on the far bank. The wolf and the cabbage remain on the near bank.
+wgc      why              answer      True  True   calls=2 live=True pinned=[] | The cabbage was eaten because the goat was left unattended with it, which allowed the goat to eat the cabbage. This is described by the 'eat' move in 
+wgc      what-if          answer      True  True   calls=6 live=True pinned=[] | If the farmer carries the cabbage across first, the wolf and the goat are left unattended together on the starting bank. Consequently, the wolf will e
+wgc      necessity        answer      True  False  calls=3 live=True pinned=['answer'] | No, carrying the wolf across first was not necessary for the cabbage to be gone. The cabbage was gone because the eating rule was triggered, which req
+{"seat": "gemma4", "dog_day_unchanged": true, "events": 17}
