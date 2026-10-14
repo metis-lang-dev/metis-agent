@@ -42,6 +42,9 @@ test harness's, not part of either interface.
 
 The replay face (integration step 1, the orchestrator's replay driver;
 harness lines like the clock, not part of either interface):
+    --case live is the same case on the orchestrator's wall-clock beats
+      (integration step 2): the orchestrator owns time and sends the clock;
+      a domain whose env brings its own day (the kitchen pair) keeps it.
     --case replay / {"reset": {"seed", "case"}}: the hosted day's script is
       off and the day has no end (the person comes as intents, the world as
       world lines); the world's answers to commands stay the host's. A reset
@@ -51,6 +54,18 @@ harness lines like the clock, not part of either interface):
       the host's next tick, as the script's world changes are.
     Every non-clock line's replies end with {"ack": intent|tool|world|reset|error,
       "id": the line's id or null}; a clock line's with its clock line.
+
+Several domains in one process (integration step 2: one model for all):
+    --domain dog,kitchen,kitchen_shared hosts each as its own agent (Domains);
+    a line goes to its agent by "domain"; --narrate dog narrates the dog
+    only (the others' text is their %% line), every agent's consultant
+    shares the one model. The kitchen pair shares one env (a fresh pair dir
+    per build and reset) and its clock is the pair's: {"clock": "beat",
+    "domain": "kitchen", "n": K} advances both cooks K env beats, stepped
+    interleaved as run_pair does; {"clock": "step", "domain": D} one watch
+    step of D. A clock line without "domain" runs every domain's clock once
+    (the pair as one). The clock's line names the domain it ran and
+    "domains": {name: {beat, over}}.
 
     py/.venv/bin/python -m metis_agent.domain_agent --domain dog [--narrate] [--case replay]    # from metis-agent/py
 """
@@ -131,12 +146,14 @@ class DomainAgent:
         self.own_voice = getattr(module, "VOICE", "") == "own"
         self.host.last_row = lambda: self.repl.fired_rows[-1]
         self.case = case
-        if case == "replay":
-            if not hasattr(self.host, "replay"):
+        if case in ("replay", "live"):
+            # live is the replay case on the orchestrator's wall-clock beats
+            if hasattr(self.host, "replay"):
+                self.host.replay()
+            elif not getattr(module, "OWN_DAY", False):
                 raise ValueError("domain %s has no replay case (its host keeps its own day)" % self.name)
-            self.host.replay()
         elif case not in (None, "hosted"):
-            raise ValueError("case: hosted | replay, not %r" % case)
+            raise ValueError("case: hosted | replay | live, not %r" % case)
         self.over = False
         self.log = []        # what the mapper did, per intent (the report's table)
         self.narrated = []   # (fragment, sentence) per narrated fragment
@@ -462,15 +479,93 @@ def kind_of(msg):
     return "error"
 
 
+def ready(agent):
+    line = {"clock": "ready", "domain": agent.name, "beat": agent.beat_no()}
+    if isinstance(agent, Domains):
+        line["domains"] = list(agent.order)
+    return line
+
+
+class Domains:
+    """Several domain agents in one process (integration step 2): one model
+    for every narrator and consultant, each agent its own runtime, mirror
+    line and replies (each reply names its domain). Lines are routed by
+    their "domain"; the kitchen pair's clock is the pair's."""
+
+    STEP_CAP = 200     # steps in one pair beat before it gives up (a stuck pair)
+
+    def __init__(self, agents):
+        self.agents = {a.name: a for a in agents}
+        self.order = [a.name for a in agents]
+        self.name = ",".join(self.order)
+        self.pairs = {}
+        for a in agents:
+            pr = getattr(a.mod, "PAIR", None)
+            if pr and all(p in self.agents for p in pr):
+                self.pairs[a.name] = tuple(pr)
+
+    def beat_no(self):
+        return max(a.beat_no() for a in self.agents.values())
+
+    @property
+    def over(self):
+        return all(a.over for a in self.agents.values())
+
+    def handle(self, msg):
+        d = msg.get("domain")
+        if "clock" in msg:
+            if d is not None and d not in self.agents:
+                return [reply(self.name, "error", error="no domain %r here (%s)" % (d, self.name)),
+                        {"clock": msg["clock"], "domain": d, "beat": self.beat_no(), "over": self.over}]
+            out, done = [], set()
+            for n in ([d] if d else self.order):
+                group = self.pairs.get(n, (n,))
+                if group[0] in done:
+                    continue
+                done.add(group[0])
+                if msg["clock"] == "beat" and len(group) > 1:
+                    for _ in range(max(1, int(msg.get("n", 1)))):
+                        out += self.pair_beat(group)
+                else:
+                    for _ in range(max(1, int(msg.get("n", 1)))):
+                        ag = self.agents[n]
+                        out += ag.step() if msg["clock"] == "step" else ag.beat()
+            line = {"clock": msg["clock"], "beat": self.beat_no(), "over": self.over,
+                    "domains": {n: {"beat": a.beat_no(), "over": a.over} for n, a in self.agents.items()}}
+            if d:
+                line["domain"] = d
+            return out + [line]
+        if d is None and len(self.agents) == 1:
+            d = self.order[0]
+        if d not in self.agents:
+            return [reply(self.name, "error", id=msg.get("id"),
+                          error="a line needs its domain: one of %s, not %r" % (", ".join(self.order), d))]
+        return self.agents[d].handle(msg)
+
+    def pair_beat(self, group):
+        """One env beat of a pair: its agents stepped in turn (run_pair's
+        interleaving) until each has moved past the beat it stood at."""
+        ags = [self.agents[n] for n in group]
+        b0 = {a.name: a.beat_no() for a in ags}
+        out = []
+        for _ in range(self.STEP_CAP):
+            if all(a.over or a.beat_no() > b0[a.name] for a in ags):
+                break
+            for a in ags:
+                out += a.step()
+        return out
+
+
 def serve(agent, msg, rebuild):
     """One input line → the output lines: the agent's replies, then the ack
-    (non-clock lines). A reset swaps the agent (rebuild(seed, case)) and
-    answers ready; it returns the agent that serves the next line."""
+    (non-clock lines). A reset swaps the agent (rebuild(seed, case,
+    pair_dir)) and answers ready; it returns the agent that serves the next
+    line."""
     if "reset" in msg:
         r = msg["reset"] or {}
         try:
-            agent = rebuild(r.get("seed", 1), r.get("case"))
-            out = [{"clock": "ready", "domain": agent.name, "beat": agent.beat_no()}]
+            agent = rebuild(r.get("seed", 1), r.get("case"), r.get("pair_dir"))
+            out = [ready(agent)]
         except Exception as e:
             out = [reply(agent.name, "error", id=msg.get("id"), error="reset: %s: %s" % (type(e).__name__, e))]
     else:
@@ -504,18 +599,21 @@ class _Now:
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--domain", default="dog", help="a module under metis_agent.domains")
+    ap.add_argument("--domain", default="dog", help="a module under metis_agent.domains, or several "
+                    "comma-separated (one process, one model: dog,kitchen,kitchen_shared)")
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--narrate", action="store_true", help="the narrator writes text (gemma4, thinking off); "
-                    "the consultant shares its model")
+    ap.add_argument("--narrate", nargs="?", const="*", default=None, metavar="DOMAINS",
+                    help="the narrator writes text (gemma4, thinking off) — every domain, or the comma-separated "
+                         "ones named (--narrate dog); the consultant shares its model")
     ap.add_argument("--consult", default="", choices=["", "gemma4", "claude"],
                     help="the consultant's seat (default: gemma4 when --narrate)")
     ap.add_argument("--model", default="", help="the GGUF (default: E2B Q4 under go/models)")
     ap.add_argument("--missing-seat", action="store_true", help="a computed missing goes to the seat too "
                     "(default: the harness answers it with no model call, DESIGN 98530fd)")
-    ap.add_argument("--case", default=None, choices=["hosted", "replay"],
+    ap.add_argument("--case", default=None, choices=["hosted", "replay", "live"],
                     help="hosted (default): the host's own day; replay: no script, no end — the driver brings "
-                         "the person (intents) and the world (world lines)")
+                         "the person (intents) and the world (world lines); live: the same on the orchestrator's "
+                         "wall-clock beats")
     a = ap.parse_args()
     llm = None
     if a.narrate or a.consult == "gemma4":
@@ -527,18 +625,34 @@ def main():
     if a.consult == "claude":
         from .claude_seat import ClaudeSeat
         seat = ClaudeSeat()
-    module = importlib.import_module("metis_agent.domains." + a.domain)
+    names = [d.strip() for d in a.domain.split(",") if d.strip()]
+    modules = [importlib.import_module("metis_agent.domains." + d) for d in names]
+    narrated = set(names) if a.narrate == "*" else set((a.narrate or "").split(",")) - {""}
+    state = {"pair_dir": None}
 
-    def build(seed, case):
-        # the model (llm, seat) is built once and kept across resets
-        ag = DomainAgent(module, seed=seed, llm=llm if a.narrate or a.consult == "gemma4" else None,
-                         consult_seat=seat, consult_missing="seat" if a.missing_seat else "template", case=case)
-        if not a.narrate:
-            ag.narrator = None
-        return ag
+    def build(seed, case, pair_dir=None):
+        # the model (llm, seat) is built once and kept across resets; a pair
+        # hosted here gets a fresh env each build (its own dir, unless given)
+        import shutil
+        import tempfile
+        if any(getattr(m, "PAIR", None) for m in modules):
+            if state["pair_dir"] and not os.environ.get("METIS_PAIR_DIR_KEEP"):
+                shutil.rmtree(state["pair_dir"], ignore_errors=True)
+            state["pair_dir"] = pair_dir or (tempfile.mkdtemp(prefix="pair-") if len(modules) > 1 or pair_dir
+                                             else os.environ.get("METIS_PAIR_DIR"))
+            if state["pair_dir"]:
+                os.environ["METIS_PAIR_DIR"] = state["pair_dir"]
+        ags = []
+        for m in modules:
+            ag = DomainAgent(m, seed=seed, llm=llm, consult_seat=seat,
+                             consult_missing="seat" if a.missing_seat else "template", case=case)
+            if m.NAME not in narrated:
+                ag.narrator = None
+            ags.append(ag)
+        return ags[0] if len(ags) == 1 else Domains(ags)
 
     agent = build(a.seed, a.case)
-    print(json.dumps({"clock": "ready", "domain": agent.name, "beat": agent.beat_no()}), flush=True)
+    print(json.dumps(ready(agent)), flush=True)
     for line in sys.stdin:
         if not line.strip():
             continue

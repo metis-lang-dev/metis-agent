@@ -142,7 +142,7 @@ def test_serve_acks_every_non_clock_line_and_reset_keeps_the_model():
     from metis_agent.domain_agent import DomainAgent, serve
     built = []
 
-    def rebuild(seed, case):
+    def rebuild(seed, case, pair_dir=None):
         built.append((seed, case))
         return DomainAgent(dog, seed=seed, case=case)
 
@@ -244,3 +244,36 @@ def test_no_fallback_for_an_absent_argument():
         assert isinstance(r, Unmapped), (args, r)
     assert m.map({"verb": "QUERY", "args": {"target": {"type": "REGION", "description": "the moon"}}}).atom == "cmd_look(elsewhere)"
     assert m.map({"verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}).atom == "cmd_go(kitchen)"
+
+
+def test_domains_in_one_process_route_by_domain_and_step_the_pair():
+    # integration step 2: dog + the kitchen pair in one process, one env for the pair
+    import os
+    import tempfile
+    from metis_agent.domain_agent import DomainAgent, Domains
+    from metis_agent.domains import kitchen as k1, kitchen_shared as k2
+    os.environ["METIS_PAIR_DIR"] = tempfile.mkdtemp(prefix="pair-")
+    try:
+        h = Domains([DomainAgent(dog, case="replay"), DomainAgent(k1, case="replay"), DomainAgent(k2, case="replay")])
+        assert h.pairs == {"kitchen": ("kitchen", "kitchen_shared"), "kitchen_shared": ("kitchen", "kitchen_shared")}
+        out = h.handle({"id": "c1", "domain": "dog", "verb": "go", "args": {"place": "tag3"}})
+        assert out[0]["status"] == "accepted" and out[0]["domain"] == "dog"
+        assert h.handle({"id": "c2", "verb": "STOP", "args": {}})[0]["kind"] == "error"     # no domain, several here
+        # one clock line without a domain: every domain's clock once, the pair as one
+        out = h.handle({"clock": "beat"})
+        assert out[-1]["domains"]["dog"]["beat"] == 1 and out[-1]["domains"]["kitchen"]["beat"] >= 1
+        assert any(r.get("id") == "c1" and r.get("status") == "progress" for r in out)
+        # the pair's beats bring the first cook's surprise (env beat 31, after its second order)
+        sur = None
+        for _ in range(60):
+            out = h.handle({"clock": "beat", "domain": "kitchen", "n": 1})
+            sur = next((r for r in out if r.get("kind") == "surprise"), None)
+            if sur:
+                break
+        assert sur and sur["domain"] == "kitchen" and 29 <= out[-1]["domains"]["kitchen"]["beat"] <= 33, out[-1]
+        assert out[-1]["domains"]["dog"]["beat"] == 1                                     # the dog's clock untouched
+        res = h.handle({"tool": "explain", "id": "x", "domain": "kitchen",
+                        "args": {"record": sur["record"], "card": "kitchen_shared", "move": "partner_load"}})
+        assert res[0]["status"].startswith("admitted")
+    finally:
+        del os.environ["METIS_PAIR_DIR"]

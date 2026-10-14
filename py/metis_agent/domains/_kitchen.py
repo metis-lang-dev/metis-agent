@@ -19,6 +19,8 @@ FRAG_COUNTS = "touched"     # E8's fragments, as the step-2 kitchen row
 EXO_EVENTS = True           # an order arriving (+pot_space 3) is news
 QUIESCENCE = "every"        # an order done is news
 BEATS = pair.SCRIPT["beats"] * 4    # as run_pair; the host ends the day at its own beats
+OWN_DAY = True              # the env script brings the orders: a replay or live run keeps it
+PAIR = ("kitchen", "kitchen_shared")   # one env, stepped interleaved (run_pair's clock)
 
 
 def module(path, factory):
