@@ -63,19 +63,19 @@ class Agent:
 
     def send(self, msg, until=None):
         """Send one line; read the replies: until the clock's ack for a
-        clock line, else exactly one reply per intent/tool line (the sync
-        answer; the intent's later outcomes come with the beats)."""
+        clock line, else until the line's {"ack"} (an intent's sync answer,
+        a tool's one or two replies; the intent's later outcomes come with
+        the beats). The ack itself is logged, not returned."""
         self.lines.append({"dir": "out", "agent": self.domain, "msg": msg})
         self.p.stdin.write(json.dumps(msg) + "\n")
         self.p.stdin.flush()
         out = []
         while True:
             r = self._read()
+            if "ack" in r and "clock" not in msg:
+                return out
             out.append(r)
-            if "clock" in msg:
-                if r.get("clock") == msg["clock"]:
-                    return out
-            else:
+            if "clock" in msg and r.get("clock") == msg["clock"]:
                 return out
 
     def close(self):

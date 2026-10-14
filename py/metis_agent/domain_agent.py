@@ -40,7 +40,19 @@ beat (one host tick, then the runtime until it would tick again) and is acknowle
 with {"clock": "beat", "beat": N, "over": bool}. The clock line is the
 test harness's, not part of either interface.
 
-    py/.venv/bin/python -m metis_agent.domain_agent --domain dog [--narrate]    # from metis-agent/py
+The replay face (integration step 1, the orchestrator's replay driver;
+harness lines like the clock, not part of either interface):
+    --case replay / {"reset": {"seed", "case"}}: the hosted day's script is
+      off and the day has no end (the person comes as intents, the world as
+      world lines); the world's answers to commands stay the host's. A reset
+      rebuilds kernel and host and keeps the model; it answers
+      {"clock": "ready", "domain", "beat": 0}.
+    {"world": ["-closed(kitchen)", "+open(kitchen)"], "id"?}: do-lines on
+      the host's next tick, as the script's world changes are.
+    Every non-clock line's replies end with {"ack": intent|tool|world|reset|error,
+      "id": the line's id or null}; a clock line's with its clock line.
+
+    py/.venv/bin/python -m metis_agent.domain_agent --domain dog [--narrate] [--case replay]    # from metis-agent/py
 """
 import argparse
 import importlib
@@ -92,7 +104,7 @@ def offered_moves(repl):
 
 
 class DomainAgent:
-    def __init__(self, module, seed=1, llm=None, counts=None, consult_seat=None, consult_missing="template"):
+    def __init__(self, module, seed=1, llm=None, counts=None, consult_seat=None, consult_missing="template", case=None):
         os.environ.setdefault("METIS_CONFIG", "")   # the kernel's llm endpoint is never called
         from metis.lang.repl import Repl
         from metis.loop.watch import Watch
@@ -114,6 +126,13 @@ class DomainAgent:
                                getattr(module, "alternatives", None), mirror_atoms(self.repl.text),
                                getattr(module, "PAIRS", ()))
         self.host.last_row = lambda: self.repl.fired_rows[-1]
+        self.case = case
+        if case == "replay":
+            if not hasattr(self.host, "replay"):
+                raise ValueError("domain %s has no replay case (its host keeps its own day)" % self.name)
+            self.host.replay()
+        elif case not in (None, "hosted"):
+            raise ValueError("case: hosted | replay, not %r" % case)
         self.over = False
         self.log = []        # what the mapper did, per intent (the report's table)
         self.narrated = []   # (fragment, sentence) per narrated fragment
@@ -408,7 +427,49 @@ class DomainAgent:
             return self.tool(msg)
         if "verb" in msg:
             return self.intent(msg)
-        return [reply(self.name, "error", id=msg.get("id"), error="neither an intent, a tool call nor the clock")]
+        if "world" in msg:
+            return self.world(msg)
+        return [reply(self.name, "error", id=msg.get("id"), error="neither an intent, a tool call, a world line nor the clock")]
+
+    # ── the replay face: the world's changes from the driver ──
+    def world(self, msg):
+        if not hasattr(self.host, "world"):
+            return [reply(self.name, "error", id=msg.get("id"), error="this domain's host takes no world lines")]
+        lines = msg["world"] if isinstance(msg["world"], list) else [msg["world"]]
+        try:
+            self.host.world(lines)
+        except ValueError as e:
+            return [reply(self.name, "error", id=msg.get("id"), error=str(e))]
+        return []
+
+
+def kind_of(msg):
+    """The ack's kind for a non-clock line."""
+    for k, name in (("reset", "reset"), ("verb", "intent"), ("tool", "tool"), ("world", "world")):
+        if k in msg:
+            return name
+    return "error"
+
+
+def serve(agent, msg, rebuild):
+    """One input line → the output lines: the agent's replies, then the ack
+    (non-clock lines). A reset swaps the agent (rebuild(seed, case)) and
+    answers ready; it returns the agent that serves the next line."""
+    if "reset" in msg:
+        r = msg["reset"] or {}
+        try:
+            agent = rebuild(r.get("seed", 1), r.get("case"))
+            out = [{"clock": "ready", "domain": agent.name, "beat": agent.beat_no()}]
+        except Exception as e:
+            out = [reply(agent.name, "error", id=msg.get("id"), error="reset: %s: %s" % (type(e).__name__, e))]
+    else:
+        try:
+            out = agent.handle(msg)
+        except Exception as e:     # the agent itself failed: an error reply, the process lives
+            out = [reply(agent.name, "error", id=msg.get("id"), error="%s: %s" % (type(e).__name__, e))]
+    if "clock" not in msg:
+        out = out + [{"ack": kind_of(msg), "id": msg.get("id")}]
+    return agent, out
 
 
 class _NoHost:
@@ -441,6 +502,9 @@ def main():
     ap.add_argument("--model", default="", help="the GGUF (default: E2B Q4 under go/models)")
     ap.add_argument("--missing-seat", action="store_true", help="a computed missing goes to the seat too "
                     "(default: the harness answers it with no model call, DESIGN 98530fd)")
+    ap.add_argument("--case", default=None, choices=["hosted", "replay"],
+                    help="hosted (default): the host's own day; replay: no script, no end — the driver brings "
+                         "the person (intents) and the world (world lines)")
     a = ap.parse_args()
     llm = None
     if a.narrate or a.consult == "gemma4":
@@ -452,11 +516,17 @@ def main():
     if a.consult == "claude":
         from .claude_seat import ClaudeSeat
         seat = ClaudeSeat()
-    agent = DomainAgent(importlib.import_module("metis_agent.domains." + a.domain), seed=a.seed,
-                        llm=llm if a.narrate or a.consult == "gemma4" else None, consult_seat=seat,
-                        consult_missing="seat" if a.missing_seat else "template")
-    if not a.narrate:
-        agent.narrator = None
+    module = importlib.import_module("metis_agent.domains." + a.domain)
+
+    def build(seed, case):
+        # the model (llm, seat) is built once and kept across resets
+        ag = DomainAgent(module, seed=seed, llm=llm if a.narrate or a.consult == "gemma4" else None,
+                         consult_seat=seat, consult_missing="seat" if a.missing_seat else "template", case=case)
+        if not a.narrate:
+            ag.narrator = None
+        return ag
+
+    agent = build(a.seed, a.case)
     print(json.dumps({"clock": "ready", "domain": agent.name, "beat": agent.beat_no()}), flush=True)
     for line in sys.stdin:
         if not line.strip():
@@ -464,12 +534,9 @@ def main():
         try:
             msg = json.loads(line)
         except ValueError as e:
-            out = [reply(agent.name, "error", error="not JSON: %s" % e)]
+            out = [reply(agent.name, "error", error="not JSON: %s" % e), {"ack": "error", "id": None}]
         else:
-            try:
-                out = agent.handle(msg)
-            except Exception as e:     # the agent itself failed: an error reply, the process lives
-                out = [reply(agent.name, "error", id=msg.get("id"), error="%s: %s" % (type(e).__name__, e))]
+            agent, out = serve(agent, msg, build)
         for r in out:
             print(json.dumps(r), flush=True)
 

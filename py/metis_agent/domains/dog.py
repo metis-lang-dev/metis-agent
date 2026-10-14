@@ -114,8 +114,23 @@ class AgentHost:
     def __init__(self, inner, commands):
         self.inner, self.commands = inner, commands
         self.queue, self.inflight, self.acted = [], {}, []
+        self.world_lines = []    # do-lines from the driver ({"world": [...]}), asserted on the next tick
         self.last_row = None
         self.beat_stage = getattr(inner, "beat_stage", None)
+
+    def replay(self):
+        """The orchestrator's replay: the person and the world come from the
+        driver (intents, world lines), so the hosted day's script is off and
+        the day has no end; the world's answers to commands stay the host's."""
+        self.inner.script, self.inner.last = {}, None
+
+    def world(self, lines):
+        """World changes from the driver ("-closed(kitchen)", "+open(kitchen)"):
+        do-lines on the next tick, as the hosted script's world changes are."""
+        bad = [l for l in lines if not (isinstance(l, str) and l[:1] in "+-" and len(l) > 1)]
+        if bad:
+            raise ValueError("world lines are +atom / -atom, not %r" % bad)
+        self.world_lines += list(lines)
 
     @property
     def beat(self):
@@ -135,6 +150,8 @@ class AgentHost:
         if dos is None:
             return None
         dos = [d for d in dos if not (d.startswith("+") and d[1:].split("(")[0].split()[0] in self.commands)]
+        dos += self.world_lines
+        self.world_lines = []
         for q in self.queue:
             if q.get("retract"):
                 dos.append("-" + q["atom"])
@@ -158,11 +175,11 @@ class AgentHost:
         self.inner.on_event(name, args)
 
     def snapshot(self):
-        return (self.inner.snapshot(), copy.deepcopy((self.queue, self.inflight, self.acted)))
+        return (self.inner.snapshot(), copy.deepcopy((self.queue, self.inflight, self.acted, self.world_lines)))
 
     def restore(self, snap):
         self.inner.restore(snap[0])
-        self.queue, self.inflight, self.acted = copy.deepcopy(snap[1])
+        self.queue, self.inflight, self.acted, self.world_lines = copy.deepcopy(snap[1])
 
 
 def _host_module():

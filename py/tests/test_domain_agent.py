@@ -109,3 +109,52 @@ def test_event_ref_carries_the_outcome():
     assert event_ref("query_seen[T=chair,P=kitchen]", {"cmd_query(chair)": 1}, {"done(query)": 1}, {"cmd_query"},
                      {"seen(chair)": 1, "where(chair,kitchen)": 1}) == "query_seen: chair, kitchen"
     assert event_ref("load") == "load"
+
+
+def test_replay_case_runs_no_script_and_has_no_end():
+    # integration step 1: the person and the world come from the driver
+    from metis_agent.domain_agent import DomainAgent
+    ag = DomainAgent(dog, case="replay")
+    for _ in range(22):                      # past the hosted day's last beat (18) and its beat-15 battery change
+        ag.handle({"clock": "beat"})
+    assert not ag.over and ag.beat_no() == 22
+    assert ag.repl.counts.get("battery_ok", 0) == 1 and not ag.repl.counts.get("battery_low")
+    assert not any(r[2].name.startswith(("sit", "go", "find")) for r in ag.repl.fired_rows if r[0] != "exo")
+    with pytest.raises(ValueError):
+        DomainAgent(dog, case="weekend")
+
+
+def test_world_lines_apply_on_the_next_tick():
+    from metis_agent.domain_agent import DomainAgent
+    ag = DomainAgent(dog, case="replay")
+    assert ag.handle({"world": ["-battery_ok", "+battery_low"], "id": "w1"}) == []
+    assert ag.repl.counts.get("battery_ok") == 1              # not before the tick
+    ag.handle({"clock": "beat"})
+    assert ag.repl.counts.get("battery_low") == 1 and not ag.repl.counts.get("battery_ok")
+    bad = ag.handle({"world": ["open(kitchen)"], "id": "w2"})
+    assert bad[0]["kind"] == "error" and "+atom" in bad[0]["error"]
+
+
+def test_serve_acks_every_non_clock_line_and_reset_keeps_the_model():
+    from metis_agent.domain_agent import DomainAgent, serve
+    built = []
+
+    def rebuild(seed, case):
+        built.append((seed, case))
+        return DomainAgent(dog, seed=seed, case=case)
+
+    ag = rebuild(1, "replay")
+    ag, out = serve(ag, {"id": "c1", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "STAND_UP"}}, rebuild)
+    assert out[0]["status"] == "accepted" and out[-1] == {"ack": "intent", "id": "c1"}
+    ag, out = serve(ag, {"world": ["+open(kitchen)"]}, rebuild)
+    assert out == [{"ack": "world", "id": None}]
+    ag, out = serve(ag, {"clock": "beat"}, rebuild)
+    assert out[-1]["clock"] == "beat" and not any("ack" in r for r in out)
+    ag, out = serve(ag, {"tool": "state", "args": {}, "id": "t1"}, rebuild)
+    assert out[0]["kind"] == "read" and out[-1] == {"ack": "tool", "id": "t1"}
+    old = ag
+    ag, out = serve(ag, {"reset": {"seed": 1, "case": "replay"}, "id": "r1"}, rebuild)
+    assert ag is not old and built[-1] == (1, "replay")
+    assert out == [{"clock": "ready", "domain": "dog", "beat": 0}, {"ack": "reset", "id": "r1"}]
+    ag, out = serve(ag, {"nonsense": 1}, rebuild)
+    assert out[0]["kind"] == "error" and out[-1] == {"ack": "error", "id": None}
