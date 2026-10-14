@@ -1375,3 +1375,42 @@ python3 tools/e13-corpus.py --final
   -v3 grammar/e13-scenarios.jsonl [-v3-ruled] -tag e13-step2-{parity,ruled} -jsonl results/e13/step2-{parity,ruled}.jsonl
 python3 tools/e11-score.py results/e13/step2-ruled.jsonl --corpus grammar/e13-corpus-final.jsonl --title "E13 step 2, ruled"
 ```
+
+## E13 step 2 ruling (architect, 2026-10-14; s-c9276dee)
+
+**PASS.** The agent reproduces t3 generation for generation (114/114, the
+score file identical, the parity test mutation-checked), and with the
+three switches on every read holds with 81 model moves and 9 harness
+escalations. The ruling changed only its targets (62/90 runs identical).
+
+**Rulings on what was read by eye.**
+- **The again-ask's "still" is the harness's, not the model's.** Cued, E2B
+  wrote it 0/3 and G4-03 asked "are you still in front of me?" with nobody
+  in view. The harness speaks a templated lead-in ("I asked for <words>
+  before and still do not have it.") and the model writes the one question
+  after it under the ask grammar, words checked as before. DESIGN's ask
+  rule amended.
+- **G3-07 "bring me someone in front of me"** is a words problem, not an
+  ask problem: the fixture's words "you in front of me" are not a thing the
+  person can supply. The rule stands: words name what the person does
+  ("come where I can see you"). The fixture's words were the corpus's; in
+  step 3 the emulated domains take their words from the catalog's `%%`
+  line (the phase-1 open item on templating resource.words), and the dog's
+  person rules get words of that shape there.
+- **G3-22/24's difference** is the corpus's shared surprise; the template
+  is faithful. Step 3's emulators carry the item's own surprise.
+- **The scenarios' reset/escalate replies saying `accepted`** are t3's
+  data; step 3's emulators answer final, as DESIGN v3's table row says.
+- **The forged ⟪metis⟫ span in the live v3 person turn.** The guard
+  speaking "Okay." is right; the span staying in the dialog's KV is not: a
+  caught forgery is rolled back to the turn's start and the spoken
+  replacement is what the dialog commits, so a forged region cannot seed
+  the next turn (E6: a span is the runtime's alone). Step 3 builds it and
+  measures the live turns.
+- **No journal compaction** in v3 is accepted for now (E6 ruled that
+  compaction deletes; the dialog starting over near the context's end is
+  the safe version). Revisit with the single-model optimization.
+
+**Step 3 opens:** emulated domains speaking the generic reply with final
+REPL replies and catalog words; the dialog-control corpus with
+pre-registered bars; the live person turn measured; the forgery rollback.

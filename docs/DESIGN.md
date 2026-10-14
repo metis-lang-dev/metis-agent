@@ -203,7 +203,11 @@ E11's items, every read held):
   the harness checks the ask for them; a miss is answered like a repeat (a
   note, the ask asked again). A required literal in the grammar made E2B
   splice the words into its own phrasing ("…so I can stand up nextmy
-  charger?") on 3 of 12 ask items.
+  charger?") on 3 of 12 ask items. On the again-ask the harness speaks
+  the lead-in itself ("I asked for <words> before and still do not have
+  it.") and the model writes the one question after it: cued for "still",
+  E2B never wrote it (E13 step 2, 0/3) and once asked "are you still in
+  front of me?" with nobody in view.
 - **The escalate line's template takes the consult's finding first,** the
   surprise's difference second (E13 step 1 saw escalations describe the pot
   difference instead of what the consult found).
