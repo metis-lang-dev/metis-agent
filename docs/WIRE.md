@@ -57,7 +57,7 @@ Every record: `kind`, `seq` (1…, the session's order), `t` (RFC 3339),
 | `dlg-start` | `why` (the clock started: `first viewer`) |
 | `dlg-wake` | person: `what: person`, `person` (the words), `wait_ms?` (from the words' arrival to the turn's start: queued behind a consult). A reply: `beat`, `rank` (the floor's), `domain`, `what` (`kind[:status]`: `result:refused`, `quiescence`, `surprise`, `notice`, `event` …), `cid`, `text`, `record?`, `voice?` (the text's origin: `narrator` · `line` · `ref`), `difference?` (a surprise's, the object as sent) |
 | `dlg-gen` | `label` (`move` · `voice` · `answer` · `rollback`), `branch` (`person` · `bound` · `none` · `answer` · `surprise` · `speak` · `""` for an outcome's voice …), `harness` (the harness wrote it, no model), `text`, `n_ctx`, `ms`, `try` |
-| `dlg-dispatch` | `cid`, `j` (the intent sent to the domain) |
+| `dlg-dispatch` | `cid`, `j` (the intent sent to the domain), `wait_ms?` (in a person turn: from the words' arrival to this dispatch, before the send) |
 | `dlg-say` | `what` (`voice` · `template` · `ask` · `turn`), `text`, `src: {by: model \| harness \| rollback, gen?, wake, domain?, what, branch?}` — `gen` the `dlg-gen` that carries the line, `wake` the `dlg-wake` it answers, `branch` `outcome` for `""`. `turn` is a person turn's own line (the reads take it from its `dlg-gen` and skip this record) |
 | `dlg-world` | `domain`, `lines`, `error?` |
 | `dlg-domain` | `verb` (`activate` · `deactivate` · `reload`), `domain`, `by` (`person` · `model`), `bindings?`, `key?` (reload), `error?` |

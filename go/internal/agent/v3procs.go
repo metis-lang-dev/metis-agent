@@ -52,6 +52,7 @@ type procDomains struct {
 	sift    func(rs []map[string]any) []map[string]any // the trace replies journaled and taken out
 	off     map[string]bool                            // deactivated: not stepped, not heard, its calls refused (under v3.mu)
 	verb    func(verb, domain string, bindings any, by string) error
+	turnAt  time.Time // a person turn's words arrived (under v3.mu): a dispatch in it records wait_ms
 }
 
 func notActive(dom string) Reply {
@@ -77,7 +78,11 @@ func (d *procDomains) Intent(c Call) (Reply, bool) {
 	delete(j, "intent")
 	d.n++
 	cid := fmt.Sprintf("c%d", d.n)
-	d.note(map[string]any{"kind": "dlg-dispatch", "cid": cid, "j": c.Text()})
+	rec := map[string]any{"kind": "dlg-dispatch", "cid": cid, "j": c.Text()}
+	if !d.turnAt.IsZero() { // the dispatch-wait column (int-step3-table): the person's words to this dispatch, as py records it
+		rec["wait_ms"] = time.Since(d.turnAt).Milliseconds()
+	}
+	d.note(rec)
 	rs, err := p.Do(map[string]any{"id": cid, "domain": d.intents, "verb": verb, "args": j})
 	if err != nil {
 		log.Printf("[v3] %s intent: %v", d.intents, err)

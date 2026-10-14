@@ -183,6 +183,11 @@ func (v *v3) utterance(a *Agent, text string, at time.Time) (Turn, error) {
 		return Turn{}, err
 	}
 	if v.live != nil {
+		v.live.pd.turnAt = at
+		if at.IsZero() {
+			v.live.pd.turnAt = time.Now()
+		}
+		defer func() { v.live.pd.turnAt = time.Time{} }()
 		w := map[string]any{"kind": "dlg-wake", "what": "person", "person": text}
 		if !at.IsZero() { // the turn waited this long behind the orchestrator's other work (a consult)
 			w["wait_ms"] = time.Since(at).Milliseconds()

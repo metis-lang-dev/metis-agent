@@ -7,8 +7,8 @@ per backend label, so the Go backend and the py port compare side by side.
 
 Rows (ms; n, median, p90, max):
   person wait        dlg-wake person wait_ms: queued behind the orchestrator's other work
-  dispatch wait      dlg-dispatch wait_ms: the person's words to the intent's dispatch (py; Go
-                     writes no wait_ms on dispatch, its cell is —)
+  dispatch wait      dlg-dispatch wait_ms: the person's words to the intent's dispatch (both
+                     backends: the words' arrival to the send)
   dispatch → line    a dispatch to the first spoken line about its id (src.wake a result of the cid)
   … during a consult the same two, for dispatches inside another domain's consult (a surprise
                      wake to its consult's dlg-wake answer, or to its template line)
