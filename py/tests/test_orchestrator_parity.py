@@ -43,49 +43,7 @@ class Rec:
         return out, 0, 0.0, 0.0
 
 
-class Domains:
-    """v3Domains: the scenario's answers to the move, by the call's name, key or canonical JSON."""
-
-    def __init__(self, answers):
-        self.answers = answers
-
-    def match(self, c):
-        text = c.text()
-        name, key = O.call_of(text)
-        by = {"name": name, "key": key, "canon": O.canon_json(text)}
-        for a in self.answers:
-            if by.get(a["by"]) == a["key"]:
-                return O.Reply(a["reply"]), True
-        return O.Reply(), False
-
-    call = intent = match
-
-
-def replay(l, s, cfg):
-    cfg.sample_moves = bool(s.get("sampled_moves"))
-    o = O.Orch(cfg, l, Domains(s.get("answers") or []))
-    for e in s["events"]:
-        op = e["op"]
-        if op == "past":
-            o.past(e.get("person", ""), O.jdump(e["said"]), e.get("id", ""), e.get("spoken", ""))
-        elif op == "person":
-            o.person(e.get("text", ""))
-        elif op == "context":
-            o.context(e.get("text", ""))
-        elif op == "wake":
-            o.wake(O.Reply(e["reply"]))
-        elif op == "said":
-            o.said_call(O.Call(j=O.jdump(e["j"])) if e.get("j") is not None else O.Call.of(e["call"]))
-        elif op == "reply":
-            o.reply(O.Reply(e["reply"]))
-        elif op == "spoke":
-            o.spoke_line(e.get("text", ""))
-        elif op == "end":
-            o.end()
-        elif op == "move":
-            o.move()
-        else:
-            raise ValueError("v3: unknown event %r" % op)
+from metis_agent.v3replay import Domains, replay  # noqa: E402
 
 
 def scenarios():
