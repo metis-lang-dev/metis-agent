@@ -152,7 +152,7 @@ agent, for every kind:
 | `read` | the answer to a REPL API read (state, ctx, events, why, findings), synchronous | `tool`, `output` (the kernel's read-out, scrubbed and capped), `text` optional |
 | `event` | progress the domain reports unasked | `counts` (the mirror's numbers) |
 | `quiescence` | nothing left the domain can do | `goal_pending` |
-| `surprise` | a zero-probability reading; the domain is observe-only | `record`, `difference`, `cards` (what could explain it) |
+| `surprise` | a zero-probability reading; the domain is observe-only | `record` (a string, the domain's own record id, "0"; the person-facing text writes #0), `difference` (an object, atom → signed count: `{"pot_onion": 1, "pot_space": -1}`), `cards` (what could explain it). Integration step 2: the real kitchen sent a number and an object where the emulator sent "#0" and a string, and the decoder dropped both silently — the shapes are these, the emulator follows |
 | `notice` | an admission, an explanation adopted | `record`, `card`, `move` |
 | `error` | the agent itself failed (host down, mapper has no row, budget spent) | `error` |
 | `consult` | the answer to a consult | `answer_kind` (explains · missing · noise · unexplained · answer), `cause {card, move}` or `resource {atom, words}`, `evidence`, `calls` |
@@ -188,7 +188,8 @@ consult.explains                → REPL explain(domain, record, card, move)
 consult.missing                 → ask(person): the resource in the person's words
 consult.noise                   → REPL reset(domain, record)
 consult.unexplained             → REPL escalate(domain, record, text)
-surprise                        → REPL consult(domain, …) with its cards   (Decide, today)
+surprise                        → REPL consult(domain, Q) with its cards, Q templated by the harness from the difference:
+   "why does the reading differ from the model: pot onion +1, pot space -1?"   (the model asked "how do I close surprise 0?" and the consultant answered unexplained, 3/3)
 the same refusal again          → the harness picks from the earlier consult's answer (E13 step 1):
    earlier answer missing, first again  → ask(person) once more, the ask saying it is still missing
    earlier answer anything else, or a second again → REPL escalate(domain, record, text)
