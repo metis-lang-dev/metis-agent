@@ -439,3 +439,30 @@ give 24/24 identical answers. Live stays random. Closing commit
 325f1f0 (nina): the §12 defaults, the result's short form, the seed.
 
 **Removed (consolidation, 2026-10-12):** the narrator's structural retrieval (`Pull`), its `interp: cue` switch and its thinking knob are gone; the narrator has one path (every script resident in the system turn, thinking off) and `llmbench -e8` runs forms only. E8's history stays in `grammar/e8-scripts.json`, `tools/e8-score.py` and the script-rag subject's step-3 records and table.
+
+**12.1 The catalog's `%%` conventions for narration (2026-10-14, the user's wildfire finding).**
+A `%%` doc is the narrator's vocabulary, one plain sentence per story row; a catalog mined from a source text had put the source's quotes there, and the REPL narrator retold the machinery (the unrolled neighbour count, the walk over cells) as "functions", and the cap cut it mid-word. Four conventions, honoured by metispy's `narrate` (metispy 7bc4b8b); the domain agent's narrator does not read the tags yet, since none of its catalogs (dog, kitchen) carry them.
+
+| in the catalog | what the narrator gets |
+|---|---|
+| `%% [fold]` | bookkeeping: its events are not listed; a run of them with nothing to tell is dropped |
+| `%% [fold P …] words` | a run of these events becomes one beat line: the words, then `⇒ left:` the net-new atoms of the predicates P |
+| `%% phrase one \| phrase two` on a ⊕ rule | branch N's event tells phrase N |
+| `% evidence: "…"` | nothing: single-`%` comments never reach the narrator (mined quotes, counts, record numbers) |
+
+Folded rules also leave the material's rules section; a forced/do/env event never folds (agency is told). The wildfire rows (metis-catalog 8c56765) as the example:
+
+```
+  % evidence: "for the cells X in x1 x2 x3, Y in y1 y2 y3"
+  %% [fold]
+  visit [dyn] : walk(X, Y) * nextcell(X, Y, U, V) -o cell(U, V) * walk(U, V).
+  % evidence: "k, the number of its neighbors burning at the start of the step"
+  %% [fold tally] the fire counts the burning neighbours of each cell
+  see_fire [dyn] : scan(X, Y, S) * tally(X, Y, K) * nb(X, Y, S, U, V) * $burning(U, V) * nextslot(S, S2) * next(K, K2) -o scan(X, Y, S2) * tally(X, Y, K2).
+  %% X,Y burns, and its fuel is spent.
+  burn_fuel [dyn] : held(X, Y) * not_out_of_fuel(X, Y) -o out_of_fuel(X, Y).
+  %% X,Y, with K burning neighbours, catches fire | X,Y, with K burning neighbours, stays unburnt.
+  catch [dyn] : fresh(X, Y) * tally(X, Y, K) * not_burning(X, Y) -o (burning(X, Y) @w pign(K) | not_burning(X, Y) @w ~pign(K)).
+```
+
+The 77-event seeded trace then reads `1–22 | ⋯ 66 events of machinery, folded — the fire counts the burning neighbours of each cell ⇒ left: tally(x1,y2,k1), tally(x2,y3,k1), …` and one line per burn, calm target and catch. Two rules ride with it: a narration ends on a sentence ("(narration cut at N tokens; ask fewer beats)" when the endpoint stopped at its cap), and the material asks for at most 40 + 25 words per told event (80–300).
