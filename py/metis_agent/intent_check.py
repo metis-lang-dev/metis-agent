@@ -26,7 +26,11 @@ GGUF = Path(__file__).resolve().parents[2] / "go/models/gemma4/gemma-4-E2B-it-Q4
 
 
 def generator(root=CATALOG_ROOT):
+    """metis-catalog's tools/intents.py — the checkout's (a scratch domains/
+    root, e.g. the loop console's proposal check, uses the real one)."""
     p = Path(root).parent / "tools/intents.py"
+    if not p.is_file():
+        p = CATALOG_ROOT.parent / "tools/intents.py"
     spec = importlib.util.spec_from_file_location("metis_catalog_intents", p)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -43,21 +47,46 @@ def corpus(path):
     return rows
 
 
+# the orchestrator's own: talk and the clock, never dispatched (DESIGN v3;
+# integration step 4) — a domain need not map them
+NOT_DISPATCHED = {"CHITCHAT", "UNKNOWN", "TIME", "DATE"}
+
+
+def declared(domain_module):
+    """The predicates the program declares (`pred name…`): a mapped atom must be one."""
+    import re
+    return set(re.findall(r"^\s*pred\s+(\w+)", Path(domain_module["CATALOG"]).read_text(), re.M))
+
+
+def in_program(atom, err, preds):
+    if atom and atom != "(talk)" and atom.split("(")[0] not in preds:
+        return None, "%s is not a predicate the program declares" % atom.split("(")[0]
+    return atom, err
+
+
 def mapped(mapper, js):
-    """The pass-1 JSON as an intent (verb = its "intent", args = the rest) → atom or error."""
+    """The pass-1 JSON as an intent (verb = its "intent", args = the rest) →
+    atom or error; a verb the orchestrator never dispatches maps to "(talk)"
+    when the domain has no row for it."""
     try:
         j = json.loads(js)
     except ValueError:
         return None, "not JSON"
-    got = mapper.map({"verb": j.pop("intent", ""), "args": j})
-    return (got.atom, None) if isinstance(got, Mapped) else (None, got.error)
+    verb = j.pop("intent", "")
+    got = mapper.map({"verb": verb, "args": j})
+    if isinstance(got, Mapped):
+        return got.atom, None
+    if verb in NOT_DISPATCHED and not any(r["verb"] == verb for r in mapper.card["rows"]):
+        return "(talk)", None
+    return None, got.error
 
 
 def check(name, rows, model=str(GGUF), root=CATALOG_ROOT, log=print):
     gen = generator(root)
-    spec = gen.load(name)
+    spec = gen.load_from(Path(root) / name)
     persona, gbnf = gen.prompt(spec) + gen.spoken(spec), gen.grammar(spec)
-    mapper = Mapper(build(name, root=root)["CARD"])
+    dom = build(name, root=root)
+    mapper, preds = Mapper(dom["CARD"]), declared(dom)
     from .llm import LLM
     llm = LLM(model, n_ctx=4096, n_batch=512, n_threads=6, n_gpu_layers=99)
     llm.prime(persona)
@@ -69,7 +98,7 @@ def check(name, rows, model=str(GGUF), root=CATALOG_ROOT, log=print):
             got = json.loads(res["json"]).get("intent", "")
         except ValueError:
             got = ""
-        atom, err = mapped(mapper, res["json"])
+        atom, err = in_program(*mapped(mapper, res["json"]), preds)
         rec = dict(r, got=got, json=res["json"], voice=res["voice"], atom=atom, error=err,
                    ok=got == r["want"] and err is None, ms=round((time.perf_counter() - t0) * 1e3))
         out.append(rec)
@@ -81,13 +110,14 @@ def check(name, rows, model=str(GGUF), root=CATALOG_ROOT, log=print):
 
 def check_examples(name, root=CATALOG_ROOT):
     """No model: every example in intent.yaml maps to one command atom."""
-    spec = generator(root).load(name)
-    mapper = Mapper(build(name, root=root)["CARD"])
+    spec = generator(root).load_from(Path(root) / name)
+    dom = build(name, root=root)
+    mapper, preds = Mapper(dom["CARD"]), declared(dom)
     out = []
     for e in spec.get("examples", []):
         if isinstance(e, dict):
             continue
-        atom, err = mapped(mapper, json.dumps(e[1]))
+        atom, err = in_program(*mapped(mapper, json.dumps(e[1])), preds)
         out.append({"utt": e[0], "json": json.dumps(e[1], separators=(",", ":")), "atom": atom, "error": err,
                     "ok": err is None})
     return out
@@ -101,14 +131,21 @@ def main(argv=None):
     ap.add_argument("--root", default=str(CATALOG_ROOT), help="the catalog's domains/ directory")
     ap.add_argument("--json", default="", help="write the rows as JSON lines")
     ap.add_argument("--no-model", action="store_true", help="intent.yaml's examples through the mapper only")
+    ap.add_argument("--examples", action="store_true",
+                    help="intent.yaml's examples as the corpus (a new domain before it has one)")
     a = ap.parse_args(argv)
     if a.no_model:
         recs = check_examples(a.domain, a.root)
         for r in recs:
             print("%s %-40r %s %s" % ("ok  " if r["ok"] else "MISS", r["utt"], r["json"], r["atom"] or r["error"]))
     else:
-        path = a.corpus or Path(a.root) / a.domain / "intent" / ("%s-corpus.tsv" % a.domain)
-        recs = check(a.domain, corpus(path), a.model, a.root)
+        if a.examples:
+            rows = [{"utt": e[0], "want": e[1]["intent"], "src": "example"}
+                    for e in generator(a.root).load_from(Path(a.root) / a.domain).get("examples", [])
+                    if not isinstance(e, dict)]
+        else:
+            rows = corpus(a.corpus or Path(a.root) / a.domain / "intent" / ("%s-corpus.tsv" % a.domain))
+        recs = check(a.domain, rows, a.model, a.root)
     if a.json:
         with open(a.json, "w") as f:
             for r in recs:
