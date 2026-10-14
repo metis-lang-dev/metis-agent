@@ -30,8 +30,8 @@ type Reply struct {
 	Output       json.RawMessage   `json:"output,omitempty"`
 	Counts       json.RawMessage   `json:"counts,omitempty"`
 	GoalPending  json.RawMessage   `json:"goal_pending,omitempty"`
-	Record       string            `json:"record,omitempty"`
-	Difference   string            `json:"difference,omitempty"`
+	Record       FlexText          `json:"record,omitempty"`
+	Difference   FlexText          `json:"difference,omitempty"`
 	Cards        json.RawMessage   `json:"cards,omitempty"`
 	Card         string            `json:"card,omitempty"`
 	Move         string            `json:"move,omitempty"`
@@ -50,6 +50,41 @@ type Reply struct {
 	Calls    int             `json:"calls,omitempty"`
 	Ref      json.RawMessage `json:"ref,omitempty"`
 	Text     string          `json:"text,omitempty"`
+}
+
+// FlexText is a reply field the domains write in more than one shape
+// (integration step 2: the real kitchen's record is a number, 0, and its
+// difference an object, {"pot_onion": 1, "pot_space": -1}; DESIGN, E13 and
+// the emulator wrote "#0" and "pot onion +1, pot space -1"): a string as
+// it is, a number as its literal, an object as "key ±n" words.
+type FlexText string
+
+func (f *FlexText) UnmarshalJSON(b []byte) error {
+	var s string
+	if json.Unmarshal(b, &s) == nil {
+		*f = FlexText(s)
+		return nil
+	}
+	var m map[string]json.Number
+	if json.Unmarshal(b, &m) == nil {
+		keys := make([]string, 0, len(m))
+		for k := range m {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		parts := make([]string, len(keys))
+		for i, k := range keys {
+			v := m[k].String()
+			if !strings.HasPrefix(v, "-") {
+				v = "+" + v
+			}
+			parts[i] = strings.ReplaceAll(k, "_", " ") + " " + v
+		}
+		*f = FlexText(strings.Join(parts, ", "))
+		return nil
+	}
+	*f = FlexText(strings.TrimSpace(string(b))) // a number: its literal
+	return nil
 }
 
 // Call is one outbound call: a J object (an intent, or the person's ask) or

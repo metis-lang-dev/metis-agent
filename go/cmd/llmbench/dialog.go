@@ -30,18 +30,19 @@ type dlgPerson struct {
 
 type dlgWorld struct { // the timeline's person acting on a real domain's world (integration step 1)
 	Premise bool     `json:"premise,omitempty"` // a line that makes the emulator's premise (an arrival the world does not answer); off with -dog-as-is
-	At     int      `json:"at"`
-	Domain string   `json:"domain"`
-	Lines  []string `json:"lines"`
+	At      int      `json:"at"`
+	Domain  string   `json:"domain"`
+	Lines   []string `json:"lines"`
 }
 
 type dlgItem struct {
-	World   []dlgWorld      `json:"world,omitempty"`
-	ID      string          `json:"id"`
-	Reps    int             `json:"reps"`
-	Prompt  string          `json:"prompt"`
-	Person  []dlgPerson     `json:"person"`
-	Scripts []domemu.Script `json:"scripts"`
+	KitchenAhead int             `json:"kitchen_ahead,omitempty"` // integration step 2: the real pair's beat lines before t=0 (its signals placed in the timeline)
+	World        []dlgWorld      `json:"world,omitempty"`
+	ID           string          `json:"id"`
+	Reps         int             `json:"reps"`
+	Prompt       string          `json:"prompt"`
+	Person       []dlgPerson     `json:"person"`
+	Scripts      []domemu.Script `json:"scripts"`
 }
 
 type dlgRec struct {
@@ -92,6 +93,10 @@ func readDialog(path string) ([]dlgItem, error) {
 	return out, sc.Err()
 }
 
+// kitchenReal: -kitchen-real — the kitchen pair real, in the dog's process
+// (integration step 2), its tools and clock routed there
+var kitchenReal bool
+
 // noPremise: -dog-as-is — the dog's world as dog.llp has it, only the
 // person's own acts (the door opened) applied: the emulator's premises off
 var noPremise bool
@@ -106,6 +111,7 @@ const dogTail = 8
 type dlgDomains struct {
 	emu  *domemu.Emu
 	dog  *agent.DomainProc // integration step 1: the real dog behind the orchestrator (nil: emulated)
+	kit  bool              // integration step 2: the kitchen pair real, in the dog's process (else emulated)
 	pend []map[string]any  // the real domain's replies that came with a request but answer something else
 	err  error
 	n    int
@@ -131,18 +137,37 @@ func (d *dlgDomains) split(rs []map[string]any, id string, tool bool) (map[strin
 // now is what is due at once: the emulated domains' and the real one's queue.
 func (d *dlgDomains) now() []map[string]any {
 	out := d.emu.Now()
-	out, d.pend = append(out, d.pend...), nil
+	out, d.pend = append(out, heard(d.pend)...), nil
+	return out
+}
+
+// heard drops the replies of a domain the orchestrator has not loaded (the
+// pair's second cook speaks to its env, not to the person).
+func heard(rs []map[string]any) []map[string]any {
+	var out []map[string]any
+	for _, r := range rs {
+		if r["domain"] != "kitchen_shared" {
+			out = append(out, r)
+		}
+	}
 	return out
 }
 
 func (d *dlgDomains) step() []map[string]any {
 	out := d.emu.Step()
 	if d.dog != nil {
-		rs, err := d.dog.Beat()
+		rs, err := d.dog.BeatOf("dog", 1)
 		if err != nil && d.err == nil {
 			d.err = err
 		}
 		out = append(out, rs...)
+		if d.kit {
+			rs, err := d.dog.BeatOf("kitchen", 1)
+			if err != nil && d.err == nil {
+				d.err = err
+			}
+			out = append(out, heard(rs)...)
+		}
 	}
 	return out
 }
@@ -181,14 +206,14 @@ func (d *dlgDomains) Intent(c agent.Call) (agent.Reply, bool) {
 
 func (d *dlgDomains) Call(c agent.Call) (agent.Reply, bool) {
 	dom, _ := c.Args["domain"].(string)
-	if dom == "dog" && d.dog != nil {
+	if d.dog != nil && (dom == "dog" || (dom == "kitchen" && d.kit)) {
 		args := map[string]any{}
 		for k, v := range c.Args {
 			if k != "domain" {
 				args[k] = v
 			}
 		}
-		rs, err := d.dog.Tool(c.Name, args, "")
+		rs, err := d.dog.ToolTo(dom, c.Name, args, "")
 		if err != nil {
 			d.err = err
 			return agent.Reply{}, false
@@ -268,16 +293,16 @@ func dialogRun(l agent.DialogLLM, it dlgItem, gbnf, tag string, rep int, sd uint
 		}
 	}
 	scripts := it.Scripts
-	if dog != nil { // the real dog in place of the dog's script; the kitchen stays emulated
+	if dog != nil { // the real dog in place of the dog's script; the kitchen too with -kitchen-real
 		scripts = nil
 		for _, s := range it.Scripts {
-			if s.Domain != "dog" {
+			if s.Domain != "dog" && !(kitchenReal && s.Domain == "kitchen") {
 				scripts = append(scripts, s)
 			}
 		}
 	}
 	emu := domemu.New(scripts)
-	doms := &dlgDomains{emu: emu, dog: dog, note: func(cid, j string) { rec(dlgRec{Kind: "dlg-dispatch", CID: cid, J: j}) }}
+	doms := &dlgDomains{emu: emu, dog: dog, kit: dog != nil && kitchenReal, note: func(cid, j string) { rec(dlgRec{Kind: "dlg-dispatch", CID: cid, J: j}) }}
 	defer func() {
 		if dog == nil {
 			return
@@ -326,10 +351,17 @@ func dialogRun(l agent.DialogLLM, it dlgItem, gbnf, tag string, rep int, sd uint
 			if err := dog.World(pre); err != nil {
 				return err
 			}
-			if rs, err := dog.Beat(); err != nil {
+			if rs, err := dog.BeatOf("dog", 1); err != nil {
 				return err
 			} else if len(rs) > 0 {
 				rec(dlgRec{Kind: "dlg-wire", What: "premise-tick", Text: fmt.Sprint(rs)})
+			}
+		}
+		if kitchenReal { // the pair's day run ahead: its signals placed in the timeline (heard by no one)
+			for k := 0; k < it.KitchenAhead; k++ {
+				if _, err := dog.BeatOf("kitchen", 1); err != nil {
+					return err
+				}
 			}
 		}
 	}

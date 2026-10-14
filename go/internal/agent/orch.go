@@ -149,9 +149,9 @@ func (o *Orch) Context(text string) { o.Person(changeTag + text) }
 
 // Wake: a surprise wakes the agent.
 func (o *Orch) Wake(r Reply) {
-	o.surprises[r.Record] = r
-	o.br = branch{name: "surprise", domain: r.Domain, record: r.Record, reply: r}
-	o.Person("Close SURPRISE " + r.Record + " in " + r.Domain + " with exactly one call.\n" + r.Text)
+	o.surprises[string(r.Record)] = r
+	o.br = branch{name: "surprise", domain: r.Domain, record: string(r.Record), reply: r}
+	o.Person("Close SURPRISE " + hashed(string(r.Record)) + " in " + r.Domain + " with exactly one call.\n" + r.Text)
 }
 
 // Said: a call the model made (the dialog's past); a T call waits for its
@@ -481,8 +481,8 @@ func (o *Orch) branchOf(r Reply, c Call) (branch, error) {
 		b.name = map[bool]string{true: "alts", false: "none"}[len(b.alts) > 0]
 		return b, nil
 	case r.Kind == "surprise":
-		o.surprises[r.Record] = r
-		return branch{name: "surprise", domain: r.Domain, record: r.Record, reply: r}, nil
+		o.surprises[string(r.Record)] = r
+		return branch{name: "surprise", domain: r.Domain, record: string(r.Record), reply: r}, nil
 	}
 	return branch{domain: r.Domain, reply: r}, nil
 }
@@ -636,7 +636,7 @@ func (o *Orch) harnessEscalate(b branch) error {
 		}
 	}
 	if s, ok := o.surprises[b.record]; ok && s.Difference != "" {
-		parts = append(parts, s.Difference)
+		parts = append(parts, string(s.Difference))
 	}
 	c := Call{Name: "escalate", Args: map[string]any{"domain": b.domain, "record": b.record, "text": strings.Join(parts, "; ")}}
 	text := c.Text()

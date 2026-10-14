@@ -193,7 +193,9 @@ def main(argv):
                 if not m or opener is None:
                     continue
                 args = dict(re.findall(r'(\w+):<\|"\|>(.*?)<\|"\|>', m.group(2)))
-                ok = args.get("domain") == opener[0] and (m.group(1) == "consult" or args.get("record") == opener[1])
+                # a record compared without its "#": the real kitchen sends 0 where E13 wrote "#0" (integration step 2)
+                ok = args.get("domain") == opener[0] and (m.group(1) == "consult" or
+                                                          str(args.get("record", "")).lstrip("#") == str(opener[1]).lstrip("#"))
                 R["R1b move carries opener"].append((ok, "%s %s %s (opener %s)" % (tag, m.group(1), args, opener)))
             # R3 / R4: the person's turns
             if what == "person":

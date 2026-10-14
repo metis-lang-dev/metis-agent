@@ -57,7 +57,7 @@ func (m *mirror) see(r Reply, c Call) {
 			m.last[d] = r.Text
 		}
 	case "surprise":
-		m.surprise[d] = r.Record
+		m.surprise[d] = hashed(string(r.Record))
 	case "notice":
 		delete(m.surprise, d)
 	}
@@ -366,6 +366,15 @@ func ownVoice(text, domain string) bool {
 		}
 	}
 	return false
+}
+
+// hashed: a record as the person-facing text writes it (#N); the calls
+// carry the domain's own (a number for the real kitchen, "#0" for E13's).
+func hashed(r string) string {
+	if r == "" || strings.HasPrefix(r, "#") {
+		return r
+	}
+	return "#" + r
 }
 
 const lineLeaveIt = "Alright, I'll leave it."

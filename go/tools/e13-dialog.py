@@ -181,7 +181,17 @@ def item(iid, what, person, scripts, expect=None, world=None):
           "expect": expect or {}}
     if world:  # the person acting on a real domain's world (integration step 1; the emulator's world is its script)
         it["world"] = world
+    # integration step 2, the real kitchen pair: its beat lines run ahead of
+    # t=0 place its own day in the timeline — lines 1-2 quiescences (the
+    # first order's moves), 3-23 calm, 24 an order, 25 the surprise (env
+    # beat 33); 2 by default (calm), 1 where the timeline has a kitchen
+    # report at beat 2 (D3-c, D4-c: the real quiescence at beat 1), 24 for
+    # D4-b (the real surprise at beat 1)
+    it["kitchen_ahead"] = KITCHEN_AHEAD.get(iid, 2)
     return it
+
+
+KITCHEN_AHEAD = {"D3-c": 1, "D4-c": 1, "D4-b": 24}
 
 
 # integration step 1, the real dog (dog.llp's world, dog_host's ANSWERS):

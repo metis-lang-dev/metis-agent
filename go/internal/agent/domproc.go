@@ -132,9 +132,15 @@ func (p *DomainProc) Intent(id, verb string, args map[string]any) ([]map[string]
 	return p.Do(map[string]any{"id": id, "domain": p.Name, "verb": verb, "args": args})
 }
 
-// Tool sends a REPL call {tool, args, id}.
+// Tool sends a REPL call {tool, args, id} to this process's domain.
 func (p *DomainProc) Tool(tool string, args map[string]any, id string) ([]map[string]any, error) {
-	req := map[string]any{"tool": tool, "args": args}
+	return p.ToolTo(p.Name, tool, args, id)
+}
+
+// ToolTo sends a REPL call to one domain of a several-domain process
+// (integration step 2: dog, kitchen, kitchen_shared on one model).
+func (p *DomainProc) ToolTo(domain, tool string, args map[string]any, id string) ([]map[string]any, error) {
+	req := map[string]any{"tool": tool, "args": args, "domain": domain}
 	if id != "" {
 		req["id"] = id
 	}
@@ -146,10 +152,16 @@ func (p *DomainProc) Beat() ([]map[string]any, error) {
 	return p.Do(map[string]any{"clock": "beat"})
 }
 
+// BeatOf steps one domain's clock: n env beats of a pair (its cooks
+// interleaved inside the process), one beat of a single domain.
+func (p *DomainProc) BeatOf(domain string, n int) ([]map[string]any, error) {
+	return p.Do(map[string]any{"clock": "beat", "domain": domain, "n": max(n, 1)})
+}
+
 // World changes the domain's world on its next tick (the timeline's
 // person acting: a door opened).
 func (p *DomainProc) World(lines []string) error {
-	_, err := p.Do(map[string]any{"world": lines})
+	_, err := p.Do(map[string]any{"world": lines, "domain": p.Name})
 	return err
 }
 
