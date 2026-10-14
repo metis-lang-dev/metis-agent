@@ -188,9 +188,15 @@ func main() {
 	kitReal := flag.Bool("kitchen-real", false, "integration step 2: the kitchen pair real, in -dog-proc's process (--domain dog,kitchen,kitchen_shared)")
 	dogDir := flag.String("dog-dir", "../py", "integration step 1: -dog-proc's working directory")
 	dialogF := flag.String("dialog", "", "E13 step 3: the dialog-control corpus (tools/e13-dialog.py) through the orchestrator agent against emulated domains; -gbnf, -e10-ids, -pass2_seed")
+	v3TurnF := flag.String("v3-turn", "", "-v3 / -dialog: this system turn for every scenario and timeline (metis-agent -print-turn: the turn built from the catalog's manifests)")
+	v3CatalogF := flag.String("v3-catalog", "", "-v3 / -dialog: the catalog the turn declares (comma list; default E13's six)")
 	v3Ruled := flag.Bool("v3-ruled", false, "E13 step 2: the agent with the E13 step 1 ruling (ask words checked, the again-branch and the escalate call the harness's); off = t3 parity")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
 	flag.Parse()
+	v3Turn = *v3TurnF
+	if *v3CatalogF != "" {
+		v3Catalog = strings.Split(*v3CatalogF, ",")
+	}
 	if *e10Dump != "" {
 		dumpE10(*e8Cards, *e10Dump)
 		return

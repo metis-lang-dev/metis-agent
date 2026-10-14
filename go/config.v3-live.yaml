@@ -51,9 +51,14 @@ ws:
 # kitchen env beats; the journal is the session's record for the E13 reads.
 v3:
     prompt: [grammar/e13-prompt-base.txt]
-    # the system turn's catalog (the REPL API's activate enum: E13's, t3 parity) —
-    # not the console's list, which is the catalog's (catalog: above)
-    catalog: [kitchen, nav, xtraffic, sysadmin, social, votes]
+    # WHICH installed domains the orchestrator is offered (the operator's
+    # selection; the manifests are the source, the config selects): each must
+    # have a manifest in catalog.root (else the service refuses to start), and
+    # the system turn's "## Domains" cards and the activate/deactivate enum are
+    # built from those manifests' lines — never from literals here
+    # (metis-agent -loop v3 -print-turn shows the turn; the console's list is
+    # the catalog's whole list, not this selection)
+    catalog: [kitchen]
     loaded: [dog, kitchen]
     n_ctx: 16384                # integration step 4 ruling: ~10k tokens of dialog room (+106 MiB); was 8192
     tick_ms: 1500

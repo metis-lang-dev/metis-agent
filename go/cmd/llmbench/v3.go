@@ -55,6 +55,10 @@ type v3Scenario struct {
 // kitchen's sibling card by its display name
 var (
 	v3Catalog = []string{"kitchen", "nav", "xtraffic", "sysadmin", "social", "votes"}
+	// v3Turn, when set (-v3-turn), replaces every scenario's and timeline's
+	// prompt: the service's system turn as built from the catalog
+	// (metis-agent -print-turn), for the regression the catalog ruling asks
+	v3Turn    string
 	v3Loaded  = []string{"dog", "kitchen"}
 	v3Display = map[string]string{"kitchen_shared": "second cook"}
 )
@@ -164,17 +168,21 @@ func runV3(l *llm.LLM, path, ids, tag string, seed uint32, ruled bool, emit func
 		if len(idSet) > 0 && !idSet[s.ID] {
 			continue
 		}
-		p, ok := prompts[s.Prompt]
+		src := s.Prompt
+		if v3Turn != "" {
+			src = v3Turn
+		}
+		p, ok := prompts[src]
 		if !ok {
-			b, err := os.ReadFile(s.Prompt)
+			b, err := os.ReadFile(src)
 			if err != nil {
 				fail(err)
 			}
 			p = string(b)
 			if !strings.HasSuffix(p, agent.APIDeclarations(v3Catalog, v3Loaded)) {
-				fail(fmt.Errorf("v3: %s does not end with the agent's REPL API declarations", s.Prompt))
+				fail(fmt.Errorf("v3: %s does not end with the agent's REPL API declarations", src))
 			}
-			prompts[s.Prompt] = p
+			prompts[src] = p
 		}
 		for rep := 0; rep < max(s.Reps, 1); rep++ {
 			sd := uint32(0)

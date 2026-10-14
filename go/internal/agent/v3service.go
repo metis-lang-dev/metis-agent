@@ -34,6 +34,11 @@ type V3Service struct {
 	// Listed: the consoles' list of the catalog (metis_catalog.index(), via
 	// the loader; domain-catalog step 2) — what the catalog frame shows
 	Listed []Listed
+	// Lines: the selected catalog's display lines from their manifests —
+	// the system turn's "## Domains" cards are written from them (the
+	// manifests are the source, the config selects); nil: the prompt
+	// file's own cards stand
+	Lines map[string]string
 	// Start, when set, holds the clock until it closes (-wait-viewer: the
 	// first page joins, so the person hears the run from its first beat)
 	Start <-chan struct{}
@@ -70,13 +75,32 @@ func (e *idEmitter) Command(id, name string, args map[string]any) {
 	e.Emitter.Command(id, name, args)
 }
 
-func (a *Agent) startV3(l *llm.LLM) error {
-	sc := a.cfg.V3
+// SystemTurn is the orchestrator's system turn: the prompt files, their
+// "## Domains" cards written from the catalog's lines (when given), the
+// REPL API's declarations over the catalog and the loaded domains.
+func SystemTurn(sc V3Service) (string, error) {
 	var b strings.Builder
 	for _, p := range sc.Prompt {
 		b.WriteString(p)
 	}
-	b.WriteString(APIDeclarations(sc.Catalog, sc.Loaded))
+	turn := b.String()
+	if sc.Lines != nil {
+		var err error
+		if turn, err = InstalledCards(turn, sc.Catalog, sc.Lines); err != nil {
+			return "", err
+		}
+	}
+	return turn + APIDeclarations(sc.Catalog, sc.Loaded), nil
+}
+
+func (a *Agent) startV3(l *llm.LLM) error {
+	sc := a.cfg.V3
+	turn, err := SystemTurn(sc)
+	if err != nil {
+		return err
+	}
+	var b strings.Builder
+	b.WriteString(turn)
 	if sc.NCtx <= 0 {
 		sc.NCtx = 8192
 	}

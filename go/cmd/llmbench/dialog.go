@@ -244,7 +244,11 @@ func runDialog(l *llm.LLM, path, gbnfPath, ids, tag string, seed uint32, dog *ag
 		if len(idSet) > 0 && !idSet[it.ID] {
 			continue
 		}
-		b, err := os.ReadFile(it.Prompt)
+		src := it.Prompt
+		if v3Turn != "" {
+			src = v3Turn
+		}
+		b, err := os.ReadFile(src)
 		if err != nil {
 			fail(err)
 		}

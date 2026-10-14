@@ -436,3 +436,33 @@ func namesWords(ask, words string) bool {
 	}
 	return true
 }
+
+// InstalledCards writes the system turn's "## Domains" card list from the
+// catalog's display lines (domain-catalog step 2 ruling: the manifests are
+// the source, the config selects): one "- name: line" per selected domain,
+// in the selection's order, replacing the list the prompt file carries.
+func InstalledCards(turn string, catalog []string, lines map[string]string) (string, error) {
+	i := strings.Index(turn, "## Domains")
+	if i < 0 {
+		return "", fmt.Errorf("the system turn has no \"## Domains\" section")
+	}
+	a := strings.Index(turn[i:], "\nCards:\n")
+	if a < 0 {
+		return "", fmt.Errorf("the \"## Domains\" section has no Cards: list")
+	}
+	a += i + len("\nCards:\n")
+	b := strings.Index(turn[a:], "\n\n")
+	if b < 0 {
+		return "", fmt.Errorf("the Domains card list does not end")
+	}
+	b += a
+	var cards []string
+	for _, n := range catalog {
+		l, ok := lines[n]
+		if !ok || l == "" {
+			return "", fmt.Errorf("no display line for %q", n)
+		}
+		cards = append(cards, "- "+n+": "+l)
+	}
+	return turn[:a] + strings.Join(cards, "\n") + turn[b:], nil
+}

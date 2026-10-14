@@ -2,6 +2,7 @@ package agent
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -298,5 +299,34 @@ func TestReloadSummary(t *testing.T) {
 	}
 	if !watched("dog.llp") || !watched("intent.yaml") || !watched("dog.gbnf") || watched("README.md") {
 		t.Fatal("watched")
+	}
+}
+
+// the system turn's Domains cards from the catalog's lines: the prompt
+// file's own lines rebuild it byte for byte
+func TestInstalledCardsRebuildTheTurn(t *testing.T) {
+	b, err := os.ReadFile("../../grammar/e13-prompt-base.txt")
+	if err != nil {
+		t.Skip(err)
+	}
+	turn := string(b)
+	lines := map[string]string{}
+	var names []string
+	i := strings.Index(turn, "## Domains")
+	a := i + strings.Index(turn[i:], "\nCards:\n") + len("\nCards:\n")
+	for _, l := range strings.Split(turn[a:a+strings.Index(turn[a:], "\n\n")], "\n") {
+		n, line, _ := strings.Cut(strings.TrimPrefix(l, "- "), ": ")
+		names, lines[n] = append(names, n), line
+	}
+	got, err := InstalledCards(turn, names, lines)
+	if err != nil || got != turn {
+		t.Fatalf("rebuilt turn differs (%v)", err)
+	}
+	got, _ = InstalledCards(turn, []string{"kitchen"}, map[string]string{"kitchen": "the kitchen: the first cook"})
+	if !strings.Contains(got, "Cards:\n- kitchen: the kitchen: the first cook\n\nExamples:") {
+		t.Fatalf("one card: %q", got[strings.Index(got, "## Domains"):][:400])
+	}
+	if _, err := InstalledCards(turn, []string{"nav"}, map[string]string{}); err == nil {
+		t.Fatal("a domain without a line must be refused")
 	}
 }

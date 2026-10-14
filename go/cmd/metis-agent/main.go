@@ -12,6 +12,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -101,6 +102,7 @@ func main() {
 	libDir := flag.String("lib-dir", "", "serve this directory at /lib/ (fsttm-web's lib/; default <ui-dir>/../lib when it has dialog.js)")
 	noDomains := flag.Bool("no-domains", false, "attach no domain (the persona alone: the parity bar)")
 	loop := flag.String("loop", "v2", "v2: the dog's two-pass path; v3: the orchestrator agent (DESIGN v3; config v3:)")
+	printTurn := flag.Bool("print-turn", false, "-loop v3: print the orchestrator's system turn as built (the catalog's cards and declarations) and exit")
 	waitViewer := flag.Bool("wait-viewer", false, "attach the domains (v2), start the domain agents' clock (v3) when the first page connects (it hears the run from its start)")
 	flag.Parse()
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
@@ -165,17 +167,6 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	l, err := llm.Load(llm.Config{ModelPath: cfg.LLM.Model, NCtx: cfg.LLM.NCtx,
-		NBatch: cfg.LLM.NBatch, NThreads: cfg.LLM.NThreads,
-		NGpuLayers: cfg.LLM.NGpuLayers, Template: cfg.LLM.Template,
-		Pass2: llm.Pass2{Temp: cfg.LLM.Pass2.Temperature, TopK: cfg.LLM.Pass2.TopK,
-			MaxTokens: cfg.LLM.Pass2.MaxTokens}})
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer l.Close()
-	log.Printf("[llm] %s: template=%s", cfg.LLM.Model, l.Template())
-
 	var v3 agent.V3Service
 	if *loop == "v3" {
 		if len(cfg.V3.Prompt) == 0 {
@@ -187,6 +178,16 @@ func main() {
 		v3.Catalog, v3.Loaded, v3.Display, v3.NCtx, v3.Ruled = cfg.V3.Catalog, cfg.V3.Loaded, cfg.V3.Display, cfg.V3.NCtx, cfg.V3.Ruled
 		v3.Domains, v3.TickMs, v3.Journal = cfg.V3.Domains, cfg.V3.TickMs, cfg.V3.Journal
 		if manifests != nil {
+			// the manifests are the source, the config selects: every selected
+			// domain is installed, and its card in the system turn is its line
+			v3.Lines = map[string]string{}
+			for _, n := range v3.Catalog {
+				m, ok := manifests[n]
+				if !ok || m.Line == "" {
+					log.Fatalf("[catalog] v3.catalog selects %q, which has no manifest with a line in %s", n, cfg.Catalog.Root)
+				}
+				v3.Lines[n] = m.Line
+			}
 			fromManifests(&v3, manifests)
 			if cfg.Catalog.Python != "" {
 				es, err := catalog.List(cfg.Catalog.Python, cfg.Catalog.Root)
@@ -206,6 +207,26 @@ func main() {
 			}
 		}
 	}
+
+	if *printTurn {
+		turn, err := agent.SystemTurn(v3)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Print(turn)
+		return
+	}
+
+	l, err := llm.Load(llm.Config{ModelPath: cfg.LLM.Model, NCtx: cfg.LLM.NCtx,
+		NBatch: cfg.LLM.NBatch, NThreads: cfg.LLM.NThreads,
+		NGpuLayers: cfg.LLM.NGpuLayers, Template: cfg.LLM.Template,
+		Pass2: llm.Pass2{Temp: cfg.LLM.Pass2.Temperature, TopK: cfg.LLM.Pass2.TopK,
+			MaxTokens: cfg.LLM.Pass2.MaxTokens}})
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer l.Close()
+	log.Printf("[llm] %s: template=%s", cfg.LLM.Model, l.Template())
 
 	srv := console.New(cfg.WS.UIDir)
 	if *libDir != "" {
