@@ -59,12 +59,12 @@ def consult(ag, question, max_calls=6):
     return {"consult": out[0], "full": ag.consults[-1] if ag.consults else {}}
 
 
-def dog(seat, llm):
+def dog(seat, llm, missing="template"):
     from metis_agent.domain_agent import DomainAgent
     from metis_agent.domains import dog as mod
     from orch_emu import hosted
     scn = json.loads((ROOT / "py/tools/scenarios/dog-day.json").read_text())
-    ag = DomainAgent(mod, llm=None, consult_seat=seat)
+    ag = DomainAgent(mod, llm=None, consult_seat=seat, consult_missing=missing)
     recs, k = [], 0
     for beat in range(1, 60):
         for m in scn["beats"].get(str(beat), []):
@@ -88,6 +88,7 @@ def dog(seat, llm):
                 rec["atom_ok"] = (not atoms) or norm(got) in {norm(a) for a in atoms}
                 rec["blocker"], rec["words"] = r.get("blocker"), (c["consult"].get("resource") or {}).get("words")
                 rec["fixed"] = c["full"].get("fixed")
+                rec["seat_called"] = c["full"].get("stop") != "template"
                 recs.append(rec)
         if rs[-1].get("over"):
             break
@@ -152,6 +153,8 @@ def main():
     ap.add_argument("--model", default=str(ROOT / "go/models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf"))
     ap.add_argument("--out", default=str(ROOT / "py/results/domain-agent/step5"))
     ap.add_argument("--only", default="dog,kitchen,wgc")
+    ap.add_argument("--missing-seat", action="store_true", help="a computed missing goes to the seat "
+                    "(the words/sentence measurement; default: the harness's template, no model call)")
     a = ap.parse_args()
     os.environ.setdefault("METIS_CONFIG", "")
     out = Path(a.out)
@@ -165,10 +168,10 @@ def main():
     else:
         from metis_agent.claude_seat import ClaudeSeat
         seat = ClaudeSeat()
-    recs, summ = [], {"seat": a.seat}
+    recs, summ = [], {"seat": a.seat, "missing": "seat" if a.missing_seat else "template"}
     only = a.only.split(",")
     if "dog" in only:
-        r, s = dog(seat, llm)
+        r, s = dog(seat, llm, "seat" if a.missing_seat else "template")
         recs += r
         summ.update(s)
     if "kitchen" in only:

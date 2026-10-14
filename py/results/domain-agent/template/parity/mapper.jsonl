@@ -1,0 +1,54 @@
+{"utt": "stand up", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "STAND_UP"}}, "atom": "cmd_stand", "act": "stand", "dropped": {}}
+{"utt": "sit", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}, "atom": "cmd_sit", "act": "sit", "dropped": {}}
+{"utt": "lie down", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "LIE_DOWN"}}, "atom": "cmd_lie", "act": "lie", "dropped": {}}
+{"utt": "lay down", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "LIE_DOWN"}}, "atom": "cmd_lie", "act": "lie", "dropped": {}}
+{"utt": "turn left ninety degrees", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "TURN", "direction": "LEFT", "angle_deg": 90}}, "atom": "cmd_turn(left)", "act": "turn", "dropped": {"angle_deg": 90}}
+{"utt": "turn around", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "TURN", "direction": "AROUND"}}, "atom": "cmd_turn(around)", "act": "turn", "dropped": {}}
+{"utt": "take a step forward", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "MOVE", "direction": "FORWARD"}}, "atom": "cmd_move(forward)", "act": "move", "dropped": {}}
+{"utt": "go one meter forward", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "MOVE", "direction": "FORWARD", "distance_m": 1}}, "atom": "cmd_move(forward)", "act": "move", "dropped": {"distance_m": 1}}
+{"utt": "back up half a meter", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "MOVE", "direction": "BACKWARD", "distance_m": 0.5}}, "atom": "cmd_move(backward)", "act": "move", "dropped": {"distance_m": 0.5}}
+{"utt": "take a step back", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "MOVE", "direction": "BACKWARD"}}, "atom": "cmd_move(backward)", "act": "move", "dropped": {}}
+{"utt": "give me your paw", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "SHAKE"}}, "atom": "cmd_paw", "act": "paw", "dropped": {}}
+{"utt": "wave at me", "src": "prompt", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "SHAKE"}}, "atom": "cmd_paw", "act": "paw", "dropped": {}}
+{"utt": "where is the chair", "src": "prompt", "intent": {"verb": "QUERY", "args": {"target": {"type": "OBJECT", "description": "chair"}}}, "atom": "cmd_query(chair)", "act": "query", "dropped": {}}
+{"utt": "what is next to the table", "src": "prompt", "intent": {"verb": "QUERY", "args": {"target": {"type": "OBJECT", "description": "table"}, "constraints": [{"relation": "NEXT_TO", "reference": {"type": "OBJECT", "description": "table"}}]}}, "atom": "cmd_query(table)", "act": "query", "dropped": {"constraints": [{"relation": "NEXT_TO", "reference": {"type": "OBJECT", "description": "table"}}]}}
+{"utt": "go to the door", "src": "prompt", "intent": {"verb": "NAVIGATE", "args": {"goal": {"type": "OBJECT", "description": "door"}}}, "atom": "cmd_go(door)", "act": "go", "dropped": {}}
+{"utt": "go to the chair next to the window", "src": "prompt", "intent": {"verb": "NAVIGATE", "args": {"goal": {"type": "OBJECT", "description": "chair"}, "constraints": [{"relation": "NEXT_TO", "reference": {"type": "OBJECT", "description": "window"}}]}}, "atom": "cmd_go(window_chair)", "act": "go", "dropped": {}}
+{"utt": "go to the kitchen", "src": "prompt", "intent": {"verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}, "atom": "cmd_go(kitchen)", "act": "go", "dropped": {}}
+{"utt": "go to tag five", "src": "prompt", "intent": {"verb": "NAVIGATE", "args": {"goal": {"type": "TAG", "description": "tag"}, "tag_id": 5}}, "atom": "cmd_go(tag5)", "act": "go", "dropped": {}}
+{"utt": "walk to april tag three", "src": "prompt", "intent": {"verb": "NAVIGATE", "args": {"goal": {"type": "TAG", "description": "april tag"}, "tag_id": 3}}, "atom": "cmd_go(tag3)", "act": "go", "dropped": {}}
+{"utt": "go to the tag", "src": "prompt", "intent": {"verb": "NAVIGATE", "args": {"goal": {"type": "TAG", "description": "tag"}}}, "atom": "cmd_go(tag_near)", "act": "go", "dropped": {}}
+{"utt": "find a fire extinguisher", "src": "prompt", "intent": {"verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "fire extinguisher"}}}, "atom": "cmd_find(extinguisher)", "act": "find", "dropped": {}}
+{"utt": "go find the red chair near the window", "src": "prompt", "intent": {"verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "chair", "attributes": {"color": "red"}}, "constraints": [{"relation": "NEAR", "reference": {"type": "OBJECT", "description": "window"}}]}}, "atom": "cmd_find(chair)", "act": "find", "dropped": {"constraints": [{"relation": "NEAR", "reference": {"type": "OBJECT", "description": "window"}}], "target.attributes": {"color": "red"}}}
+{"utt": "follow me", "src": "prompt", "intent": {"verb": "FOLLOW", "args": {"target": {"type": "PERSON", "description": "the person"}}}, "atom": "cmd_follow", "act": "follow", "dropped": {"target": {"type": "PERSON", "description": "the person"}}}
+{"utt": "stop", "src": "prompt", "intent": {"verb": "STOP", "args": {}}, "atom": "cmd_stop", "act": "stop", "dropped": {}}
+{"utt": "never mind", "src": "prompt", "intent": {"verb": "CANCEL", "args": {}}, "atom": "cmd_cancel", "act": "cancel", "dropped": {}}
+{"utt": "what time is it", "src": "prompt", "intent": {"verb": "TIME", "args": {}}, "atom": "cmd_time", "act": "time", "dropped": {}}
+{"utt": "good boy", "src": "prompt", "intent": {"verb": "CHITCHAT", "args": {}}, "atom": "cmd_chat", "act": "chat", "dropped": {}}
+{"utt": "order me a pizza", "src": "prompt", "intent": {"verb": "UNKNOWN", "args": {}}, "atom": "cmd_unknown", "act": "unknown", "dropped": {}}
+{"utt": "do a front flip", "src": "prompt", "intent": {"verb": "UNKNOWN", "args": {}}, "atom": "cmd_unknown", "act": "unknown", "dropped": {}}
+{"utt": "do a backflip", "src": "prompt", "intent": {"verb": "UNKNOWN", "args": {}}, "atom": "cmd_unknown", "act": "unknown", "dropped": {}}
+{"utt": "roll over", "src": "prompt", "intent": {"verb": "UNKNOWN", "args": {}}, "atom": "cmd_unknown", "act": "unknown", "dropped": {}}
+{"utt": "dance", "src": "prompt", "intent": {"verb": "UNKNOWN", "args": {}}, "atom": "cmd_unknown", "act": "unknown", "dropped": {}}
+{"utt": "jump", "src": "prompt", "intent": {"verb": "UNKNOWN", "args": {}}, "atom": "cmd_unknown", "act": "unknown", "dropped": {}}
+{"utt": "pounce", "src": "prompt", "intent": {"verb": "UNKNOWN", "args": {}}, "atom": "cmd_unknown", "act": "unknown", "dropped": {}}
+{"utt": "could you sit down please", "src": "heldout", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}, "atom": "cmd_sit", "act": "sit", "dropped": {}}
+{"utt": "get up", "src": "heldout", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "STAND_UP"}}, "atom": "cmd_stand", "act": "stand", "dropped": {}}
+{"utt": "turn right", "src": "heldout", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "TURN", "direction": "RIGHT"}}, "atom": "cmd_turn(right)", "act": "turn", "dropped": {}}
+{"utt": "move forward two meters", "src": "heldout", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "MOVE", "direction": "FORWARD", "distance_m": 2}}, "atom": "cmd_move(forward)", "act": "move", "dropped": {"distance_m": 2}}
+{"utt": "shake hands", "src": "heldout", "intent": {"verb": "LOCAL_ACTION", "args": {"action": "SHAKE"}}, "atom": "cmd_paw", "act": "paw", "dropped": {}}
+{"utt": "is there a chair around here", "src": "heldout", "intent": {"verb": "QUERY", "args": {"target": {"type": "OBJECT", "description": "chair"}}}, "atom": "cmd_query(chair)", "act": "query", "dropped": {}}
+{"utt": "what do you see near the window", "src": "heldout", "intent": {"verb": "QUERY", "args": {"target": {"type": "OBJECT", "description": "thing"}}}, "atom": "cmd_look(elsewhere)", "act": "look", "dropped": {}}
+{"utt": "head over to the kitchen", "src": "heldout", "intent": {"verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}, "atom": "cmd_go(kitchen)", "act": "go", "dropped": {}}
+{"utt": "go to april tag seven", "src": "heldout", "intent": {"verb": "NAVIGATE", "args": {"goal": {"type": "TAG", "description": "april tag"}, "tag_id": 7}}, "atom": "cmd_go(elsewhere)", "act": "go", "dropped": {"tag_id": 7}}
+{"utt": "walk to the sofa", "src": "heldout", "intent": {"verb": "NAVIGATE", "args": {"goal": {"type": "OBJECT", "description": "sofa"}}}, "atom": "cmd_go(sofa)", "act": "go", "dropped": {}}
+{"utt": "look for my keys", "src": "heldout", "intent": {"verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "keys"}}}, "atom": "cmd_find(keys)", "act": "find", "dropped": {}}
+{"utt": "search for a blue bottle", "src": "heldout", "intent": {"verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "bottle", "attributes": {"color": "blue"}}}}, "atom": "cmd_find(bottle)", "act": "find", "dropped": {"target.attributes": {"color": "blue"}}}
+{"utt": "come with me", "src": "heldout", "intent": {"verb": "FOLLOW", "args": {"target": {"type": "PERSON", "description": "the person"}}}, "atom": "cmd_follow", "act": "follow", "dropped": {"target": {"type": "PERSON", "description": "the person"}}}
+{"utt": "halt", "src": "heldout-in-prompt", "intent": {"verb": "STOP", "args": {}}, "atom": "cmd_stop", "act": "stop", "dropped": {}}
+{"utt": "forget it", "src": "heldout-in-prompt", "intent": {"verb": "CANCEL", "args": {}}, "atom": "cmd_cancel", "act": "cancel", "dropped": {}}
+{"utt": "what's the date today", "src": "heldout-in-prompt", "intent": {"verb": "DATE", "args": {}}, "atom": "cmd_date", "act": "date", "dropped": {}}
+{"utt": "hi there buddy", "src": "heldout", "intent": {"verb": "CHITCHAT", "args": {}}, "atom": "cmd_chat", "act": "chat", "dropped": {}}
+{"utt": "make me a coffee", "src": "heldout", "intent": {"verb": "UNKNOWN", "args": {}}, "atom": "cmd_unknown", "act": "unknown", "dropped": {}}
+{"utt": "do a somersault", "src": "heldout", "intent": {"verb": "UNKNOWN", "args": {}}, "atom": "cmd_unknown", "act": "unknown", "dropped": {}}
+{"utt": "play dead", "src": "heldout", "intent": {"verb": "UNKNOWN", "args": {}}, "atom": "cmd_unknown", "act": "unknown", "dropped": {}}

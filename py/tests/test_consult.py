@@ -46,7 +46,7 @@ def test_consult_never_writes_the_live_session():
     seat = ScriptedSeat([("step", ""), ("run", "3"), ("do", "+battery_low"), ("fork", "2"), ("step", ""),
                          ("back", ""), ("step", ""), ("undo", ""), ("undo", ""), ("state", "")],
                         {"kind": "missing", "atom": "open(kitchen)", "words": "an open door", "text": "The door is shut."})
-    ag = DomainAgent(dog, consult_seat=seat)
+    ag = DomainAgent(dog, consult_seat=seat, consult_missing="seat")     # the seat path, in a fork
     for m in ({"id": "c1", "verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}},
               {"id": "c2", "verb": "NAVIGATE", "args": {"goal": "kitchen"}}):
         ag.handle(m)
@@ -172,10 +172,56 @@ def test_missing_words_are_the_hosts():
     got = {}
     for name, mod in (("host", dog), ("model", _NoWords())):
         seat = ScriptedSeat([("state", "")], answer)
-        ag = DomainAgent(mod, consult_seat=seat)
+        ag = DomainAgent(mod, consult_seat=seat, consult_missing="seat")
         ag.handle({"id": "c1", "verb": "NAVIGATE", "args": {"goal": "kitchen"}})
         ag.handle({"clock": "beat"})
         r = ag.handle({"tool": "consult", "id": "k", "args": {"question": "Why?"}})[0]
         got[name] = (r["resource"]["words"], "words" in seat.answer_props, r["text"])
     assert got["host"] == ("open the way to the kitchen", False, "The kitchen is closed.")
     assert got["model"] == ("the door", True, "The kitchen is closed.")
+
+
+class RaisingSeat:
+    def turn(self, *a, **k):
+        raise AssertionError("the seat was called")
+
+    def cont(self, question):
+        raise AssertionError("the seat was called")
+
+    def tokens(self):
+        return 0
+
+
+def test_computed_missing_needs_no_model_call():
+    """DESIGN 98530fd: by default a computed missing (the blocker flips, the
+    host has words) is the harness's — kind, atom, words, and the refusal's
+    own sentence; calls 0, no seat. consult_missing="seat" still asks the seat."""
+    def refused(ag):
+        ag.handle({"id": "c1", "verb": "NAVIGATE", "args": {"goal": "kitchen"}})
+        return next(r for r in ag.handle({"clock": "beat"}) if r.get("status") == "refused")
+    ag = DomainAgent(dog, consult_seat=RaisingSeat())
+    res = refused(ag)
+    before = live(ag)
+    r = ag.handle({"tool": "consult", "id": "k", "args": {"question": "Why?"}})[0]
+    assert (r["kind"], r["answer_kind"], r["calls"]) == ("consult", "missing", 0)
+    assert r["resource"] == {"atom": "closed(kitchen)", "words": "open the way to the kitchen"}
+    assert r["text"] == res["text"] == "I can't go there: the way to it is closed."
+    assert r["evidence"] == ["closed(kitchen) 1", "mapped(kitchen) 1"]
+    assert live(ag) == before and ag.consults[-1]["stop"] == "template" and ag.consults[-1]["live_unchanged"]
+    # no seat at all: still answered
+    ag2 = DomainAgent(dog)
+    refused(ag2)
+    assert ag2.handle({"tool": "consult", "id": "k", "args": {"question": "Why?"}})[0]["calls"] == 0
+    # what is open still goes to the seat: the person's own question (raises), and the flag path
+    import pytest
+    with pytest.raises(AssertionError, match="seat was called"):
+        ag.handle({"tool": "consult", "id": "k2", "args": {"question": "How are you?"}})
+    ag4 = DomainAgent(_NoWords(), consult_seat=RaisingSeat())      # a host without a words table: the seat's
+    refused(ag4)
+    with pytest.raises(AssertionError, match="seat was called"):
+        ag4.handle({"tool": "consult", "id": "k", "args": {"question": "Why?"}})
+    seat = ScriptedSeat([("state", "")], {"kind": "missing", "text": "Closed."})
+    ag3 = DomainAgent(dog, consult_seat=seat, consult_missing="seat")
+    refused(ag3)
+    r3 = ag3.handle({"tool": "consult", "id": "k", "args": {"question": "Why?"}})[0]
+    assert r3["calls"] == 1 and r3["text"] == "Closed." and seat.seen

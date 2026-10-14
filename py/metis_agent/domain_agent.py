@@ -47,6 +47,7 @@ import importlib
 import json
 import os
 import sys
+import time
 
 from .mapper import Mapped, Mapper
 from .narrator import Fragment, Narrator, event_ref, from_signal, words
@@ -91,7 +92,7 @@ def offered_moves(repl):
 
 
 class DomainAgent:
-    def __init__(self, module, seed=1, llm=None, counts=None, consult_seat=None):
+    def __init__(self, module, seed=1, llm=None, counts=None, consult_seat=None, consult_missing="template"):
         os.environ.setdefault("METIS_CONFIG", "")   # the kernel's llm endpoint is never called
         from metis.lang.repl import Repl
         from metis.loop.watch import Watch
@@ -131,6 +132,12 @@ class DomainAgent:
         if llm is not None:
             self.narrator = Narrator(llm, {self.name: self.script}, self.names)
         self.consult_seat = consult_seat
+        # a computed missing (the blocker flips, the host has its words): answered
+        # by the harness with no model call ("template", DESIGN 98530fd), or by the
+        # seat as before ("seat": the words/sentence measurement)
+        if consult_missing not in ("template", "seat"):
+            raise ValueError("consult_missing: template | seat, not %r" % consult_missing)
+        self.consult_missing = consult_missing
         if consult_seat is None and llm is not None:
             from .seat import Gemma4Seat
             self.consult_seat = Gemma4Seat(llm)    # one model: the narrator's and the consultant's
@@ -198,7 +205,7 @@ class DomainAgent:
             for r in out:
                 if r.get("status") == "refused":
                     self.last_refusal = {"id": r["id"], "seq": k, "event": ev.name, "persist": dict(ev.persist),
-                                         "blocker": r.get("blocker"),
+                                         "blocker": r.get("blocker"), "said": r.get("text", ""),
                                          "act": next((a[len("refused("):-1] for a in ev.produce
                                                       if a.startswith("refused(")), "")}
             return out
@@ -272,18 +279,22 @@ class DomainAgent:
 
     def consult(self, iid, args):
         from .consult import Consultant
-        if self.consult_seat is None:
-            return [reply(self.name, "error", id=iid, error="consult: no consultant seat (run with --narrate or --consult)")]
         q = str(args.get("question", "")).strip()
         if not q:
             return [reply(self.name, "error", id=iid, error="consult needs a question")]
-        from .narrator import script_text
-        c = Consultant(self.repl, self.consult_seat, self.display, script_text(self.name, self.script, self.names, exact=True),
-                       offered=offered_moves(self.repl))
         # the situation: an open surprise, else the latest refusal not yet
         # consulted, else the person's own question (args.situation overrides)
         situation = args.get("situation") or ("surprise" if self.watch.open is not None
                                               else "refusal" if self.last_refusal else "question")
+        if situation == "refusal" and self.consult_missing == "template":
+            t = self.templated_missing(iid)
+            if t:
+                return t
+        if self.consult_seat is None:
+            return [reply(self.name, "error", id=iid, error="consult: no consultant seat (run with --narrate or --consult)")]
+        from .narrator import script_text
+        c = Consultant(self.repl, self.consult_seat, self.display, script_text(self.name, self.script, self.names, exact=True),
+                       offered=offered_moves(self.repl))
         band, evidence = "", []
         if situation == "surprise" and self.watch.open is not None:
             band = self.surprise_context()
@@ -312,6 +323,32 @@ class DomainAgent:
         self.consults.append(r)
         return [reply(self.name, "consult", id=iid, calls=len(r["calls"]), text=r["text"], evidence=evidence or None,
                       ref={"seq": len(self.repl.fired), "beat": self.beat_no()}, **r["envelope"])]
+
+    def templated_missing(self, iid):
+        """A refusal whose blocker flips in the host's pairs, on a host with a
+        words table: nothing is open — the kind, the atom and the words are
+        the host's, the sentence the refusal's own (the narrator's, else the
+        rule's %% line, as the result carried it). No seat call (DESIGN
+        98530fd). None when the refusal is not such a one: the seat answers."""
+        lr = self.last_refusal
+        b = lr and lr.get("blocker")
+        if not (b and self.flips(b) and self.host_words):
+            return None
+        w = self.host_words(b, self.handle_names)
+        if not w:
+            return None
+        t0, before = time.perf_counter(), (self.repl.stage, dict(self.repl.counts), len(self.repl.fired))
+        band, evidence = self.first_read(lr)             # the reads only: the evidence the reply carries
+        self.last_refusal = None
+        fixed = {"kind": "missing", "atom": b, "words": w}
+        env = {"answer_kind": "missing", "resource": {"atom": b, "words": w}}
+        self.consults.append({"situation": "refusal", "first_read": band, "fixed": fixed, "kinds": ["missing"],
+                              "envelope": env, "text": lr.get("said", ""), "calls": [], "typed": None, "pinned": [],
+                              "clamped": False, "stop": "template", "tokens": 0,
+                              "live_unchanged": before == (self.repl.stage, dict(self.repl.counts), len(self.repl.fired)),
+                              "ms": round((time.perf_counter() - t0) * 1e3)})
+        return [reply(self.name, "consult", id=iid, calls=0, text=lr.get("said", ""), evidence=evidence or None,
+                      ref={"seq": len(self.repl.fired), "beat": self.beat_no()}, **env)]
 
     def card_names(self, card, move):
         """A card and move as a model wrote them → as the cards spell them
@@ -402,6 +439,8 @@ def main():
     ap.add_argument("--consult", default="", choices=["", "gemma4", "claude"],
                     help="the consultant's seat (default: gemma4 when --narrate)")
     ap.add_argument("--model", default="", help="the GGUF (default: E2B Q4 under go/models)")
+    ap.add_argument("--missing-seat", action="store_true", help="a computed missing goes to the seat too "
+                    "(default: the harness answers it with no model call, DESIGN 98530fd)")
     a = ap.parse_args()
     llm = None
     if a.narrate or a.consult == "gemma4":
@@ -414,7 +453,8 @@ def main():
         from .claude_seat import ClaudeSeat
         seat = ClaudeSeat()
     agent = DomainAgent(importlib.import_module("metis_agent.domains." + a.domain), seed=a.seed,
-                        llm=llm if a.narrate or a.consult == "gemma4" else None, consult_seat=seat)
+                        llm=llm if a.narrate or a.consult == "gemma4" else None, consult_seat=seat,
+                        consult_missing="seat" if a.missing_seat else "template")
     if not a.narrate:
         agent.narrator = None
     print(json.dumps({"clock": "ready", "domain": agent.name, "beat": agent.beat_no()}), flush=True)
