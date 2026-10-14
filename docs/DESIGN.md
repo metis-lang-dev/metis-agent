@@ -387,6 +387,59 @@ Nothing above changes; what changes is how the contexts are served:
   on ids kept straight, the floor honoured, the answer bound to its
   question, zero signals read as commands.
 
+### Scenes across domains, and a partly known world (architect, 2026-10-14; the user's questions)
+
+**A scene that crosses domains** ("the dog goes to the kitchen and starts
+cooking"). The dog and the kitchen are two domain agents on two kernels;
+the orchestrator is the only bridge, and it bridges in exactly two ways:
+- **routing:** "go to the kitchen" is the dog's verb, "start cooking" is
+  the kitchen's; the orchestrator routes each by the display lines of the
+  loaded domains' dictionaries (one pass, E12), holds one mirror line per
+  domain, and never translates between them;
+- **facts, by the person or by an outcome:** the kitchen's precondition
+  "the cook is at the stove" is a fact of the kitchen's world; the
+  orchestrator hands it over when the dog's `done(go, kitchen)` arrives, as
+  a world line on the kitchen (`activate(kitchen, bindings)` at load, a
+  `world` line after), the same face the replay uses. A fact crosses
+  domains only through the orchestrator's journal, never kernel to kernel.
+An actor that cooks is a kitchen domain whose cook is the dog's handle,
+not a dog catalog that knows about pots: the domains stay small, the
+orchestrator keeps the scene.
+
+**End to end without optimization** (phase 3 step 2): the fsttm-web page
+(voice: Chrome's recognizer and synthesis, barge-in) over `/ws` → the
+orchestrator agent (`go/`, E2B instance 1, `-loop v3`) → the domain
+agents (`py/`, one process per loaded domain, one kernel each, sharing
+E2B instance 2 for narration and the open consults) → each domain's host
+plugin, from the catalog, binding the ports to the world. Several
+domains: loaded by config at start, and switched by `activate` /
+`deactivate` on the REPL API — from the page (a domain picker is a
+REPL-API call, not an intent) or by the orchestrator itself: it knows the
+display lines of the *installed* domains, not only the active ones, so a
+command no active domain has routes to `activate(domain)` first, then the
+intent (the harness's move, as every branch is). Measured in step 3.
+
+**A partly known world: a priori or observed?** Both, and the catalog
+says which. A domain's world is complementary pairs (`open|closed`,
+`seen|unseen`) and handles:
+- **a priori** is what someone asserted: the catalog's `#init` for the
+  demo scene, the config's bindings at `activate`, the person's words
+  ("the kitchen door is closed") as a world line through the orchestrator;
+- **observed** is what the host reports on its TIME face (battery,
+  obstacles, a person in view, an arrival), exogenous `[env]` rows that
+  flip a pair;
+- **unknown** is a pair with neither side present. LL has no negation, so
+  "unknown" is not a token but an absence; a rule that needs a side does
+  not fire, and today the command would sit. The rule to add, per pair
+  that can start unknown: an **observe** rule (`go_unknown : cmd_go(P) *
+  … -o observing(P) * progress(go)`, the host answers `+open(P)` or
+  `+closed(P)`), or a refusal whose consult answer is `missing` with the
+  words "let me look" — the dog looks before it asks. Which pairs may
+  start unknown is the catalog author's declaration, not the
+  orchestrator's guess.
+Not built yet; the dog's `#init` asserts every pair. It becomes a step
+when a live scene needs it (phase 3 step 2 will show which pairs).
+
 ### Build order (user, 2026-10-13): the architecture first, the optimization later
 
 Build the two agents as stated, each on its own model instance, and defer
