@@ -326,11 +326,11 @@ func main() {
 				fail(err)
 			}
 			defer dog.Close()
-			emit(map[string]any{"kind": "dlg-vram", "tag": *tag, "dog_pid": dog.Pid(), "self_pid": os.Getpid(), "nvidia": vramApps()})
+			emit(map[string]any{"kind": "int-vram", "tag": *tag, "dog_pid": dog.Pid(), "self_pid": os.Getpid(), "nvidia": vramApps()})
 		}
 		runDialog(l, *dialogF, *gbnfF, *e10IDs, *tag, uint32(*seed), dog, emit)
 		if dog != nil {
-			emit(map[string]any{"kind": "dlg-vram", "tag": *tag, "at": "end", "nvidia": vramApps()})
+			emit(map[string]any{"kind": "int-vram", "tag": *tag, "at": "end", "nvidia": vramApps()})
 		}
 		return
 	}
