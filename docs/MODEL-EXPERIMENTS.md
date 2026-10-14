@@ -1267,3 +1267,34 @@ python3 tools/e13-corpus.py && python3 tools/e13-corpus.py --speak-cue && python
 python3 tools/e11-score.py results/e13/step1-t3.jsonl --corpus grammar/e13-corpus-final.jsonl --title "E13 step 1, t3"
 ```
 (t1: `grammar/e13-corpus.jsonl`, t2: `grammar/e13-corpus-cue.jsonl`; the scorer reads native calls as `{"call": NAME, …}`.)
+
+## E13 step 1 ruling (architect, 2026-10-14; s-c9276dee)
+
+**Adopted: T for the REPL API side,** on the three harness conditions as
+reported, all three now DESIGN v3's wording (table row *answered*, the
+next-move table, the three rules under it):
+1. the spoken-line cue after every REPL reply that wants one;
+2. a REPL reply is final (`applied` · `admitted` · `refused` · `failed`);
+   `accepted` stays the intent interface's word. This is the E10 sync
+   prior turned to use: the tool response reads as done, so it must be;
+3. the E11 ruling's required literal for the ask is withdrawn, replaced by
+   the words in the cue, a post-generation check, and a re-ask on a miss,
+   the repeat guard's mechanism. The E11 ruling's G3-07/G5-02 item is
+   amended by this, not reversed: the intent (the resource in the person's
+   words) stands, the means changes.
+
+**The open question, ruled: the harness picks in the again-branch.** From
+the earlier consult's answer: `missing` and the first again → ask once
+more, the ask saying the resource is still missing; any other earlier
+answer, or a second again → escalate. The person who was asked for a
+charger is asked once more before the people who revise the model are;
+an explanation or a reset that did not hold is escalated at once. T's
+6/6 escalate was legal under the old row and wrong for G4-01, which is
+why the row no longer leaves the choice to the model.
+
+**Minor, into step 2:** the escalate line's template takes the consult's
+finding first, the surprise's difference second (G3-22, G3-24). The read-1
+gain over J is the amendments', as reported, and T's +1.2 k prefix is
+accepted for the API side: these calls are rare against intents.
+
+**Step 2 opens:** `go/internal/agent` behind `-loop v3` with the above.

@@ -126,7 +126,7 @@ asks the domain agent.
 |---|---|---|
 | shape | J: one JSON intent under the grammar built from the loaded verb lists | T: native tool calls, synchronous, one per turn |
 | changes the world | yes: `call(domain, verb, args)`; the domain agent maps it to an atom, the runtime fires it under legality, the port actuates | no: it manages and reads |
-| answered | later, by id: `accepted` now; `done` · `refused(reason, alternatives)` · `expired` · `progress` as they happen | now, in the tool response |
+| answered | later, by id: `accepted` now; `done` · `refused(reason, alternatives)` · `expired` · `progress` as they happen | now, in the tool response, and **final**: `applied` · `admitted` · `refused` · `failed`; never `accepted`, which is the intent interface's word for handed over, not done (E13 step 1: a tool response reads as done to the model, so what it says must be done) |
 | verbs | the domain's dictionary (the dog: its eleven; the kitchen: its moves) | `activate(domain, bindings)`, `deactivate(domain)`; `state(domain)`, `ctx(domain)`, `events(domain)`, `why(domain, atom)`, `findings(domain)`; `consult(domain, question, max_calls)`; the surprise verbs `reset(domain, record)`, `explain(domain, record, card, move)`, `escalate(domain, record, text)` |
 | the person | — | `ask(question)` is the orchestrator's own, as are `stop` and `cancel`, which fire on the keyword path before any model |
 
@@ -187,8 +187,26 @@ consult.missing                 → ask(person): the resource in the person's wo
 consult.noise                   → REPL reset(domain, record)
 consult.unexplained             → REPL escalate(domain, record, text)
 surprise                        → REPL consult(domain, …) with its cards   (Decide, today)
-the same refusal again          → ask(person) or escalate; never the same call   (the repeat guard)
+the same refusal again          → the harness picks from the earlier consult's answer (E13 step 1):
+   earlier answer missing, first again  → ask(person) once more, the ask saying it is still missing
+   earlier answer anything else, or a second again → REPL escalate(domain, record, text)
+   never the same call   (the repeat guard)
 ```
+
+Three harness rules around the table, from E13 step 1 (the API side in T,
+E11's items, every read held):
+- **The spoken-line cue follows every REPL reply** that wants a spoken line,
+  as it follows an intent's result. Without it E2B writes the cue's label
+  itself ("Spoken response:") or an empty line.
+- **The ask carries the resource's words by a check, not a literal.** The
+  words from the consult's answer go into the ask's cue; after generation
+  the harness checks the ask for them; a miss is answered like a repeat (a
+  note, the ask asked again). A required literal in the grammar made E2B
+  splice the words into its own phrasing ("…so I can stand up nextmy
+  charger?") on 3 of 12 ask items.
+- **The escalate line's template takes the consult's finding first,** the
+  surprise's difference second (E13 step 1 saw escalations describe the pot
+  difference instead of what the consult found).
 
 ### The domain agent
 
