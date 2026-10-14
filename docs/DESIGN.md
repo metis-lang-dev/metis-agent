@@ -320,10 +320,14 @@ Nothing above changes; what changes is how the contexts are served:
 
 ### Open, to be settled by experience
 
-- the `resource.words` of a missing answer: E2B writes usable words on 1/4
-  (domain-agent step 5; claude 4/4); the candidate is to template them from
-  the refusing rule's `%%` line and the handle's display name, leaving the
-  model the sentence only — decided in phase 2 with the ask's wording;
+- ~~the `resource.words` of a missing answer~~ **settled 2026-10-14 (E13
+  step 2):** the words are the domain's, not the model's. The host's pair
+  table carries, per blocking side, what the person does to flip it
+  (`dog_host.WORDS`: `nobody` → "come where I can see you", `closed(P)` →
+  "open the way to {P}" with the handle's display name); the domain agent
+  fills `resource.words` from it and the model writes the sentence only.
+  E2B wrote usable words 1/4 (domain-agent step 5) and the corpus's own
+  words gave "bring me someone in front of me" (E13 step 2);
 
 - which functions move between the intent interface and the REPL API;
 - whether the surprise verbs (reset, explain, escalate) stay on the API
