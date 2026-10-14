@@ -40,6 +40,8 @@ type Config struct {
 	Rack      kernel.RackConfig
 	Narr      kernel.NarrConfig
 	Talk      TalkConfig
+	Loop      string    // "" or v2: the dog's two-pass path; v3: the orchestrator (DESIGN v3, orchestrator-agent step 2)
+	V3        V3Service // -loop v3's system turn and world
 }
 
 // Sink is where the agent's events go: the console backend's wire
@@ -109,6 +111,7 @@ type Agent struct {
 	st   *streamer
 
 	talk  *talker
+	v3    *v3 // -loop v3: the orchestrator, else nil (the dog path)
 	narrQ chan Narration
 	nmu   sync.Mutex
 	nseq  int
@@ -135,6 +138,15 @@ func New(cfg Config, l *llm.LLM, out Sink) (*Agent, error) {
 			return nil, err
 		}
 		a.talk = t
+	}
+	switch cfg.Loop {
+	case "", "v2":
+	case "v3":
+		if err := a.startV3(l); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("agent: no loop %q (v2 | v3)", cfg.Loop)
 	}
 	return a, nil
 }
@@ -194,6 +206,9 @@ func (a *Agent) narrate(n Narration) {
 // TIME/DATE answered by the clock, a question about the domains from the
 // rack, a command dispatched (its outcome comes back as a Task).
 func (a *Agent) Utterance(text string) (Turn, error) {
+	if a.v3 != nil {
+		return a.v3Utterance(text)
+	}
 	text = strings.TrimSpace(text)
 	prompt := a.Prompt()
 	var r *llm.Result
@@ -322,6 +337,10 @@ func (a *Agent) Heard(id, text string) {
 // Task is a host outcome for an emitted command (pipeline's onTask, floor
 // free): spoken as a narration when the command is still pending.
 func (a *Agent) Task(t Task) {
+	if a.v3 != nil {
+		a.v3Task(t)
+		return
+	}
 	if t.At.IsZero() {
 		t.At = time.Now()
 	}

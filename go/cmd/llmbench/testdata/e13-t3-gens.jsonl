@@ -1,0 +1,90 @@
+{"id": "G1-01", "rep": 0, "gens": ["{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"ROOM\",\"description\":\"living room\"}}", "I'm heading to the living room now."]}
+{"id": "G1-02", "rep": 0, "gens": ["{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"TAG\",\"description\":\"tag\"},\"tag_id\":3}", "I'm heading to tag three now."]}
+{"id": "G1-03", "rep": 0, "gens": ["{\"intent\":\"FIND\",\"target\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}", "I am now looking for the sofa."]}
+{"id": "G1-04", "rep": 0, "gens": ["{\"intent\":\"LOCAL_ACTION\",\"action\":\"TURN\",\"direction\":\"RIGHT\",\"angle_deg\":90}", "I am turning right ninety degrees now."]}
+{"id": "G1-05", "rep": 0, "gens": ["{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"fire extinguisher\"}}", "I am now looking at the fire extinguisher."]}
+{"id": "G1-06", "rep": 0, "gens": ["{\"intent\":\"LOCAL_ACTION\",\"action\":\"MOVE\",\"direction\":\"FORWARD\",\"distance_m\":0.5}", "I am moving forward now."]}
+{"id": "G1-07", "rep": 0, "gens": ["<|tool_call>call:reset{domain:<|\"|>kitchen<|\"|>,record:<|\"|>#1<|\"|>}<tool_call|>", "I have closed that surprise."]}
+{"id": "G1-08", "rep": 0, "gens": ["<|tool_call>call:activate{domain:<|\"|>nav<|\"|>}<tool_call|>", "I've activated the navigation domain."]}
+{"id": "G1-09", "rep": 0, "gens": ["<|tool_call>call:keep{}<tool_call|>", "I kept the context as is."]}
+{"id": "G1-10", "rep": 0, "gens": ["<|tool_call>call:keep{}<tool_call|>", "The kitchen domain was kept active."]}
+{"id": "G1-11", "rep": 0, "gens": ["<|tool_call>call:activate{domain:<|\"|>social<|\"|>}<tool_call|>", "I activated the social domain."]}
+{"id": "G1-12", "rep": 0, "gens": ["<|tool_call>call:deactivate{domain:<|\"|>nav<|\"|>}<tool_call|>", "I have deactivated the navigation domain."]}
+{"id": "G2-01", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>dog<|\"|>,question:<|\"|>why did the path to the kitchen get blocked?<|\"|>}<tool_call|>", "The dog agent is looking into it."]}
+{"id": "G2-02", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>dog<|\"|>,question:<|\"|>why was the command to stand up refused?<|\"|>}<tool_call|>", "The dog agent is looking into it."]}
+{"id": "G2-03", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>dog<|\"|>,question:<|\"|>why was following refused?<|\"|>}<tool_call|>", "The dog agent is looking into it; its answer follows."]}
+{"id": "G2-04", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>dog<|\"|>,question:<|\"|>why did my front leg overheat?<|\"|>}<tool_call|>", "The dog agent is looking into it."]}
+{"id": "G2-05", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>dog<|\"|>,question:<|\"|>why is the way to tag five blocked?<|\"|>}<tool_call|>", "The dog agent is looking into it."]}
+{"id": "G2-06", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>dog<|\"|>,question:<|\"|>why was the search refused?<|\"|>}<tool_call|>", "The dog agent is looking into it; its answer follows."]}
+{"id": "G2-07", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>kitchen<|\"|>,question:<|\"|>why does the move not explain it?<|\"|>}<tool_call|>", "The kitchen agent is looking into it."]}
+{"id": "G2-08", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>kitchen<|\"|>,question:<|\"|>why does the move not change pot onion +1, pot space -1?<|\"|>}<tool_call|>", "The kitchen agent is looking into it."]}
+{"id": "G2-09", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>kitchen<|\"|>,question:<|\"|>why does the move not explain it?<|\"|>}<tool_call|>", "The kitchen agent is looking into it."]}
+{"id": "G2-10", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>kitchen<|\"|>,question:<|\"|>why did the move not fire?<|\"|>}<tool_call|>", "I am looking into why the move did not fire."]}
+{"id": "G2-11", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>kitchen<|\"|>,question:<|\"|>why does the difference persist?<|\"|>}<tool_call|>", "I asked why the difference persisted."]}
+{"id": "G2-12", "rep": 0, "gens": ["<|tool_call>call:consult{domain:<|\"|>kitchen<|\"|>,question:<|\"|>why did the runtime not resume?<|\"|>}<tool_call|>", "I tried to reset the surprise, but the kitchen agent is looking into it."]}
+{"id": "G3-01-explains", "rep": 0, "gens": ["<|tool_call>call:explain{card:<|\"|>kitchen_shared<|\"|>,domain:<|\"|>kitchen<|\"|>,move:<|\"|>partner_load<|\"|>,record:<|\"|>#0<|\"|>}<tool_call|>"]}
+{"id": "G3-02-explains", "rep": 0, "gens": ["<|tool_call>call:explain{card:<|\"|>kitchen_shared<|\"|>,domain:<|\"|>kitchen<|\"|>,move:<|\"|>partner_load<|\"|>,record:<|\"|>#1<|\"|>}<tool_call|>"]}
+{"id": "G3-03-explains", "rep": 0, "gens": ["<|tool_call>call:explain{card:<|\"|>kitchen_shared<|\"|>,domain:<|\"|>kitchen<|\"|>,move:<|\"|>partner_load<|\"|>,record:<|\"|>#0<|\"|>}<tool_call|>"]}
+{"id": "G3-04-explains", "rep": 0, "gens": ["<|tool_call>call:explain{card:<|\"|>kitchen_shared<|\"|>,domain:<|\"|>kitchen<|\"|>,move:<|\"|>partner_load<|\"|>,record:<|\"|>#1<|\"|>}<tool_call|>"]}
+{"id": "G3-05-explains", "rep": 0, "gens": ["<|tool_call>call:explain{card:<|\"|>kitchen_shared<|\"|>,domain:<|\"|>kitchen<|\"|>,move:<|\"|>partner_load<|\"|>,record:<|\"|>#0<|\"|>}<tool_call|>"]}
+{"id": "G3-06-explains", "rep": 0, "gens": ["<|tool_call>call:explain{card:<|\"|>kitchen_shared<|\"|>,domain:<|\"|>kitchen<|\"|>,move:<|\"|>partner_load<|\"|>,record:<|\"|>#1<|\"|>}<tool_call|>"]}
+{"id": "G3-07-missing", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring a person into view for me to follow, please, or tell me where the person is located,you in front of me?\"}"]}
+{"id": "G3-08-missing", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you tell me where the sofa is located?\"}"]}
+{"id": "G3-09-missing", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you tell me where tag five is?\"}"]}
+{"id": "G3-10-missing", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me the onion dispenser refills from the pantry refill station in the kitchen refill onions in the dispenser?\"}"]}
+{"id": "G3-11-missing", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you turn the stove on?\"}"]}
+{"id": "G3-12-missing", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me some clean plates?\"}"]}
+{"id": "G3-13-noise", "rep": 0, "gens": ["<|tool_call>call:reset{domain:<|\"|>dog<|\"|>,record:<|\"|>c1<|\"|>}<tool_call|>"]}
+{"id": "G3-14-noise", "rep": 0, "gens": ["<|tool_call>call:reset{domain:<|\"|>dog<|\"|>,record:<|\"|>c1<|\"|>}<tool_call|>"]}
+{"id": "G3-15-noise", "rep": 0, "gens": ["<|tool_call>call:reset{domain:<|\"|>dog<|\"|>,record:<|\"|>c1<|\"|>}<tool_call|>"]}
+{"id": "G3-16-noise", "rep": 0, "gens": ["<|tool_call>call:reset{domain:<|\"|>kitchen<|\"|>,record:<|\"|>#1<|\"|>}<tool_call|>"]}
+{"id": "G3-17-noise", "rep": 0, "gens": ["<|tool_call>call:reset{domain:<|\"|>kitchen<|\"|>,record:<|\"|>#0<|\"|>}<tool_call|>"]}
+{"id": "G3-18-noise", "rep": 0, "gens": ["<|tool_call>call:reset{domain:<|\"|>kitchen<|\"|>,record:<|\"|>#1<|\"|>}<tool_call|>"]}
+{"id": "G3-19-unexplained", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>dog<|\"|>,record:<|\"|>c1<|\"|>,text:<|\"|>I stopped halfway because I did not reach the kitchen.<|\"|>}<tool_call|>"]}
+{"id": "G3-20-unexplained", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>dog<|\"|>,record:<|\"|>c1<|\"|>,text:<|\"|>my back legs did not move when I tried to sit down<|\"|>}<tool_call|>"]}
+{"id": "G3-21-unexplained", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>dog<|\"|>,record:<|\"|>c1<|\"|>,text:<|\"|>I turned only halfway and the reason for the incomplete turn is unknown.<|\"|>}<tool_call|>"]}
+{"id": "G3-22-unexplained", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>kitchen<|\"|>,record:<|\"|>#1<|\"|>,text:<|\"|>A pot onion increased by one and pot space decreased by one, and no move explains this.<|\"|>}<tool_call|>"]}
+{"id": "G3-23-unexplained", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>kitchen<|\"|>,record:<|\"|>#0<|\"|>,text:<|\"|>the pot has two more onions and no move adds two<|\"|>}<tool_call|>"]}
+{"id": "G3-24-unexplained", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>kitchen<|\"|>,record:<|\"|>#1<|\"|>,text:<|\"|>the pot onion count is one higher and the pot space count is one lower than the model predicts<|\"|>}<tool_call|>"]}
+{"id": "G5-01", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you turn on the hallway light?\"}"]}
+{"id": "G5-01", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you turn on the hallway light?\"}"]}
+{"id": "G5-01", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you turn on the hallway light?\"}"]}
+{"id": "G5-02", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me the storage room key?\"}"]}
+{"id": "G5-02", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me the storage room key?\"}"]}
+{"id": "G5-02", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me the storage room key?\"}"]}
+{"id": "G5-03", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you plug me into the charger to charge my battery up right now, please, so I can stand up nextmy charger?\"}"]}
+{"id": "G5-03", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you plug me into the charger to charge my battery up right now, please, so I can stand up nextmy charger?\"}"]}
+{"id": "G5-03", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you plug me into the charger to charge my battery up right now, please, so I can stand up nextmy charger?\"}"]}
+{"id": "G5-04", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me another pot?\"}"]}
+{"id": "G5-04", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me another pot?\"}"]}
+{"id": "G5-04", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me another pot?\"}"]}
+{"id": "G5-05", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me more onions?\"}"]}
+{"id": "G5-05", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me more onions?\"}"]}
+{"id": "G5-05", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me more onions?\"}"]}
+{"id": "G5-06", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me a clean bowl?\"}"]}
+{"id": "G5-06", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me a clean bowl?\"}"]}
+{"id": "G5-06", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me a clean bowl?\"}"]}
+{"id": "G5s-01", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Can you turn on the hallway light?\"}"]}
+{"id": "G5s-01", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you turn on the hallway light?\"}"]}
+{"id": "G5s-01", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you turn on the hallway light?\"}"]}
+{"id": "G5s-02", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me the storage room key?\"}"]}
+{"id": "G5s-02", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me the storage room key?\"}"]}
+{"id": "G5s-02", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me the storage room key?\"}"]}
+{"id": "G5s-03", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you plug me into the charger to charge my battery up for standing up again, please, or should my chargeremain low?\"}"]}
+{"id": "G5s-03", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you plug me into the charger to charge my battery up, please, so I can stand up again right-ofmy charger?\"}"]}
+{"id": "G5s-03", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you plug me into the charger to charge my battery up again right now, please, human owner of my charger?\"}"]}
+{"id": "G5s-04", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me another pot?\"}"]}
+{"id": "G5s-04", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me another pot?\"}"]}
+{"id": "G5s-04", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me another pot?\"}"]}
+{"id": "G5s-05", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me more onions?\"}"]}
+{"id": "G5s-05", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me more onions?\"}"]}
+{"id": "G5s-05", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me more onions?\"}"]}
+{"id": "G5s-06", "rep": 0, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me a clean bowl?\"}"]}
+{"id": "G5s-06", "rep": 1, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me a clean bowl?\"}"]}
+{"id": "G5s-06", "rep": 2, "gens": ["{\"call\":\"ask\",\"text\":\"Could you bring me a clean bowl?\"}"]}
+{"id": "G4-01", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>dog<|\"|>,record:<|\"|>c5<|\"|>,text:<|\"|>The kitchen door is closed again.<|\"|>}<tool_call|>"]}
+{"id": "G4-02", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>dog<|\"|>,record:<|\"|>c5<|\"|>,text:<|\"|>The battery is too low to stand.<|\"|>}<tool_call|>"]}
+{"id": "G4-03", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>dog<|\"|>,record:<|\"|>c5<|\"|>,text:<|\"|>I cannot follow you because no person is visible.<|\"|>}<tool_call|>"]}
+{"id": "G4-04", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>kitchen<|\"|>,record:<|\"|>#0<|\"|>,text:<|\"|>The onion dispenser is empty and I cannot load the onions.<|\"|>}<tool_call|>"]}
+{"id": "G4-05", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>kitchen<|\"|>,record:<|\"|>#1<|\"|>,text:<|\"|>The pot's scale is showing an incorrect count.<|\"|>}<tool_call|>"]}
+{"id": "G4-06", "rep": 0, "gens": ["<|tool_call>call:escalate{domain:<|\"|>kitchen<|\"|>,record:<|\"|>c5<|\"|>,text:<|\"|>the kitchen stove is on and the robot is in the kitchen, but the stove is not certified<|\"|>}<tool_call|>"]}

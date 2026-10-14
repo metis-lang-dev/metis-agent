@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"regexp"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/metis-lang-dev/metis-agent/go/internal/agent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/kernel"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
 )
@@ -82,95 +82,15 @@ type e10Gen struct {
 	MsFirst int64  `json:"ms_first"`
 	Ms      int64  `json:"ms"`
 	Err     string `json:"err,omitempty"`
+	Harness bool   `json:"harness,omitempty"` // -v3: a move the harness made, not generated
 }
 
+// callOf and canonJSON are the agent's (internal/agent v3reply.go): the
+// orchestrator's repeat guard matches on the same keys the bench does.
 var (
-	tCallRe = regexp.MustCompile(`call:([A-Za-z_]+)\{(.*)\}`)
-	tStrRe  = regexp.MustCompile(`<\|"\|>(.*?)<\|"\|>`)
+	callOf    = agent.CallOf
+	canonJSON = agent.CanonJSON
 )
-
-// callOf reads the first call in a generation: a native call
-// (call:NAME{k:<|"|>v<|"|>,…}) or a JSON object ({"call"|"intent":NAME,
-// k:v,…}). The key is NAME and the top-level string values in order,
-// joined by ':'; "" when there is no call.
-func callOf(text string) (name, key string) {
-	if i := strings.Index(text, "<|tool_call>"); i >= 0 || strings.HasPrefix(text, "call:") {
-		s := text[max(i, 0):]
-		if j := strings.Index(s, "<tool_call|>"); j >= 0 {
-			s = s[:j]
-		}
-		m := tCallRe.FindStringSubmatch(s)
-		if m == nil {
-			return "", ""
-		}
-		parts := []string{m[1]}
-		depth := 0 // top-level values only: nested objects are not part of the key
-		args := m[2]
-		for k := 0; k < len(args); k++ {
-			switch {
-			case args[k] == '{' || args[k] == '[':
-				depth++
-			case args[k] == '}' || args[k] == ']':
-				depth--
-			case depth == 0 && strings.HasPrefix(args[k:], `<|"|>`):
-				if v := tStrRe.FindStringSubmatch(args[k:]); v != nil {
-					parts = append(parts, v[1])
-					k += len(v[0]) - 1
-				}
-			}
-		}
-		return m[1], strings.Join(parts, ":")
-	}
-	i := strings.IndexByte(text, '{')
-	if i < 0 {
-		return "", ""
-	}
-	dec := json.NewDecoder(strings.NewReader(text[i:]))
-	var vals []string
-	depth, wantKey, key := 0, false, ""
-	for {
-		tok, err := dec.Token()
-		if err != nil {
-			return "", ""
-		}
-		switch t := tok.(type) {
-		case json.Delim:
-			if t == '{' || t == '[' {
-				depth++
-				if depth == 1 {
-					wantKey = true
-				}
-			} else {
-				depth--
-			}
-			if depth == 0 {
-				if name == "" {
-					return "", ""
-				}
-				return name, strings.Join(append([]string{name}, vals...), ":")
-			}
-			if depth == 1 && (t == '}' || t == ']') {
-				wantKey = true
-			}
-			continue
-		case string:
-			if depth == 1 && wantKey {
-				key, wantKey = t, false
-				continue
-			}
-			if depth == 1 {
-				if key == "call" || key == "intent" {
-					name = t
-				} else {
-					vals = append(vals, t)
-				}
-			}
-		}
-		if depth == 1 {
-			wantKey = true
-		}
-	}
-}
 
 func readE10(path string) ([]e10Item, error) {
 	f, err := os.Open(path)
@@ -255,7 +175,7 @@ func runE10(l *llm.LLM, corpus, arms, groups, ids, tag string, seed uint32, emit
 }
 
 type e10Run struct {
-	l         *llm.LLM
+	l         agent.DialogLLM
 	it        e10Item
 	rep       int
 	seed      uint32
@@ -337,27 +257,6 @@ func (r *e10Run) by(how string) string {
 		return r.name
 	}
 	return r.key
-}
-
-// canonJSON is the first JSON object in a generation with its keys sorted,
-// compact, HTML characters unescaped: tools/e11-corpus.py writes the same
-// with json.dumps(sort_keys=True, separators=(",", ":"), ensure_ascii=False).
-func canonJSON(text string) string {
-	i := strings.IndexByte(text, '{')
-	if i < 0 {
-		return ""
-	}
-	var v any
-	if err := json.NewDecoder(strings.NewReader(text[i:])).Decode(&v); err != nil {
-		return ""
-	}
-	var b strings.Builder
-	enc := json.NewEncoder(&b)
-	enc.SetEscapeHTML(false)
-	if err := enc.Encode(v); err != nil {
-		return ""
-	}
-	return strings.TrimSuffix(b.String(), "\n")
 }
 
 // dumpE10 writes the decide seat as the harness renders it from the cards

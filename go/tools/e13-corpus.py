@@ -349,6 +349,54 @@ def guarded(gpath, refused_j=None, refused_t=None, also_t=()):
     return steps
 
 
+# ── the same items as the agent's events (--final: grammar/e13-scenarios.jsonl) ──
+# E13 step 2 replays the corpus through internal/agent (llmbench -v3): the
+# scenario holds only what the domains and the dialog's past give the agent
+# (the person's words, the calls made, the generic replies); the rendering,
+# the branch, the cue, the grammar, the guard and the templates are the
+# agent's. "answers" is the emulated domains' table for the move.
+
+SCENARIOS = "grammar/e13-scenarios.jsonl"
+
+
+def ev(op, **kv):
+    return dict({"op": op}, **kv)
+
+
+def ev_dog_past(utt, j, cid):
+    return ev("past", person=utt, said=j, id=cid, spoken=e11.ACKS.get(j["intent"], "Okay."))
+
+
+def ev_kitchen(ctx, k, record):
+    """kitchen_ctx's events: the surprise or the context change, the call made."""
+    if ctx in ("explain", "reset"):
+        s = e11.SUR[k % 2]
+        body = e11.SURPRISE.format(nxt="Next reading: the difference persists.", **s).split("\n", 1)[1]
+        name, args = as_t(e11.EXPLAIN if ctx == "explain" else e11.RESET, "#%d" % s["rec"])
+        wake = ev("wake", reply={"domain": "kitchen", "kind": "surprise", "record": "#%d" % s["rec"],
+                                 "difference": s["diff"], "text": body})
+        return [wake, ev("said", call={"name": name, "args": args})], name, args
+    said, call = ctx
+    name, args = as_t(call, record)
+    return [ev("context", text=said), ev("said", call={"name": name, "args": args})], name, args
+
+
+def ans(by, key, rep):
+    return {"by": by, "key": key, "reply": rep}
+
+
+def ans_after_move(cid, dom):
+    """after_t_move's table, by the move's name."""
+    return [ans("name", "explain", {"domain": dom, "kind": "result", "id": cid, "status": "admitted",
+                                    "text": "The explanation is adopted and the kitchen resumes."}),
+            ans("name", "reset", {"domain": dom, "kind": "result", "id": cid, "status": "accepted",
+                                  "text": "The runtime resumes on its model."}),
+            ans("name", "escalate", {"domain": dom, "kind": "result", "id": cid, "status": "accepted",
+                                     "text": "It goes to the people who revise the model."}),
+            ans("name", "consult", {"domain": dom, "kind": "result", "id": cid, "status": "accepted",
+                                    "text": "The %s agent is looking into it; its answer follows." % dom})]
+
+
 # ── the items ────────────────────────────────────────────────────────────────
 
 def main():
@@ -360,11 +408,26 @@ def main():
     (GO / GDIR).mkdir(exist_ok=True)
     p = prompt()
     (GO / PROMPT).write_text(p)
-    items = []
+    items, scen = [], []
 
     def add(group, iid, steps, rule, reps=1):
         items.append({"id": iid, "group": group, "arm": "T-api", "prompt": PROMPT, "reps": reps,
                       "steps": steps, "rule": rule})
+
+    def add_scen(group, iid, events, answers, reps=1, sampled=False):
+        s = {"id": iid, "group": group, "arm": "T-api", "prompt": PROMPT, "reps": reps, "events": events + [ev("move")],
+             "answers": answers}
+        if sampled:
+            s["sampled_moves"] = True
+        scen.append(s)
+
+    def refused_reply(dom, cid, status, reason, alts=None, text=None):
+        r = {"domain": dom, "kind": "result", "id": cid, "status": status, "reason": reason}
+        if alts:
+            r["alternatives"] = alts
+        if text:
+            r["text"] = text
+        return r
 
     # G1: refused with alternatives → one of them (dog J, kitchen T)
     for n, (dom, ctx, j, reason, alts) in enumerate(e11.G1, 1):
@@ -375,6 +438,8 @@ def main():
                    for a in alts}
             steps += e11.speak_after(acc, by="canon")
             rule = {"domain": dom, "refused": canon(j), "alts": [canon(a) for a in alts], "reason": reason, "n_alts": len(alts)}
+            add_scen("G1", "G1-%02d" % n, [ev_dog_past(ctx, j, "c1"), ev("reply", reply=refused_reply(dom, "c1", "refused", reason, alts))],
+                     [ans("canon", canon(a), {"domain": dom, "kind": "result", "id": "c2", "status": "accepted"}) for a in alts])
         else:
             ctx_text, name, args = kitchen_ctx(ctx, n, "c1")
             talts = [as_t(a, args.get("record", "c1")) for a in alts]
@@ -393,6 +458,13 @@ def main():
                       inject(END)]
             rule = {"domain": dom, "refused": canon(t_dict(name, args)), "alts": [canon(t_dict(an, aa)) for an, aa in talts],
                     "reason": reason, "n_alts": len(alts)}
+            evs, _, _ = ev_kitchen(ctx, n, "c1")
+            add_scen("G1", "G1-%02d" % n, evs + [ev("reply", reply=refused_reply(dom, "c1", "refused", reason, alt_txt,
+                                                                                 "That was refused: %s." % reason))],
+                     [ans("key", tkey(an, aa), {"domain": "kitchen", "kind": "result", "id": "c2",
+                                                "status": "admitted" if an == "reset" else "applied",
+                                                "text": "Done: the runtime resumes on its model." if an == "reset" else "Done."})
+                      for an, aa in talts])
         add("G1", "G1-%02d" % n, steps, rule)
 
     # G2: refused / failed, none → consult(the refused call's domain)
@@ -410,6 +482,13 @@ def main():
             refused = canon(t_dict(name, args))
         steps += after_t_move("c2", dom)
         add("G2", "G2-%02d" % n, steps, {"domain": dom, "refused": refused, "reason": reason, "status": status})
+        if dom == "dog":
+            evs = [ev_dog_past(ctx, j, "c1"), ev("reply", reply=refused_reply(dom, "c1", status, reason))]
+        else:
+            evs, _, _ = ev_kitchen(ctx, n, "c1")
+            evs.append(ev("reply", reply=refused_reply(dom, "c1", status, reason, text="That %s: %s." % (
+                "was refused" if status == "refused" else "failed", reason))))
+        add_scen("G2", "G2-%02d" % n, evs, ans_after_move("c2", dom))
 
     # G3 / G5 / G5s: a consult answered (sync) → the move of its answer_kind
     def consult_item(group, iid, dom, ctx, j, status, reason, resp, reps=1, k=0, sampled=False):
@@ -439,6 +518,15 @@ def main():
         steps += after_t_move("c3", dom)
         add(group, iid, steps, {"domain": dom, "kind": resp["kind"], "refused": refused, "reason": reason,
                                 "response": resp, "record": record}, reps)
+        if dom == "dog":
+            evs = [ev_dog_past(ctx, j, "c1"), ev("reply", reply=refused_reply(dom, "c1", status, reason))]
+        else:
+            evs, _, _ = ev_kitchen(ctx, k, "c1")
+            evs.append(ev("reply", reply=refused_reply(dom, "c1", status, reason, text="That %s: %s." % (
+                "was refused" if status == "refused" else "failed", reason))))
+        env = {x: v for x, v in env.items() if x != "note"}
+        evs += [ev("said", call={"name": q[0], "args": q[1]}), ev("reply", reply=env)]
+        add_scen(group, iid, evs, ans_after_move("c3", dom), reps, sampled)
 
     n = 0
     for kind in ("explains", "missing", "noise", "unexplained"):
@@ -525,12 +613,51 @@ def main():
             refused = canon(t_dict(name2, args2))
         steps += after_t_move("c6", dom)
         add("G4", "G4-%02d" % n, steps, {"domain": dom, "refused": refused, "reason": reason, "record": record})
+        env = {x: v for x, v in env.items() if x != "note"}
+        consulted = [ev("said", call={"name": q[0], "args": q[1]}), ev("reply", reply=env)]
+        if dom == "dog":
+            evs = [ev_dog_past(ctx, j, "c1"), ev("reply", reply=refused_reply(dom, "c1", "refused", reason))] + consulted
+            if isinstance(gold, dict):
+                evs.append(ev("said", j=gold))
+            else:
+                evs += [ev("said", call={"name": gold[0], "args": gold[1]}),
+                        ev("reply", reply={"domain": dom, "kind": "result", "id": "c3", "status": "accepted", "text": "Resumed."}),
+                        ev("spoke", text=TEMPLATES["reset"])]
+            evs += [ev("end"), ev_dog_past(again, j, "c5"), ev("reply", reply=refused_reply(dom, "c5", "refused", reason))]
+        else:
+            evs, name, args = ev_kitchen(ctx, 0, "c1")
+            evs += [ev("reply", reply=refused_reply(dom, "c1", "refused", reason, text="That was refused: %s." % reason))] + consulted
+            if gold == "reset":
+                evs += [ev("said", call={"name": "reset", "args": {"domain": "kitchen", "record": args["record"]}}),
+                        ev("reply", reply={"domain": "kitchen", "kind": "result", "id": "c3", "status": "accepted", "text": "Resumed."}),
+                        ev("spoke", text=TEMPLATES["reset"])]
+            elif gold == "escalate":
+                evs += [ev("said", call={"name": "escalate", "args": {
+                            "domain": "kitchen", "record": args.get("record", "c1"),
+                            "text": "the kitchen stove has no certificate and nothing explains it"}}),
+                        ev("reply", reply={"domain": "kitchen", "kind": "result", "id": "c3", "status": "accepted", "text": "Sent."}),
+                        ev("spoke", text=TEMPLATES["escalate"])]
+            else:
+                evs.append(ev("said", j=gold))
+            evs.append(ev("end"))
+            if ctx == "reset":
+                evs += ev_kitchen("reset", 1, "c5")[0]
+            elif ctx == "explain":
+                evs += [ev("person", text=again), ev("said", call={"name": name2, "args": args2})]
+            else:
+                evs += [ev("context", text=again), ev("said", call={"name": name2, "args": args2})]
+            evs.append(ev("reply", reply=refused_reply(dom, "c5", "refused", reason, text="That was refused again: %s." % reason)))
+        add_scen("G4", "G4-%02d" % n, evs, ans_after_move("c6", dom))
 
     for path, body in GRAMMARS.items():
         (GO / path).write_text(body)
     with open(GO / CORPUS, "w") as f:
         for it in items:
             f.write(json.dumps(it, ensure_ascii=False) + "\n")
+    if FINAL:
+        with open(GO / SCENARIOS, "w") as f:
+            for s in scen:
+                f.write(json.dumps(s, ensure_ascii=False) + "\n")
     by = {}
     for it in items:
         by[it["group"]] = by.get(it["group"], 0) + 1

@@ -1298,3 +1298,80 @@ gain over J is the amendments', as reported, and T's +1.2 k prefix is
 accepted for the API side: these calls are rare against intents.
 
 **Step 2 opens:** `go/internal/agent` behind `-loop v3` with the above.
+
+## E13 step 2 — the pieces in the agent, E13's corpus replayed through it (opus, 2026-10-14; s-c9276dee)
+
+**Question.** With the E11/E13 pieces moved into `go/internal/agent` behind `-loop v3`, does E13's corpus give the same numbers through the agent, not the bench's script? Then, with the step 1 ruling applied, what changes?
+
+**What moved in** (`internal/agent`: `orch.go`, `v3reply.go`, `v3text.go`, `v3service.go`):
+- **The generic reply in** (`Reply`, the table's fields, py/metis_agent/reply.py's shape). The agent renders it in one of two ways:
+  - an intent's outcome as the runtime's user turn;
+  - a REPL call's reply as a `<|tool_response>` with the cue as its `note`.
+- **Two interfaces out:** a J intent (or the person's `ask`) and a T call of the REPL API (`APIDeclarations`: the twelve verbs, the template's macros).
+- **The branch from the reply:**
+  - **alts:** a refusal with alternatives (offered REPL calls are read `verb(v, v)` against the verb's required parameters);
+  - **none:** a refusal or failure with no alternatives;
+  - **answer:** a consult reply;
+  - **again:** the same (domain, verb, reason) refused again;
+  - **surprise.**
+- **The branch's cue and grammar,** E13 t3's.
+- **The repeat guard:**
+  - a refused J call → a note in a user turn;
+  - a refused T call or a consult already made → a note as its reply;
+  - two retries.
+- **The lines after the move:**
+  - after a surprise verb closing an answer or an again: the templated explains, reset or escalate line;
+  - otherwise: the speak cue, then the model's line;
+  - an ask is itself the line.
+- **The ruling's three switches** (`V3Config`, all off = t3):
+  - `AskCheck`: the resource's words in the cue, one question under a plain ask grammar, the words checked after generation and a miss re-asked;
+  - `AgainPick`: on the same refusal again, the harness picks from the earlier consult's answer (missing and the first again → ask once more, else escalate);
+  - `EscalateTemplate`: the escalate call is the harness's, with the consult's finding first, then on an again what the earlier answer was, then the surprise's difference.
+
+**The replay** (`llmbench -v3`, `cmd/llmbench/v3.go`):
+- **The scenarios:** `tools/e13-corpus.py --final` also writes `grammar/e13-scenarios.jsonl`, the same 66 items as the agent's events: the past turn, the person, a context change, a surprise, the calls made, the replies, the lines spoken, the move. Each also carries the emulated domains' answers to the move. The bench corpora stay byte-identical.
+- **The agent's part:** the rendering, the branch, the cue, the grammar, the guard and the templates.
+- **`TestV3ParityT3` (no model):** the bench's script and the agent's replay both run against a recorder that answers with t3's generations. On all 90 runs they decode the same chunks and generate under the same grammars and samplers. Mutation-checked: a changed template or grammar rule fails 6 runs each.
+
+**Results, E2B Q4 on the GPU, seed 1, ~1 min each.**
+
+| | t3 (bench, step 1) | step 2 parity (agent, ruling off) | step 2 ruled (agent) |
+|---|---|---|---|
+| G1 / G2 / G3 / G4 | 12 / 12 / 24 / 6 | 12 / 12 / 24 / 6 | 12 / 12 / 24 / 6 |
+| G5 ask, naming the resource | 18/18, 18/18 | 18/18, 18/18 | 18/18, 18/18 |
+| repeats; leaks/claims | 0; 0 of 48 lines | 0; 0 of 48 | 0; 0 of 51 |
+| model moves; harness moves | 90; 0 | 90; 0 | 81; 9 |
+| generations identical to t3 | — | **114/114** (text and n_ctx) | 62 of 90 runs |
+
+- **Parity holds gen for gen.** All 114 generations equal step 1's t3 in text and in the tokens in context at each. The score file is t3's line for line. A rerun of each mode gives the same records.
+- **What the ruling changes is exactly its targets.** The 28 runs that differ are the missing and unexplained items of G3, G4, and G5/G5s-01 and -03. The other 62 runs (G1, G2, G3 explains/noise, the other G5 items) are unchanged.
+- **The asks are clean** without the literal: "Could you put onions in the dispenser?" (G3-10, was "…refill station in the kitchen refill onions in the dispenser?"), "Could you bring me the charger?" (G5-03, was "…stand up nextmy charger?"). The word check never missed, so the re-ask is covered by `TestV3Ruled` only, not by the model.
+- **The harness's escalations** read as the ruling has them:
+  - G3-22: "A dish is gone and no card's move removes a dish; pot onion +1, pot space -1".
+  - G4-05: "The pot's scale misread once; set aside as noise, happened again; pot onion +1, pot space -1".
+  - G4-06: "…; escalated once, happened again".
+- **G4 now asks on the three missing items, escalates on the other three.**
+
+**Read by eye, beyond the scorer:**
+- **The again-ask does not say "still"** (0/3): "Is the kitchen door open now?", "Could you put onions in the dispenser?". G4-03's "Are you still in front of me?" gets the situation wrong: the refusal says nobody is in view.
+- **G3-07 asks the wrong person:** "Could you bring me someone in front of me?" (the resource is "you in front of me"). The scorer's word rule passes it.
+- **The surprise difference in G3-22/24** is the corpus's shared kitchen surprise (`SUR`), not the item's: E11's items reuse two surprises for every kitchen context. The harness copies it faithfully. The data, not the template, is what is off.
+- **The scenarios' REPL replies after reset and escalate still say `accepted`** (t3's data). The agent logs each one as not final per DESIGN v3. Nothing generates after them, so the numbers do not move; step 3's emulated domains answer final.
+
+**The service** (`cmd/metis-agent -loop v3`, config `v3:`):
+- **Its own context.** The orchestrator runs on a sibling context of the same model; the dog path's prefix and KV are untouched.
+- **The person's turn** is the intent interface's two-pass inside the dialog (its record is the scenario's `past`). The intent goes to the dog's dispatcher, its id is kept, and its outcome comes back as a generic reply: a refusal moves, anything else is spoken.
+- **No domain agent yet.** The REPL API is answered with an error reply until step 3's emulated domains plug in.
+- **Spoken lines are guarded.** Lines the orchestrator speaks unasked pass the dog path's guard.
+- **No journal compaction.** Near the context's end the dialog starts over.
+- **`-loop v2` (the default) is unchanged.** `Utterance` and `Task` divert only when the v3 orchestrator exists. `TestLoopFlag` (GPU, skips when busy) checks that v2's intent equals the dog's two-pass, and runs v3 on a turn and a refused outcome.
+- **The live person turn is not measured.** On the first run its spoken line began with a forged `⟪metis seq=0 …⟫` span (E6's failure; the guard turns it into "Okay."). Step 3's dialog-control corpus measures it.
+
+**Reproduce** (from `go/`):
+```
+python3 tools/e13-corpus.py --final
+./build.sh llmbench && ./build.sh test ./cmd/llmbench ./internal/agent
+./bin/llmbench -model models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf -ngl 99 -threads 4 -n_ctx 8192 -pass2_seed 1 \
+  -v3 grammar/e13-scenarios.jsonl [-v3-ruled] -tag e13-step2-{parity,ruled} -jsonl results/e13/step2-{parity,ruled}.jsonl
+python3 tools/e11-score.py results/e13/step2-ruled.jsonl --corpus grammar/e13-corpus-final.jsonl --title "E13 step 2, ruled"
+```

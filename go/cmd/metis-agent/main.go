@@ -62,7 +62,15 @@ type config struct {
 	Domains        []agent.DomainConfig `yaml:"domains"`
 	Rack           kernel.RackConfig    `yaml:"rack"`
 	Narr           kernel.NarrConfig    `yaml:"narr"`
-	WS             struct {
+	V3             struct {
+		Prompt  []string          `yaml:"prompt"`  // the orchestrator's system turn, files concatenated
+		Catalog []string          `yaml:"catalog"` // the domains activate attaches
+		Loaded  []string          `yaml:"loaded"`
+		Display map[string]string `yaml:"display"` // a card's display name (the explains line)
+		NCtx    int               `yaml:"n_ctx"`
+		Ruled   *bool             `yaml:"ruled"` // the E13 step 1 ruling (default on)
+	} `yaml:"v3"`
+	WS struct {
 		Addr  string `yaml:"addr"`
 		UIDir string `yaml:"ui_dir"`
 	} `yaml:"ws"`
@@ -75,6 +83,7 @@ func main() {
 	uiDir := flag.String("ui-dir", "", "serve this static UI at / (fsttm-web web/; overrides ws.ui_dir)")
 	addr := flag.String("addr", "", "listen address (overrides ws.addr)")
 	noDomains := flag.Bool("no-domains", false, "attach no domain (the persona alone: the parity bar)")
+	loop := flag.String("loop", "v2", "v2: the dog's two-pass path; v3: the orchestrator agent (DESIGN v3; config v3:)")
 	waitViewer := flag.Bool("wait-viewer", false, "attach the domains when the first page connects (it hears the run from its start)")
 	flag.Parse()
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
@@ -133,9 +142,20 @@ func main() {
 	defer l.Close()
 	log.Printf("[llm] %s: template=%s", cfg.LLM.Model, l.Template())
 
+	var v3 agent.V3Service
+	if *loop == "v3" {
+		if len(cfg.V3.Prompt) == 0 {
+			log.Fatal("-loop v3 needs v3.prompt in the config")
+		}
+		for _, f := range cfg.V3.Prompt {
+			v3.Prompt = append(v3.Prompt, mustRead(f))
+		}
+		v3.Catalog, v3.Loaded, v3.Display, v3.NCtx, v3.Ruled = cfg.V3.Catalog, cfg.V3.Loaded, cfg.V3.Display, cfg.V3.NCtx, cfg.V3.Ruled
+	}
+
 	srv := console.New(cfg.WS.UIDir)
 	a, err := agent.New(agent.Config{Persona: persona, GBNF: gbnf, StopWords: stopWords, Ages: ages,
-		Rack: cfg.Rack, Narr: cfg.Narr,
+		Rack: cfg.Rack, Narr: cfg.Narr, Loop: *loop, V3: v3,
 		Talk: agent.TalkConfig{System: talkSys, NCtx: cfg.Talk.NCtx, Keep: cfg.Talk.Keep,
 			Sampling: llm.Sampling{Temp: cfg.Talk.Temperature, TopK: cfg.Talk.TopK, TopP: cfg.Talk.TopP,
 				MinP: cfg.Talk.MinP, Repeat: cfg.Talk.Repeat, MaxToks: cfg.Talk.MaxTokens}}}, l, srv)

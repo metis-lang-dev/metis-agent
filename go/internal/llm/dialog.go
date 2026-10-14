@@ -16,7 +16,8 @@ import (
 // E10 (MODEL-EXPERIMENTS.md, llmbench -e10): a scripted dialog driven turn
 // by turn — the bench injects the rendered turns (user turns, the
 // runtime's responses, signals, cues) and generates only where the model
-// answers. Bench only; the harness keeps TwoPass, Narrate and Decide.
+// answers. The orchestrator agent (internal/agent Orch, -loop v3) runs on
+// it, on a sibling context; the dog path keeps TwoPass, Narrate and Decide.
 
 // BeginDialog puts the KV at the cached system prefix (priming it when the
 // prompt changed) and returns the token count there.
