@@ -85,6 +85,7 @@ func main() {
 	cfgPath := flag.String("config", "config.agent.yaml", "YAML config")
 	uiDir := flag.String("ui-dir", "", "serve this static UI at / (fsttm-web web/; overrides ws.ui_dir)")
 	addr := flag.String("addr", "", "listen address (overrides ws.addr)")
+	libDir := flag.String("lib-dir", "", "serve this directory at /lib/ (fsttm-web's lib/; default <ui-dir>/../lib when it has dialog.js)")
 	noDomains := flag.Bool("no-domains", false, "attach no domain (the persona alone: the parity bar)")
 	loop := flag.String("loop", "v2", "v2: the dog's two-pass path; v3: the orchestrator agent (DESIGN v3; config v3:)")
 	waitViewer := flag.Bool("wait-viewer", false, "attach the domains (v2), start the domain agents' clock (v3) when the first page connects (it hears the run from its start)")
@@ -158,6 +159,9 @@ func main() {
 	}
 
 	srv := console.New(cfg.WS.UIDir)
+	if *libDir != "" {
+		srv.LibDir = *libDir
+	}
 	if *waitViewer && *loop == "v3" && len(v3.Domains) > 0 {
 		v3.Start = srv.Joined()
 	}

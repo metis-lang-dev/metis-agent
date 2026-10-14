@@ -8,7 +8,7 @@
 #   ./run.sh status     running or not, the URL, the GPU
 #   ./run.sh log        follow the service's log
 #
-#   CONFIG=go/config.v3-live.yaml   UI_DIR=<page dir>   ADDR=:8395
+#   CONFIG=go/config.v3-live.yaml   UI_DIR=<page dir>   LIB_DIR=../fsttm-web/lib   ADDR=:8395
 #
 # The page: fsttm-web/web/ beside this repo (UI_DIR= another). Every typed or spoken line is a person turn of the orchestrator
 # (-loop v3 has no talk mode; the page's "replies" toggle does nothing).
@@ -60,6 +60,9 @@ if running; then echo "already running (pid $(cat "$PID")) — $URL"; exit 0; fi
 UI_DIR="${UI_DIR:-$(cd "$ROOT/.." && pwd)/fsttm-web/web}"
 case "$UI_DIR" in /*) ;; *) UI_DIR="$ROOT/$UI_DIR" ;; esac
 [ -f "$UI_DIR/index.html" ] || { echo "no page at $UI_DIR (set UI_DIR)" >&2; exit 1; }
+# fsttm-web's library (lib/dialog.js …) at /lib/, beside whichever page
+LIB_DIR="${LIB_DIR:-$(cd "$ROOT/.." && pwd)/fsttm-web/lib}"
+[ -f "$LIB_DIR/dialog.js" ] || { echo "no fsttm-web lib at $LIB_DIR (set LIB_DIR)" >&2; exit 1; }
 [ -x "$ROOT/py/.venv/bin/python" ] || { echo "no py/.venv — the domain agents need it (cd py && python3 -m venv .venv && .venv/bin/pip install -e .)" >&2; exit 1; }
 
 # build if the binary is missing or older than a Go source
@@ -76,7 +79,7 @@ if [ -s "$J" ]; then
 fi
 
 cd "$GO"
-nohup "$BIN" -config "$CONFIG" -loop v3 -no-domains -wait-viewer -addr "$ADDR" -ui-dir "$UI_DIR" >"$LOG" 2>&1 &
+nohup "$BIN" -config "$CONFIG" -loop v3 -no-domains -wait-viewer -addr "$ADDR" -ui-dir "$UI_DIR" -lib-dir "$LIB_DIR" >"$LOG" 2>&1 &
 echo $! >"$PID"
 
 # up when the console serves (the model and the domain agents load first)
