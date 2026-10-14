@@ -1,6 +1,7 @@
 # The specialist — LLM-CML-LL: the model as the kernel's user
 
-Status: design, 2026-10-13 (architect). Decisions by the user are marked
+Status: design, 2026-10-13 (architect); aligned to DESIGN v3's agentic
+model 2026-10-14 (§1b, §2, §3). Decisions by the user are marked
 **(user)**. Implementer: nina (runtime, tool loop), opus (corpus, scoring).
 Companions: DESIGN.md (the orchestrator contract), CML.md (the tape and
 its regions), FRAMEWORK.md (the executive as built), RAG.md §11–12
@@ -14,7 +15,7 @@ The same certified kernel serves two applications with the roles reversed:
 |---|---|---|
 | who is in charge | the metis runtime: signals up, intents down, exactly once, no deadlines | the LLM: it asks, the kernel answers |
 | the LLM is | a proposer and a narrator | the user of the REPL |
-| its tools | calls with async outcomes (E10's IO) | the REPL verbs, synchronous |
+| its tools | down: J intents (async, world-changing) and the REPL API (T, sync: activate, state, why, consult, …); up: one generic reply (DESIGN v3) | the kernel's REPL verbs, synchronous |
 | latency | matters; a small model | secondary; any model |
 | output | behaviour: the robot, navigation, interaction | understanding: an explanation, a what-if, a formalization proposal |
 | where | metis-agent `go/` today (FRAMEWORK.md): the wrapper around the C++ IR runtime; whether it stays in metis-agent is decided later | metis-agent `py/`, this doc |
@@ -23,6 +24,41 @@ They intersect in the Decide step: a surprise wakes the executive's model
 with cards, it proposes explanations, the runtime scores them. That is a
 small specialist act inside the executive, and E8's narration from the
 script RAG is the specialist's reading side used there.
+
+### 1b. Where the specialist sits in DESIGN v3 (2026-10-14)
+
+DESIGN v3 splits the executive into two agents on one kernel: the
+**orchestrator agent** (one per device, `go/internal/agent`) and the
+**domain agent** (one per loaded domain, `py/metis_agent`). The domain
+agent's components are the narrator, the mapper (intent → atom), the
+replier (outcome tokens → the generic reply) and the **consultant**. The
+consultant *is* this document's loop: `loop.py` unchanged, run on the live
+session in a fork it never leaves, answering the orchestrator's REPL API
+`consult(domain, question)` with one closing `answer` tool whose kinds,
+cards and moves are restricted to the situation (domain-agent step 3). So
+the Decide step above is now: surprise → the orchestrator's `consult` →
+the domain agent's consultant → the specialist loop over the kernel.
+
+Three consequences for this document:
+- **Two T surfaces, two levels.** The orchestrator's REPL API (DESIGN v3:
+  activate, deactivate, state, ctx, events, why, findings, consult, reset,
+  explain, escalate) is the orchestrator's view of a *domain agent*. The
+  specialist's sixteen verbs (§7) are the *kernel's* REPL. The names
+  overlap (state, ctx, events, why, findings) because the domain agent
+  answers the first by calling the second; they are not the same
+  declarations and are never in one prefix.
+- **A computed `missing` needs no model.** After a refusal whose blocker is
+  a side of a host pair, kind, atom, words (`dog_host.WORDS`) and text
+  (the refusing rule's `%%` line) are the harness's, calls 0 (DESIGN,
+  2026-10-14; nina f1bb6f8). The seat is consulted only where something is
+  open: a surprise, a failure, a non-flippable blocker, a host without a
+  words table, the person's own question. S1 measures exactly that open
+  part.
+- **Consult pins apply to the seat.** A fresh context per consult; the
+  harness's first read in the band (the refusal's `why`, or the surprise's
+  difference and cards); the answer tool's enums restricted by situation;
+  the closing turn pinned at max calls. These are the domain agent's
+  harness rules, and S1's loop carries them when run as the consultant.
 
 **Decisions (user).** The specialist is metis-agent's, as DESIGN.md states
 the interaction with the metis runtime; it is not metis-loop's. The LLM
@@ -34,17 +70,22 @@ formalization, its stable design and tests; nothing here imports it.
 
 ## 2. The boundary, so the halves do not rot
 
-- `go/` is the executive today: the service, the wire, the domains, the
-  page, over the C++ IR runtime it wraps. E10 was its protocol test (J-text
-  stays). It does not gain specialist code. Whether `go/` stays in
-  metis-agent or moves beside the runtime it wraps is a later decision
-  (user, 2026-10-13); nothing here depends on the answer.
-- `py/` is the specialist: the Python LLM runtime, the CML tape, the REPL
-  tool loop, its benches. Experimental until §6's reads are in.
+- `go/` is the orchestrator agent and the executive's service: the wire,
+  the page, `internal/agent` (E13), the emulated domains (`domemu`), over
+  the C++ IR runtime it wraps. E10 was its protocol test (J-text stays).
+  It does not gain specialist code. Whether `go/` stays in metis-agent or
+  moves beside the runtime it wraps is a later decision (user,
+  2026-10-13); nothing here depends on the answer.
+- `py/` is the domain agent and, inside it, the specialist: the Python
+  LLM runtime, the seats, the REPL tool loop (the consultant), the
+  narrator, mapper and replier, the CML tape, the benches. Experimental
+  until §6's reads are in.
 - Shared: the kernel (metispy `metis.lang`, imported in-process), the
-  catalogs (metis-catalog), the docs. Nothing else. `go/` and `py/` share
-  no code; what they share is the kernel's REPL surface and the CML
-  vocabulary.
+  catalogs (metis-catalog, with each domain's host: pairs, words, keys),
+  the docs, and one wire: the domain agent's JSON lines (typed intents and
+  REPL calls down, the generic reply up), which `domemu` speaks for phase
+  2 and `py/metis_agent/domain_agent.py` speaks for phase 3. `go/` and
+  `py/` share no code.
 - One decision deferred, not drifting: if the specialist proves out and
   the executive's LLM should move to Python too, that is one ruling after
   §6, not a gradual port. Until then the two adapters are allowed to
@@ -129,8 +170,8 @@ chance), sufficiency 0.5 against 0.25. Twenty items, five per kind:
 | kind | example | the instrument that answers it |
 |---|---|---|
 | trace | "how many crossings until the goat is across?" | run, events, state |
-| why | "why did the pot overflow?" | why / explain, findings |
-| what-if | "what if the second cook stops loading?" | do, fork, run, undo |
+| why | "why is the red block clear?" | why, findings |
+| what-if | "what if the small disc moves to the third peg first?" | do, fork, run, back, undo |
 | necessity | "was the first crossing of the two slowest necessary for fifteen?" | necessity, sufficiency |
 
 Each item: the catalog, the question, the expected instrument(s), the
@@ -216,8 +257,9 @@ decision).
   service. The architect stops and restarts the service for a measured
   window on request.
 - **Kernel bug, not ours:** `narrate user` substitutes a binding into a
-  row's `%%` doc ("far farmer with a wolf"). Filed to the metis line
-  (opus) as a metispy fix.
+  row's `%%` doc ("far farmer with a wolf"). Filed to the metis line;
+  fixed in metispy 9ff4bd8 (2026-10-14: role letters replaced outside
+  quotes only).
 - **What E2B did on four items, informally:** finds `why` once the ctx
   band shows the atoms; misses the interventions; repeats refused calls.
   S1 (step 2) measures it properly, with the guard and the frozen
@@ -245,7 +287,8 @@ decision).
   still a repeat.
 - **The ctx band's `forced/do` count disagrees with `do` after a setup
   `step EVENT`** (band: `1 forced/do`; `do`: none). Kernel bookkeeping, not
-  ours: filed to the metis line as the narrate-user bug was. Consequence
+  ours: filed to the metis line as the narrate-user bug was; opus is on
+  the metispy fix (2026-10-14). Consequence
   for the corpus: S1 setups avoid `step EVENT` where `run N` reaches the
   same state, and an item whose setup needs a named step records that its
   band carries the mark.
