@@ -46,6 +46,7 @@ type procDomains struct {
 	n       int
 	pend    []map[string]any
 	note    func(rec map[string]any)
+	sift    func(rs []map[string]any) []map[string]any // the trace replies journaled and taken out
 }
 
 func (d *procDomains) Intent(c Call) (Reply, bool) {
@@ -70,7 +71,7 @@ func (d *procDomains) Intent(c Call) (Reply, bool) {
 		log.Printf("[v3] %s intent: %v", d.intents, err)
 		return Reply{}, false
 	}
-	return d.split(rs, cid, false)
+	return d.split(d.sift(rs), cid, false)
 }
 
 func (d *procDomains) Call(c Call) (Reply, bool) {
@@ -89,7 +90,7 @@ func (d *procDomains) Call(c Call) (Reply, bool) {
 	if err != nil {
 		return Reply{Domain: dom, Kind: "error", Error: err.Error()}, true
 	}
-	return d.split(rs, "", true)
+	return d.split(d.sift(rs), "", true)
 }
 
 func (d *procDomains) split(rs []map[string]any, id string, tool bool) (Reply, bool) {
@@ -159,7 +160,7 @@ func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journa
 			intents = n
 		}
 	}
-	ld.pd = &procDomains{procs: ld.procs, intents: intents, note: ld.record}
+	ld.pd = &procDomains{procs: ld.procs, intents: intents, note: ld.record, sift: ld.sift}
 	v.live = ld
 	return v.restart(a)
 }
@@ -171,6 +172,26 @@ func slicesContains(xs []string, x string) bool {
 		}
 	}
 	return false
+}
+
+// sift journals the trace replies (the domain agent's --trace: fired
+// rules, narrated fragments, consults, REPL reads — the console's REPL log)
+// as dlg-trace and returns the rest: a trace is never an inbound.
+func (ld *liveDomains) sift(rs []map[string]any) []map[string]any {
+	out := make([]map[string]any, 0, len(rs))
+	for _, r := range rs {
+		if r["kind"] != "trace" {
+			out = append(out, r)
+			continue
+		}
+		rec := map[string]any{}
+		for k, v := range r {
+			rec[k] = v
+		}
+		rec["kind"] = "dlg-trace"
+		ld.record(rec)
+	}
+	return out
 }
 
 func journalStem(j string) string {
@@ -240,7 +261,7 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 					log.Printf("[v3] %s clock: %v", s.Name, err)
 					continue
 				}
-				for _, r := range rs {
+				for _, r := range ld.sift(rs) {
 					if dom, _ := r["domain"].(string); !slicesContains(s.Quiet, dom) {
 						due = append(due, r)
 					}
@@ -258,6 +279,7 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 func (v *v3) handleDue(a *Agent, beat int, due []map[string]any) {
 	ld := v.live
 	var queue []Inbound
+	voice := map[*Reply]any{} // the reply's origin (narrator | line | ref): the journal's, not the model's
 	quiet := map[string]bool{}
 	for _, s := range ld.specs {
 		for _, q := range s.Quiet {
@@ -270,6 +292,9 @@ func (v *v3) handleDue(a *Agent, beat int, due []map[string]any) {
 				continue
 			}
 			r := asReply(m)
+			if v, ok := m["voice"]; ok {
+				voice[&r] = v
+			}
 			queue = append(queue, Inbound{Reply: &r})
 		}
 	}
@@ -288,6 +313,9 @@ func (v *v3) handleDue(a *Agent, beat int, due []map[string]any) {
 			}
 			if in.Reply.Record != "" {
 				w["record"] = string(in.Reply.Record)
+			}
+			if v, ok := voice[in.Reply]; ok {
+				w["voice"] = v
 			}
 		}
 		ld.record(w)
@@ -315,6 +343,7 @@ func (a *Agent) V3World(domain string, lines []string) error {
 		return fmt.Errorf("no domain %q", domain)
 	}
 	a.v3.live.record(map[string]any{"kind": "dlg-world", "domain": domain, "lines": lines})
-	_, err := p.Do(map[string]any{"world": lines, "domain": domain})
+	rs, err := p.Do(map[string]any{"world": lines, "domain": domain})
+	a.v3.live.sift(rs)
 	return err
 }

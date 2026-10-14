@@ -53,7 +53,7 @@ v3:
     journal: results/live/session.jsonl
     domains:
         - name: agents
-          argv: [.venv/bin/python, -m, metis_agent.domain_agent, --domain, "dog,kitchen,kitchen_shared", --case, live, --narrate, dog]
+          argv: [.venv/bin/python, -m, metis_agent.domain_agent, --domain, "dog,kitchen,kitchen_shared", --case, live, --narrate, dog, --trace]
           dir: ../py
           domains: [dog, kitchen, kitchen_shared]
           clocks: [{domain: dog, n: 1}, {domain: kitchen, n: 2}]
