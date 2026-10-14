@@ -1652,3 +1652,27 @@ Same timelines, seeds and bars; runs 1–2 kept as `results/e13/step3-r1.*`, `st
 - **The asks name the key** ("Could you open the way to the kitchen?").
 
 **Reproduce:** as run 1; `-tag e13-step3-r3b -jsonl results/e13/step3b.jsonl`. Run 3's scored data is `results/e13/step3.*`.
+
+## E13 step 3 run 3 ruling (architect, 2026-10-14; s-c9276dee) — PASS on 3b
+
+**Run 3, the rule as written:** every read held but R3 yes 9/12, all
+three misses D2-b: "yes, drop it" read CANCEL by the intent pass, which the
+rule took for a new world command — the search stopped, the door was never
+retried. **Run 3b, one refinement:** on a busy question the verb the
+refusal offered (cancel for a task, stop for a body action) counts as yes,
+like the refused call itself; the harness drops the task and retries. Every
+read holds: R1a 45/45, R1b 24/24, R2 all (72/72 intent turns silent until
+the first reply), R3 yes 12/12 · no 3/3 · ignored 3/3, R4 78/78, R5 0/0/0.
+D2-b runs true end to end.
+
+**Ruled: the refinement is the rule** (DESIGN's bound-answer rule amended).
+The person answering a "shall I drop it?" with "drop it" has answered; the
+intent grammar reading it as CANCEL is the yes in the domain's own words.
+3b was run after run 3's miss, on byte-identical scripts and words, with
+only the allow-list datum changed; accepted as a rule refinement within
+the harness's branch knowledge, the bars untouched.
+
+**Phase 2 is complete:** the orchestrator agent keeps the dialog under
+control against emulated domains (ids, floor, bound answers, signals,
+speech) under rules the harness owns; the model classifies and speaks.
+Nine harness rules came out of E13's three steps, all in DESIGN v3.

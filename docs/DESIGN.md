@@ -218,8 +218,10 @@ and signals held, the bound answer and the outcome lines did not):
   person's turn runs the intent pass first: a new world command closes the
   question and is the move (E13 step 3 run 2: "sit down" classified
   directly read as yes 3/3, while the intent pass read it SIT_DOWN 3/3);
-  the refused call itself is yes; talk is classified under a two-literal
-  grammar (yes · no). The harness moves: yes → the retry (after the
+  the refused call itself is yes, and so is the alternative the refusal
+  offered (cancel for a task, stop for a body action: "yes, drop it" read
+  CANCEL 3/3 in E13 step 3 run 3, which is the answer, not a new command);
+  talk is classified under a two-literal grammar (yes · no). The harness moves: yes → the retry (after the
   cancel, for a busy question); no → talk, the task stays refused. E2B
   given the move chose STAND_UP on "no, I can't right now" (2/3) and
   CHITCHAT with "Okay, I'll drop it" on "yes, drop it" (3/3) — a false
