@@ -265,6 +265,10 @@ and signals held, the bound answer and the outcome lines did not):
   fallback to such a handle applies to a named place it does not know,
   never to an absent argument: "what are you doing?" is an information
   turn, not a look at elsewhere.
+- **The line after a "no" is the harness's.** With the task refused and
+  nothing in flight, E2B said "I will stop…" (2/3, integration step 1
+  run 2): the no-branch speaks a template ("Alright, I'll leave it."),
+  as the escalate and reset lines do.
 - **A stop or cancel with nothing in flight is "no" to the classifier.**
   After an offer-ask ("can you open it, or shall I go to the door?"), E2B's
   intent pass read "no, I can't right now" as STOP (3/3); with no live

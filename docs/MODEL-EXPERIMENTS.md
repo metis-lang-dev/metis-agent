@@ -1701,3 +1701,22 @@ are the findings.
 
 **Re-run:** the same timelines and bars with the rules in; step 1 passes
 when R1a and R4 hold with the rest.
+
+## Integration step 1 run 2 ruling (architect, 2026-10-14; s-f82a578f) — PASS
+
+**Every read holds with the real dog, in the premise world and as-is:**
+R1a 45/45 and 21/21, R1b 24/24, R2 72/72 · 9/9 · 120/120 · 81/81, R3
+12/12 · 3/3 · 3/3, R4 78/78, R5 0/0/0. The wire 0–2 ms a request, a beat
+113 ms (the narrator), both E2B instances 4.6–4.7 GB of 8. Phase 3 step 1
+is done: the orchestrator built against emulated domains controls the real
+one unchanged, and the five differences the real dog exposed were each a
+rule, now DESIGN's.
+
+**By eye, ruled into step 2:** the talk after a "no" is templated (DESIGN:
+"Alright, I'll leave it."); the orchestrator's copy check for a domain
+text applies the own-voice guard too (one third-person line copied); a
+query's result line says what the dog did (a lookup is "I last saw…", not
+"I found…" — the catalog's query doc now reads "I tell you about {T}:
+last seen at {P}.", metis-catalog 7e57d62, so the narrator has the
+material); an ask is a question, not an imperative with a "?" (the ask
+grammar). None moves a bar; step 2 carries them.
