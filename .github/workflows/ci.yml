@@ -17,8 +17,10 @@ env:
   # the pin: the archive checkout the harness is built and benched against
   LLAMA_COMMIT: 8ad8aef447703e76cdcf74ed78dab16b92ec231a
   # metispy and metis-catalog are PRIVATE siblings: read with METIS_READ_TOKEN
-  # (Contents: read on both), as metispy's own ci.yml reads metis-catalog
-  HAVE_READ_TOKEN: ${{ secrets.METIS_READ_TOKEN != '' }}
+  # (Contents: read on both), as metispy's own ci.yml reads metis-catalog.
+  # The secret is an ENVIRONMENT secret (environment METIS_READ_TOKEN), so each
+  # job declares that environment and computes HAVE_READ_TOKEN itself: an
+  # environment secret is empty at the workflow level and in a job without it.
 
 jobs:
   # go/: cgo against a CPU-only llama.cpp at the pin (cached on the commit);
@@ -28,6 +30,9 @@ jobs:
   go:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: METIS_READ_TOKEN
+    env:
+      HAVE_READ_TOKEN: ${{ secrets.METIS_READ_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -96,6 +101,9 @@ jobs:
   py:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: METIS_READ_TOKEN
+    env:
+      HAVE_READ_TOKEN: ${{ secrets.METIS_READ_TOKEN != '' }}
     steps:
       - name: No METIS_READ_TOKEN — py/ tests NOT run
         if: env.HAVE_READ_TOKEN != 'true'
