@@ -76,7 +76,7 @@ export class Journal {
       case 'dlg-dispatch': out.chat = this.dispatch(r); break;
       case 'dlg-world': out.chat = this.world(r); break;
       case 'dlg-trace': this.domain(r.domain).trace.push(r); out.trace = r; break;
-      case 'dlg-domain': out.chat = this.note(r, `${r.op ?? 'activate'} ${r.domain}${r.by ? ' (by ' + r.by + ')' : ''}${r.error ? ': ' + r.error : ''}`); break;
+      case 'dlg-domain': out.chat = this.note(r, `${r.verb ?? r.op ?? 'activate'} ${r.domain}${r.by ? ' (by ' + r.by + ')' : ''}${r.error ? ': ' + r.error : ''}`); break;
     }
     return out;
   }
@@ -163,7 +163,7 @@ export class Journal {
 
   // source: {by, label, domain?, branch?, gen?, wake?, detail}
   source(say, gen) {
-    if (say.src) return this.labelled(say.src);
+    if (say.src) return this.labelled(say.src, say);
     const wake = this.lastWake;
     const domain = wake?.domain;
     if (say.what === 'template') {
@@ -187,13 +187,14 @@ export class Journal {
   }
 
   // the service's own src (agent-console step 1) → a label
-  labelled(s) {
+  labelled(s, say = {}) {
     const wake = s.wake != null ? this.bySeq.get(s.wake) : null;
     const gen = s.gen != null ? this.bySeq.get(s.gen) : null;
     const domain = s.domain ?? wake?.domain;
     const branch = s.branch ?? gen?.branch ?? '?';
     if (s.by === 'harness') return { ...s, domain, label: 'harness · template', detail: `the harness's words after ${wakeLabel(wake) || 'the move'}` };
     if (s.by === 'rollback') return { ...s, label: 'harness · rollback', detail: 'a forged line rolled back' };
+    if (say.what === 'ask') return { ...s, domain, branch, label: `model · ask (${branch})`, detail: `the ask's text from the model's move #${s.gen ?? '?'}` };
     const copy = wake?.text && gen && norm(gen.text) === norm(wake.text);
     if (copy) {
       const who = wake.voice === 'line' ? `${this.name(domain)}'s %% line` : wake.voice === 'narrator' ? `${this.name(domain)}'s narrator` : `${this.name(domain)}'s text`;

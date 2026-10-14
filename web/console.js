@@ -211,10 +211,18 @@ function renderDomains() {
   const box = $('domains');
   box.replaceChildren();
   for (const d of catalog.domains) {
-    const st = d.loaded ? domState(d.name) : { text: 'not loaded', cls: 'off' };
+    // the service's own state line (the mirror's: idle · task c1 · surprise 0 · inactive …), the
+    // surprise's difference from the journal; without a service, the journal's alone
+    let st = d.loaded ? domState(d.name) : { text: 'not loaded', cls: 'off' };
+    if (catalogLive) {
+      const diff = J.domains.get(d.name)?.surprise?.difference;
+      const text = `${d.state ?? ''}${diff && /surprise/.test(d.state ?? '') ? ': ' + diffText(diff) : ''}`;
+      st = { text, cls: /surprise/.test(text) ? 'surprise' : /task/.test(text) ? 'task' : d.loaded ? '' : 'off' };
+    }
     const btn = el('button', { title: d.loaded ? 'deactivate(domain): detach it from the runtime tree' : 'activate(domain): attach it' }, d.loaded ? 'deactivate' : 'activate');
-    btn.disabled = !ws || !catalogLive;
+    btn.disabled = !ws || !catalogLive || (d.served === false && !d.loaded) || /pair/.test(d.state ?? '');
     if (!catalogLive) btn.title += ' — needs the live service';
+    else if (d.served === false) btn.title = 'no domain agent serves it in this configuration';
     btn.onclick = () => { send({ ev: d.loaded ? 'deactivate' : 'activate', domain: d.name }); btn.disabled = true; };
     box.append(el('div', { class: 'dom' },
       el('div', { class: 'name' }, el('b', {}, d.name), d.display ? el('div', { class: 'disp' }, d.display) : null),
