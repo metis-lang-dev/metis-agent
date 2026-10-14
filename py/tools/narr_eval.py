@@ -37,7 +37,8 @@ def record(tag, rep, f, sn):
     return {"kind": "e8-sentence", "tag": tag, "retrieval": "flat", "form": "policy", "setting": "", "rep": rep,
             "t": f.t, "path": f.path, "seq": f.seq, "beat": f.beat, "frag_kind": f.kind, "ref": f.ref,
             "counts": f.counts, "expected": f.expected, "inserted": sn["inserted"], "sentence": sn["text"],
-            "tok_fragment": sn["tok_fragment"], "tok_script": 0, "ms": sn["ms"]}
+            "tok_fragment": sn["tok_fragment"], "tok_script": 0, "ms": sn["ms"],
+            "own_line": getattr(f, "own_line", ""), "held": sn.get("held", True)}
 
 
 def kitchen(llm, reps, names):
@@ -94,6 +95,8 @@ def target_check(recs):
     out = []
     for r in recs:
         carried = set(r["ref"].split(": ", 1)[1].split(", ")) if ": " in r["ref"] else set()
+        # the own-voice line is bound from the event's bindings: what it names is carried
+        carried |= {h for h, rx in pat.items() if r.get("own_line") and rx.search(r["own_line"])}
         named = {h for h, rx in pat.items() if rx.search(r["sentence"])}
         # a handle inside another's words ('chair' in 'window chair') counts once
         named -= {h for h in named for g in named if g != h and h in g}
@@ -136,6 +139,18 @@ def main():
                            capture_output=True, text=True)
     (out / "score.txt").write_text(score.stdout + score.stderr)
     print(score.stdout[-3000:], score.stderr[-2000:])
+
+    # the dog speaks for itself (VOICE own, DESIGN 56da709): E8's attribution
+    # ("the agent named") does not apply to "I"; the check is the sentence
+    # held to its bound line (narrator.holds_line, as the domain agent runs it)
+    own = [r for r in recs if r["path"] == "dog" and r.get("own_line")]
+    held = sum(1 for r in own if r["held"])
+    third = sum(1 for r in own if "the dog" in r["sentence"].lower())
+    vline = ("dog own-voice line check: %d/%d sentences held to their bound line (the rest spoke the line); "
+             "third person %d" % (held, len(own), third))
+    print(vline)
+    with open(out / "score.txt", "a") as f:
+        f.write("\n" + vline + "\n")
 
     tc = target_check([r for r in recs if r["path"] == "dog"])
     wrong = [r for r in tc if r["wrong_target"]]

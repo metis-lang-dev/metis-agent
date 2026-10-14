@@ -1,0 +1,159 @@
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 0}, "text": "Accepted.", "id": "c1", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 2, "beat": 1, "event": "sit[P=standing]"}, "text": "I sit down.", "id": "c1", "status": "done"}
+{"rep": 0, "clock": "beat", "beat": 1, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 1}, "text": "Accepted.", "id": "c2", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 4, "beat": 2, "event": "go_closed[P=kitchen]"}, "text": "I can't go to the kitchen because the way to it is closed.", "id": "c2", "status": "refused", "reason": "the way to it is closed", "alternatives": [{"verb": "go", "args": {"place": "door"}}, {"verb": "go", "args": {"place": "tag3"}}], "blocker": "closed(kitchen)"}
+{"rep": 0, "clock": "beat", "beat": 2, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 2}, "text": "Accepted.", "id": "c3", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 6, "beat": 3, "event": "stand[P=sitting]"}, "text": "I stand up.", "id": "c3", "status": "done"}
+{"rep": 0, "clock": "beat", "beat": 3, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 3}, "text": "Accepted.", "id": "c4", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 8, "beat": 4, "event": "go[P=tag3]"}, "text": "I set off for tag 3.", "id": "c4", "status": "progress"}
+{"rep": 0, "clock": "beat", "beat": 4, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 4}, "text": "Accepted.", "id": "c5", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 10, "beat": 5, "event": "find_busy[T=keys,P=tag3]"}, "text": "I can't take that now: I am already busy with a task.", "id": "c5", "status": "refused", "reason": "I am already busy with a task", "alternatives": [{"verb": "cancel", "args": {}}], "blocker": null}
+{"rep": 0, "clock": "beat", "beat": 5, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 12, "beat": 6, "event": "arrive[P=tag3,Q=door]"}, "text": "I have arrived at tag 3.", "id": "c4", "status": "done"}
+{"rep": 0, "clock": "beat", "beat": 6, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 6}, "text": "Accepted.", "id": "c6", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 14, "beat": 7, "event": "move_wall[W=backward]"}, "text": "I can't move that way because there is a wall right there.", "id": "c6", "status": "refused", "reason": "there is a wall right there", "alternatives": [], "blocker": "wall(backward)"}
+{"rep": 0, "clock": "beat", "beat": 7, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 7}, "text": "Accepted.", "id": "c7", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 16, "beat": 8, "event": "find[T=extinguisher]"}, "text": "I start looking for the fire extinguisher.", "id": "c7", "status": "progress"}
+{"rep": 0, "clock": "beat", "beat": 8, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 8}, "text": "Accepted.", "id": "c8", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 18, "beat": 9, "event": "query_seen[T=chair,P=kitchen]"}, "text": "I have seen the chair at the kitchen.", "id": "c8", "status": "done"}
+{"rep": 0, "clock": "beat", "beat": 9, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 20, "beat": 10, "event": "find_locked[T=extinguisher]"}, "text": "I can't reach the fire extinguisher because it is locked away.", "id": "c7", "status": "refused", "reason": "it is locked away", "alternatives": [], "blocker": "locked_away(extinguisher)"}
+{"rep": 0, "clock": "beat", "beat": 10, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 10}, "text": "Accepted.", "id": "c9", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 22, "beat": 11, "event": "follow"}, "text": "I follow you.", "id": "c9", "status": "progress"}
+{"rep": 0, "clock": "beat", "beat": 11, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 11}, "text": "Accepted.", "id": "c10", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 24, "beat": 12, "event": "stop_follow"}, "text": "I stop following you.", "id": "c9", "status": "cancelled", "reason": "I stop following you"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 24, "beat": 12, "event": "stop_follow"}, "text": "I stop following you.", "id": "c10", "status": "done"}
+{"rep": 0, "clock": "beat", "beat": 12, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 12}, "text": "Accepted.", "id": "c11", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 26, "beat": 13, "event": "unknown"}, "text": "I can't do that because it is not something I can or may do.", "id": "c11", "status": "refused", "reason": "it is not something I can or may do", "alternatives": [], "blocker": null}
+{"rep": 0, "clock": "beat", "beat": 13, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 13}, "text": "Accepted.", "id": "c12", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 28, "beat": 14, "event": "paw"}, "text": "I give you my paw.", "id": "c12", "status": "done"}
+{"rep": 0, "clock": "beat", "beat": 14, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 14}, "text": "Accepted.", "id": "c13", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 30, "beat": 15, "event": "find_low[T=bottle]"}, "text": "I can't search because the battery is too low to search.", "id": "c13", "status": "refused", "reason": "the battery is too low to search", "alternatives": [], "blocker": "battery_low"}
+{"rep": 0, "clock": "beat", "beat": 15, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 15}, "text": "Accepted.", "id": "c14", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 32, "beat": 16, "event": "sit[P=standing]"}, "text": "I sit down.", "id": "c14", "status": "done"}
+{"rep": 0, "clock": "beat", "beat": 16, "over": false}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"beat": 16}, "text": "Accepted.", "id": "c15", "status": "accepted"}
+{"rep": 0, "domain": "dog", "kind": "result", "ref": {"seq": 34, "beat": 17, "event": "turn_must_stand[S=left,P=sitting]"}, "text": "I can't turn because I have to stand up first.", "id": "c15", "status": "refused", "reason": "I have to stand up first", "alternatives": [{"verb": "stand", "args": {}}], "blocker": null}
+{"rep": 0, "clock": "beat", "beat": 17, "over": false}
+{"rep": 0, "clock": "beat", "beat": 18, "over": false}
+{"rep": 0, "domain": "dog", "kind": "quiescence", "ref": {"seq": 35, "beat": 18}, "text": "The dog is quiet now.", "goal_pending": false}
+{"rep": 0, "clock": "beat", "beat": 18, "over": true}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 0}, "text": "Accepted.", "id": "c1", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 2, "beat": 1, "event": "sit[P=standing]"}, "text": "I sit down.", "id": "c1", "status": "done"}
+{"rep": 1, "clock": "beat", "beat": 1, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 1}, "text": "Accepted.", "id": "c2", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 4, "beat": 2, "event": "go_closed[P=kitchen]"}, "text": "I can't go to the kitchen because the way to it is closed.", "id": "c2", "status": "refused", "reason": "the way to it is closed", "alternatives": [{"verb": "go", "args": {"place": "door"}}, {"verb": "go", "args": {"place": "tag3"}}], "blocker": "closed(kitchen)"}
+{"rep": 1, "clock": "beat", "beat": 2, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 2}, "text": "Accepted.", "id": "c3", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 6, "beat": 3, "event": "stand[P=sitting]"}, "text": "I stand up.", "id": "c3", "status": "done"}
+{"rep": 1, "clock": "beat", "beat": 3, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 3}, "text": "Accepted.", "id": "c4", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 8, "beat": 4, "event": "go[P=tag3]"}, "text": "I set off for tag 3.", "id": "c4", "status": "progress"}
+{"rep": 1, "clock": "beat", "beat": 4, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 4}, "text": "Accepted.", "id": "c5", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 10, "beat": 5, "event": "find_busy[T=keys,P=tag3]"}, "text": "I can't take that now: I am already busy with a task.", "id": "c5", "status": "refused", "reason": "I am already busy with a task", "alternatives": [{"verb": "cancel", "args": {}}], "blocker": null}
+{"rep": 1, "clock": "beat", "beat": 5, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 12, "beat": 6, "event": "arrive[P=tag3,Q=door]"}, "text": "I have arrived at tag 3.", "id": "c4", "status": "done"}
+{"rep": 1, "clock": "beat", "beat": 6, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 6}, "text": "Accepted.", "id": "c6", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 14, "beat": 7, "event": "move_wall[W=backward]"}, "text": "I can't move that way because there is a wall right there.", "id": "c6", "status": "refused", "reason": "there is a wall right there", "alternatives": [], "blocker": "wall(backward)"}
+{"rep": 1, "clock": "beat", "beat": 7, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 7}, "text": "Accepted.", "id": "c7", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 16, "beat": 8, "event": "find[T=extinguisher]"}, "text": "I start looking for the fire extinguisher.", "id": "c7", "status": "progress"}
+{"rep": 1, "clock": "beat", "beat": 8, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 8}, "text": "Accepted.", "id": "c8", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 18, "beat": 9, "event": "query_seen[T=chair,P=kitchen]"}, "text": "I have seen the chair at the kitchen.", "id": "c8", "status": "done"}
+{"rep": 1, "clock": "beat", "beat": 9, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 20, "beat": 10, "event": "find_locked[T=extinguisher]"}, "text": "I can't reach the fire extinguisher because it is locked away.", "id": "c7", "status": "refused", "reason": "it is locked away", "alternatives": [], "blocker": "locked_away(extinguisher)"}
+{"rep": 1, "clock": "beat", "beat": 10, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 10}, "text": "Accepted.", "id": "c9", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 22, "beat": 11, "event": "follow"}, "text": "I follow you.", "id": "c9", "status": "progress"}
+{"rep": 1, "clock": "beat", "beat": 11, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 11}, "text": "Accepted.", "id": "c10", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 24, "beat": 12, "event": "stop_follow"}, "text": "I stop following you.", "id": "c9", "status": "cancelled", "reason": "I stop following you"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 24, "beat": 12, "event": "stop_follow"}, "text": "I stop following you.", "id": "c10", "status": "done"}
+{"rep": 1, "clock": "beat", "beat": 12, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 12}, "text": "Accepted.", "id": "c11", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 26, "beat": 13, "event": "unknown"}, "text": "I can't do that because it is not something I can or may do.", "id": "c11", "status": "refused", "reason": "it is not something I can or may do", "alternatives": [], "blocker": null}
+{"rep": 1, "clock": "beat", "beat": 13, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 13}, "text": "Accepted.", "id": "c12", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 28, "beat": 14, "event": "paw"}, "text": "I give you my paw.", "id": "c12", "status": "done"}
+{"rep": 1, "clock": "beat", "beat": 14, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 14}, "text": "Accepted.", "id": "c13", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 30, "beat": 15, "event": "find_low[T=bottle]"}, "text": "I can't search because the battery is too low to search.", "id": "c13", "status": "refused", "reason": "the battery is too low to search", "alternatives": [], "blocker": "battery_low"}
+{"rep": 1, "clock": "beat", "beat": 15, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 15}, "text": "Accepted.", "id": "c14", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 32, "beat": 16, "event": "sit[P=standing]"}, "text": "I sit down.", "id": "c14", "status": "done"}
+{"rep": 1, "clock": "beat", "beat": 16, "over": false}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"beat": 16}, "text": "Accepted.", "id": "c15", "status": "accepted"}
+{"rep": 1, "domain": "dog", "kind": "result", "ref": {"seq": 34, "beat": 17, "event": "turn_must_stand[S=left,P=sitting]"}, "text": "I can't turn because I have to stand up first.", "id": "c15", "status": "refused", "reason": "I have to stand up first", "alternatives": [{"verb": "stand", "args": {}}], "blocker": null}
+{"rep": 1, "clock": "beat", "beat": 17, "over": false}
+{"rep": 1, "clock": "beat", "beat": 18, "over": false}
+{"rep": 1, "domain": "dog", "kind": "quiescence", "ref": {"seq": 35, "beat": 18}, "text": "The dog is running over after thirty-five moves.", "goal_pending": false}
+{"rep": 1, "clock": "beat", "beat": 18, "over": true}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 0}, "text": "Accepted.", "id": "c1", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 2, "beat": 1, "event": "sit[P=standing]"}, "text": "I sit down.", "id": "c1", "status": "done"}
+{"rep": 2, "clock": "beat", "beat": 1, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 1}, "text": "Accepted.", "id": "c2", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 4, "beat": 2, "event": "go_closed[P=kitchen]"}, "text": "I can't go to the kitchen because the way to it is closed.", "id": "c2", "status": "refused", "reason": "the way to it is closed", "alternatives": [{"verb": "go", "args": {"place": "door"}}, {"verb": "go", "args": {"place": "tag3"}}], "blocker": "closed(kitchen)"}
+{"rep": 2, "clock": "beat", "beat": 2, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 2}, "text": "Accepted.", "id": "c3", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 6, "beat": 3, "event": "stand[P=sitting]"}, "text": "I stand up.", "id": "c3", "status": "done"}
+{"rep": 2, "clock": "beat", "beat": 3, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 3}, "text": "Accepted.", "id": "c4", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 8, "beat": 4, "event": "go[P=tag3]"}, "text": "I set off for tag 3.", "id": "c4", "status": "progress"}
+{"rep": 2, "clock": "beat", "beat": 4, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 4}, "text": "Accepted.", "id": "c5", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 10, "beat": 5, "event": "find_busy[T=keys,P=tag3]"}, "text": "I can't take that now: I am already busy with a task.", "id": "c5", "status": "refused", "reason": "I am already busy with a task", "alternatives": [{"verb": "cancel", "args": {}}], "blocker": null}
+{"rep": 2, "clock": "beat", "beat": 5, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 12, "beat": 6, "event": "arrive[P=tag3,Q=door]"}, "text": "I have arrived at tag 3.", "id": "c4", "status": "done"}
+{"rep": 2, "clock": "beat", "beat": 6, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 6}, "text": "Accepted.", "id": "c6", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 14, "beat": 7, "event": "move_wall[W=backward]"}, "text": "I can't move that way because there is a wall right there.", "id": "c6", "status": "refused", "reason": "there is a wall right there", "alternatives": [], "blocker": "wall(backward)"}
+{"rep": 2, "clock": "beat", "beat": 7, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 7}, "text": "Accepted.", "id": "c7", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 16, "beat": 8, "event": "find[T=extinguisher]"}, "text": "I start looking for the fire extinguisher.", "id": "c7", "status": "progress"}
+{"rep": 2, "clock": "beat", "beat": 8, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 8}, "text": "Accepted.", "id": "c8", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 18, "beat": 9, "event": "query_seen[T=chair,P=kitchen]"}, "text": "I tell you where the chair is: I have seen it at the kitchen.", "id": "c8", "status": "done"}
+{"rep": 2, "clock": "beat", "beat": 9, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 20, "beat": 10, "event": "find_locked[T=extinguisher]"}, "text": "I can't reach the fire extinguisher because it is locked away.", "id": "c7", "status": "refused", "reason": "it is locked away", "alternatives": [], "blocker": "locked_away(extinguisher)"}
+{"rep": 2, "clock": "beat", "beat": 10, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 10}, "text": "Accepted.", "id": "c9", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 22, "beat": 11, "event": "follow"}, "text": "I follow you.", "id": "c9", "status": "progress"}
+{"rep": 2, "clock": "beat", "beat": 11, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 11}, "text": "Accepted.", "id": "c10", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 24, "beat": 12, "event": "stop_follow"}, "text": "I stop following you.", "id": "c9", "status": "cancelled", "reason": "I stop following you"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 24, "beat": 12, "event": "stop_follow"}, "text": "I stop following you.", "id": "c10", "status": "done"}
+{"rep": 2, "clock": "beat", "beat": 12, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 12}, "text": "Accepted.", "id": "c11", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 26, "beat": 13, "event": "unknown"}, "text": "I can't do that because it is not something I can or may do.", "id": "c11", "status": "refused", "reason": "it is not something I can or may do", "alternatives": [], "blocker": null}
+{"rep": 2, "clock": "beat", "beat": 13, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 13}, "text": "Accepted.", "id": "c12", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 28, "beat": 14, "event": "paw"}, "text": "I give you my paw.", "id": "c12", "status": "done"}
+{"rep": 2, "clock": "beat", "beat": 14, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 14}, "text": "Accepted.", "id": "c13", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 30, "beat": 15, "event": "find_low[T=bottle]"}, "text": "I can't search because the battery is too low to search.", "id": "c13", "status": "refused", "reason": "the battery is too low to search", "alternatives": [], "blocker": "battery_low"}
+{"rep": 2, "clock": "beat", "beat": 15, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 15}, "text": "Accepted.", "id": "c14", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 32, "beat": 16, "event": "sit[P=standing]"}, "text": "I sit down.", "id": "c14", "status": "done"}
+{"rep": 2, "clock": "beat", "beat": 16, "over": false}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"beat": 16}, "text": "Accepted.", "id": "c15", "status": "accepted"}
+{"rep": 2, "domain": "dog", "kind": "result", "ref": {"seq": 34, "beat": 17, "event": "turn_must_stand[S=left,P=sitting]"}, "text": "I can't turn because I have to stand up first.", "id": "c15", "status": "refused", "reason": "I have to stand up first", "alternatives": [{"verb": "stand", "args": {}}], "blocker": null}
+{"rep": 2, "clock": "beat", "beat": 17, "over": false}
+{"rep": 2, "clock": "beat", "beat": 18, "over": false}
+{"rep": 2, "domain": "dog", "kind": "quiescence", "ref": {"seq": 35, "beat": 18}, "text": "The dog is running over after thirty-five moves.", "goal_pending": false}
+{"rep": 2, "clock": "beat", "beat": 18, "over": true}

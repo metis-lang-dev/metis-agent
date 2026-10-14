@@ -14,10 +14,12 @@ Binding an outcome to the intent it answers, from the runtime alone:
   mirror's counts.
 
 reason = the fired rule's %% line after its colon (the whole line if it
-has none); text = the %% line verbatim (step 1: the template the narrator
-later replaces); ref = {seq, beat, event}, seq the event's number as
+has none); text = the %% line (step 1: the template the narrator later
+replaces), its {P}/{T} slots bound from the event in display names
+(DESIGN 56da709); ref = {seq, beat, event}, seq the event's number as
 `log` numbers it.
 """
+from .narrator import bind_line, words
 from .reply import reply
 
 
@@ -33,7 +35,7 @@ def atom_args(atom):
 
 
 class Replier:
-    def __init__(self, domain, docs, outcomes, commands, alternatives=None, mirror=(), pairs=()):
+    def __init__(self, domain, docs, outcomes, commands, alternatives=None, mirror=(), pairs=(), display=words):
         """docs: rule → %% line; outcomes: outcome predicate → result
         status; commands: the card's command predicates; alternatives:
         f(rule, counts) → list, or None; mirror: the atoms the
@@ -41,6 +43,7 @@ class Replier:
         self.domain, self.docs, self.outcomes = domain, docs, outcomes
         self.commands, self.alternatives, self.mirror = commands, alternatives, tuple(mirror)
         self.blocking = {b for _, b in pairs}       # the pairs' blocking sides (DESIGN f590c3d)
+        self.display = display                      # a binding's value → its display name (the kitchen, tag 3)
         self.pending = {}    # command atom -> [(id, act)], FIFO
         self.tasks = {}      # act -> id of the intent whose task runs
 
@@ -50,12 +53,18 @@ class Replier:
     def counts(self, counts):
         return {a: counts.get(a, 0) for a in self.mirror}
 
-    def fired(self, ev, seq, beat, counts, text=None):
-        """One fired event → its replies (a list, possibly empty); text =
-        the narrator's sentence for it, else the %% line."""
+    def line(self, ev):
+        """The fired rule's %% line, its slots bound: (line, objects)."""
         rule = ev.name.partition("[")[0]
         base = rule.rsplit("-", 1)[0] if rule.rsplit("-", 1)[-1].isdigit() else rule
-        doc = self.docs.get(base, self.docs.get(rule, ""))
+        return bind_line(self.docs.get(base, self.docs.get(rule, "")), ev.name, self.display)
+
+    def fired(self, ev, seq, beat, counts, text=None):
+        """One fired event → its replies (a list, possibly empty); text =
+        the narrator's sentence for it, else the %% line (bound)."""
+        rule = ev.name.partition("[")[0]
+        base = rule.rsplit("-", 1)[0] if rule.rsplit("-", 1)[-1].isdigit() else rule
+        doc, _ = self.line(ev)
         said = text or doc
         ref = {"seq": seq, "beat": beat, "event": ev.name}
         cmd = None

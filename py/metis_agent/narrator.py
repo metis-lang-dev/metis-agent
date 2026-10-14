@@ -27,6 +27,13 @@ Speak one short plain sentence in the person's words. Name the agent as the frag
 
 CUE = "Narrate this fragment for the person in one sentence."
 
+# a domain that speaks for itself (its %% lines are in its own voice, the
+# dog's "I"; DESIGN 56da709): the fragment carries the line, bound
+OWN_VOICE = """When a fragment gives the agent's line, the agent is speaking: say that line in its own words and its own voice, keeping "I" and every place and thing it names; never turn it into a sentence about the agent."""
+# the cue for a fragment with its own line: the general CUE gets "The dog
+# sat down." on 17 of 17 dog lines, this one first person on 17 of 17
+OWN_CUE = "The agent speaks to the person. Give its line in one sentence, first person, keeping the places and things it names and the reason it gives."
+
 # llm.go sentenceGBNF: one spoken sentence, no markup / JSON / fact syntax
 SENTENCE_GBNF = 'root ::= " "? "\\""? [A-Z] [a-zA-Z0-9 ,;\'()%-]{3,200} [.!?] "\\""?\n'
 SPOKEN = "Spoken response:"
@@ -111,6 +118,7 @@ class Fragment:
     counts: dict = field(default_factory=dict)
     expected: dict = field(default_factory=dict)
     t: float = 0.0
+    own_line: str = ""          # the agent's own line, bound (OWN_VOICE domains only)
 
     def body(self):
         line = words(self.ref)
@@ -118,6 +126,8 @@ class Fragment:
             line += "; now " + count_list(self.counts)
         if self.expected:
             line += "; the model expected " + count_list(self.expected)
+        if self.own_line:
+            line += '; its line: "%s"' % self.own_line
         return line
 
     def line(self, name):
@@ -281,17 +291,63 @@ def event_ref(name, consume=(), produce=(), commands=(), persist=()):
     return m.group(1) + (": " + ", ".join(v for _, v in binds) if binds else "")
 
 
+_SLOT = re.compile(r"\{(\w+)\}")
+
+
+def bind_line(doc, name, display=words):
+    """A %% line with its {P}/{T} slots filled from the event's bindings,
+    in display names ('go[P=kitchen]' + "I set off for {P}." → "I set off
+    for the kitchen."; DESIGN 56da709: the domain's text names its object).
+    → (the line, the display names it filled). A slot the event does not
+    bind stays as it is."""
+    m = re.match(r"^[^\[]+\[(.*)\]$", name)
+    binds = dict(b.split("=", 1) for b in (m.group(1).split(",") if m else []) if "=" in b)
+    used = []
+
+    def fill(k):
+        v = binds.get(k.group(1))
+        if v is None:
+            return k.group(0)
+        d = display(v)
+        used.append(d)
+        return d
+    return _SLOT.sub(fill, doc), used
+
+
+def holds_line(sentence, line, objects, agent):
+    """The attribution check for an own-voice line: the sentence names
+    every object the line binds, does not speak about the agent in the
+    third person, keeps the line's "I", and keeps most of the reason a
+    line gives after its colon ("…: I am already busy with a task" told
+    as "I am already searching" is a different reason)."""
+    s = " " + sentence.lower() + " "
+    if any(o.lower() not in s for o in objects):
+        return False
+    if agent and (" " + agent.lower() + " ") in s:
+        return False
+    if re.search(r"\bI\b", line) and not re.search(r"\bI\b", sentence):
+        return False
+    head, sep, why = line.partition(": ")
+    if sep:
+        ws = [w for w in re.findall(r"[a-z']+", why.lower()) if len(w) > 2]
+        if ws and sum((" " + w + " ") in re.sub(r"[^a-z' ]", " ", s) for w in ws) < 0.75 * len(ws):
+            return False
+    return True
+
+
 # ── the narrator (narrator.go) + the speaking turn (llm.go SpeakCap, thinking off) ──
 
 class Narrator:
-    def __init__(self, llm, scripts, name, top_k=40, temp=0.4, max_tokens=70, seed=1):
+    def __init__(self, llm, scripts, name, top_k=40, temp=0.4, max_tokens=70, seed=1, own_voice=False):
         """scripts: {path: [card, …]} as the `script` op returns them;
-        name: path → display name."""
+        name: path → display name; own_voice: the domain's lines are its
+        own voice (the fragment carries the bound line; OWN_VOICE)."""
         self.llm, self.scripts, self.name = llm, scripts, name
         self.top_k, self.temp, self.max_tokens, self.seed = top_k, temp, max_tokens, seed
+        self.own_voice = own_voice
 
     def system(self):
-        return INTERPRET + "\n\nThe scripts:\n" + "\n\n".join(
+        return INTERPRET + ("\n" + OWN_VOICE if self.own_voice else "") + "\n\nThe scripts:\n" + "\n\n".join(
             script_text(p, cards, self.name) for p, cards in self.scripts.items())
 
     def fragment_text(self, f):
@@ -303,7 +359,7 @@ class Narrator:
     def narrate(self, f):
         import llama_cpp as L
         llm, sys_text = self.llm, self.system()
-        user = self.fragment_text(f) + "\n\n" + CUE
+        user = self.fragment_text(f) + "\n\n" + (OWN_CUE if f.own_line else CUE)
         t0 = time.perf_counter()
         llm.prime(sys_text)
         llm.rewind()

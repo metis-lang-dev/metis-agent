@@ -205,7 +205,7 @@ def test_computed_missing_needs_no_model_call():
     r = ag.handle({"tool": "consult", "id": "k", "args": {"question": "Why?"}})[0]
     assert (r["kind"], r["answer_kind"], r["calls"]) == ("consult", "missing", 0)
     assert r["resource"] == {"atom": "closed(kitchen)", "words": "open the way to the kitchen"}
-    assert r["text"] == res["text"] == "I can't go there: the way to it is closed."
+    assert r["text"] == res["text"] == "I can't go to the kitchen: the way to it is closed."
     assert r["evidence"] == ["closed(kitchen) 1", "mapped(kitchen) 1"]
     assert live(ag) == before and ag.consults[-1]["stop"] == "template" and ag.consults[-1]["live_unchanged"]
     # no seat at all: still answered

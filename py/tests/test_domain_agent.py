@@ -176,3 +176,71 @@ def test_alternatives_are_at_most_two_typed_intents():
     assert [m.map(a).atom for a in (dog.alternatives("find_busy", {}) + dog.alternatives("turn_must_stand", {}))] == \
         ["cmd_cancel", "cmd_stand"]
     assert m.map({"verb": "go", "args": {"place": "door"}}).dropped == {}
+
+
+def test_a_stop_acts_before_the_timeout_that_falls_due():
+    # DESIGN 56da709, integration D2-a: the stop reached the runtime on the
+    # timeout's tick and lost to it; commands first, the due answers wait a beat
+    from metis_agent.domain_agent import DomainAgent
+    ag = DomainAgent(dog, case="replay")
+    out = []
+    ag.handle({"world": ["-closed(kitchen)", "+open(kitchen)"]})
+    ag.handle({"id": "c2", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}})
+    out += ag.handle({"clock": "beat"})                       # go[P=kitchen]: the world has no answer for it → timeout due
+    due = [b for b, d in ag.host.inner.due if d == "+timeout"]
+    assert due, ag.host.inner.due
+    while ag.beat_no() + 1 < due[0]:
+        out += ag.handle({"clock": "beat"})
+    ag.handle({"id": "c3", "domain": "dog", "verb": "STOP", "args": {}})   # arrives on the timeout's tick
+    for _ in range(3):
+        out += ag.handle({"clock": "beat"})
+    res = {r["id"]: r for r in out if r.get("kind") == "result" and r.get("status") != "accepted"}
+    assert res["c2"]["status"] == "cancelled" and res["c3"]["status"] == "done"
+    assert not any(r.get("status") == "expired" for r in out)
+
+
+def test_lines_bind_their_object_in_display_names():
+    # DESIGN 56da709: "I set off for {P}." names the place, as the person says it
+    from metis_agent.narrator import bind_line, holds_line
+    disp = lambda v: dog.HANDLE_NAMES.get(v, v)          # noqa: E731
+    assert bind_line("I set off for {P}.", "go[P=kitchen]", disp) == ("I set off for the kitchen.", ["the kitchen"])
+    assert bind_line("I tell you where {T} is: I have seen it at {P}.", "query_seen[T=keys,P=kitchen]", disp) == \
+        ("I tell you where the keys is: I have seen it at the kitchen.", ["the keys", "the kitchen"])
+    assert bind_line("I can't go yet: I have to stand up first.", "go_must_stand[P=kitchen]", disp) == \
+        ("I can't go yet: I have to stand up first.", [])                 # no slot: the line as it is
+    assert holds_line("I am heading to the kitchen now.", "I set off for the kitchen.", ["the kitchen"], "the dog")
+    assert not holds_line("The dog is going to the kitchen and is busy.", "I set off for the kitchen.", ["the kitchen"], "the dog")
+    assert not holds_line("I set off.", "I set off for the kitchen.", ["the kitchen"], "the dog")
+    # the reason is the line's too: "busy with a task" told as "searching" is not held
+    busy = "I can't take that now: I am already busy with a task."
+    assert holds_line("I can't take that now because I am already busy with a task.", busy, [], "the dog")
+    assert not holds_line("I can't take that now because I am already searching.", busy, [], "the dog")
+    # a fragment without its own line carries none (the kitchen's narration is unchanged)
+    from metis_agent.narrator import Fragment
+    assert "its line" not in Fragment(path="kitchen", seq=1, beat=1, kind="quiescence", ref="quiet").body()
+    # without the narrator the reply's text is the bound line
+    from metis_agent.domain_agent import DomainAgent
+    ag = DomainAgent(dog, case="replay")
+    for m in ({"id": "c1", "verb": "LOCAL_ACTION", "args": {"action": "STAND_UP"}},
+              {"id": "c2", "verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}):
+        ag.handle(dict(m, domain="dog"))
+        rs = ag.handle({"clock": "beat"})
+    r = next(r for r in rs if r.get("id") == "c2")
+    assert r["text"] == "I can't go to the kitchen: the way to it is closed." and "{" not in r["reason"]
+
+
+def test_busy_body_actions_offer_stop():
+    for rule in ("sit_busy", "lie_busy", "turn_busy", "move_busy", "paw_busy"):
+        assert dog.alternatives(rule, {}) == [{"verb": "stop", "args": {}}]
+    assert dog.alternatives("go_busy", {}) == [{"verb": "cancel", "args": {}}]
+    assert Mapper(dog.CARD).map({"verb": "stop", "args": {}}).atom == "cmd_stop"
+
+
+def test_no_fallback_for_an_absent_argument():
+    # "what are you doing?" is an information turn, not look(elsewhere)
+    m = Mapper(dog.CARD)
+    for args in ({}, {"target": {"type": "REGION", "description": ""}}, {"target": ""}):
+        r = m.map({"verb": "QUERY", "args": args})
+        assert isinstance(r, Unmapped), (args, r)
+    assert m.map({"verb": "QUERY", "args": {"target": {"type": "REGION", "description": "the moon"}}}).atom == "cmd_look(elsewhere)"
+    assert m.map({"verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}).atom == "cmd_go(kitchen)"

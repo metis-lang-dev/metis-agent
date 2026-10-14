@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[3]
 CATALOG = ROOT.parent / "metis-catalog/domains/dog/dog.llp"
 NAME = "dog"
 DISPLAY = "the dog"      # the agent as the narrator names it
+VOICE = "own"            # its %% lines speak for it ("I set off for {P}."): the narrator keeps the "I"
 
 # ── the card's table: verb + args → one command atom (README "The shape") ──
 CARD = {
@@ -81,11 +82,13 @@ STANDING = {"tag_near", "elsewhere"}
 # fact of the world the person can change — not a consult; the replier
 # offers the catalog's alternative (stand first; cancel the running task)
 # or none, and the orchestrator speaks the reason
-STAND, CANCEL = {"verb": "stand", "args": {}}, {"verb": "cancel", "args": {}}
+STAND, CANCEL, STOP = {"verb": "stand", "args": {}}, {"verb": "cancel", "args": {}}, {"verb": "stop", "args": {}}
 NO_BLOCKER = {
     **{r: [STAND] for r in ("turn_must_stand", "move_must_stand", "go_must_stand", "follow_must_stand")},
     **{r: [CANCEL] for r in ("go_busy", "go_busy_find", "go_busy_follow", "find_busy", "find_busy_find",
                              "find_busy_follow", "follow_busy", "follow_busy_find")},
+    # a body action refused while a task runs: the way out is stop (DESIGN 56da709)
+    **{r: [STOP] for r in ("sit_busy", "lie_busy", "turn_busy", "move_busy", "paw_busy")},
     **{r: [] for r in ("stand_already", "sit_already", "lie_already", "follow_already", "stop_still", "unknown")},
 }
 MAX_ALTERNATIVES = 2
@@ -152,7 +155,17 @@ class AgentHost:
     def bind(self, reg):
         self.inner.bind(reg)
 
+    # the commands that end what runs: they act on the tick they arrive,
+    # before the world's due answers (DESIGN 56da709: D2-a's stop lost to
+    # the timeout that fell due on the same tick)
+    ENDERS = ("cmd_stop", "cmd_cancel")
+
     def tick(self, counts):
+        if any(q["atom"].split("(")[0] in self.ENDERS for q in self.queue if not q.get("retract")):
+            # what falls due this tick waits one beat: the stop fires first,
+            # and a task it ends owes no answer (on_event clears the due)
+            nxt = self.inner.beat + 1
+            self.inner.due = tuple((b + 1 if b == nxt else b, d) for b, d in self.inner.due)
         dos = self.inner.tick(counts)
         if dos is None:
             return None

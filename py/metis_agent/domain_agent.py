@@ -62,7 +62,7 @@ import sys
 import time
 
 from .mapper import Mapped, Mapper
-from .narrator import Fragment, Narrator, event_ref, from_signal, words
+from .narrator import Fragment, Narrator, event_ref, from_signal, holds_line, words
 from .repl_tools import scrub
 from .replier import Replier
 from .reply import reply
@@ -122,9 +122,13 @@ class DomainAgent:
         self.flips = getattr(module, "flips", lambda a: None)
         # the host's words for a blocker (None: the host has no table, the model writes them)
         self.host_words, self.handle_names = getattr(module, "words", None), getattr(module, "HANDLE_NAMES", {})
+        handles = getattr(module, "HANDLE_NAMES", {})
+        self.display_of = lambda v: handles.get(v, words(v))   # a binding's display name (the kitchen, tag 3)
         self.replier = Replier(self.name, rule_docs(module.CATALOG), module.OUTCOMES, self.mapper.commands,
                                getattr(module, "alternatives", None), mirror_atoms(self.repl.text),
-                               getattr(module, "PAIRS", ()))
+                               getattr(module, "PAIRS", ()), self.display_of)
+        # the domain speaks for itself (VOICE = "own": the dog's "I"; DESIGN 56da709)
+        self.own_voice = getattr(module, "VOICE", "") == "own"
         self.host.last_row = lambda: self.repl.fired_rows[-1]
         self.case = case
         if case == "replay":
@@ -149,7 +153,7 @@ class DomainAgent:
         self.narrator = None
         self.script = scripts_of(self.repl)
         if llm is not None:
-            self.narrator = Narrator(llm, {self.name: self.script}, self.names)
+            self.narrator = Narrator(llm, {self.name: self.script}, self.names, own_voice=self.own_voice)
         self.consult_seat = consult_seat
         # a computed missing (the blocker flips, the host has its words): answered
         # by the harness with no model call ("template", DESIGN 98530fd), or by the
@@ -217,9 +221,16 @@ class DomainAgent:
             # "left": what the move produced and what it kept ($-premises, still true after it)
             atoms = sorted(set(ev.produce) | set(ev.persist) if self.frag_counts == "left"
                            else set(ev.consume) | set(ev.produce))
+            line, objects = self.replier.line(ev) if self.own_voice else ("", [])
             text = self.narrate(Fragment(path=self.name, seq=k, beat=beat, kind="event",
                                          ref=event_ref(ev.name, ev.consume, ev.produce, self.mapper.commands, ev.persist),
-                                         counts={a: self.repl.counts.get(a, 0) for a in atoms}))
+                                         counts={a: self.repl.counts.get(a, 0) for a in atoms}, own_line=line))
+            # the attribution check holds the sentence to the bound line: a
+            # sentence that drops its object or leaves the agent's voice is
+            # not spoken, the line is
+            if text and line and not holds_line(text, line, objects, self.display):
+                self.narrated[-1][1]["held"] = False
+                text = line
             out = self.replier.fired(ev, k, beat, self.repl.counts, text)   # seq as `log` numbers it
             for r in out:
                 if r.get("status") == "refused":

@@ -80,7 +80,10 @@ class Mapper:
 
     def resolve(self, typ, arg, args, used, fallback=True):
         v = args.get(arg)
-        if v is None:
+        # an absent argument is not an unknown one: the fallback handle
+        # (elsewhere) stands for a NAMED place the host cannot resolve, never
+        # for none ("what are you doing?" is not look(elsewhere); DESIGN 56da709)
+        if v is None or (not _desc(v) and "tag_id" not in args and not (isinstance(v, dict) and v.get("constraints"))):
             return None, "no %s given" % arg
         if typ in self.card.get("values", {}):
             const = self.card["values"][typ].get(v if not isinstance(v, str) else v.upper())
