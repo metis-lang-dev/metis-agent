@@ -222,6 +222,21 @@ HANDLE_NAMES = {h: ("the " + m["description"][0]) if m.get("description") else
                 for kind in CARD["handles"].values() for h, m in kind}
 
 
+# the world's reports the person can send from the console (the host's
+# answers to a long command, dog_host.py ANSWERS / on_event): report -> the
+# handle kind it takes (None: no argument)
+def _reports():
+    arg = {r["act"]: r["atom"].partition(":")[2].rstrip(")}") or None for r in CARD["rows"]}
+    out = {}
+    for act, table in _host_module().ANSWERS.items():
+        for kind, _ in table.values():
+            out.setdefault(kind, arg.get(act))
+    return dict(out, lost=None, timeout=None)
+
+
+REPORTS = _reports()
+
+
 def make(case):
     dog_host = _host_module()
     commands = {r["atom"].split("(")[0] for r in CARD["rows"]}

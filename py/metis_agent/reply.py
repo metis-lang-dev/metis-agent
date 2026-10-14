@@ -10,7 +10,9 @@ orchestrator's own use, `text` optional. A field that does not apply is
 left out, never null.
 """
 
-BASE = ("domain", "kind", "ref", "text")
+# voice: where `text` came from — narrator (its sentence held) · line (the
+# rule's %% line) · ref (the fragment's ref in words); the console's label
+BASE = ("domain", "kind", "ref", "text", "voice")
 
 # kind -> the fields beyond domain/ref/text (DESIGN.md's table)
 KINDS = {
@@ -22,6 +24,10 @@ KINDS = {
     "notice": ("record", "card", "move"),
     "error": ("id", "error"),
     "consult": ("id", "answer_kind", "cause", "resource", "evidence", "calls"),
+    # the console's (agent-console, s-7f3d1088): never into the orchestrator's
+    # inbox — the host's world ports, and what the agent did on a line
+    "ports": ("world", "pairs", "reports", "handles", "held"),
+    "trace": ("beat", "fired", "more", "narrated", "consults", "reads", "world"),
 }
 
 # result.status as the table lists it (`cancelled`: a task the person

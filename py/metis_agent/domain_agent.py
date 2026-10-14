@@ -180,6 +180,11 @@ class DomainAgent:
         if consult_missing not in ("template", "seat"):
             raise ValueError("consult_missing: template | seat, not %r" % consult_missing)
         self.consult_missing = consult_missing
+        # --trace (the console's REPL log): what each line made the agent do
+        self.tracing = False
+        self.cursor = (0, 0, 0)    # fired_rows, narrated, consults already traced
+        self.reads = []            # the REPL reads since the last trace
+        self.worlds = []           # the world lines since the last trace
         if consult_seat is None and llm is not None:
             from .seat import Gemma4Seat
             self.consult_seat = Gemma4Seat(llm)    # one model: the narrator's and the consultant's
@@ -231,8 +236,22 @@ class DomainAgent:
         self.narrated.append((f, sn))
         return sn["text"] or None
 
+    def voiced(self, rs):
+        """The text's origin on replies made from narrate(f) or words(f.ref)
+        (quiescence, surprise, notice, a surprise verb's result): the
+        narrator's sentence, or the fragment's ref in words."""
+        n = len(self.narrated)
+        for r in rs:
+            if r.get("text") and "voice" not in r:
+                r["voice"] = "narrator" if n and self.narrated[-1][1].get("text") == r["text"] else "ref"
+        return rs
+
     def signal(self, s):
-        """One watch signal → the replies it makes (possibly none)."""
+        """One watch signal → the replies it makes (possibly none), each
+        text with its origin (voice)."""
+        return self.voiced(self._signal(s))
+
+    def _signal(self, s):
         kind, beat = s["signal"], self.beat_no()
         if kind == "event" and s.get("kind") == "clause":
             k = s["fired"]
@@ -251,6 +270,11 @@ class DomainAgent:
                 self.narrated[-1][1]["held"] = False
                 text = line
             out = self.replier.fired(ev, k, beat, self.repl.counts, text)   # seq as `log` numbers it
+            # where the reply's text came from (the console's label): the
+            # narrator's sentence that held, or the rule's %% line
+            for r in out:
+                if r.get("text"):
+                    r["voice"] = "narrator" if text and text != line else "line"
             for r in out:
                 if r.get("status") == "refused":
                     self.last_refusal = {"id": r["id"], "seq": k, "event": ev.name, "persist": dict(ev.persist),
@@ -286,6 +310,7 @@ class DomainAgent:
         if name in READS:
             arg = args.get("atom") or args.get("arg") or ""
             output = scrub(self.repl.capture(name, arg) or "(no output)")
+            self.reads.append({"tool": name, "arg": arg, "out": output[:2000]})
             return [reply(self.name, "read", tool=name, output=output,
                           ref={"seq": len(self.repl.fired), "beat": self.beat_no()})]
         if name == "consult":
@@ -436,7 +461,7 @@ class DomainAgent:
                 out.append(reply(self.name, "notice", record=s.get("record"), card=s.get("card"), move=s.get("move"),
                                  ref=ref, text=self.narrate(nf) or words(nf.ref)))
         self.watch.outbox.clear()
-        return out
+        return self.voiced(out)
 
     def step(self):
         """One watch step (a fired move, an entry into quiescence, or one
@@ -459,6 +484,8 @@ class DomainAgent:
             return self.intent(msg)
         if "world" in msg:
             return self.world(msg)
+        if "ports" in msg:
+            return self.ports(msg)
         return [reply(self.name, "error", id=msg.get("id"), error="neither an intent, a tool call, a world line nor the clock")]
 
     # ── the replay face: the world's changes from the driver ──
@@ -470,12 +497,53 @@ class DomainAgent:
             self.host.world(lines)
         except ValueError as e:
             return [reply(self.name, "error", id=msg.get("id"), error=str(e))]
+        self.worlds.append(lines)
         return []
+
+    # ── the console's faces (agent-console, s-7f3d1088) ──
+    def ports(self, msg):
+        """The host's world ports, so the person does not guess names: the
+        pairs (needs, blocks) and which side holds now, the reports the
+        world can send (and the handle kind each takes), the handles."""
+        pairs = [list(p) for p in getattr(self.mod, "PAIRS", ())]
+        sides = {x for p in pairs for x in p}
+        held = sorted(a for a, n in self.repl.counts.items() if n > 0 and a.partition("(")[0] in sides)
+        kinds = (getattr(self.mod, "CARD", None) or {}).get("handles", {})
+        standing = set(getattr(self.mod, "STANDING", ()))
+        handles = {k: [{"id": h, "display": self.display_of(h)} for h, _ in hs if h not in standing]
+                   for k, hs in kinds.items()}
+        return [reply(self.name, "ports", world=hasattr(self.host, "world"), pairs=pairs,
+                      reports=dict(getattr(self.mod, "REPORTS", {})), handles=handles, held=held,
+                      ref={"seq": len(self.repl.fired), "beat": self.beat_no()})]
+
+    def trace(self):
+        """What the agent did since the last trace (fired rows, narrated
+        fragments, consults, reads, world lines): one trace reply, or None."""
+        f0, n0, c0 = self.cursor
+        rows, nar, cons = self.repl.fired_rows[f0:], self.narrated[n0:], self.consults[c0:]
+        self.cursor = (len(self.repl.fired_rows), len(self.narrated), len(self.consults))
+        reads, worlds, self.reads, self.worlds = self.reads, self.worlds, [], []
+        if not (rows or nar or cons or reads or worlds):
+            return None
+        fired = []
+        for i, (kind, stage, ev) in enumerate(rows[-40:], f0 + max(0, len(rows) - 40) + 1):
+            line = self.replier.line(ev)[0] if kind != "exo" else ""
+            fired.append({"seq": i, "kind": kind, "event": ev.name, "consume": sorted(ev.consume),
+                          "produce": sorted(ev.produce), **({"line": line} if line else {})})
+        narrated = [{"kind": f.kind, "seq": f.seq, "sentence": sn.get("text", ""), "line": getattr(f, "own_line", "") or "",
+                     "held": sn.get("held", True), "ms": sn.get("ms")} for f, sn in nar]
+        consults = [{"situation": c.get("situation"), "stop": c.get("stop"), "text": c.get("text", ""),
+                     "answer": c.get("envelope"), "calls": [str(x)[:400] for x in (c.get("calls") or [])][:12],
+                     "first_read": c.get("first_read", ""), "ms": c.get("ms")} for c in cons]
+        return reply(self.name, "trace", beat=self.beat_no(), fired=fired or None,
+                     **({"more": len(rows) - 40} if len(rows) > 40 else {}),
+                     narrated=narrated or None, consults=consults or None, reads=reads or None,
+                     world=worlds or None, ref={"seq": len(self.repl.fired), "beat": self.beat_no()})
 
 
 def kind_of(msg):
     """The ack's kind for a non-clock line."""
-    for k, name in (("reset", "reset"), ("verb", "intent"), ("tool", "tool"), ("world", "world")):
+    for k, name in (("reset", "reset"), ("verb", "intent"), ("tool", "tool"), ("world", "world"), ("ports", "ports")):
         if k in msg:
             return name
     return "error"
@@ -575,6 +643,11 @@ def serve(agent, msg, rebuild):
             out = agent.handle(msg)
         except Exception as e:     # the agent itself failed: an error reply, the process lives
             out = [reply(agent.name, "error", id=msg.get("id"), error="%s: %s" % (type(e).__name__, e))]
+    if "reset" not in msg:   # --trace: what the line made each agent do, before its ack (or clock line)
+        ags = agent.agents.values() if isinstance(agent, Domains) else [agent]
+        ts = [t for t in (a.trace() for a in ags if a.tracing) if t]
+        if ts:
+            out = (out[:-1] + ts + out[-1:]) if "clock" in msg and out else out + ts
     if "clock" not in msg:
         out = out + [{"ack": kind_of(msg), "id": msg.get("id")}]
     return agent, out
@@ -616,6 +689,8 @@ def main():
                     help="hosted (default): the host's own day; replay: no script, no end — the driver brings "
                          "the person (intents) and the world (world lines); live: the same on the orchestrator's "
                          "wall-clock beats")
+    ap.add_argument("--trace", action="store_true", help="a trace reply per line (the console's REPL log): "
+                    "the fired rows, narrated fragments, consults, reads and world lines it caused")
     a = ap.parse_args()
     llm = None
     if a.narrate or a.consult == "gemma4":
@@ -650,6 +725,7 @@ def main():
                              consult_missing="seat" if a.missing_seat else "template", case=case)
             if m.NAME not in narrated:
                 ag.narrator = None
+            ag.tracing = a.trace
             ags.append(ag)
         return ags[0] if len(ags) == 1 else Domains(ags)
 
