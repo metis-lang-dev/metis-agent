@@ -44,6 +44,7 @@ type Orch struct {
 	q     *question // step 3: the open question to the person
 	qseq  int
 	quiet map[string]bool // step 3: the harness's own intents (their outcomes are the journal's only)
+	spoke map[string]bool // step 3: the intents whose first reply has spoken
 
 	br   branch
 	last struct {
@@ -120,7 +121,7 @@ type branch struct {
 func NewOrch(cfg V3Config, l DialogLLM, dom Domains) *Orch {
 	return &Orch{cfg: cfg, l: l, dom: dom, api: replAPI(cfg.Catalog, cfg.Loaded),
 		byID: map[string]Call{}, answers: map[string]Reply{}, refusals: map[refusal]int{}, surprises: map[string]Reply{},
-		m: newMirror(), quiet: map[string]bool{}}
+		m: newMirror(), quiet: map[string]bool{}, spoke: map[string]bool{}}
 }
 
 // ── the dialog's past and its wakes ──────────────────────────────────────────
@@ -209,49 +210,57 @@ func (o *Orch) say(kind, line string) {
 func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 	b := branch{name: "person"}
 	q := o.q
-	if q != nil { // the open question: this turn is its answer, bound by id
+	if q != nil { // the open question: this turn answers it, bound by id
 		o.q, b.name = nil, "bound"
-		person = fmt.Sprintf("[Reply to your question %s — %q — about %s (%s), refused: %s.] %s\n%s",
-			q.id, q.text, describe(q.refused), q.refusedID, q.reason, person, cueBound(q))
+		person = fmt.Sprintf("[Reply to your question %s — %q — about %s (%s), refused: %s.] %s",
+			q.id, q.text, describe(q.refused), q.refusedID, q.reason, person)
 	}
 	o.Person(person)
 	o.last.call = Call{}
-	var c Call
-	if q != nil {
-		// the step 3 ruling: the model judges the answer, the harness moves
-		class, _, err := o.genCapture("answer", grammarAnswer, b)
-		if err != nil {
-			return "", "", err
+	// the intent pass first (step 3 ruling, c77232b)
+	if err := o.gen("move", 0, gbnf, false, b); err != nil {
+		return "", "", err
+	}
+	c := o.last.call
+	verb := c.Verb()
+	talk := c.IsJ() && (verb == "CHITCHAT" || verb == "UNKNOWN")
+	retry := func() {
+		if q.kind == "cancelask" {
+			o.cancelFirst(q)
 		}
-		switch answerClass(class) {
-		case "yes": // the retry, after the cancel for a busy question: the line after it is true
-			if q.kind == "cancelask" {
-				o.cancelFirst(q)
-			}
-			c = q.refused
+		c, verb, talk = q.refused, q.refused.Verb(), false
+	}
+	if q != nil {
+		switch {
+		case CanonJSON(c.Text()) == CanonJSON(q.refused.Text()): // the refused call itself: yes
+			retry()
+		case q.kind == "cancelask" && verb == q.alt: // the verb the busy refusal offered: yes, to dropping the live task (run 3b)
+			retry()
 			o.pend.WriteString("\n" + c.Text())
 			if o.cfg.OnGen != nil {
 				o.cfg.OnGen(GenInfo{Label: "move", Text: c.Text(), Harness: true, Branch: "bound"})
 			}
-		case "no": // talk; the task stays refused
-		default: // something else: the person's turn under the intent grammar, the question closed
-			o.pend.WriteString("\n")
-			if err := o.gen("move", 0, gbnf, false, b); err != nil {
+		case talk: // only talk is judged: yes · no; the harness moves
+			o.pend.WriteString("\n" + cueBound(q) + "\n")
+			class, _, err := o.genCapture("answer", grammarAnswer, b)
+			if err != nil {
 				return "", "", err
 			}
-			c = o.last.call
+			if answerClass(class) == "yes" {
+				retry()
+				o.pend.WriteString("\n" + c.Text())
+				if o.cfg.OnGen != nil {
+					o.cfg.OnGen(GenInfo{Label: "move", Text: c.Text(), Harness: true, Branch: "bound"})
+				}
+			}
 		}
-	} else {
-		if err := o.gen("move", 0, gbnf, false, b); err != nil {
-			return "", "", err
-		}
-		c = o.last.call
+		// a new world command closes the question and is the move
 	}
 	intent = c.Text()
-	verb := c.Verb()
-	readLike := o.cfg.Mirror && c.IsJ() && (verb == "QUERY" || verb == "TIME" || verb == "DATE")
-	if !readLike { // a read-like intent speaks at its result (step 3 ruling)
-		if o.cfg.Mirror && (verb == "CHITCHAT" || verb == "UNKNOWN") { // an information turn speaks from the mirror
+	// nothing is spoken at the person's turn: the intent's first reply speaks
+	// (step 3 ruling); talk is its own reply, spoken now, from the mirror
+	if !o.cfg.Mirror || talk {
+		if o.cfg.Mirror {
 			o.pend.WriteString("\n" + o.m.render(o.cfg.Loaded))
 		}
 		o.pend.WriteString("\n" + speakCue) // the dog path's cue, byte for byte (a dangling space derails E2B)
@@ -259,7 +268,7 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 			return intent, "", err
 		}
 	}
-	if c.IsJ() && verb != "ask" {
+	if c.IsJ() && verb != "ask" && !talk {
 		if r, ok := o.dom.Intent(c); ok && r.ID != "" {
 			o.byID[r.ID] = c
 			o.m.see(r, c)
@@ -453,7 +462,7 @@ func (o *Orch) branchOf(r Reply, c Call) (branch, error) {
 // cue is the branch named for the model: "" when the model does not move.
 func statusWords(s string) string {
 	if w, ok := map[string]string{"done": "is done", "expired": "expired: no outcome came in time",
-		"cancelled": "was cancelled", "admitted": "was admitted", "applied": "was applied"}[s]; ok {
+		"cancelled": "was cancelled", "admitted": "was admitted", "applied": "was applied", "progress": "is under way"}[s]; ok {
 		return w
 	}
 	return s

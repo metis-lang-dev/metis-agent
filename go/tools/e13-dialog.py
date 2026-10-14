@@ -67,12 +67,12 @@ def nav(desc, *replies, typ="REGION"):
 
 
 def go_ok(desc, done):
-    return nav(desc, res("progress", 1), res("done", done, "I have arrived at the %s." % desc))
+    return nav(desc, res("progress", 1, "I set off for the %s." % desc), res("done", done, "I have arrived at the %s." % desc))
 
 
 def find_ok(thing, done):
     return {"verb": "FIND", "slot": "task", "when": {"target.description": thing},
-            "replies": [res("progress", 1), res("done", done, "I found your %s." % thing)]}
+            "replies": [res("progress", 1, "I start looking for your %s." % thing), res("done", done, "I found your %s." % thing)]}
 
 
 def query(thing, text):
@@ -195,11 +195,11 @@ def main():
               kitchen()]),
         item("D2-a", "stop mid-task: the cancelled line about the kitchen, the progress unspoken",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(3, "stop", [{"intent": "STOP"}])],
-             [dog(nav("kitchen", res("progress", 1), res("progress", 2), res("done", 6, "I have arrived at the kitchen.")),
+             [dog(nav("kitchen", res("progress", 1, "I set off for the kitchen."), res("progress", 2), res("done", 6, "I have arrived at the kitchen.")),
                   live="going to the kitchen"), kitchen()]),
         item("D2-b", "a busy refusal asks before it cancels; yes → cancel (harness) → the retry",
              [p(0, "find my keys", a_keys()), p(2, "actually, go to the door", a_nav("door")),
-              p(3, "yes, drop it", [a_nav("door")] + TALK)],
+              p(3, "yes, drop it", [a_nav("door"), {"intent": "CANCEL"}] + TALK)],   # CANCEL: the offered verb (c77232b's intent pass)
              [dog(find_ok("keys", 8), go_ok("door", 3), live="searching for your keys"), kitchen()], {"bound_at": 3, "bound": "retry"}),
         item("D2-c", "what are you doing? mid-task: no new world intent, the line says the kitchen",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(2, "what are you doing?", TALK)],

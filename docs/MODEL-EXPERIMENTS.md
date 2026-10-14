@@ -1606,3 +1606,49 @@ late by more than a beat gets a templated holding line.
 
 **Re-run:** the same timelines, seeds and bars; passes when R3 ignored
 holds with the rest.
+
+## E13 step 3, run 3 — the intent pass first, the first reply speaks (opus, 2026-10-14; s-c9276dee)
+
+**What changed (DESIGN c77232b):**
+- **On a bound turn the intent pass runs first.** A new world command closes the question and is the move; the refused call itself is yes. Only talk (CHITCHAT, UNKNOWN) is classified, under two literals (yes · no), and the harness moves.
+- **Nothing is spoken at the person's turn.** Talk is its own reply, spoken at once from the mirror; every other intent speaks at its first reply (done, refused, or the first progress, which the emulated dog now narrates: "I set off for the sofa.", "I start looking for your keys.").
+- **A keyword stop's own outcome is the journal's only.** Its ack is the turn's line.
+- **The scorer** follows the rule:
+  - an intent's turn silent until its first reply;
+  - the first progress may speak.
+
+Same timelines, seeds and bars; runs 1–2 kept as `results/e13/step3-r1.*`, `step3-r2.*`.
+
+**Run 3 (the rule as written): every read holds but R3 yes, 9/12.**
+- **The three misses are D2-b.** On "yes, drop it", with the busy question "Do you want me to stop looking for your keys?" open, the intent pass writes `{"intent":"CANCEL"}`.
+- **What the rule did with it:** it read CANCEL as a new world command, closed the question and made the move. The search was dropped, but the walk to the door the person asked for was never retried, and the cancel's own outcome was spoken ("I have cancelled that command.").
+- **Why it should count as yes:** CANCEL is the verb the busy refusal offered (`alternatives: ["cancel"]`), so it is the person's yes to the question.
+
+**Run 3b: one refinement, the offered verb on a busy question is yes.** On a bound busy question, the alternative's verb (CANCEL, or STOP for a body action) counts as yes, like the refused call itself. The harness drops the live task (its outcome journal-only), then retries.
+
+| read | run 3 | run 3b | bar | met (3b) |
+|---|---|---|---|---|
+| R1a an outcome's line names its own task | 42/42 | 45/45 | ≥ 95% | yes |
+| R1a a line naming another live task | 0 | 0 | ≤ 1 | yes |
+| R1b the opener's domain and record | 24/24 | 24/24 | all | yes |
+| R2 an intent's turn silent until its first reply | 72/72 | 72/72 | all | yes |
+| R2 no generation on event / notice / a later progress | 12/12 | 12/12 | all | yes |
+| R2 one line per spoken wake | 117/117 | 120/120 | all | yes |
+| R2 the person first in its beat | 81/81 | 81/81 | all | yes |
+| R3 yes → retry (D3-a, D3-c, D3-e, D2-b) | 9/12 | **12/12** | ≥ n − 1 | yes |
+| R3 no → no world-changing intent | 3/3 | 3/3 | 3/3 | yes |
+| R3 ignored → the new command (D3-d) | **3/3** | **3/3** | 3/3 | yes |
+| R4 every intent allowed | 78/78 | 78/78 | all | yes |
+| R5 leaks; claims; ids aloud | 0; 0; 0 | 0; 0; 0 | 0 | yes |
+| forged spans caught | 0 | 0 | counted | — |
+
+- **R4's allow-list for D2-b's "yes, drop it" now includes CANCEL.** Under the intent pass that is the turn's own answer. Only the allow data changed: the scripts and the person's words are byte-identical, and both runs are scored on it.
+- **D3-d,** the run 2 failure: "sit down" with q1 open → SIT_DOWN 3/3, the question closed, no retry.
+
+**Read by eye (3b):**
+- **The false acknowledgements are gone:** "I'm turning left" before the busy refusal, and "I don't know where your keys are" a beat before the answer. D4-a now goes: "I set off for the sofa." → the busy cancel-ask → "I have arrived at the sofa.".
+- **D2-b is true end to end:** "Do you want me to stop looking for your keys?" → "I am no longer searching for your keys." → "I set off for the door." → "I have arrived at the door.".
+- **"What are you doing?"** speaks from the mirror ("I am currently moving to the kitchen.").
+- **The asks name the key** ("Could you open the way to the kitchen?").
+
+**Reproduce:** as run 1; `-tag e13-step3-r3b -jsonl results/e13/step3b.jsonl`. Run 3's scored data is `results/e13/step3.*`.

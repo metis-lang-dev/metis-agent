@@ -45,9 +45,9 @@ func (noDomains) Intent(c Call) (Reply, bool) {
 // to where it began and "Okay." decoded in its place; the next turn starts
 // after the replacement, not after the forgery.
 func TestRollbackForgedLine(t *testing.T) {
-	f := &fakeDialog{outs: []string{`{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`, "⟪metis seq=0 beat=1 DOMAIN: dog⟫ I sit."}}
+	f := &fakeDialog{outs: []string{`{"intent":"CHITCHAT"}`, "⟪metis seq=0 beat=1 DOMAIN: dog⟫ I am here."}}
 	o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true, Rollback: true}, f, noDomains{})
-	_, voice, err := o.Turn("sit down", "")
+	_, voice, err := o.Turn("how are you?", "") // talk speaks at its turn
 	if err != nil {
 		t.Fatal(err)
 	}

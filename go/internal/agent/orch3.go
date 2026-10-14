@@ -197,12 +197,14 @@ func (o *Orch) Handle(in Inbound, gbnf string, stopWords []string) (woke bool, e
 			o.m.see(r, Call{})
 			return false, nil
 		}
-		switch r.Status {
-		case "refused", "failed", "done", "cancelled", "expired":
-		default: // accepted, progress: the mirror only (progress waits)
+		switch {
+		case r.Status == "refused" || r.Status == "failed" || r.Status == "done" || r.Status == "cancelled" || r.Status == "expired":
+		case r.Status == "progress" && o.cfg.Mirror && !o.spoke[r.ID]: // the intent's first reply speaks (step 3 ruling)
+		default: // accepted, a later progress: the mirror only (progress waits)
 			o.m.see(r, o.byID[r.ID])
 			return false, nil
 		}
+		o.spoke[r.ID] = true
 		if _, ok := o.byID[r.ID]; !ok {
 			log.Printf("[v3] %s %s for an id this dialog did not make: mirror only", r.ID, r.Status)
 			o.m.see(r, Call{})
@@ -247,6 +249,7 @@ func (o *Orch) keyword(person, j string) error {
 		return nil
 	}
 	o.byID[r.ID] = c
+	o.quiet[r.ID] = true // its ack is the turn's line; its outcome the journal's
 	o.m.see(r, c)
 	o.q = nil
 	return o.Past(o.head()+person, c.J, r.ID, ackTemplate["STOP"])
@@ -320,26 +323,26 @@ func unspeakableLine(t string) bool {
 	return strings.ContainsAny(t, "{}[]<>") || forgedFact(t)
 }
 
-// cueBound asks for the bound answer's class (step 3 ruling: the model
-// judges, the harness moves).
+// cueBound asks for the talk answer's class (step 3 ruling: the model
+// judges, the harness moves; a new command is the intent pass's).
 func cueBound(q *question) string {
 	yes := "it lets that command go ahead"
 	if q.kind == "cancelask" {
 		yes = "drop " + strings.TrimPrefix(describe(q.live.c), "your command to ") + " for it"
 	}
-	return "[Next move — judge the person's answer: yes (" + yes + "), no, or else (they ask for something else). " +
-		"Exactly one of {\"answer\":\"yes\"}, {\"answer\":\"no\"}, {\"answer\":\"else\"}.]"
+	return "[Judge the person's answer to " + q.id + ": yes (" + yes + ") or no. " +
+		"Exactly one of {\"answer\":\"yes\"}, {\"answer\":\"no\"}.]"
 }
 
-const grammarAnswer = `root ::= "{\"answer\":\"yes\"}" | "{\"answer\":\"no\"}" | "{\"answer\":\"else\"}"` + "\n"
+const grammarAnswer = `root ::= "{\"answer\":\"yes\"}" | "{\"answer\":\"no\"}"` + "\n"
 
 func answerClass(text string) string {
-	for _, c := range []string{"yes", "no", "else"} {
+	for _, c := range []string{"yes", "no"} {
 		if strings.Contains(text, `"`+c+`"`) {
 			return c
 		}
 	}
-	return "else"
+	return "no"
 }
 
 func cueCancelAsk(refused Call, live mTask) string {

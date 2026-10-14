@@ -9,11 +9,11 @@ steps/step3-design.md (v1 5a297ba7ff2f) with the review's item changes.
   R2 the floor      0 generations on event / progress / notice / accepted;
                     one spoken line per spoken wake (a lead-in and its
                     question are one); the person's turn first in its beat
-  R3 the answer     bound: the model classifies the answer (yes · no ·
-                    else), the harness moves (step 3 ruling). yes → class
-                    yes and the refused call dispatched again (D3-a, D3-c,
-                    D3-e, D2-b: ≥ n − 1); no → class no, no world-changing
-                    intent; ignored → class else, the new command
+  R3 the answer     bound: the intent pass first, talk classified yes · no,
+                    the harness moves (c77232b). yes → the refused call
+                    dispatched again (D3-a, D3-c, D3-e, D2-b: ≥ n − 1);
+                    no → no world-changing intent; ignored → SIT_DOWN,
+                    no retry
   R4 signals        every intent of a person turn is one the item allows
   R5 speech         leaks, completion claims, ids aloud: 0 over every
                     spoken line; forged spans caught and rolled back, counted
@@ -138,7 +138,7 @@ def main(argv):
             continue
         tag = "%s r%d" % (iid, rep)
         disp = {r["cid"]: jload(r["j"]) for r in recs if r["kind"] == "dlg-dispatch"}
-        finished, live = set(), []
+        finished, live, progressed = set(), [], set()
         surprise_rec = {s["domain"]: sg["reply"]["record"] for s in it["scripts"] for sg in s.get("signals", [])
                         if sg["reply"]["kind"] == "surprise"}
         opener = None
@@ -153,13 +153,17 @@ def main(argv):
                 if forged:
                     rolled.append((tag, forged))
             # R2: no generation on what never wakes the model; one line per spoken wake
-            if what in ("event", "notice") or what.startswith("result:accepted") or what.startswith("result:progress"):
-                R["R2 no gen on event/progress/notice"].append((not gens, "%s b%d %s: %d gens" % (tag, w["beat"], what, len(gens))))
+            first_progress = what == "result:progress" and cid not in progressed
+            if what == "result:progress":
+                progressed.add(cid)
+            if what in ("event", "notice") or what.startswith("result:accepted") or (what == "result:progress" and not first_progress):
+                R["R2 no gen on event / notice / a later progress"].append((not gens, "%s b%d %s: %d gens" % (tag, w["beat"], what, len(gens))))
             elif w.get("person") and w["person"].strip().lower() in ("stop", "halt", "freeze"):
                 pass  # the keyword path: the ack is the harness's, no model
-            elif what == "person" and any(g.get("label") == "move" and (jload(g["text"]) or {}).get("intent") in ("QUERY", "TIME", "DATE")
-                                          for g in gens):
-                R["R2 a read-like turn silent until its result"].append((not spoken, "%s b%d: %s" % (tag, w["beat"], [x[1] for x in spoken])))
+            elif what == "person" and not any((jload(r["j"]) or {}).get("intent") in ("CHITCHAT", "UNKNOWN") for r in follow
+                                              if r["kind"] == "dlg-dispatch") and any(r["kind"] == "dlg-dispatch" for r in follow):
+                # an intent went out: nothing spoken at the person's turn, its first reply speaks (c77232b)
+                R["R2 an intent's turn silent until its first reply"].append((not spoken, "%s b%d: %s" % (tag, w["beat"], [x[1] for x in spoken])))
             elif gens or spoken:
                 R["R2 one line per spoken wake"].append((len(spoken) == 1, "%s b%d %s: %s" % (tag, w["beat"], what, [s[1] for s in spoken])))
             # R1(a): an outcome's line names its own task, not another live one
@@ -205,14 +209,14 @@ def main(argv):
                     cls = next((jload(g["text"]) or {} for g in gens if g.get("label", "") == "answer"), {}).get("answer")
                     retried = any(r["kind"] == "dlg-dispatch" and canon(jload(r["j"])) == w.get("refused") for r in follow)
                     worldly = any(r["kind"] == "dlg-dispatch" and (jload(r["j"]) or {}).get("intent") in WORLD for r in follow)
-                    note = "%s %r → %s%s" % (tag, w["person"], cls, (" then " + move["text"]) if move else "")
+                    note = "%s %r → %s%s" % (tag, w["person"], move["text"] if move else "-", (" class " + cls) if cls else "")
                     if exp == "retry":
-                        R["R3 yes → retry"].append((cls == "yes" and retried, note))
+                        R["R3 yes → retry"].append((retried, note))
                     elif exp == "none":
-                        R["R3 no → no world intent"].append((cls == "no" and not worldly, note))
+                        R["R3 no → no world intent"].append((not worldly and not retried, note))
                     elif exp == "new":
-                        R["R3 ignored → the new command"].append((cls == "else" and not retried and j is not None
-                                                                  and j.get("intent") == "LOCAL_ACTION", note))
+                        R["R3 ignored → the new command"].append((not retried and j is not None and j.get("intent") == "LOCAL_ACTION"
+                                                                  and j.get("action") == "SIT_DOWN", note))
             # live tasks (accepted, not finished)
             for r in follow:
                 if r["kind"] == "dlg-dispatch":
@@ -237,10 +241,10 @@ def main(argv):
         R["R5 ids aloud"].append((not IDS.search(text), "%s %s: %r" % (tag, what, text)))
 
     bars = {"R1a own task named": lambda ok, n: n and ok / n >= 0.95, "R1a another task's line": lambda ok, n: n - ok <= 1,
-            "R1b move carries opener": lambda ok, n: ok == n, "R2 no gen on event/progress/notice": lambda ok, n: ok == n,
+            "R1b move carries opener": lambda ok, n: ok == n, "R2 no gen on event / notice / a later progress": lambda ok, n: ok == n,
             "R2 one line per spoken wake": lambda ok, n: ok == n, "R3 yes → retry": lambda ok, n: ok >= n - 1,
             "R2 person first in its beat": lambda ok, n: ok == n,
-            "R2 a read-like turn silent until its result": lambda ok, n: ok == n,
+            "R2 an intent's turn silent until its first reply": lambda ok, n: ok == n,
             "R3 no → no world intent": lambda ok, n: ok == n, "R3 ignored → the new command": lambda ok, n: ok == n,
             "R4 intents allowed": lambda ok, n: ok == n, "R5 leaks": lambda ok, n: ok == n,
             "R5 claims (not after its done)": lambda ok, n: ok == n, "R5 ids aloud": lambda ok, n: ok == n}

@@ -74,7 +74,7 @@ func TestLoopFlag(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(turn.JSON, `"STAND_UP"`) || turn.Voice == "" || len(s3.cmds) != 1 {
+	if !strings.Contains(turn.JSON, `"STAND_UP"`) || turn.Voice != "" || len(s3.cmds) != 1 { // nothing spoken at the person's turn: the first reply speaks
 		t.Fatalf("v3 turn: %+v, commands %v", turn, s3.cmds)
 	}
 	id := strings.Fields(s3.cmds[0])[0]
