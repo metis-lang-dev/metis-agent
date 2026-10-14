@@ -63,12 +63,15 @@ type config struct {
 	Rack           kernel.RackConfig    `yaml:"rack"`
 	Narr           kernel.NarrConfig    `yaml:"narr"`
 	V3             struct {
-		Prompt  []string          `yaml:"prompt"`  // the orchestrator's system turn, files concatenated
-		Catalog []string          `yaml:"catalog"` // the domains activate attaches
-		Loaded  []string          `yaml:"loaded"`
-		Display map[string]string `yaml:"display"` // a card's display name (the explains line)
-		NCtx    int               `yaml:"n_ctx"`
-		Ruled   *bool             `yaml:"ruled"` // the E13 step 1 ruling (default on)
+		Prompt  []string           `yaml:"prompt"`  // the orchestrator's system turn, files concatenated
+		Catalog []string           `yaml:"catalog"` // the domains activate attaches
+		Loaded  []string           `yaml:"loaded"`
+		Display map[string]string  `yaml:"display"` // a card's display name (the explains line)
+		NCtx    int                `yaml:"n_ctx"`
+		Ruled   *bool              `yaml:"ruled"`   // the E13 step 1 ruling (default on)
+		Domains []agent.DomainSpec `yaml:"domains"` // real domain agents as processes (integration step 2)
+		TickMs  int                `yaml:"tick_ms"`
+		Journal string             `yaml:"journal"`
 	} `yaml:"v3"`
 	WS struct {
 		Addr  string `yaml:"addr"`
@@ -151,6 +154,7 @@ func main() {
 			v3.Prompt = append(v3.Prompt, mustRead(f))
 		}
 		v3.Catalog, v3.Loaded, v3.Display, v3.NCtx, v3.Ruled = cfg.V3.Catalog, cfg.V3.Loaded, cfg.V3.Display, cfg.V3.NCtx, cfg.V3.Ruled
+		v3.Domains, v3.TickMs, v3.Journal = cfg.V3.Domains, cfg.V3.TickMs, cfg.V3.Journal
 	}
 
 	srv := console.New(cfg.WS.UIDir)

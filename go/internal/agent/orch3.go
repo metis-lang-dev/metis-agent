@@ -353,6 +353,23 @@ func bindsObject(text string, c Call) bool {
 	return namesWords(text, objectWords(c))
 }
 
+// ownVoice: the domain's text in its own first person — no "the dog",
+// an I/my/me (696d215: one third-person line got through the object check).
+func ownVoice(text, domain string) bool {
+	l := " " + strings.ToLower(text) + " "
+	if strings.Contains(l, " the "+strings.ToLower(domain)+" ") || strings.Contains(l, " the "+strings.ToLower(domain)+"'") {
+		return false
+	}
+	for _, w := range []string{" i ", " i'm ", " i've ", " i'll ", " my ", " me "} {
+		if strings.Contains(strings.NewReplacer(".", " ", ",", " ", ";", " ", ":", " ").Replace(l), w) {
+			return true
+		}
+	}
+	return false
+}
+
+const lineLeaveIt = "Alright, I'll leave it."
+
 // unspeakableLine: a line the dog path's guard would not speak (a forged
 // ⟪metis …⟫ span, a call or its braces).
 func unspeakableLine(t string) bool {

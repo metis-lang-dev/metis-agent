@@ -179,7 +179,7 @@ func TestV3Ruled(t *testing.T) {
 
 	// missing, the first again: ask once more, cued as still missing, one question
 	f, gens := run("G4-01", `{"call":"ask","text":"The kitchen door is still closed; could you open the kitchen door?"}`)
-	if !has(f, "the kitchen door is still missing") || !has(f, `q ::= [a-zA-Z0-9 ,;:'+-]{8,160} "?"`) || len(gens) != 1 {
+	if !has(f, "the kitchen door is still missing") || !has(f, `qhead ::= "Could you "`) || len(gens) != 1 {
 		t.Errorf("G4-01: not asked once more under the ask grammar:\n%s", strings.Join(f.log, "\n---\n"))
 	}
 	// noise, again: the harness escalates, the finding first, the earlier answer, no generation for the move

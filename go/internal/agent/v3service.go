@@ -4,6 +4,7 @@ import (
 	"log"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/intent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
@@ -25,6 +26,11 @@ type V3Service struct {
 	Display map[string]string
 	NCtx    int // its context (default 8192)
 	Ruled   *bool
+	// integration step 2: real domain agents as processes, the
+	// orchestrator's ticker their clock, the journal as JSON lines
+	Domains []DomainSpec
+	TickMs  int    // one clock tick (default 1500 ms)
+	Journal string // the journal's file ("" = none)
 }
 
 type v3 struct {
@@ -37,6 +43,7 @@ type v3 struct {
 	nctx   int
 	dsp    *intent.Dispatcher
 	rec    *idEmitter
+	live   *liveDomains // the real domain agents (nil: the dog's dispatcher)
 }
 
 // idEmitter keeps the id of the last command emitted, so an intent the
@@ -72,6 +79,9 @@ func (a *Agent) startV3(l *llm.LLM) error {
 	v.rec = &idEmitter{Emitter: a.out}
 	v.dsp = wire.NewDispatcher(v.rec, a.Tasks)
 	v.cfg.OnSay = func(kind, line string) { // the dog path's guard: a forged ⟪metis …⟫ span or a call is never spoken
+		if v.live != nil {
+			v.live.record(map[string]any{"kind": "dlg-say", "what": kind, "text": line})
+		}
 		if s := sanitizeAck(line); kind == "template" || taskVoiceOK(s) {
 			a.narrate(Narration{Kind: "v3-" + kind, Form: narr.FormN, Sentence: s})
 			return
@@ -79,9 +89,21 @@ func (a *Agent) startV3(l *llm.LLM) error {
 		log.Printf("[v3] %s line %q not spoken (unspeakable)", kind, line)
 	}
 	v.cfg.OnGen = func(g GenInfo) {
+		if v.live != nil {
+			v.live.record(map[string]any{"kind": "dlg-gen", "label": g.Label, "try": g.Try, "branch": g.Branch,
+				"harness": g.Harness, "text": g.Text, "n_ctx": g.NCtx, "ms": g.All.Milliseconds()})
+		}
 		log.Printf("[v3] %s/%s try %d (%d tok, %d ms) %s", g.Branch, g.Label, g.Try, g.NCtx, g.All.Milliseconds(), g.Text)
 	}
-	if err := v.restart(a); err != nil {
+	if len(sc.Domains) > 0 {
+		tick := time.Duration(sc.TickMs) * time.Millisecond
+		if tick <= 0 {
+			tick = 1500 * time.Millisecond
+		}
+		if err := v.startProcs(a, sc.Domains, tick, sc.Journal); err != nil {
+			return err
+		}
+	} else if err := v.restart(a); err != nil {
 		return err
 	}
 	a.v3 = v
@@ -97,7 +119,11 @@ func (v *v3) restart(a *Agent) error {
 	if err != nil {
 		return err
 	}
-	v.o = NewOrch(v.cfg, v.l, v3Domains{a: a, v: v})
+	var doms Domains = v3Domains{a: a, v: v}
+	if v.live != nil {
+		doms = v.live.pd
+	}
+	v.o = NewOrch(v.cfg, v.l, doms)
 	v.o.nPast = n
 	return nil
 }
@@ -151,9 +177,15 @@ func (v *v3) utterance(a *Agent, text string) (Turn, error) {
 		}
 		return Turn{JSON: string(j), Voice: ackTemplate["STOP"]}, nil
 	}
+	if v.live != nil {
+		v.live.record(map[string]any{"kind": "dlg-wake", "what": "person", "person": text})
+	}
 	j, voice, err := v.o.Turn(text, v.gbnf)
 	if err != nil {
 		return Turn{}, err
+	}
+	if v.live != nil { // what the turn brought at once (an acceptance, a refusal on the spot)
+		v.handleDue(a, -1, nil)
 	}
 	return Turn{JSON: j, Voice: sanitizeAck(voice)}, nil
 }
@@ -163,6 +195,10 @@ func (v *v3) utterance(a *Agent, text string) (Turn, error) {
 func (v *v3) task(a *Agent, t Task) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	if v.live != nil { // the dog is a domain agent process: its outcomes come on its wire, not the console's
+		log.Printf("[v3] console task %s %s ignored: the domain agents answer on their wire", t.ID, t.Result)
+		return nil
+	}
 	if t.Result == "progress" {
 		a.Tasks.Touch(t.ID)
 		return nil

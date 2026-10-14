@@ -211,7 +211,8 @@ func (o *Orch) say(kind, line string) {
 func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 	b := branch{name: "person"}
 	q := o.q
-	if q != nil { // the open question: this turn answers it, bound by id
+	saidNo := false // a bound "no": the harness speaks the line (696d215)
+	if q != nil {   // the open question: this turn answers it, bound by id
 		o.q, b.name = nil, "bound"
 		person = fmt.Sprintf("[Reply to your question %s — %q — about %s (%s), refused: %s.] %s",
 			q.id, q.text, describe(q.refused), q.refusedID, q.reason, person)
@@ -237,7 +238,7 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 			retry()
 		case q.kind != "cancelask" && (verb == "STOP" || verb == "CANCEL") && !o.m.anyLive():
 			// a stop with nothing in flight is the person's "no" (56da709): talk, the task stays refused
-			c, verb, talk = Call{}, "", true
+			c, verb, talk, saidNo = Call{}, "", true, true
 			if o.cfg.OnGen != nil {
 				o.cfg.OnGen(GenInfo{Label: "answer", Text: `{"answer":"no"}`, Harness: true, Branch: "bound"})
 			}
@@ -253,7 +254,9 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 			if err != nil {
 				return "", "", err
 			}
-			if answerClass(class) == "yes" {
+			if answerClass(class) != "yes" {
+				saidNo = true
+			} else {
 				retry()
 				o.pend.WriteString("\n" + c.Text())
 				if o.cfg.OnGen != nil {
@@ -266,7 +269,11 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 	intent = c.Text()
 	// nothing is spoken at the person's turn: the intent's first reply speaks
 	// (step 3 ruling); talk is its own reply, spoken now, from the mirror
-	if !o.cfg.Mirror || talk {
+	if saidNo && o.cfg.Mirror { // the task stays refused: the harness's line, not the model's ("I will stop…")
+		voice = lineLeaveIt
+		o.pend.WriteString("\n" + speakCue + " " + voice)
+		o.say("template", voice)
+	} else if !o.cfg.Mirror || talk {
 		if o.cfg.Mirror {
 			o.pend.WriteString("\n" + o.m.render(o.cfg.Loaded))
 		}
@@ -393,7 +400,7 @@ func (o *Orch) Reply(r Reply) (string, error) {
 			o.pend.WriteString(userTurn(o.head() + respTag + fmt.Sprintf("%s (%s) was accepted: handed over, not done yet.", capFirst(identity(c)), r.ID) + tellNow))
 		default: // an outcome (done, expired, cancelled …): not measured by E13, step 3's corpus is
 			said := ""
-			if r.Text != "" && o.cfg.Mirror && bindsObject(r.Text, c) { // a text that fails to name the task's object is not copied (56da709)
+			if r.Text != "" && o.cfg.Mirror && bindsObject(r.Text, c) && ownVoice(r.Text, r.Domain) { // a text that fails to name the task's object, or is not the domain's own first person, is not copied (56da709, 696d215)
 				said = " The " + r.Domain + " says: " + r.Text
 			}
 			o.pend.WriteString(userTurn(o.head() + respTag + fmt.Sprintf("%s (%s) %s.", capFirst(identity(c)), r.ID, statusWords(r.Status)) + said +

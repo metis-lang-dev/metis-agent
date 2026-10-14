@@ -107,3 +107,10 @@ func TestInfoQueryAndUnboundText(t *testing.T) {
 		t.Fatal("a body action has no object to bind")
 	}
 }
+
+func TestOwnVoice(t *testing.T) {
+	if ownVoice("The dog told you the keys were last seen at the kitchen.", "dog") || !ownVoice("I have arrived at the kitchen.", "dog") ||
+		ownVoice("The keys were last seen at the kitchen.", "dog") {
+		t.Fatal("ownVoice")
+	}
+}

@@ -160,6 +160,9 @@ func (a *Agent) Prompt() string {
 
 // Run sweeps the pending commands (their windows expire) until ctx ends.
 func (a *Agent) Run(ctx context.Context) {
+	if a.v3 != nil && a.v3.live != nil { // the domain agents' clock (integration step 2)
+		go a.v3.runClock(ctx, a)
+	}
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
 	for {

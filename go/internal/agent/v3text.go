@@ -280,9 +280,13 @@ func grammarAskLiteral(words string) string {
 		"pre ::= [a-zA-Z0-9 ,;:'+-]{0,100}", `post ::= [a-zA-Z0-9 ,;:'+-]{0,40} "?"`)
 }
 
-// the ask, one question, its words checked after generation (the ruling)
+// the ask, one question, its words checked after generation (the ruling);
+// a question's opening, never an imperative with a "?" (696d215: "Walk me
+// to tag 5 once so I can map it?")
 func grammarAsk() string {
-	return gRules("root ::= "+askHead+` q "\"}"`, `q ::= [a-zA-Z0-9 ,;:'+-]{8,160} "?"`)
+	return gRules("root ::= "+askHead+` q "\"}"`,
+		`q ::= qhead [a-zA-Z0-9 ,;:'+-]{4,150} "?"`,
+		`qhead ::= "Could you " | "Can you " | "Would you " | "Will you " | "Do you " | "Did you " | "Shall I " | "Should I " | "Is " | "Are " | "Where " | "What " | "When " | "How "`)
 }
 
 // the same refusal again, the model choosing (E13 t3; the ruling picks)
