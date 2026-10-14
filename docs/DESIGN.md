@@ -282,6 +282,30 @@ and signals held, the bound answer and the outcome lines did not):
   3 runs 1–2). A reply that is late by more than a beat gets a templated
   holding line, not a model one.
 
+Two from integration step 2's live session (the real dog and kitchen pair
+on the orchestrator's wall clock):
+- **A bound J that is neither the refused call nor an offered alternative
+  is judged.** Live, the kitchen's lines between the ask and the answer
+  (its quiescence reports, or its surprise) derailed the bound move:
+  "okay, it's open now" — D3-a's own words — after "Can you open the way
+  to the kitchen?" moved LOCAL_ACTION MOVE FORWARD 3/3 ("I opened it"
+  1/1), where the replay moved NAVIGATE kitchen 3/3 on the same refusal,
+  consult and ask. Isolated: the kitchen deactivated, the same words moved
+  NAVIGATE kitchen 1/1. The intent pass still runs first; when its J is
+  neither the refused call nor an alternative the refusal or the blocker
+  offered, the harness judges the words under a three-literal grammar
+  (yes · no · neither): yes → the retry, no → the no-template's line,
+  neither → the J stands as the new command and closes the question.
+  The bound prefix is unchanged (a cue change there would reopen the step
+  3 reads).
+- **A quiescence speaks only when it is news.** A domain's quiescence is
+  spoken when it closes a task the person asked of that domain, when it is
+  the domain's first since activation, or when its day is over; every
+  other quiescence updates the mirror silently. The kitchen reported
+  "quiet after N moves" every ~11 beats, which is noise to the person and,
+  between an ask and its answer, the derailment above. The surprise
+  speaks, as it must.
+
 ### The domain agent
 
 **Role.** The one party that understands its domain: it narrates what the
@@ -489,6 +513,39 @@ change behind interfaces that do not move.
 
 The v2 build plan below stays as the record; its phases 1–3 are these,
 re-cut along the two agents.
+
+### The process shape (user, 2026-10-14 evening): Python is the agent, Go is the runtime path
+
+The integration live session ran the Go service as the master process,
+spawning the Python domain agents as one child over JSON lines, with
+fsttm-web's demo page in front. The user asked why, and ruled:
+
+- **metis-agent/py is the standalone agent.** The orchestrator agent and the
+  domain agents run in one Python process on the py llama wrapper (whose
+  context management is one-to-one with the Go adapter, the parity checked
+  at 54/54), with the page backend in the same process. The orchestrator's
+  harness rules (E13's nine, integration's rulings) and its prompts and
+  grammars (`go/grammar/*`) are ported as they are; the Go orchestrator stays
+  as the reference the port must match (t3 parity 114/114, the 14 timelines'
+  reads, the integration replay reads, the same `dlg-*` journal so
+  `tools/live-reads.py` reads either).
+- **metis-agent/go stays for the kernel runtime path**: the cgo binding of
+  the C++/IR runtime, where extra commands beyond the metispy REPL will be
+  added. It is not the agent's process, and nothing is spawned from it.
+- **fsttm-web becomes a Python UI library** (a package shipping `lib/` and
+  the page assets, with a mount for a Python web server), loaded by the
+  console application, not served by a Go binary beside it.
+- **metis-agent/console is the console** (s-7f3d1088's list: every spoken
+  line labelled by source, domains panel, per-domain tabs with the REPL log,
+  world ports from the page, the journal live; `run.sh` starts the Python
+  process). The user's live session happens there.
+
+Why: the Go-spawns-Python shape was the history of who built what (opus the
+orchestrator in go/ through E10–E13, nina the domain agent in py/), not a
+need of the architecture; the one-to-one context management already on the
+py side makes the orchestrator's KV discipline portable; a page backend in
+Python is a small thing beside the two agents. Both the library packaging
+and the console are nina's.
 
 ### How this section came to be (2026-10-13, the record is in git)
 
