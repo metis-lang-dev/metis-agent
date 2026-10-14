@@ -16,9 +16,12 @@ llm:
     n_gpu_layers: 99
     template: gemma4
     pass2: {temperature: 0.4, top_k: 40, max_tokens: 50}
-prompt:  grammar/dog-prompt.txt
-prompt_extra: [grammar/pass2-examples-gemma4.txt]
-grammar: grammar/dog.gbnf
+# the dog's intent pass, generated from metis-catalog domains/dog/intent.yaml
+# (tools/intents.py; e2e-workflow step 2: the prompts byte-identical to
+# grammar/'s, the grammar the same rules) — re-read after a reload
+prompt:  ../../metis-catalog/domains/dog/intent/dog-prompt.txt
+prompt_extra: [../../metis-catalog/domains/dog/intent/dog-spoken.txt]
+grammar: ../../metis-catalog/domains/dog/intent/dog.gbnf
 talk:                            # say_text{mode: talk}: the free dialog (fsttm-web's long replies)
     prompt: grammar/talk-prompt.txt
     n_ctx: 4096
@@ -58,3 +61,4 @@ v3:
           domains: [dog, kitchen, kitchen_shared]
           clocks: [{domain: dog, n: 1}, {domain: kitchen, n: 2}]
           quiet: [kitchen_shared]
+          watch: {dog: ../../metis-catalog/domains/dog}   # changed on disk → the panel marks it; reload takes it

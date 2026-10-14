@@ -284,3 +284,19 @@ func (d *countDomains) Intent(c Call) (Reply, bool) {
 	d.n++
 	return Reply{Domain: "dog", Kind: "result", ID: "c1", Status: "accepted"}, true
 }
+
+// e2e-workflow step 3: a domain directory's change in one line — each
+// changed file and its first changed line
+func TestReloadSummary(t *testing.T) {
+	base := map[string]string{"dog.llp": "a\n  %% I sit down.\nb", "intent.yaml": "x"}
+	now := map[string]string{"dog.llp": "a\n  %% I sit down, nice and slow.\nb", "intent.yaml": "x", "dog_host.py": "new"}
+	if got := summary(base, now); got != "dog.llp: %% I sit down, nice and slow.; dog_host.py: new" {
+		t.Fatalf("summary %q", got)
+	}
+	if summary(base, base) != "" {
+		t.Fatal("no change, no summary")
+	}
+	if !watched("dog.llp") || !watched("intent.yaml") || !watched("dog.gbnf") || watched("README.md") {
+		t.Fatal("watched")
+	}
+}

@@ -113,6 +113,8 @@ func (p *DomainProc) Do(req map[string]any) ([]map[string]any, error) {
 		kind = "reset"
 	case req["ports"] != nil:
 		kind = "ports"
+	case req["reload"] != nil:
+		kind = "reload"
 	}
 	t0 := time.Now()
 	if _, err := p.in.Write(append(b, '\n')); err != nil {

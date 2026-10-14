@@ -29,6 +29,9 @@ type DomainSpec struct {
 	Domains []string    `yaml:"domains"` // the domains it serves (default: [name])
 	Clocks  []ClockSpec `yaml:"clocks"`  // its clock lines per tick (default: one bare beat)
 	Quiet   []string    `yaml:"quiet"`   // domains stepped but not heard (the pair's second cook)
+	// Watch: domain → its catalog directory, watched for changes on disk
+	// (e2e-workflow step 3: the panel marks it changed; reload takes it)
+	Watch map[string]string `yaml:"watch"`
 }
 
 // ClockSpec is one clock line per tick: a domain's beat, n env beats of a pair.
@@ -147,18 +150,28 @@ type liveDomains struct {
 	seq     int
 	recs    []map[string]any // the journal so far (a page's hello replays it)
 	emit    func(ev string, f map[string]any)
-	wakeRec map[string]any   // the last dlg-wake: a spoken line's src.wake
-	gens    []map[string]any // the dlg-gens since it
-	say     map[string]any   // the last dlg-say
-	lastCat string           // the catalog last sent
-	clockMs []float64        // clock round trips since the last dlg-wire summary
+	wakeRec map[string]any               // the last dlg-wake: a spoken line's src.wake
+	gens    []map[string]any             // the dlg-gens since it
+	say     map[string]any               // the last dlg-say
+	lastCat string                       // the catalog last sent
+	clockMs []float64                    // clock round trips since the last dlg-wire summary
+	watch   map[string]string            // domain → its directory
+	base    map[string]map[string]string // domain → file → the content it was loaded with
+	changed map[string]string            // domain → a one-line summary of what changed on disk (under v3.mu)
 	// a world line went in: the domain's ports again after its next beat (under v3.mu)
 	portsDue map[string]bool
 }
 
 func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journal string) error {
 	ld := &liveDomains{specs: specs, procs: map[string]*DomainProc{}, byName: map[string]*DomainProc{}, tick: tick,
-		portsDue: map[string]bool{}}
+		portsDue: map[string]bool{}, watch: map[string]string{}, base: map[string]map[string]string{},
+		changed: map[string]string{}}
+	for _, s := range specs {
+		for d, dir := range s.Watch {
+			ld.watch[d] = dir
+			ld.base[d] = snapshot(dir)
+		}
+	}
 	if s, ok := a.out.(interface{ Send(string, map[string]any) }); ok {
 		ld.emit = s.Send
 	}

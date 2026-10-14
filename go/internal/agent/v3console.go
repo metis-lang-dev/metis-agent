@@ -162,8 +162,12 @@ func (v *v3) catalog() []map[string]any {
 		case served:
 			state = "inactive"
 		}
-		out = append(out, map[string]any{"name": n, "display": v.cfg.Display[n], "loaded": loaded,
-			"served": served, "state": state})
+		e := map[string]any{"name": n, "display": v.cfg.Display[n], "loaded": loaded,
+			"served": served, "state": state}
+		if c := ld.changed[n]; c != "" {
+			e["changed"] = c // on disk since it was loaded: reload takes it
+		}
+		out = append(out, e)
 	}
 	return out
 }

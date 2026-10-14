@@ -166,7 +166,7 @@ func main() {
 	if *waitViewer && *loop == "v3" && len(v3.Domains) > 0 {
 		v3.Start = srv.Joined()
 	}
-	a, err := agent.New(agent.Config{Persona: persona, GBNF: gbnf, StopWords: stopWords, Ages: ages,
+	a, err := agent.New(agent.Config{Persona: persona, GBNF: gbnf, GBNFPath: cfg.Grammar, StopWords: stopWords, Ages: ages,
 		Rack: cfg.Rack, Narr: cfg.Narr, Loop: *loop, V3: v3,
 		Talk: agent.TalkConfig{System: talkSys, NCtx: cfg.Talk.NCtx, Keep: cfg.Talk.Keep,
 			Sampling: llm.Sampling{Temp: cfg.Talk.Temperature, TopK: cfg.Talk.TopK, TopP: cfg.Talk.TopP,
@@ -246,6 +246,16 @@ func main() {
 					ack["error"] = err.Error()
 				}
 				srv.Send("world_ack", ack)
+			}()
+		case "reload": // e2e-workflow step 3: the domain agent recompiles; a failed compile leaves the old one running
+			go func() {
+				ack := map[string]any{"domain": m.Domain, "ok": true}
+				if key, err := a.V3Reload(m.Domain, "person"); err != nil {
+					ack["ok"], ack["error"] = false, err.Error()
+				} else if key != "" {
+					ack["key"] = key
+				}
+				srv.Send("reload_ack", ack)
 			}()
 		case "ports": // agent-console: a domain tab opened — its world ports now
 			go a.V3Ports(m.Domain)

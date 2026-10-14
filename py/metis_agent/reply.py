@@ -28,6 +28,8 @@ KINDS = {
     # inbox — the host's world ports, and what the agent did on a line
     "ports": ("world", "pairs", "reports", "handles", "held"),
     "trace": ("beat", "fired", "more", "narrated", "consults", "reads", "world", "records"),
+    # e2e-workflow step 3: a domain rebuilt from the files on disk (WIRE.md reload)
+    "reloaded": ("key",),
 }
 
 # result.status as the table lists it (`cancelled`: a task the person

@@ -35,6 +35,7 @@ import (
 type Config struct {
 	Persona   string // the intent model's persona: prompt + prompt_extra, byte for byte
 	GBNF      string // the intent grammar
+	GBNFPath  string // its file (-loop v3: re-read after a domain's reload)
 	StopWords []string
 	Ages      wire.Ages
 	Rack      kernel.RackConfig
@@ -164,6 +165,7 @@ func (a *Agent) Prompt() string {
 func (a *Agent) Run(ctx context.Context) {
 	if a.v3 != nil && a.v3.live != nil { // the domain agents' clock (integration step 2)
 		go a.v3.runClock(ctx, a)
+		go a.v3.runWatch(ctx)
 	}
 	t := time.NewTicker(time.Second)
 	defer t.Stop()
