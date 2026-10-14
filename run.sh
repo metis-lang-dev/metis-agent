@@ -10,7 +10,7 @@
 #
 #   CONFIG=go/config.v3-live.yaml   UI_DIR=<page dir>   LIB_DIR=../fsttm-web/lib   ADDR=:8395
 #
-# The page: fsttm-web/web/ beside this repo (UI_DIR= another). Every typed or spoken line is a person turn of the orchestrator
+# The page: web/ (the console; UI_DIR=../fsttm-web/web for the plain page). Every typed or spoken line is a person turn of the orchestrator
 # (-loop v3 has no talk mode; the page's "replies" toggle does nothing).
 # The domains' clock starts when the first page connects. Each start keeps
 # the previous journal as go/results/live/session-<time>.jsonl.
@@ -55,9 +55,9 @@ esac
 
 if running; then echo "already running (pid $(cat "$PID")) — $URL"; exit 0; fi
 
-# the plain fsttm-web page until the console page (web/, agent-console
-# step 2) is wired to the service; UI_DIR=web tries it
-UI_DIR="${UI_DIR:-$(cd "$ROOT/.." && pwd)/fsttm-web/web}"
+# the console page (web/, agent-console step 2: source-labelled lines,
+# domain tabs, world ports) by default; UI_DIR=../fsttm-web/web for the plain page
+UI_DIR="${UI_DIR:-$ROOT/web}"
 case "$UI_DIR" in /*) ;; *) UI_DIR="$ROOT/$UI_DIR" ;; esac
 [ -f "$UI_DIR/index.html" ] || { echo "no page at $UI_DIR (set UI_DIR)" >&2; exit 1; }
 # fsttm-web's library (lib/dialog.js …) at /lib/, beside whichever page

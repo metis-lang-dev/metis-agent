@@ -139,16 +139,17 @@ func TestMirrorSurpriseDifference(t *testing.T) {
 // retries the refused call, no keeps it refused, neither keeps the J
 func TestBoundJudgedJ(t *testing.T) {
 	nav := Call{J: []byte(`{"intent":"NAVIGATE","goal":{"type":"REGION","description":"kitchen"}}`)}
-	for _, tc := range []struct{ move, answer, want string }{
-		{`{"intent":"LOCAL_ACTION","action":"MOVE","direction":"FORWARD"}`, `{"answer":"yes"}`, nav.Text()},
-		{`{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`, `{"answer":"neither"}`, `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`},
-		{`{"intent":"LOCAL_ACTION","action":"MOVE","direction":"FORWARD"}`, `{"answer":"no"}`, ""},
+	for _, tc := range []struct{ words, move, answer, want string }{
+		{"okay, it's open now", `{"intent":"LOCAL_ACTION","action":"MOVE","direction":"FORWARD"}`, `{"answer":"yes"}`, nav.Text()},
+		{"sit down", `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`, `{"answer":"neither"}`, `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`},
+		{"no, I won't, turn left", `{"intent":"LOCAL_ACTION","action":"TURN","direction":"LEFT"}`, `{"answer":"no"}`, ""},
+		{"sit down", `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`, `{"answer":"no"}`, `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`}, // no negation: the J stands
 	} {
 		f := &fakeDialog{outs: []string{tc.move, tc.answer, "Okay."}}
 		o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true}, f, noDomains{})
 		o.q = &question{id: "q1", text: "Can you open the way to the kitchen?", kind: "none", refused: nav,
 			refusedID: "c1", reason: "the way to it is closed"}
-		intent, voice, err := o.Turn("okay, it's open now", "")
+		intent, voice, err := o.Turn(tc.words, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -199,5 +200,25 @@ func TestQuiescenceRule(t *testing.T) {
 	o.Activated("kitchen")
 	if !o.quiescenceSpoken(Reply{Domain: "kitchen", Kind: "quiescence", Text: "quiet"}) {
 		t.Fatal("the first after activation speaks")
+	}
+}
+
+// question-form words the intent pass moved as a world command are judged:
+// info → an information turn (spoken from the mirror), command → dispatched
+func TestInfoJudge(t *testing.T) {
+	for _, tc := range []struct{ judge, want string }{{`{"turn":"info"}`, `{"intent":"CHITCHAT"}`},
+		{`{"turn":"command"}`, `{"intent":"LOCAL_ACTION","action":"MOVE","direction":"FORWARD"}`}} {
+		f := &fakeDialog{outs: []string{`{"intent":"LOCAL_ACTION","action":"MOVE","direction":"FORWARD"}`, tc.judge, "I am standing here."}}
+		o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true}, f, noDomains{})
+		intent, _, err := o.Turn("what are you doing?", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if CanonJSON(intent) != CanonJSON(tc.want) {
+			t.Fatalf("%s: intent %s", tc.judge, intent)
+		}
+	}
+	if !negated("no, I can't right now") || !negated("I don’t think so") || negated("sit down") || negated("okay, it's open now") {
+		t.Fatal("negated")
 	}
 }

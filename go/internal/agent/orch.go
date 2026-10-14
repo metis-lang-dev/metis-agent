@@ -215,6 +215,7 @@ func (o *Orch) say(kind, line string) {
 // acceptance kept by id for its outcome.
 func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 	b := branch{name: "person"}
+	words := strings.TrimSpace(person)
 	q := o.q
 	saidNo := false // a bound "no": the harness speaks the line (696d215)
 	if q != nil {   // the open question: this turn answers it, bound by id
@@ -231,6 +232,24 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 	c := o.last.call
 	verb := c.Verb()
 	talk := c.IsJ() && (verb == "CHITCHAT" || verb == "UNKNOWN" || infoQuery(c)) // an information turn is never an intent (56da709)
+	if c.IsJ() && !talk && verb != "QUERY" && verb != "STOP" && verb != "CANCEL" && strings.HasSuffix(words, "?") {
+		// question-form words moved as a world command: judged info or
+		// command (integration step 2 ruling: after the kitchen's lines,
+		// "what are you doing?" was dispatched as MOVE FORWARD)
+		o.pend.WriteString("\n" + cueInfo(c) + "\n")
+		class, _, err := o.genCapture("answer", grammarInfo, b)
+		if err != nil {
+			return "", "", err
+		}
+		if strings.Contains(class, `"info"`) {
+			c = Call{J: json.RawMessage(`{"intent":"CHITCHAT"}`)}
+			verb, talk = "CHITCHAT", true
+			o.pend.WriteString("\n" + c.Text())
+			if o.cfg.OnGen != nil {
+				o.cfg.OnGen(GenInfo{Label: "move", Text: c.Text(), Harness: true, Branch: b.name})
+			}
+		}
+	}
 	retry := func() {
 		if q.kind == "cancelask" {
 			o.cancelFirst(q)
@@ -259,7 +278,7 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 			// kitchen's lines between ask and answer turned "okay, it's open
 			// now" into MOVE FORWARD) — yes retries the refused call, no is
 			// the no-template's line, neither keeps the J as the new command
-			o.pend.WriteString("\n" + cueBoundJ(q) + "\n")
+			o.pend.WriteString("\n" + cueBoundJ(q, c) + "\n")
 			class, _, err := o.genCapture("answer", grammarAnswer3, b)
 			if err != nil {
 				return "", "", err
@@ -272,7 +291,11 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 					o.cfg.OnGen(GenInfo{Label: "move", Text: c.Text(), Harness: true, Branch: "bound"})
 				}
 			case "no":
-				c, verb, talk, saidNo = Call{}, "", true, true
+				// a decline says so: a judged no on words with no negation
+				// is the J read as a new command ("sit down": no 1/3 live)
+				if negated(words) {
+					c, verb, talk, saidNo = Call{}, "", true, true
+				}
 			}
 		case talk: // only talk is judged: yes · no; the harness moves
 			o.pend.WriteString("\n" + cueBound(q) + "\n")

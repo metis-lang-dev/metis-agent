@@ -434,10 +434,20 @@ const grammarAnswer = `root ::= "{\"answer\":\"yes\"}" | "{\"answer\":\"no\"}"` 
 // the refused call: yes, no, or neither (a new command).
 const grammarAnswer3 = `root ::= "{\"answer\":\"yes\"}" | "{\"answer\":\"no\"}" | "{\"answer\":\"neither\"}"` + "\n"
 
-func cueBoundJ(q *question) string {
-	return "[Judge the person's words as an answer to " + q.id + ": yes (" + describe(q.refused) +
-		" goes ahead now), no (it stays refused), or neither (the words are a new command). " +
-		"Exactly one of {\"answer\":\"yes\"}, {\"answer\":\"no\"}, {\"answer\":\"neither\"}.]"
+func cueBoundJ(q *question, read Call) string {
+	return "[Judge the person's words as an answer to " + q.id + ". yes: they say it is done or agree, so " +
+		describe(q.refused) + " goes ahead now. neither: they ask for something else (" + describe(read) +
+		"), which replaces it. no: they decline and ask for nothing else. " +
+		"Exactly one of {\"answer\":\"yes\"}, {\"answer\":\"neither\"}, {\"answer\":\"no\"}.]"
+}
+
+// grammarInfo: question-form words the intent pass moved as a command —
+// a request for information, or a request to act.
+const grammarInfo = `root ::= "{\"turn\":\"info\"}" | "{\"turn\":\"command\"}"` + "\n"
+
+func cueInfo(read Call) string {
+	return "[Judge the person's words: a question asking for information (info), or a request to act (command: " +
+		describe(read) + "). Exactly one of {\"turn\":\"info\"}, {\"turn\":\"command\"}.]"
 }
 
 func answerClass3(text string) string {
@@ -447,6 +457,22 @@ func answerClass3(text string) string {
 		}
 	}
 	return "neither"
+}
+
+// negated: the words carry a negation (a decline says so).
+func negated(words string) bool {
+	for _, w := range strings.FieldsFunc(strings.ToLower(strings.ReplaceAll(words, "’", "'")), func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r == '\'')
+	}) {
+		switch w {
+		case "no", "not", "nope", "never", "don't", "can't", "cannot", "won't", "isn't", "wasn't", "couldn't", "shouldn't", "nah", "neither", "nor":
+			return true
+		}
+		if strings.HasSuffix(w, "n't") {
+			return true
+		}
+	}
+	return false
 }
 
 // offered: c is one of the alternatives the refusal or the blocker offered.
