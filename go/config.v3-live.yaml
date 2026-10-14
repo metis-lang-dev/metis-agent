@@ -1,0 +1,54 @@
+# metis-agent (docs/FRAMEWORK.md): the agent core + the console backend
+# serving the fsttm-web page. One process owns the model (no llama-server
+# beside it).
+#
+#   ./bin/metis-agent -config config.agent.yaml -ui-dir ../../fsttm-web/web
+#   open http://localhost:8395/          (the page picks the ws backend by itself)
+#
+# The intent turn is config.ws.yaml's (the parity bar: gemma4 E2B Q4 + the
+# gemma4 pass-2 examples, thinking off); talk mode is the free dialog on its
+# own context of the same model.
+llm:
+    model: models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf
+    n_ctx: 4096
+    n_batch: 512
+    n_threads: 6
+    n_gpu_layers: 99
+    template: gemma4
+    pass2: {temperature: 0.4, top_k: 40, max_tokens: 50}
+prompt:  grammar/dog-prompt.txt
+prompt_extra: [grammar/pass2-examples-gemma4.txt]
+grammar: grammar/dog.gbnf
+talk:                            # say_text{mode: talk}: the free dialog (fsttm-web's long replies)
+    prompt: grammar/talk-prompt.txt
+    n_ctx: 4096
+    temperature: 1.0
+    top_k: 64
+    top_p: 0.95
+    min_p: 0.05
+    repeat_penalty: 1.1
+    max_tokens: 160
+    keep_turns: 12
+ws:
+    addr: :8395
+
+# integration step 2 (s-f82a578f): -loop v3 with the real domain agents —
+#   ./bin/metis-agent -config config.v3-live.yaml -loop v3 -no-domains -ui-dir ../../fsttm-web/web
+# one domain-agent process serves the dog and the kitchen pair on one model
+# (nina ad9231b); the orchestrator owns time: each tick one dog beat and two
+# kitchen env beats; the journal is the session's record for the E13 reads.
+v3:
+    prompt: [grammar/e13-prompt-base.txt]
+    catalog: [kitchen, nav, xtraffic, sysadmin, social, votes]
+    loaded: [dog, kitchen]
+    display: {kitchen_shared: second cook}
+    n_ctx: 8192
+    tick_ms: 1500
+    journal: results/live/session.jsonl
+    domains:
+        - name: agents
+          argv: [.venv/bin/python, -m, metis_agent.domain_agent, --domain, "dog,kitchen,kitchen_shared", --case, live, --narrate, dog]
+          dir: ../py
+          domains: [dog, kitchen, kitchen_shared]
+          clocks: [{domain: dog, n: 1}, {domain: kitchen, n: 2}]
+          quiet: [kitchen_shared]

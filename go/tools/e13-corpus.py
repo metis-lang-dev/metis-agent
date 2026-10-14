@@ -408,6 +408,8 @@ def main():
     (GO / GDIR).mkdir(exist_ok=True)
     p = prompt()
     (GO / PROMPT).write_text(p)
+    if FINAL:  # the live -loop v3's system turn: the same, the REPL API's declarations left to the service (APIDeclarations)
+        (GO / "grammar/e13-prompt-base.txt").write_text(p[:len(p) - len("".join(e9.declaration(t) for t in API))])
     items, scen = [], []
 
     def add(group, iid, steps, rule, reps=1):

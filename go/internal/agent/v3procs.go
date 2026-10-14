@@ -19,15 +19,22 @@ import (
 // journal (every wake, dispatch, generation and spoken line) is written as
 // JSON lines for the E13 reads after the fact.
 
-// DomainSpec is one domain agent process.
+// DomainSpec is one domain agent process: one domain, or several on one
+// model (nina's ad9231b: --domain dog,kitchen,kitchen_shared).
 type DomainSpec struct {
-	Name  string   `yaml:"name"`
-	Argv  []string `yaml:"argv"`  // the command line (e.g. .venv/bin/python -m metis_agent.domain_agent --domain dog …)
-	Dir   string   `yaml:"dir"`   // its working directory
-	Env   []string `yaml:"env"`   // KEY=VALUE beside the service's environment
-	Clock string   `yaml:"clock"` // beat (default) | step (an interleaved pair's)
-	Steps int      `yaml:"steps"` // clock lines per tick (default 1)
-	Quiet bool     `yaml:"quiet"` // stepped, its replies not the person's (the pair's second cook)
+	Name    string      `yaml:"name"`
+	Argv    []string    `yaml:"argv"`    // the command line (e.g. .venv/bin/python -m metis_agent.domain_agent --domain dog …)
+	Dir     string      `yaml:"dir"`     // its working directory
+	Env     []string    `yaml:"env"`     // KEY=VALUE beside the service's environment
+	Domains []string    `yaml:"domains"` // the domains it serves (default: [name])
+	Clocks  []ClockSpec `yaml:"clocks"`  // its clock lines per tick (default: one bare beat)
+	Quiet   []string    `yaml:"quiet"`   // domains stepped but not heard (the pair's second cook)
+}
+
+// ClockSpec is one clock line per tick: a domain's beat, n env beats of a pair.
+type ClockSpec struct {
+	Domain string `yaml:"domain"`
+	N      int    `yaml:"n"`
 }
 
 // procDomains routes the orchestrator's calls to the domain processes: an
@@ -58,7 +65,7 @@ func (d *procDomains) Intent(c Call) (Reply, bool) {
 	d.n++
 	cid := fmt.Sprintf("c%d", d.n)
 	d.note(map[string]any{"kind": "dlg-dispatch", "cid": cid, "j": c.Text()})
-	rs, err := p.Intent(cid, verb, j)
+	rs, err := p.Do(map[string]any{"id": cid, "domain": d.intents, "verb": verb, "args": j})
 	if err != nil {
 		log.Printf("[v3] %s intent: %v", d.intents, err)
 		return Reply{}, false
@@ -78,7 +85,7 @@ func (d *procDomains) Call(c Call) (Reply, bool) {
 			args[k] = v
 		}
 	}
-	rs, err := p.Tool(c.Name, args, "")
+	rs, err := p.ToolTo(dom, c.Name, args, "")
 	if err != nil {
 		return Reply{Domain: dom, Kind: "error", Error: err.Error()}, true
 	}
@@ -111,17 +118,18 @@ func asReply(m map[string]any) Reply {
 
 // liveDomains is the live loop: the processes, their specs, the ticker.
 type liveDomains struct {
-	specs []DomainSpec
-	procs map[string]*DomainProc
-	pd    *procDomains
-	tick  time.Duration
-	jw    io.Writer
-	jmu   sync.Mutex
-	seq   int
+	specs  []DomainSpec
+	procs  map[string]*DomainProc // by domain
+	byName map[string]*DomainProc // by process
+	pd     *procDomains
+	tick   time.Duration
+	jw     io.Writer
+	jmu    sync.Mutex
+	seq    int
 }
 
 func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journal string) error {
-	ld := &liveDomains{specs: specs, procs: map[string]*DomainProc{}, tick: tick}
+	ld := &liveDomains{specs: specs, procs: map[string]*DomainProc{}, byName: map[string]*DomainProc{}, tick: tick}
 	if journal != "" {
 		f, err := os.Create(journal)
 		if err != nil {
@@ -135,8 +143,15 @@ func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journa
 		if err != nil {
 			return fmt.Errorf("domain %s: %w", s.Name, err)
 		}
-		ld.procs[s.Name] = p
-		log.Printf("[v3] domain agent %s up (pid %d)", s.Name, p.Pid())
+		doms := s.Domains
+		if len(doms) == 0 {
+			doms = []string{s.Name}
+		}
+		for _, d := range doms {
+			ld.procs[d] = p
+		}
+		ld.byName[s.Name] = p
+		log.Printf("[v3] domain agent %s (%v) up (pid %d)", s.Name, doms, p.Pid())
 	}
 	intents := ""
 	for _, n := range v.cfg.Loaded {
@@ -147,6 +162,15 @@ func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journa
 	ld.pd = &procDomains{procs: ld.procs, intents: intents, note: ld.record}
 	v.live = ld
 	return v.restart(a)
+}
+
+func slicesContains(xs []string, x string) bool {
+	for _, y := range xs {
+		if y == x {
+			return true
+		}
+	}
+	return false
 }
 
 func journalStem(j string) string {
@@ -177,7 +201,7 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 	for {
 		select {
 		case <-ctx.Done():
-			for _, p := range ld.procs {
+			for _, p := range ld.byName {
 				_ = p.Close()
 			}
 			return
@@ -186,21 +210,27 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 		beat++
 		var due []map[string]any
 		for _, s := range ld.specs {
-			p := ld.procs[s.Name]
-			for k := 0; k < max(s.Steps, 1); k++ {
+			p := ld.byName[s.Name]
+			clocks := s.Clocks
+			if len(clocks) == 0 {
+				clocks = []ClockSpec{{}}
+			}
+			for _, c := range clocks {
 				var rs []map[string]any
 				var err error
-				if s.Clock == "step" {
-					rs, err = p.Do(map[string]any{"clock": "step"})
-				} else {
+				if c.Domain == "" {
 					rs, err = p.Beat()
+				} else {
+					rs, err = p.BeatOf(c.Domain, c.N)
 				}
 				if err != nil {
 					log.Printf("[v3] %s clock: %v", s.Name, err)
 					continue
 				}
-				if !s.Quiet {
-					due = append(due, rs...)
+				for _, r := range rs {
+					if dom, _ := r["domain"].(string); !slicesContains(s.Quiet, dom) {
+						due = append(due, r)
+					}
 				}
 			}
 		}
@@ -215,8 +245,17 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 func (v *v3) handleDue(a *Agent, beat int, due []map[string]any) {
 	ld := v.live
 	var queue []Inbound
+	quiet := map[string]bool{}
+	for _, s := range ld.specs {
+		for _, q := range s.Quiet {
+			quiet[q] = true
+		}
+	}
 	add := func(rs []map[string]any) {
 		for _, m := range rs {
+			if d, _ := m["domain"].(string); quiet[d] {
+				continue
+			}
 			r := asReply(m)
 			queue = append(queue, Inbound{Reply: &r})
 		}
@@ -234,6 +273,9 @@ func (v *v3) handleDue(a *Agent, beat int, due []map[string]any) {
 			if in.Reply.Status != "" {
 				w["what"] = in.Reply.Kind + ":" + in.Reply.Status
 			}
+			if in.Reply.Record != "" {
+				w["record"] = string(in.Reply.Record)
+			}
 		}
 		ld.record(w)
 		if _, err := v.o.Handle(in, v.gbnf, a.cfg.StopWords); err != nil {
@@ -242,4 +284,24 @@ func (v *v3) handleDue(a *Agent, beat int, due []map[string]any) {
 		add(ld.pd.pend)
 		ld.pd.pend = nil
 	}
+}
+
+// V3World is the person's hand on a simulated domain's world (integration
+// step 2's live session: "I opened the kitchen door" changes nothing in the
+// dog's host until a world line says so): do-lines on the domain's next
+// tick, recorded in the journal.
+func (a *Agent) V3World(domain string, lines []string) error {
+	if a.v3 == nil || a.v3.live == nil {
+		return fmt.Errorf("no live domain agents (-loop v3 with v3.domains)")
+	}
+	if domain == "" {
+		domain = a.v3.live.pd.intents
+	}
+	p := a.v3.live.procs[domain]
+	if p == nil {
+		return fmt.Errorf("no domain %q", domain)
+	}
+	a.v3.live.record(map[string]any{"kind": "dlg-world", "domain": domain, "lines": lines})
+	_, err := p.Do(map[string]any{"world": lines, "domain": domain})
+	return err
 }

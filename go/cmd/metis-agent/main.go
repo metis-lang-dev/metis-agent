@@ -223,6 +223,10 @@ func main() {
 			a.Task(agent.Task{ID: m.ID, Result: m.Result, Detail: m.Detail})
 		case "say":
 			a.Announce(m.Text)
+		case "world": // -loop v3 with real domain agents: the person's hand on a simulated world (mode = the domain)
+			if err := a.V3World(m.Mode, strings.Fields(m.Text)); err != nil {
+				log.Printf("[v3] world: %v", err)
+			}
 		case "heard":
 			go a.Heard(m.ID, m.Text)
 		case "runtime_intent":
