@@ -148,7 +148,7 @@ agent, for every kind:
 
 | kind | when | fields beyond domain/ref/text |
 |---|---|---|
-| `result` | an intent's outcome, by id; also the answer to activate/deactivate and to the surprise verbs | `id`, `status` (accepted · admitted · admitted+notice · applied · done · refused · expired · progress · cancelled · failed), `reason`, `alternatives`, `blocker` (on refused: the atom the refusing rule rested on, or null when the refusal is not about the world: busy, already, must stand) |
+| `result` | an intent's outcome, by id; also the answer to activate/deactivate and to the surprise verbs | `id`, `status` (accepted · admitted · admitted+notice · applied · done · refused · expired · progress · cancelled · failed), `reason`, `alternatives` (typed intents `{verb, args}` in the domain's own dictionary, at most two, never bare handles: the orchestrator has no handle map and renders them as J as they are), `blocker` (on refused: the atom the refusing rule rested on, or null when the refusal is not about the world: busy, already, must stand) |
 | `read` | the answer to a REPL API read (state, ctx, events, why, findings), synchronous | `tool`, `output` (the kernel's read-out, scrubbed and capped), `text` optional |
 | `event` | progress the domain reports unasked | `counts` (the mirror's numbers) |
 | `quiescence` | nothing left the domain can do | `goal_pending` |
@@ -177,10 +177,12 @@ E2B consulted when alternatives were offered and repeated consults; with the
 branch structural, reads hold (MODEL-EXPERIMENTS "E11 ruling"):
 
 ```
-result.refused with alternatives → intent on one of them
+result.refused, blocker set     → REPL consult(domain, "why <reason>?") FIRST, alternatives or not
+   …the ask then offers them: "the way to the kitchen is closed — can you open it, or shall I go to the door instead?"
+   (a world blocker makes every alternative a change of the person's goal; that is theirs to decide)
+result.refused, blocker null, alternatives → intent on one of them (the catalog's precondition move: stand, then go)
    …unless the alternative cancels a live task (busy → cancel) → ask(person): the person decides what to drop
-result.refused, no alternatives, blocker set   → REPL consult(domain, "why <reason>?")
-result.refused, no alternatives, blocker null  → speak the reason; nothing to consult (already stopped)
+result.refused, blocker null, no alternatives → speak the reason; nothing to consult (already stopped)
 result.failed                   → REPL consult(domain, "why <reason>?")
 consult.explains                → REPL explain(domain, record, card, move)
 consult.missing                 → ask(person): the resource in the person's words
@@ -239,6 +241,10 @@ and signals held, the bound answer and the outcome lines did not):
   a read of the journal: the speak cue inlines the mirror's line (E6: an
   inline fact at the cue is used), the model phrases it. Mid-walk E2B said
   "I am waiting for instructions" 3/3 without it.
+- **An answer follows its question by at least a beat.** The real domain
+  agent answers on its next tick, one beat after the emulator did
+  (integration step 1); a timeline's person answer sits after the ask it
+  answers, never on the same beat.
 - **No intent speaks at the person's turn; the first reply speaks.** Every
   intent comes back at once as done, refused or progress (the domain
   agent narrates "I set off…" itself), so a person-turn acknowledgement
