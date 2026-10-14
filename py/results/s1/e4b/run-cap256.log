@@ -1,0 +1,28 @@
+load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: control-looking token:      1 '<eos>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: '</s>' is a normal token here, removing it from EOG list
+llama_kv_cache_iswa: using full-size SWA cache (ref: https://github.com/ggml-org/llama.cpp/pull/13194#issuecomment-2868343055)
+llama_kv_cache: the V embeddings have different sizes across layers and FA is not enabled - padding V cache to 1024
+llama_kv_cache: the V embeddings have different sizes across layers and FA is not enabled - padding V cache to 1024
+W1       trace     reached True  state → events → step → state                      | After the farmer carries the goat across first, the farmer and the goat are on the far bank, while the wolf and the cabb
+W2       why       reached True  state → why                                        | The cabbage is gone because event 3, which is the `eat` event, occurred. This event shows that the goat ate the cabbage 
+W3       what-if   reached True  state → events → do → state → run → events → step  | If the farmer carries the cabbage across first, the goat will be eaten by the wolf. This occurs because the farmer leave
+W4       necessity reached True  state → events → necessity                         | Yes, carrying the wolf across first (event 2) was necessary for the cabbage to be gone, as the probability of the cabbag
+W5       why       reached True  state → why → events → run                         | The current state of the model shows that the goat is located on the far bank. The causal analysis tool was unable to tr
+W6       trace     reached True  run                                                | The boat crossed the river 2 times during the 12 steps. At the end of the simulation, the goat is at the far side.
+B1       what-if   reached True  state → events → do → state                        | Right after c and d cross the bridge together, there are 7 minutes of wick left. This was determined by forcing the even
+B2       what-if   reached True  state → list → step → events → step → step → state | The first action, where A and B cross together, was successfully simulated, resulting in the wick being reduced to 13 mi
+B3       why       reached True  state → why → events                               | The simulation has reached a quiescent state, and there are no active events to trace the movement of token 'd'. The sta
+B4       necessity reached False state → events → list → run → ctx                  | I cannot determine if the first crossing was necessary because the simulation has reached a quiescent, finished state, a
+B5       trace     reached True  run                                                | One crossing was made, and the torch is on the far bank at the end of the simulation.
+H1       trace     reached True  state                                              | Ring r1 is currently on top of `bottom_p3`.
+H2       why       reached True  state → why                                        | The token `r1` is on `bottom_p3` because event 4, `putdown_on_post[R=r1,B=bottom_p3,P=p3,V=top_r1]`, fired. This event o
+H3       necessity reached True  necessity → necessity → events                     | The event number 3 is not present in the current list of enabled events. Therefore, I cannot determine if the pickup at 
+H4       what-if   reached True  state → do                                         | If the arm picks up ring r1 and puts it down on post p2, which rings can the arm pick up next?  I cannot simulate the hy
+K1       trace     reached True  state                                              | Block 'a' is on the table. The blocks are stacked as 'b' on 'c' on 'a', and block 'arm' is free.
+K2       why       reached True  why                                                | The atom `block b on block c` was never produced in this session and is not present in the base state.
+K3       necessity reached True  necessity → necessity → state → events → necessity | I was unable to determine if picking up b from the table (event 5) was necessary for b being on c because the `necessity
+K4       necessity reached True  events → state → sufficiency → list → sufficiency  | I am unable to determine if forcing event 5 brings about `b on c` or its probability because the `sufficiency` tool repe
+K5       what-if   reached True  state → events → step → state → events             | Block 'b' can be put on the table or put on block 'c' next.
+{"kind": "summary", "seat": "gemma4", "think_cap": 256, "model": "gemma-4-E4B-it-Q5_K_M.gguf", "persona": "b", "items": 20, "reached": 19, "ms": 228614}
