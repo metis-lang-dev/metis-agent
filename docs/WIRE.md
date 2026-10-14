@@ -59,6 +59,7 @@ Every record: `kind`, `seq` (1…, the session's order), `t` (RFC 3339),
 | `dlg-say` | `what` (`voice` · `template` · `ask` · `turn`), `text`, `src: {by: model \| harness \| rollback, gen?, wake, domain?, what, branch?}` — `gen` the `dlg-gen` that carries the line, `wake` the `dlg-wake` it answers, `branch` `outcome` for `""`. `turn` is a person turn's own line (the reads take it from its `dlg-gen` and skip this record) |
 | `dlg-world` | `domain`, `lines`, `error?` |
 | `dlg-domain` | `verb`, `domain`, `by` (`person` · `model`), `bindings?`, `error?` |
+| `dlg-wire` | `proc`, `what` (`intent` · `tool` · `world` · `ports`), `ms`, `replies` — one per request; `what: clock` is a summary every 40 beats: `n`, `ms` (mean), `max_ms` |
 | `dlg-trace` | the domain agent's `--trace` reply as sent (`domain`, `beat`, `fired`, `narrated`, `consults`, `reads`, `world`, `more?`): the domain tab's REPL log; never an inbound |
 
 ## The domain agent's lines the backend uses (py, JSON lines)

@@ -151,6 +151,7 @@ type liveDomains struct {
 	gens    []map[string]any // the dlg-gens since it
 	say     map[string]any   // the last dlg-say
 	lastCat string           // the catalog last sent
+	clockMs []float64        // clock round trips since the last dlg-wire summary
 	// a world line went in: the domain's ports again after its next beat (under v3.mu)
 	portsDue map[string]bool
 }
@@ -182,6 +183,8 @@ func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journa
 			ld.procs[d] = p
 		}
 		ld.byName[s.Name] = p
+		name := s.Name
+		p.OnTook = func(t Took) { ld.wire(name, t) }
 		log.Printf("[v3] domain agent %s (%v) up (pid %d)", s.Name, doms, p.Pid())
 	}
 	intents := ""
@@ -205,6 +208,33 @@ func slicesContains(xs []string, x string) bool {
 		}
 	}
 	return false
+}
+
+// wire journals a request's round trip (integration step 3's table): every
+// intent, tool, world and ports request as dlg-wire; the clock beats as a
+// summary every 40.
+func (ld *liveDomains) wire(proc string, t Took) {
+	ms := float64(t.D.Microseconds()) / 1000
+	if t.Kind != "clock" {
+		ld.record(map[string]any{"kind": "dlg-wire", "proc": proc, "what": t.Kind, "ms": ms, "replies": t.Replies})
+		return
+	}
+	ld.jmu.Lock()
+	ld.clockMs = append(ld.clockMs, ms)
+	var flush []float64
+	if len(ld.clockMs) >= 40 {
+		flush, ld.clockMs = ld.clockMs, nil
+	}
+	ld.jmu.Unlock()
+	if flush != nil {
+		sum, mx := 0.0, 0.0
+		for _, x := range flush {
+			sum += x
+			mx = max(mx, x)
+		}
+		ld.record(map[string]any{"kind": "dlg-wire", "proc": proc, "what": "clock", "n": len(flush),
+			"ms": sum / float64(len(flush)), "max_ms": mx})
+	}
 }
 
 // sift journals the trace replies (the domain agent's --trace: fired

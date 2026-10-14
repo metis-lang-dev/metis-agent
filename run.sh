@@ -21,6 +21,7 @@ RUN="$GO/results/live"
 PID="$RUN/service.pid"
 LOG="$RUN/service.log"
 CONFIG="${CONFIG:-$GO/config.v3-live.yaml}"
+case "$CONFIG" in /*) ;; *) CONFIG="$PWD/$CONFIG" ;; esac   # the service runs in go/: a relative path is the caller's
 ADDR="${ADDR:-:8395}"
 PORT="${ADDR##*:}"
 URL="http://localhost:$PORT/"

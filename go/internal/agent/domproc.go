@@ -27,6 +27,8 @@ type DomainProc struct {
 	in   io.WriteCloser
 	out  *bufio.Scanner
 	Took []Took // every request, in order
+	// OnTook, when set, sees each request's round trip (the live journal's dlg-wire)
+	OnTook func(Took)
 }
 
 // Took is one request's round trip.
@@ -125,7 +127,11 @@ func (p *DomainProc) Do(req map[string]any) ([]map[string]any, error) {
 		}
 		return m["ack"] != nil
 	})
-	p.Took = append(p.Took, Took{Kind: kind, Replies: len(out), D: time.Since(t0)})
+	tk := Took{Kind: kind, Replies: len(out), D: time.Since(t0)}
+	p.Took = append(p.Took, tk)
+	if p.OnTook != nil {
+		p.OnTook(tk)
+	}
 	return out, err
 }
 
