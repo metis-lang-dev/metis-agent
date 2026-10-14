@@ -51,6 +51,10 @@ const T = new Journal();
  { kind: 'dlg-say', seq: 4, what: 'template', text: 'Alright.', src: { by: 'harness', wake: 1 } }].forEach(r => T.add(r));
 ok(T.chat[0].src.label === "model · outcome · copies dog's narrator" && !T.chat[0].derived, 'src: relay of the narrator');
 ok(T.chat[1].src.label === 'harness · template', 'src: harness');
+T.add({ kind: 'dlg-wake', seq: 5, what: 'quiescence', domain: 'kitchen', text: 'quiet after 1 moves' });
+T.add({ kind: 'dlg-gen', seq: 6, label: 'voice', branch: '', text: 'The kitchen is quiet.' });
+T.add({ kind: 'dlg-say', seq: 7, what: 'voice', text: 'The kitchen is quiet.', src: { by: 'model', gen: 6, wake: 5, domain: 'kitchen', branch: 'outcome' } });
+ok(T.chat[2].src.label === 'model · kitchen quiescence', 'src: a quiescence is not an outcome');
 
 // world atoms
 ok(JSON.stringify(parseAtoms('-closed(kitchen) +open(kitchen) arrived(kitchen)')) === JSON.stringify({ lines: ['-closed(kitchen)', '+open(kitchen)', '+arrived(kitchen)'], bad: [] }), 'atoms');

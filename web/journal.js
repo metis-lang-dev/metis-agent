@@ -191,7 +191,10 @@ export class Journal {
     const wake = s.wake != null ? this.bySeq.get(s.wake) : null;
     const gen = s.gen != null ? this.bySeq.get(s.gen) : null;
     const domain = s.domain ?? wake?.domain;
-    const branch = s.branch ?? gen?.branch ?? '?';
+    let branch = s.branch ?? gen?.branch ?? '?';
+    // the service names a voice gen with no branch "outcome": a quiescence, a
+    // notice or an event is not one — the wake says what it answered
+    if (branch === 'outcome' && wake && wake.what !== 'person' && !(wake.what ?? '').startsWith('result')) branch = wakeLabel(wake).replace(/ #\S+$/, '');
     if (s.by === 'harness') return { ...s, domain, label: 'harness · template', detail: `the harness's words after ${wakeLabel(wake) || 'the move'}` };
     if (s.by === 'rollback') return { ...s, label: 'harness · rollback', detail: 'a forged line rolled back' };
     if (say.what === 'ask') return { ...s, domain, branch, label: `model · ask (${branch})`, detail: `the ask's text from the model's move #${s.gen ?? '?'}` };
