@@ -10,6 +10,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"log"
 	"net/http"
@@ -230,10 +231,36 @@ func main() {
 			a.Task(agent.Task{ID: m.ID, Result: m.Result, Detail: m.Detail})
 		case "say":
 			a.Announce(m.Text)
-		case "world": // -loop v3 with real domain agents: the person's hand on a simulated world (mode = the domain)
-			if err := a.V3World(m.Mode, strings.Fields(m.Text)); err != nil {
-				log.Printf("[v3] world: %v", err)
+		case "world": // -loop v3 with real domain agents: the person's hand on a simulated world
+			dom, lines := m.Domain, m.Atoms
+			if dom == "" {
+				dom = m.Mode // the first shape: mode = the domain, text = the lines
 			}
+			if len(lines) == 0 {
+				lines = strings.Fields(m.Text)
+			}
+			go func() {
+				ack := map[string]any{"domain": dom, "lines": lines}
+				if err := a.V3World(dom, lines); err != nil {
+					log.Printf("[v3] world: %v", err)
+					ack["error"] = err.Error()
+				}
+				srv.Send("world_ack", ack)
+			}()
+		case "ports": // agent-console: a domain tab opened — its world ports now
+			go a.V3Ports(m.Domain)
+		case "activate", "deactivate": // agent-console: the intent interface's domain verbs from the page
+			go func() {
+				var b any
+				if len(m.Bindings) > 0 {
+					_ = json.Unmarshal(m.Bindings, &b)
+				}
+				ack := map[string]any{"verb": m.Ev, "domain": m.Domain}
+				if err := a.V3Domain(m.Ev, m.Domain, b); err != nil {
+					ack["error"] = err.Error()
+				}
+				srv.Send("domain_ack", ack)
+			}()
 		case "heard":
 			go a.Heard(m.ID, m.Text)
 		case "runtime_intent":
@@ -246,6 +273,8 @@ func main() {
 			a.MountRack(m.Text, m.State != "off")
 		}
 	}
+
+	srv.Hello = func(m console.In) []agent.V3Frame { return a.V3Hello(m.Since) }
 
 	httpSrv := &http.Server{Addr: cfg.WS.Addr, Handler: srv.Handler()}
 	go func() { <-ctx.Done(); httpSrv.Close() }()

@@ -47,6 +47,11 @@ type v3 struct {
 	dsp    *intent.Dispatcher
 	rec    *idEmitter
 	live   *liveDomains // the real domain agents (nil: the dog's dispatcher)
+	// inside a person turn the lines said are held: the one that is the
+	// turn's own voice goes to the page in the intent frame, so its
+	// narration is marked v3-turn (the page does not voice it twice)
+	inTurn bool
+	held   []Narration
 }
 
 // idEmitter keeps the id of the last command emitted, so an intent the
@@ -82,11 +87,17 @@ func (a *Agent) startV3(l *llm.LLM) error {
 	v.rec = &idEmitter{Emitter: a.out}
 	v.dsp = wire.NewDispatcher(v.rec, a.Tasks)
 	v.cfg.OnSay = func(kind, line string) { // the dog path's guard: a forged ⟪metis …⟫ span or a call is never spoken
+		say := 0
 		if v.live != nil {
-			v.live.record(map[string]any{"kind": "dlg-say", "what": kind, "text": line})
+			say = v.live.sayRec(kind, line)
 		}
 		if s := sanitizeAck(line); kind == "template" || taskVoiceOK(s) {
-			a.narrate(Narration{Kind: "v3-" + kind, Form: narr.FormN, Sentence: s})
+			n := Narration{Kind: "v3-" + kind, Form: narr.FormN, Sentence: s, Say: say}
+			if v.inTurn {
+				v.held = append(v.held, n)
+				return
+			}
+			a.narrate(n)
 			return
 		}
 		log.Printf("[v3] %s line %q not spoken (unspeakable)", kind, line)
@@ -171,26 +182,55 @@ func (v *v3) utterance(a *Agent, text string) (Turn, error) {
 	if err := v.room(a); err != nil {
 		return Turn{}, err
 	}
-	if keywordStop(text, a.cfg.StopWords) {
-		j := []byte(`{"intent":"STOP"}`)
-		c := Call{J: j}
-		r, _ := v3Domains{a: a, v: v}.Intent(c)
-		if err := v.o.Past(text, j, r.ID, ackTemplate["STOP"]); err != nil {
-			return Turn{}, err
-		}
-		return Turn{JSON: string(j), Voice: ackTemplate["STOP"]}, nil
-	}
 	if v.live != nil {
 		v.live.record(map[string]any{"kind": "dlg-wake", "what": "person", "person": text})
 	}
+	if keywordStop(text, a.cfg.StopWords) {
+		j := []byte(`{"intent":"STOP"}`)
+		c := Call{J: j}
+		var r Reply
+		if v.live != nil { // the dog is a domain agent process: its STOP goes on its wire
+			r, _ = v.live.pd.Intent(c)
+		} else {
+			r, _ = v3Domains{a: a, v: v}.Intent(c)
+		}
+		if err := v.o.Past(text, j, r.ID, ackTemplate["STOP"]); err != nil {
+			return Turn{}, err
+		}
+		t := Turn{JSON: string(j), Voice: ackTemplate["STOP"]}
+		if v.live != nil {
+			t.Say = v.live.sayRec("turn", t.Voice)
+			v.handleDue(a, -1, nil)
+			v.pushCatalog()
+		}
+		return t, nil
+	}
+	v.inTurn = true
 	j, voice, err := v.o.Turn(text, v.gbnf)
+	v.inTurn = false
+	t := Turn{JSON: j, Voice: sanitizeAck(voice)}
+	for _, n := range v.held {
+		if n.Sentence == t.Voice {
+			n.Kind = "v3-turn"
+		}
+		a.narrate(n)
+	}
+	v.held = nil
 	if err != nil {
 		return Turn{}, err
 	}
-	if v.live != nil { // what the turn brought at once (an acceptance, a refusal on the spot)
-		v.handleDue(a, -1, nil)
+	if v.live != nil {
+		// the turn's own line: a dlg-say "turn" (the reads take a turn's voice
+		// from its dlg-gen and skip it), unless the harness already said it
+		if s := v.live.lastSay(); t.Voice != "" && (s == nil || s["text"] != voice || s["seq"].(int) < v.live.wakeSeq()) {
+			t.Say = v.live.sayRec("turn", voice)
+		} else if s != nil && t.Voice != "" {
+			t.Say = s["seq"].(int)
+		}
+		v.handleDue(a, -1, nil) // what the turn brought at once (an acceptance, a refusal on the spot)
+		v.pushCatalog()
 	}
-	return Turn{JSON: j, Voice: sanitizeAck(voice)}, nil
+	return t, nil
 }
 
 // task: the host's outcome as a generic reply (the dog's domain); a

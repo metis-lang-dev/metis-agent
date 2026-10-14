@@ -47,6 +47,12 @@ type procDomains struct {
 	pend    []map[string]any
 	note    func(rec map[string]any)
 	sift    func(rs []map[string]any) []map[string]any // the trace replies journaled and taken out
+	off     map[string]bool                            // deactivated: not stepped, not heard, its calls refused (under v3.mu)
+	verb    func(verb, domain string, bindings any, by string) error
+}
+
+func notActive(dom string) Reply {
+	return Reply{Domain: dom, Kind: "error", Error: dom + " is not active", Text: "The " + dom + " is not active."}
 }
 
 func (d *procDomains) Intent(c Call) (Reply, bool) {
@@ -62,6 +68,9 @@ func (d *procDomains) Intent(c Call) (Reply, bool) {
 	if p == nil {
 		return Reply{}, false
 	}
+	if d.off[d.intents] {
+		return notActive(d.intents), true
+	}
 	delete(j, "intent")
 	d.n++
 	cid := fmt.Sprintf("c%d", d.n)
@@ -76,9 +85,18 @@ func (d *procDomains) Intent(c Call) (Reply, bool) {
 
 func (d *procDomains) Call(c Call) (Reply, bool) {
 	dom, _ := c.Args["domain"].(string)
+	if c.Name == "activate" || c.Name == "deactivate" { // the orchestrator's own: the processes are fixed, a domain is paused or resumed
+		if err := d.verb(c.Name, dom, c.Args["bindings"], "model"); err != nil {
+			return Reply{Domain: dom, Kind: "error", Error: err.Error()}, true
+		}
+		return Reply{Domain: dom, Kind: "result", Status: "applied"}, true
+	}
 	p := d.procs[dom]
 	if p == nil {
 		return Reply{Domain: dom, Kind: "error", Error: "no such domain agent", Text: "No domain agent answers that."}, true
+	}
+	if d.off[dom] {
+		return notActive(dom), true
 	}
 	args := map[string]any{}
 	for k, v := range c.Args {
@@ -119,18 +137,30 @@ func asReply(m map[string]any) Reply {
 
 // liveDomains is the live loop: the processes, their specs, the ticker.
 type liveDomains struct {
-	specs  []DomainSpec
-	procs  map[string]*DomainProc // by domain
-	byName map[string]*DomainProc // by process
-	pd     *procDomains
-	tick   time.Duration
-	jw     io.Writer
-	jmu    sync.Mutex
-	seq    int
+	specs   []DomainSpec
+	procs   map[string]*DomainProc // by domain
+	byName  map[string]*DomainProc // by process
+	pd      *procDomains
+	tick    time.Duration
+	jw      io.Writer
+	jmu     sync.Mutex
+	seq     int
+	recs    []map[string]any // the journal so far (a page's hello replays it)
+	emit    func(ev string, f map[string]any)
+	wakeRec map[string]any   // the last dlg-wake: a spoken line's src.wake
+	gens    []map[string]any // the dlg-gens since it
+	say     map[string]any   // the last dlg-say
+	lastCat string           // the catalog last sent
+	// a world line went in: the domain's ports again after its next beat (under v3.mu)
+	portsDue map[string]bool
 }
 
 func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journal string) error {
-	ld := &liveDomains{specs: specs, procs: map[string]*DomainProc{}, byName: map[string]*DomainProc{}, tick: tick}
+	ld := &liveDomains{specs: specs, procs: map[string]*DomainProc{}, byName: map[string]*DomainProc{}, tick: tick,
+		portsDue: map[string]bool{}}
+	if s, ok := a.out.(interface{ Send(string, map[string]any) }); ok {
+		ld.emit = s.Send
+	}
 	if journal != "" {
 		f, err := os.Create(journal)
 		if err != nil {
@@ -160,7 +190,10 @@ func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journa
 			intents = n
 		}
 	}
-	ld.pd = &procDomains{procs: ld.procs, intents: intents, note: ld.record, sift: ld.sift}
+	ld.pd = &procDomains{procs: ld.procs, intents: intents, note: func(r map[string]any) { ld.record(r) }, sift: ld.sift,
+		off: map[string]bool{}, verb: func(verb, dom string, bindings any, by string) error {
+			return v.domainVerb(verb, dom, bindings, by)
+		}}
 	v.live = ld
 	return v.restart(a)
 }
@@ -201,16 +234,34 @@ func journalStem(j string) string {
 	return j[:len(j)-len(".jsonl")]
 }
 
-func (ld *liveDomains) record(rec map[string]any) {
-	if ld.jw == nil {
-		return
-	}
+// record writes one journal record — to the file, the page's journal
+// stream and the replay a page's hello reads — and returns its seq.
+func (ld *liveDomains) record(rec map[string]any) int {
 	ld.jmu.Lock()
-	defer ld.jmu.Unlock()
 	ld.seq++
-	rec["seq"], rec["t"], rec["id"], rec["rep"] = ld.seq, time.Now().Format(time.RFC3339Nano), "live", 0
-	b, _ := json.Marshal(rec)
-	_, _ = ld.jw.Write(append(b, '\n'))
+	seq := ld.seq
+	rec["seq"], rec["t"], rec["id"], rec["rep"] = seq, time.Now().Format(time.RFC3339Nano), "live", 0
+	switch rec["kind"] {
+	case "dlg-wake":
+		ld.wakeRec, ld.gens = rec, nil
+	case "dlg-gen":
+		ld.gens = append(ld.gens, rec)
+	case "dlg-say":
+		ld.say = rec
+	}
+	ld.recs = append(ld.recs, rec)
+	if len(ld.recs) > keepRecs {
+		ld.recs = ld.recs[len(ld.recs)-keepRecs:]
+	}
+	if ld.jw != nil {
+		b, _ := json.Marshal(rec)
+		_, _ = ld.jw.Write(append(b, '\n'))
+	}
+	ld.jmu.Unlock()
+	if ld.emit != nil {
+		ld.emit("journal", map[string]any{"rec": rec})
+	}
+	return seq
 }
 
 // runClock steps every domain's clock each tick and handles what fell due.
@@ -243,6 +294,12 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 		}
 		beat++
 		var due []map[string]any
+		v.mu.Lock()
+		off := map[string]bool{}
+		for d := range ld.pd.off {
+			off[d] = true
+		}
+		v.mu.Unlock()
 		for _, s := range ld.specs {
 			p := ld.byName[s.Name]
 			clocks := s.Clocks
@@ -250,6 +307,9 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 				clocks = []ClockSpec{{}}
 			}
 			for _, c := range clocks {
+				if off[c.Domain] {
+					continue
+				}
 				var rs []map[string]any
 				var err error
 				if c.Domain == "" {
@@ -262,7 +322,7 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 					continue
 				}
 				for _, r := range ld.sift(rs) {
-					if dom, _ := r["domain"].(string); !slicesContains(s.Quiet, dom) {
+					if dom, _ := r["domain"].(string); !slicesContains(s.Quiet, dom) && !off[dom] {
 						due = append(due, r)
 					}
 				}
@@ -270,7 +330,13 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 		}
 		v.mu.Lock()
 		v.handleDue(a, beat, due)
+		v.pushCatalog()
+		again := ld.portsDue
+		ld.portsDue = map[string]bool{}
 		v.mu.Unlock()
+		for d := range again { // a world line applies on the domain's next tick: its ports now
+			ld.pushPorts(d)
+		}
 	}
 }
 
@@ -279,7 +345,7 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 func (v *v3) handleDue(a *Agent, beat int, due []map[string]any) {
 	ld := v.live
 	var queue []Inbound
-	voice := map[*Reply]any{} // the reply's origin (narrator | line | ref): the journal's, not the model's
+	extra := map[*Reply]map[string]any{} // the journal's, not the model's: voice (narrator | line | ref), a surprise's difference as sent
 	quiet := map[string]bool{}
 	for _, s := range ld.specs {
 		for _, q := range s.Quiet {
@@ -288,13 +354,17 @@ func (v *v3) handleDue(a *Agent, beat int, due []map[string]any) {
 	}
 	add := func(rs []map[string]any) {
 		for _, m := range rs {
-			if d, _ := m["domain"].(string); quiet[d] {
+			if d, _ := m["domain"].(string); quiet[d] || ld.pd.off[d] {
 				continue
 			}
 			r := asReply(m)
-			if v, ok := m["voice"]; ok {
-				voice[&r] = v
+			x := map[string]any{}
+			for _, k := range []string{"voice", "difference"} {
+				if v, ok := m[k]; ok {
+					x[k] = v
+				}
 			}
+			extra[&r] = x
 			queue = append(queue, Inbound{Reply: &r})
 		}
 	}
@@ -314,8 +384,8 @@ func (v *v3) handleDue(a *Agent, beat int, due []map[string]any) {
 			if in.Reply.Record != "" {
 				w["record"] = string(in.Reply.Record)
 			}
-			if v, ok := voice[in.Reply]; ok {
-				w["voice"] = v
+			for k, x := range extra[in.Reply] {
+				w[k] = x
 			}
 		}
 		ld.record(w)
@@ -342,8 +412,22 @@ func (a *Agent) V3World(domain string, lines []string) error {
 	if p == nil {
 		return fmt.Errorf("no domain %q", domain)
 	}
-	a.v3.live.record(map[string]any{"kind": "dlg-world", "domain": domain, "lines": lines})
+	ld := a.v3.live
 	rs, err := p.Do(map[string]any{"world": lines, "domain": domain})
-	a.v3.live.sift(rs)
+	for _, r := range ld.sift(rs) {
+		if r["kind"] == "error" && err == nil {
+			e, _ := r["error"].(string)
+			err = fmt.Errorf("%s", e)
+		}
+	}
+	rec := map[string]any{"kind": "dlg-world", "domain": domain, "lines": lines}
+	if err != nil {
+		rec["error"] = err.Error()
+	} else {
+		a.v3.mu.Lock()
+		ld.portsDue[domain] = true
+		a.v3.mu.Unlock()
+	}
+	ld.record(rec)
 	return err
 }

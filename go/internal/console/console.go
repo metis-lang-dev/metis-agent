@@ -34,6 +34,12 @@ type In struct {
 	Result string `json:"result"`
 	Detail string `json:"detail"`
 	State  string `json:"state"`
+	// agent-console (s-7f3d1088): world{domain, atoms}, activate{domain,
+	// bindings} / deactivate{domain}, hello{since}
+	Domain   string          `json:"domain"`
+	Atoms    []string        `json:"atoms"`
+	Bindings json.RawMessage `json:"bindings"`
+	Since    int             `json:"since"`
 }
 
 type client struct {
@@ -50,7 +56,8 @@ type Server struct {
 	up      websocket.Upgrader
 
 	Handle func(In)
-	joined chan struct{} // closed at the first viewer
+	Hello  func(In) []agent.V3Frame // hello{since}: the frames for that page alone (nil: hello ignored)
+	joined chan struct{}            // closed at the first viewer
 	once   sync.Once
 	LibDir string // served at /lib/ (fsttm-web's lib/); "" = <ui-dir>/../lib when it exists
 }
@@ -140,6 +147,12 @@ func (s *Server) ws(rw http.ResponseWriter, r *http.Request) {
 		if json.Unmarshal(b, &m) != nil || m.Ev == "" {
 			continue
 		}
+		if m.Ev == "hello" && s.Hello != nil { // answered to this page alone, in order
+			if !s.replay(c, s.Hello(m)) {
+				return
+			}
+			continue
+		}
 		if s.Handle != nil {
 			s.Handle(m)
 		}
@@ -151,6 +164,24 @@ func noCache(h http.Handler) http.Handler {
 		rw.Header().Set("Cache-Control", "no-cache")
 		h.ServeHTTP(rw, r)
 	})
+}
+
+// replay sends frames to one page, waiting for its writer (a gone page
+// ends it: false).
+func (s *Server) replay(c *client, fr []agent.V3Frame) bool {
+	for _, f := range fr {
+		m := map[string]any{"ev": f.Ev, "t": now()}
+		for k, v := range f.F {
+			m[k] = v
+		}
+		b, _ := json.Marshal(m)
+		select {
+		case c.send <- b:
+		case <-time.After(10 * time.Second):
+			return false
+		}
+	}
+	return true
 }
 
 // Joined is closed when the first viewer connects.
@@ -211,6 +242,9 @@ func (s *Server) Domains(ds []agent.DomainInfo) {
 // voice, and the model's timings (the parity run's fields).
 func (s *Server) Intent(id string, t agent.Turn) {
 	f := map[string]any{"id": id, "intent": json.RawMessage(t.JSON), "voice": t.Voice}
+	if t.Say > 0 {
+		f["say"] = t.Say
+	}
 	if !json.Valid([]byte(t.JSON)) {
 		f["intent"] = t.JSON
 	}
@@ -229,8 +263,12 @@ func (s *Server) Talk(id, text string, done bool) {
 }
 
 func (s *Server) Narration(n agent.Narration) {
-	s.Send("narration", map[string]any{"id": n.ID, "path": n.Path, "kind": n.Kind, "form": n.Form,
-		"line": n.Line, "sentence": n.Sentence})
+	f := map[string]any{"id": n.ID, "path": n.Path, "kind": n.Kind, "form": n.Form,
+		"line": n.Line, "sentence": n.Sentence}
+	if n.Say > 0 {
+		f["say"] = n.Say
+	}
+	s.Send("narration", f)
 }
 
 func (s *Server) Error(id string, err error) {

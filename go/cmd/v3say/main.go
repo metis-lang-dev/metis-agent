@@ -10,6 +10,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -20,6 +21,7 @@ func main() {
 	wait := flag.Duration("wait", 6*time.Second, "listen this long after each line")
 	world := flag.String("world", "", `world lines for the dog's simulated world, e.g. "-closed(kitchen) +open(kitchen)"`)
 	domain := flag.String("domain", "dog", "the domain -world acts on")
+	all := flag.Bool("all", false, "print every frame (journal, catalog, ports, acks …), not only the spoken ones")
 	mode := flag.String("mode", "intent", "say_text's mode (the page sends talk for replies: long; -loop v3 ignores it)")
 	flag.Parse()
 	c, _, err := websocket.DefaultDialer.Dial("ws://"+*addr+"/ws", nil)
@@ -38,6 +40,10 @@ func main() {
 				switch m["ev"] {
 				case "intent", "narration", "error":
 					fmt.Printf("%s  %s\n", time.Now().Format("15:04:05.0"), b)
+				default:
+					if *all {
+						fmt.Printf("%s  %s\n", time.Now().Format("15:04:05.0"), b)
+					}
 				}
 			}
 		}
@@ -53,6 +59,9 @@ func main() {
 	for i, line := range flag.Args() {
 		fmt.Printf("%s  > %s\n", time.Now().Format("15:04:05.0"), line)
 		msg, _ := json.Marshal(map[string]any{"ev": "say_text", "id": fmt.Sprintf("s%d", i+1), "text": line, "mode": *mode})
+		if strings.HasPrefix(line, "{") { // a frame as it is: {"ev":"hello"}, {"ev":"deactivate","domain":"kitchen"} …
+			msg = []byte(line)
+		}
 		if err := c.WriteMessage(websocket.TextMessage, msg); err != nil {
 			log.Fatal(err)
 		}

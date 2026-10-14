@@ -67,6 +67,7 @@ type Turn struct {
 	JSON  string      // the pass-1 intent JSON
 	Voice string      // what to say (the ack, or the deterministic answer that replaces it)
 	R     *llm.Result // the model's turn (nil for a keyword stop)
+	Say   int         // -loop v3 live: the voice's dlg-say seq in the journal (0: none)
 }
 
 // Narration is one thing the agent would say unsolicited, in its form:
@@ -79,6 +80,7 @@ type Narration struct {
 	Form     string    `json:"form"`
 	Line     string    `json:"line"`
 	Sentence string    `json:"sentence"`
+	Say      int       `json:"say,omitempty"` // -loop v3 live: its dlg-say seq in the journal
 	T        time.Time `json:"-"`
 }
 

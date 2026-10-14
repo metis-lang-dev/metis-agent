@@ -109,6 +109,8 @@ func (p *DomainProc) Do(req map[string]any) ([]map[string]any, error) {
 		kind = "world"
 	case req["reset"] != nil:
 		kind = "reset"
+	case req["ports"] != nil:
+		kind = "ports"
 	}
 	t0 := time.Now()
 	if _, err := p.in.Write(append(b, '\n')); err != nil {

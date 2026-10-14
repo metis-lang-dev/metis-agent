@@ -117,6 +117,8 @@ def lines_of(follow):
             rolled = True
         elif r["kind"] == "dlg-gen" and r.get("label", "") == "voice" and r.get("branch", "") in ("person", "bound"):
             out.append(("voice", r["text"], None))
+        elif r["kind"] == "dlg-say" and r["what"] == "turn":
+            continue  # the person turn's own line (agent-console): its dlg-gen above already counts it
         elif r["kind"] == "dlg-say":
             if r["what"] == "ask" and out and out[-1][0] == "template":  # the lead-in and its question: one line
                 out[-1] = ("ask", out[-1][1] + " " + r["text"], None, out[-1][1])
