@@ -1584,3 +1584,25 @@ The cue stays byte-identical to the dog path's. The same 14 timelines × 3 seeds
   - D2-a's STOP outcome is spoken as its own line ("I have stopped." / "My command to stop is done.") after the cancelled line. The keyword's ack is already the turn's line, so the stop's own outcome could be the journal's only.
 
 **Reproduce:** as run 1, `-tag e13-step3-r2`, and `python3 tools/e13-dialog.py` first.
+
+## E13 step 3 run 2 ruling (architect, 2026-10-14; s-c9276dee) — CHANGES, one rule amended
+
+**Under the five rules everything held but one read:** R1a 45/45 (was
+30/44), R1b 24/24, R2 all (the read-like turns silent until their result
+6/6), R3 yes 12/12 with D2-b now true (the cancel precedes "Okay, I'll drop
+it"), R3 no 3/3 (was 1/3), R4 60/60, R5 0/0/0. **R3 ignored fell to 0/3:**
+with a question open, "sit down" was classified yes and the kitchen walk
+retried, where run 1's intent pass had read SIT_DOWN 3/3.
+
+**Ruled (opus's proposal):** the intent pass runs first on a bound turn; a
+new world command closes the question and is the move; the refused call
+itself is yes; only talk is classified, under yes · no. The judgment is
+asked only where the intent grammar has nothing to say.
+
+**Rule 5 generalized:** no intent speaks at the person's turn; the first
+reply speaks (done, refused, progress). D4-a's "I'm turning left" before
+the busy refusal 3/3 is the same error as the keys' "I don't know". A reply
+late by more than a beat gets a templated holding line.
+
+**Re-run:** the same timelines, seeds and bars; passes when R3 ignored
+holds with the rest.

@@ -214,11 +214,13 @@ E11's items, every read held):
 
 Five more from E13 step 3 (two domains emulated, 14 timelines; ids, floor
 and signals held, the bound answer and the outcome lines did not):
-- **A bound answer is classified, not moved.** The model judges the person's
-  answer to an open question under a three-literal grammar (yes · no ·
-  something else); the harness moves: yes → the retry (after the cancel,
-  for a busy question); no → talk, the task stays refused; something else
-  → the person's turn under the intent grammar, the question closed. E2B
+- **A bound answer is classified, not moved.** With a question open, the
+  person's turn runs the intent pass first: a new world command closes the
+  question and is the move (E13 step 3 run 2: "sit down" classified
+  directly read as yes 3/3, while the intent pass read it SIT_DOWN 3/3);
+  the refused call itself is yes; talk is classified under a two-literal
+  grammar (yes · no). The harness moves: yes → the retry (after the
+  cancel, for a busy question); no → talk, the task stays refused. E2B
   given the move chose STAND_UP on "no, I can't right now" (2/3) and
   CHITCHAT with "Okay, I'll drop it" on "yes, drop it" (3/3) — a false
   promise, since nothing was dropped. Under the rule the cancel precedes
@@ -235,9 +237,13 @@ and signals held, the bound answer and the outcome lines did not):
   a read of the journal: the speak cue inlines the mirror's line (E6: an
   inline fact at the cue is used), the model phrases it. Mid-walk E2B said
   "I am waiting for instructions" 3/3 without it.
-- **A read-like intent (query, look, time, date) speaks at its result,
-  not at the person's turn.** "Where are my keys?" got "I don't know" one
-  beat before the answer.
+- **No intent speaks at the person's turn; the first reply speaks.** Every
+  intent comes back at once as done, refused or progress (the domain
+  agent narrates "I set off…" itself), so a person-turn acknowledgement
+  is either redundant or false: "I don't know where your keys are" a beat
+  before the answer, "I'm turning left" before the busy refusal (E13 step
+  3 runs 1–2). A reply that is late by more than a beat gets a templated
+  holding line, not a model one.
 
 ### The domain agent
 
