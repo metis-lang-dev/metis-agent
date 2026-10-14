@@ -1676,6 +1676,15 @@ class Orch:
     def activated(self, d):
         self.q_heard.pop(d, None)
 
+    def reloaded(self, d):
+        """reload(domain) took (e2e-workflow step 3, Go v3reload.go): the new
+        runtime does not know the old tasks; the mirror says reloaded, the
+        open surprise is gone, the next quiescence is the first."""
+        self.m.tasks[d] = []
+        self.m.last[d] = "reloaded"
+        self.m.surprise.pop(d, None)
+        self.activated(d)
+
     def keyword(self, person, j):
         c = Call(j=j)
         r, ok = self.dom.intent(c)

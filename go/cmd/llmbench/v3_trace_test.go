@@ -84,3 +84,65 @@ func TestDumpV3Trace(t *testing.T) {
 	}
 	t.Logf("%d traces → %s", n, out)
 }
+
+// TestDumpDialogTrace: E13 step 3's 14 timelines (emulated domains, the
+// rulings, the mirror, the bound ask, the rollback), each repeat replayed
+// with a recorder answering the model's generations of a real run
+// (DIALOG_GENS: an llmbench -dialog journal), for the py timeline's parity
+// (py/tests/test_timeline_parity.py): every chunk, grammar, record. Off
+// unless DIALOG_TRACE_OUT names the file.
+func TestDumpDialogTrace(t *testing.T) {
+	out, src := os.Getenv("DIALOG_TRACE_OUT"), os.Getenv("DIALOG_GENS")
+	if out == "" || src == "" {
+		t.Skip("DIALOG_TRACE_OUT / DIALOG_GENS not set")
+	}
+	gens := map[string][]string{}
+	f, err := os.Open(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 1<<20), 1<<24)
+	for sc.Scan() {
+		var r dlgRec
+		if json.Unmarshal(sc.Bytes(), &r) == nil && r.Kind == "dlg-gen" && !r.Harness {
+			k := fmt.Sprintf("%s/%d", r.ID, r.Rep)
+			gens[k] = append(gens[k], r.Text)
+		}
+	}
+	f.Close()
+	t.Chdir("../..")
+	items, err := readDialog("grammar/e13-dialog.jsonl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gb, err := os.ReadFile("grammar/dog.gbnf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err := os.Create(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	for _, it := range items {
+		for rep := 0; rep < max(it.Reps, 1); rep++ {
+			outs := gens[fmt.Sprintf("%s/%d", it.ID, rep)]
+			rec := &recLLM{outs: outs}
+			var recs []dlgRec
+			errs := ""
+			if err := dialogRun(rec, it, string(gb), "trace", rep, uint32(1+rep), nil, func(x any) {
+				r := x.(dlgRec)
+				r.Ms, r.NCtx = 0, 0
+				recs = append(recs, r)
+			}); err != nil {
+				errs = err.Error()
+			}
+			if err := enc.Encode(map[string]any{"id": it.ID, "rep": rep, "outs": outs, "log": rec.log, "recs": recs, "err": errs}); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}

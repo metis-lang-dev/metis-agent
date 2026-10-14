@@ -126,3 +126,21 @@ def test_trace_is_the_go_agents(tr):
     assert len(rec.log) == len(tr["log"])
     assert gens == (tr["gens"] or [])
     assert says == (tr["says"] or [])
+
+
+def test_reloaded_drops_the_tasks_and_says_so():
+    """reload(domain) (e2e-workflow step 3, Go v3reload.go): the new runtime
+    does not know the old tasks; the mirror's line says reloaded, the open
+    surprise is gone, the next quiescence speaks as the domain's first."""
+    rec = Rec([])
+    o = O.Orch(O.V3Config(CATALOG, LOADED, DISPLAY, mirror=True), rec, Domains([]))
+    go = O.Call(j='{"intent":"NAVIGATE","goal":{"type":"OBJECT","description":"door"}}')
+    o.m.see(O.Reply({"domain": "dog", "kind": "result", "id": "c1", "status": "accepted"}), go)
+    o.m.see(O.Reply({"domain": "dog", "kind": "surprise", "record": 0, "difference": {"x": 1}}), O.Call())
+    o.quiescence_spoken(O.Reply({"domain": "dog", "kind": "quiescence", "text": "quiet"}))   # the first: heard
+    assert "go to the door (c1) in flight" in o.m.render(LOADED) and "surprise #0 open: x +1" in o.m.render(LOADED)
+    assert not o.quiescence_spoken(O.Reply({"domain": "dog", "kind": "quiescence", "text": "quiet"}))
+    o.reloaded("dog")
+    line = o.m.render(LOADED)
+    assert "dog: last report: reloaded." in line and "in flight" not in line and "surprise" not in line
+    assert o.quiescence_spoken(O.Reply({"domain": "dog", "kind": "quiescence", "text": "quiet"}))  # first again

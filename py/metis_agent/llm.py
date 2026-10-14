@@ -53,6 +53,9 @@ class LLM:
         self.ctx = L.llama_init_from_model(self.model, cp)
         if not self.ctx:
             raise RuntimeError("llm: cannot create context")
+        self._ctx_args = (n_batch, n_threads, flash_attn)   # a sibling's context is made alike
+        self.owns_model = True
+        self.pass2_seed = 0          # the dialog's sampler seed (Go: SetSeed; 0 = LLAMA_DEFAULT_SEED)
         self.vocab = L.llama_model_get_vocab(self.model)
         self.n_ctx, self.n_batch = n_ctx, n_batch
         self.stops = {t for t in (L.llama_vocab_eot(self.vocab), L.llama_vocab_eos(self.vocab)) if t >= 0}
@@ -70,9 +73,91 @@ class LLM:
         if self.ctx:
             L.llama_free(self.ctx)
             self.ctx = None
-        if self.model:
+        if self.model and getattr(self, "owns_model", True):
             L.llama_model_free(self.model)
-            self.model = None
+        self.model = None
+
+    # ── a sibling context and the scripted dialog (Go: Sibling, dialog.go) ───
+
+    def sibling(self, n_ctx):
+        """A second context on the same loaded model (the orchestrator's,
+        beside the narrator's and the consultant's): its own KV, the
+        weights shared (Go: Sibling)."""
+        n_batch, n_threads, flash_attn = self._ctx_args
+        s = LLM.__new__(LLM)
+        s.__dict__.update({k: v for k, v in self.__dict__.items()
+                           if k in ("model", "vocab", "stops", "eot_text", "_ctx_args")})
+        cp = L.llama_context_default_params()
+        cp.n_ctx, cp.swa_full, cp.n_batch = n_ctx, True, n_batch
+        cp.n_threads = cp.n_threads_batch = n_threads
+        cp.flash_attn_type = flash_attn
+        s.ctx = L.llama_init_from_model(self.model, cp)
+        if not s.ctx:
+            raise RuntimeError("llm: cannot create a sibling context")
+        s.owns_model, s.pass2_seed = False, 0
+        s.n_ctx, s.n_batch = n_ctx, n_batch
+        s.prefix, s.pre_text, s.pre_toks, s.n_past = None, "", [], 0
+        s.first_tok_s, s.n_decoded, s.n_generated = 0.0, 0, 0
+        return s
+
+    def set_seed(self, seed):
+        """The dialog's sampled generations draw from this seed (0 = the
+        library default, a random seed per call — the live case)."""
+        self.pass2_seed = seed
+
+    def begin_dialog(self, system):
+        """The KV at the cached system prefix (primed when the prompt
+        changed); the token count there (Go: BeginDialog)."""
+        self.prime(system)
+        self.rewind()
+        return self.n_past
+
+    def inject(self, text):
+        """Decode text (special tokens parsed) at the dialog's end; the
+        token count after it (Go: Inject)."""
+        if text:
+            self.decode(self.tokenize(text, False))
+        return self.n_past
+
+    def gen(self, gbnf, sampled, max_tokens, stop):
+        """One generation at the dialog's end (Go: Gen): greedy under gbnf
+        ("" = none) unless sampled (top-k 40 → temp 0.4 → the seeded draw);
+        stops at the end of the turn, max_tokens or a rune of stop — the
+        stopping token stays out of the KV. Returns (text with special
+        tokens rendered, tokens before it, first-token s, all s)."""
+        t0, before = time.perf_counter(), self.n_past
+        ch = self.chain(gbnf if gbnf else None, greedy=not sampled, top_k=40, temp=0.4,
+                        seed=self.pass2_seed if self.pass2_seed else 0xFFFFFFFF)
+        try:
+            out = []
+            self.first_tok_s = 0.0
+            while len(out) < max_tokens:
+                tok = L.llama_sampler_sample(ch, self.ctx, -1)
+                if not self.first_tok_s:
+                    self.first_tok_s = time.perf_counter() - t0
+                self.n_generated += 1
+                if L.llama_vocab_is_eog(self.vocab, tok) or tok in self.stops:
+                    break
+                out.append(tok)
+                if stop and any(c in self.detokenize(out) for c in stop):
+                    break
+                self.decode([tok])
+        finally:
+            L.llama_sampler_free(ch)
+        text = self.detokenize(out, special=True)
+        if stop:
+            cut = [text.find(c) for c in stop if c in text]
+            if cut:
+                text = text[:min(cut)]
+        return text.strip(), before, self.first_tok_s, time.perf_counter() - t0
+
+    def rollback(self, mark):
+        """Drop the dialog's KV after mark (Go: Rollback)."""
+        if mark < 0 or mark > self.n_past:
+            raise RuntimeError("llm: Rollback past the dialog's end")
+        if not L.llama_memory_seq_rm(L.llama_get_memory(self.ctx), 0, mark, -1):
+            raise RuntimeError("llm: Rollback could not drop the KV after the mark")
+        self.n_past = mark
 
     # ── tokenizer ─────────────────────────────────────────────────────────────
 
