@@ -287,10 +287,12 @@ decision).
   still a repeat.
 - **The ctx band's `forced/do` count disagrees with `do` after a setup
   `step EVENT`** (band: `1 forced/do`; `do`: none). Kernel bookkeeping, not
-  ours: filed to the metis line as the narrate-user bug was; opus is on
-  the metispy fix (2026-10-14). Consequence
-  for the corpus: S1 setups avoid `step EVENT` where `run N` reaches the
-  same state, and an item whose setup needs a named step records that its
-  band carries the mark.
+  ours: filed to the metis line as the narrate-user bug was; **fixed in
+  metispy 49d4888** (2026-10-14): a chosen `step EVENT` is how=forced,
+  rightly out of the likelihood; the band now reads "N chosen step(s), M
+  do", bare `do` lists the chosen steps as conditioning, not
+  interventions, and the two agree under a test. The caveat for the corpus
+  is dropped: S1's two items with a named-step setup (W2, W4) are a marked
+  setup, not a misleading band.
 - **The S1 driver** is a small loop over the corpus file with the same
   `--seat` switch as `tools/wgc.py`; nina writes it when the corpus lands.
