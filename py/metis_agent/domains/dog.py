@@ -134,6 +134,21 @@ class AgentHost:
         the day has no end; the world's answers to commands stay the host's."""
         self.inner.script, self.inner.last = {}, None
 
+    # the live case on wall-clock beats (1.5 s): the replay's waits are too
+    # short for a person at a page — a walk to a place the host has no answer
+    # for timed out 3 beats (4.5 s) after it set off, before anyone could
+    # send +arrived. Live, every wait the world would end by itself (a walk's
+    # timeout, a follow's lost) ends after LIVE_WAIT beats (30 s; the
+    # architect's ruling, integration step 2), and a report the person sends
+    # replaces the scheduled one. The answers the host has (the door's
+    # arrival, the keys spotted) keep their beats; the replay case keeps all.
+    LIVE_WAIT = 20
+    live_case = False
+
+    def live(self):
+        self.replay()
+        self.live_case = True
+
     def world(self, lines):
         """World changes from the driver ("-closed(kitchen)", "+open(kitchen)"):
         do-lines on the next tick, as the hosted script's world changes are."""
@@ -170,6 +185,9 @@ class AgentHost:
         if dos is None:
             return None
         dos = [d for d in dos if not (d.startswith("+") and d[1:].split("(")[0].split()[0] in self.commands)]
+        if self.live_case and self.world_lines:   # the person's report stands for the scheduled one
+            sent = set(self.world_lines)
+            self.inner.due = tuple(x for x in self.inner.due if x[1] not in sent)
         dos += self.world_lines
         self.world_lines = []
         for q in self.queue:
@@ -192,7 +210,15 @@ class AgentHost:
                     del self.inflight[atom]
                 self.acted.append({"beat": self.beat, "event": name, "id": q["id"], "payload": q["payload"]})
                 break
+        before = set(self.inner.due)
         self.inner.on_event(name, args)
+        if self.live_case:
+            due = []
+            for b, d in self.inner.due:
+                if (b, d) not in before and d in ("+timeout", "+lost"):
+                    b = self.inner.beat + self.LIVE_WAIT
+                due.append((b, d))
+            self.inner.due = tuple(due)
 
     def snapshot(self):
         return (self.inner.snapshot(), copy.deepcopy((self.queue, self.inflight, self.acted, self.world_lines)))

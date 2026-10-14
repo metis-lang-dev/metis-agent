@@ -67,3 +67,30 @@ def test_no_trace_without_the_flag_or_news():
     run(ag, {"clock": "beat", "domain": "dog"})
     out = run(ag, {"ports": {}, "domain": "dog"})       # nothing happened since: no trace
     assert not [r for r in out if r.get("kind") == "trace"]
+
+
+def _walk(case, extra=()):
+    from metis_agent.domain_agent import DomainAgent
+    ag = DomainAgent(dog, case=case)
+    B = {"clock": "beat", "domain": "dog"}
+    lines = [B, {"world": ["-closed(kitchen)", "+open(kitchen)"], "domain": "dog"}, B,
+             {"id": "c1", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}},
+             *extra] + [B] * 24
+    ends, beat = [], 0
+    for m in lines:
+        for r in ag.handle(m):
+            if "clock" in r:
+                beat = r["beat"]
+            elif r.get("id") == "c1" and r.get("status") in ("done", "expired"):
+                ends.append((beat, r["status"]))
+    return ends
+
+
+def test_live_walk_waits_for_the_person():
+    """The architect's ruling (integration step 2): live, a walk with no
+    answer expires after LIVE_WAIT beats (30 s at 1.5 s), not 3; the replay
+    case keeps its 3; the person's +arrived ends it and replaces the timeout."""
+    assert _walk("replay") == [(5, "expired")]
+    assert _walk("live") == [(2 + dog.AgentHost.LIVE_WAIT, "expired")]
+    B = {"clock": "beat", "domain": "dog"}
+    assert _walk("live", [B, B, {"world": ["+arrived(kitchen)"], "domain": "dog"}]) == [(4, "done")]

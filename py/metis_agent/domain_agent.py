@@ -150,7 +150,9 @@ class DomainAgent:
         self.case = case
         if case in ("replay", "live"):
             # live is the replay case on the orchestrator's wall-clock beats
-            if hasattr(self.host, "replay"):
+            if case == "live" and hasattr(self.host, "live"):
+                self.host.live()          # the replay, on a person's time (dog.py AgentHost.live)
+            elif hasattr(self.host, "replay"):
                 self.host.replay()
             elif not getattr(module, "OWN_DAY", False):
                 raise ValueError("domain %s has no replay case (its host keeps its own day)" % self.name)
