@@ -63,6 +63,16 @@ func (m *mirror) see(r Reply, c Call) {
 	}
 }
 
+// anyLive: some task is in flight in some domain.
+func (m *mirror) anyLive() bool {
+	for _, ts := range m.tasks {
+		if len(ts) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // live is the domain's task in flight other than id.
 func (m *mirror) live(d, id string) (mTask, bool) {
 	for _, t := range m.tasks[d] {
@@ -315,6 +325,32 @@ func objectWords(c Call) string {
 		return fmt.Sprintf("tag %v", t)
 	}
 	return strings.TrimPrefix(identity(c), "your command to ")
+}
+
+// infoQuery: a question about the dialog's participants (the person, or
+// the robot itself — "what are you doing?") is an information turn, read
+// from the mirror, never an intent (56da709): a QUERY whose target is a
+// PERSON. A QUERY about a thing or a place goes to the domain.
+func infoQuery(c Call) bool {
+	if c.Verb() != "QUERY" {
+		return false
+	}
+	var j map[string]any
+	_ = json.Unmarshal(c.J, &j)
+	t, _ := j["target"].(map[string]any)
+	return t != nil && t["type"] == "PERSON"
+}
+
+// bindsObject: the domain's text names the task's object (its target,
+// place or tag), or the task has none (a body action).
+func bindsObject(text string, c Call) bool {
+	var j map[string]any
+	_ = json.Unmarshal(c.J, &j)
+	has := j["target"] != nil || j["goal"] != nil || j["tag_id"] != nil || j["place"] != nil || j["thing"] != nil
+	if !has {
+		return true
+	}
+	return namesWords(text, objectWords(c))
 }
 
 // unspeakableLine: a line the dog path's guard would not speak (a forged

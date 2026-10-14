@@ -90,3 +90,20 @@ func TestWorldBlockerConsultsFirst(t *testing.T) {
 		t.Fatalf("blocker null keeps take-one: %q %+v", br, o.br.alts)
 	}
 }
+
+// 56da709: "what are you doing?" read as QUERY of a PERSON is an
+// information turn (no dispatch, spoken from the mirror); a domain text
+// that does not name the task's object is not copied into the outcome turn.
+func TestInfoQueryAndUnboundText(t *testing.T) {
+	c := Call{J: []byte(`{"intent":"QUERY","target":{"type":"PERSON","description":"the person"}}`)}
+	if !infoQuery(c) || infoQuery(Call{J: []byte(`{"intent":"QUERY","target":{"type":"OBJECT","description":"keys"}}`)}) {
+		t.Fatal("infoQuery")
+	}
+	go_ := Call{J: []byte(`{"intent":"NAVIGATE","goal":{"type":"REGION","description":"kitchen"}}`)}
+	if bindsObject("I went to the place but it timed out.", go_) || !bindsObject("I have arrived at the kitchen.", go_) {
+		t.Fatal("bindsObject on a go")
+	}
+	if !bindsObject("I stood up.", Call{J: []byte(`{"intent":"LOCAL_ACTION","action":"STAND_UP"}`)}) {
+		t.Fatal("a body action has no object to bind")
+	}
+}

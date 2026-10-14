@@ -224,7 +224,7 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 	}
 	c := o.last.call
 	verb := c.Verb()
-	talk := c.IsJ() && (verb == "CHITCHAT" || verb == "UNKNOWN")
+	talk := c.IsJ() && (verb == "CHITCHAT" || verb == "UNKNOWN" || infoQuery(c)) // an information turn is never an intent (56da709)
 	retry := func() {
 		if q.kind == "cancelask" {
 			o.cancelFirst(q)
@@ -235,6 +235,12 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 		switch {
 		case CanonJSON(c.Text()) == CanonJSON(q.refused.Text()): // the refused call itself: yes
 			retry()
+		case q.kind != "cancelask" && (verb == "STOP" || verb == "CANCEL") && !o.m.anyLive():
+			// a stop with nothing in flight is the person's "no" (56da709): talk, the task stays refused
+			c, verb, talk = Call{}, "", true
+			if o.cfg.OnGen != nil {
+				o.cfg.OnGen(GenInfo{Label: "answer", Text: `{"answer":"no"}`, Harness: true, Branch: "bound"})
+			}
 		case q.kind == "cancelask" && verb == q.alt: // the verb the busy refusal offered: yes, to dropping the live task (run 3b)
 			retry()
 			o.pend.WriteString("\n" + c.Text())
@@ -387,7 +393,7 @@ func (o *Orch) Reply(r Reply) (string, error) {
 			o.pend.WriteString(userTurn(o.head() + respTag + fmt.Sprintf("%s (%s) was accepted: handed over, not done yet.", capFirst(identity(c)), r.ID) + tellNow))
 		default: // an outcome (done, expired, cancelled …): not measured by E13, step 3's corpus is
 			said := ""
-			if r.Text != "" && o.cfg.Mirror {
+			if r.Text != "" && o.cfg.Mirror && bindsObject(r.Text, c) { // a text that fails to name the task's object is not copied (56da709)
 				said = " The " + r.Domain + " says: " + r.Text
 			}
 			o.pend.WriteString(userTurn(o.head() + respTag + fmt.Sprintf("%s (%s) %s.", capFirst(identity(c)), r.ID, statusWords(r.Status)) + said +

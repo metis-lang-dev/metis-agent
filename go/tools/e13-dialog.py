@@ -169,6 +169,9 @@ def a_keys():
             {"intent": "FIND", "target.description": "keys"}, {"intent": "FIND", "target.description": "my keys"}]
 
 
+NO_STOP = [{"intent": "STOP"}, {"intent": "CANCEL"}]   # a stop with nothing in flight answers "no" (56da709)
+
+
 def p(at, text, allow):
     return {"at": at, "text": text, "allow": allow if isinstance(allow, list) else [allow]}
 
@@ -239,7 +242,7 @@ def main():
              [dog(nav("kitchen", CLOSED), go_ok("kitchen", 3), consult=CONSULT_CLOSED), kitchen()],
              {"bound_at": 3, **yes_kitchen}, world=OPENED),
         item("D3-b", "the ask answered no: no world-changing intent",
-             [p(0, "go to the kitchen", a_nav("kitchen")), p(3, "no, I can't right now", TALK)],
+             [p(0, "go to the kitchen", a_nav("kitchen")), p(3, "no, I can't right now", TALK + NO_STOP)],
              [dog(nav("kitchen", CLOSED), go_ok("kitchen", 3), consult=CONSULT_CLOSED), kitchen()],
              {"bound_at": 3, "bound": "none"}),
         item("D3-c", "a kitchen report before the answer: still bound to q1",
