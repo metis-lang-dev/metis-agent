@@ -45,6 +45,11 @@ type Orch struct {
 	qseq  int
 	quiet map[string]bool // step 3: the harness's own intents (their outcomes are the journal's only)
 	spoke map[string]bool // step 3: the intents whose first reply has spoken
+	// the quiescence rule (integration step 2 ruling): a domain's
+	// quiescence is spoken when it closes a task the person asked of it,
+	// when it is the domain's first since activation, or at the day's end
+	asked  map[string]bool // a person's task went to the domain since its last spoken quiescence
+	qHeard map[string]bool // the domain's first quiescence has spoken
 
 	br   branch
 	last struct {
@@ -122,7 +127,7 @@ type branch struct {
 func NewOrch(cfg V3Config, l DialogLLM, dom Domains) *Orch {
 	return &Orch{cfg: cfg, l: l, dom: dom, api: replAPI(cfg.Catalog, cfg.Loaded),
 		byID: map[string]Call{}, answers: map[string]Reply{}, refusals: map[refusal]int{}, surprises: map[string]Reply{},
-		m: newMirror(), quiet: map[string]bool{}, spoke: map[string]bool{}}
+		m: newMirror(), quiet: map[string]bool{}, spoke: map[string]bool{}, asked: map[string]bool{}, qHeard: map[string]bool{}}
 }
 
 // ── the dialog's past and its wakes ──────────────────────────────────────────
@@ -248,6 +253,27 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 			if o.cfg.OnGen != nil {
 				o.cfg.OnGen(GenInfo{Label: "move", Text: c.Text(), Harness: true, Branch: "bound"})
 			}
+		case c.IsJ() && verb != "ask" && !q.offered(c):
+			// a J that is neither the refused call nor an offered alternative:
+			// the words are judged (integration step 2 ruling: live, the
+			// kitchen's lines between ask and answer turned "okay, it's open
+			// now" into MOVE FORWARD) — yes retries the refused call, no is
+			// the no-template's line, neither keeps the J as the new command
+			o.pend.WriteString("\n" + cueBoundJ(q) + "\n")
+			class, _, err := o.genCapture("answer", grammarAnswer3, b)
+			if err != nil {
+				return "", "", err
+			}
+			switch answerClass3(class) {
+			case "yes":
+				retry()
+				o.pend.WriteString("\n" + c.Text())
+				if o.cfg.OnGen != nil {
+					o.cfg.OnGen(GenInfo{Label: "move", Text: c.Text(), Harness: true, Branch: "bound"})
+				}
+			case "no":
+				c, verb, talk, saidNo = Call{}, "", true, true
+			}
 		case talk: // only talk is judged: yes · no; the harness moves
 			o.pend.WriteString("\n" + cueBound(q) + "\n")
 			class, _, err := o.genCapture("answer", grammarAnswer, b)
@@ -285,6 +311,7 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 	if c.IsJ() && verb != "ask" && !talk {
 		if r, ok := o.dom.Intent(c); ok && r.ID != "" {
 			o.byID[r.ID] = c
+			o.asked[r.Domain] = true
 			o.m.see(r, c)
 		}
 	}

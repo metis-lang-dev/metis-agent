@@ -66,6 +66,9 @@ func (m *mirror) see(r Reply, c Call) {
 	}
 }
 
+// liveIn: a task is in flight in the domain.
+func (m *mirror) liveIn(d string) bool { return len(m.tasks[d]) > 0 }
+
 // anyLive: some task is in flight in some domain.
 func (m *mirror) anyLive() bool {
 	for _, ts := range m.tasks {
@@ -123,6 +126,7 @@ type question struct {
 	id, text, kind string
 	reason         string
 	alt            string // cancelask: the verb that drops the live task
+	alts           []Call // the refusal's alternatives and the blocker's offers: an answer naming one is the person's pick
 	refused        Call
 	refusedID      string
 	live           mTask
@@ -132,7 +136,7 @@ func (o *Orch) ask(b branch, c Call) {
 	text := c.arg("text")
 	o.qseq++
 	q := &question{id: fmt.Sprintf("q%d", o.qseq), text: text, kind: b.name, refused: b.refused, refusedID: b.reply.ID,
-		reason: b.reply.Reason}
+		reason: b.reply.Reason, alts: append(append([]Call(nil), b.alts...), b.offers...)}
 	if b.name == "cancelask" {
 		q.live, _ = o.m.live(b.domain, b.reply.ID)
 		q.alt = b.alt
@@ -238,6 +242,9 @@ func (o *Orch) Handle(in Inbound, gbnf string, stopWords []string) (woke bool, e
 		return true, o.Move()
 	case "quiescence", "error":
 		o.m.see(r, Call{})
+		if r.Kind == "quiescence" && !o.quiescenceSpoken(r) { // the mirror only
+			return false, nil
+		}
 		o.closeTurn()
 		what := r.Text
 		if what == "" {
@@ -252,6 +259,28 @@ func (o *Orch) Handle(in Inbound, gbnf string, stopWords []string) (woke bool, e
 	o.m.see(r, Call{}) // event, notice: the mirror only
 	return false, nil
 }
+
+// quiescenceSpoken is the quiescence rule (integration step 2 ruling): a
+// quiescence is spoken when it closes a task the person asked of the
+// domain, when it is the domain's first since activation, or when the day
+// is over; any other updates the mirror silently. The surprise speaks as
+// it must, elsewhere.
+func (o *Orch) quiescenceSpoken(r Reply) bool {
+	d := r.Domain
+	switch {
+	case r.Over || strings.Contains(strings.ToLower(r.Text), "day is over"):
+	case !o.qHeard[d]:
+	case o.asked[d] && !o.m.liveIn(d):
+	default:
+		return false
+	}
+	o.qHeard[d], o.asked[d] = true, false
+	return true
+}
+
+// Activated: the domain was (re)activated — its next quiescence is its
+// first.
+func (o *Orch) Activated(d string) { delete(o.qHeard, d) }
 
 // keyword: a stop word fires the intent without the model (the dog path's
 // keyword stop); the turn is kept as the dialog's past.
@@ -400,6 +429,36 @@ func cueBound(q *question) string {
 }
 
 const grammarAnswer = `root ::= "{\"answer\":\"yes\"}" | "{\"answer\":\"no\"}"` + "\n"
+
+// grammarAnswer3 judges a bound answer the model moved as a J other than
+// the refused call: yes, no, or neither (a new command).
+const grammarAnswer3 = `root ::= "{\"answer\":\"yes\"}" | "{\"answer\":\"no\"}" | "{\"answer\":\"neither\"}"` + "\n"
+
+func cueBoundJ(q *question) string {
+	return "[Judge the person's words as an answer to " + q.id + ": yes (" + describe(q.refused) +
+		" goes ahead now), no (it stays refused), or neither (the words are a new command). " +
+		"Exactly one of {\"answer\":\"yes\"}, {\"answer\":\"no\"}, {\"answer\":\"neither\"}.]"
+}
+
+func answerClass3(text string) string {
+	for _, c := range []string{"yes", "no", "neither"} {
+		if strings.Contains(text, `"`+c+`"`) {
+			return c
+		}
+	}
+	return "neither"
+}
+
+// offered: c is one of the alternatives the refusal or the blocker offered.
+func (q *question) offered(c Call) bool {
+	t := CanonJSON(c.Text())
+	for _, a := range q.alts {
+		if a.IsJ() && CanonJSON(a.Text()) == t {
+			return true
+		}
+	}
+	return false
+}
 
 func answerClass(text string) string {
 	for _, c := range []string{"yes", "no"} {

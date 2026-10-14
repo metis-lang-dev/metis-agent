@@ -107,6 +107,7 @@ func (v *v3) setActive(on bool, dom string) error {
 	if on {
 		loaded = append(loaded, dom)
 		delete(ld.pd.off, dom)
+		v.o.Activated(dom)
 	} else {
 		ld.pd.off[dom] = true
 	}

@@ -529,12 +529,19 @@ fsttm-web's demo page in front. The user asked why, and ruled:
   as the reference the port must match (t3 parity 114/114, the 14 timelines'
   reads, the integration replay reads, the same `dlg-*` journal so
   `tools/live-reads.py` reads either).
-- **metis-agent/go stays for the kernel runtime path**: the cgo binding of
-  the C++/IR runtime, where extra commands beyond the metispy REPL will be
-  added. It is not the agent's process, and nothing is spawned from it.
-- **fsttm-web becomes a Python UI library** (a package shipping `lib/` and
-  the page assets, with a mount for a Python web server), loaded by the
-  console application, not served by a Go binary beside it.
+- **metis-agent/go is the second backend of the same console, at parity.**
+  The console speaks one ws protocol; go/ and py/ each serve it whole
+  (orchestrator, domains, journal), and the parity corpora run against both.
+  go/ also carries the kernel runtime path: the cgo binding of the C++/IR
+  runtime, where extra commands beyond the metispy REPL will be added. The two
+  backends are properly separated: neither spawns the other, no shared
+  process, the same `go/grammar/*` files read by both.
+- **fsttm-web is packaged twice from one source**: as the JS library it
+  already declares (`package.json` exports of `lib/`, made installable: a
+  version, the build, not private) for the console page; and as a Python UI
+  library (a package shipping the same `lib/` and page assets with a mount
+  for a Python web server) for the py backend. The Go backend serves the same
+  assets by `-lib-dir`. Neither is a copy kept by hand.
 - **metis-agent/console is the console** (s-7f3d1088's list: every spoken
   line labelled by source, domains panel, per-domain tabs with the REPL log,
   world ports from the page, the journal live; `run.sh` starts the Python
@@ -544,8 +551,8 @@ Why: the Go-spawns-Python shape was the history of who built what (opus the
 orchestrator in go/ through E10–E13, nina the domain agent in py/), not a
 need of the architecture; the one-to-one context management already on the
 py side makes the orchestrator's KV discipline portable; a page backend in
-Python is a small thing beside the two agents. Both the library packaging
-and the console are nina's.
+Python is a small thing beside the two agents. The library packaging (JS and Python), the py backend and the console are
+nina's; opus keeps the Go backend at parity and reviews the port.
 
 ### How this section came to be (2026-10-13, the record is in git)
 

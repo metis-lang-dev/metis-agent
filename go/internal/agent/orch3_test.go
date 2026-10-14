@@ -133,3 +133,71 @@ func TestMirrorSurpriseDifference(t *testing.T) {
 		t.Fatalf("after the notice: %q", got)
 	}
 }
+
+// the integration step 2 ruling (A): with a question open, a J that is
+// neither the refused call nor an offered alternative is judged — yes
+// retries the refused call, no keeps it refused, neither keeps the J
+func TestBoundJudgedJ(t *testing.T) {
+	nav := Call{J: []byte(`{"intent":"NAVIGATE","goal":{"type":"REGION","description":"kitchen"}}`)}
+	for _, tc := range []struct{ move, answer, want string }{
+		{`{"intent":"LOCAL_ACTION","action":"MOVE","direction":"FORWARD"}`, `{"answer":"yes"}`, nav.Text()},
+		{`{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`, `{"answer":"neither"}`, `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`},
+		{`{"intent":"LOCAL_ACTION","action":"MOVE","direction":"FORWARD"}`, `{"answer":"no"}`, ""},
+	} {
+		f := &fakeDialog{outs: []string{tc.move, tc.answer, "Okay."}}
+		o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true}, f, noDomains{})
+		o.q = &question{id: "q1", text: "Can you open the way to the kitchen?", kind: "none", refused: nav,
+			refusedID: "c1", reason: "the way to it is closed"}
+		intent, voice, err := o.Turn("okay, it's open now", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tc.want == "" {
+			if voice != lineLeaveIt {
+				t.Fatalf("%s → %s: voice %q, want the no-template", tc.move, tc.answer, voice)
+			}
+		} else if CanonJSON(intent) != CanonJSON(tc.want) {
+			t.Fatalf("%s → %s: intent %s, want %s", tc.move, tc.answer, intent, tc.want)
+		}
+	}
+	// the refused call itself is not judged
+	f := &fakeDialog{outs: []string{nav.Text()}}
+	o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true}, f, noDomains{})
+	o.q = &question{id: "q1", kind: "none", refused: nav, refusedID: "c1"}
+	if intent, _, _ := o.Turn("it's open", ""); CanonJSON(intent) != CanonJSON(nav.Text()) || f.n != 1 {
+		t.Fatalf("the refused call: %s after %d gens", intent, f.n)
+	}
+}
+
+// the quiescence rule (C): the domain's first quiescence speaks, the
+// next ones update the mirror only, the day's end speaks, and one that
+// closes a task the person asked of the domain speaks
+func TestQuiescenceRule(t *testing.T) {
+	f := &fakeDialog{outs: []string{"The kitchen is quiet.", "The kitchen's day is over.", `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`, "The dog is quiet."}}
+	o := NewOrch(V3Config{Loaded: []string{"dog", "kitchen"}, Mirror: true}, f, noDomains{})
+	q := func(d, text string) bool {
+		woke, err := o.Handle(Inbound{Reply: &Reply{Domain: d, Kind: "quiescence", Text: text}}, "", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return woke
+	}
+	if !q("kitchen", "quiet after 1 moves") || q("kitchen", "quiet after 12 moves") || q("kitchen", "quiet after 22 moves") {
+		t.Fatal("the first speaks, the next ones do not")
+	}
+	if !q("kitchen", "the day is over") {
+		t.Fatal("the day's end speaks")
+	}
+	o.qHeard["dog"] = true
+	if _, _, err := o.Turn("sit down", ""); err != nil { // a person's task to the dog (noDomains: accepted c1)
+		t.Fatal(err)
+	}
+	o.m.tasks["dog"] = nil // its outcome came
+	if !q("dog", "quiet") || q("dog", "quiet") {
+		t.Fatal("a quiescence closing the person's task speaks, once")
+	}
+	o.Activated("kitchen")
+	if !o.quiescenceSpoken(Reply{Domain: "kitchen", Kind: "quiescence", Text: "quiet"}) {
+		t.Fatal("the first after activation speaks")
+	}
+}
