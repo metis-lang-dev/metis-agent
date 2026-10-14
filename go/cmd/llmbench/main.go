@@ -183,6 +183,8 @@ func main() {
 	e10IDs := flag.String("e10-ids", "", "E10: only these item ids")
 	e10Dump := flag.String("e10-dump", "", "E10: write the decide seat rendered from -e8-cards (e10-decider.txt/.gbnf) into this directory and exit")
 	v3F := flag.String("v3", "", "E13 step 2: replay these scenarios (tools/e13-corpus.py --final) through the orchestrator agent (internal/agent, -loop v3); -e10-ids, -pass2_seed")
+	dogProc := flag.String("dog-proc", "", "integration step 1: the real dog for -dialog — the domain agent's command line, run in -dog-dir (e.g. \".venv/bin/python -m metis_agent.domain_agent --domain dog --narrate\")")
+	dogDir := flag.String("dog-dir", "../py", "integration step 1: -dog-proc's working directory")
 	dialogF := flag.String("dialog", "", "E13 step 3: the dialog-control corpus (tools/e13-dialog.py) through the orchestrator agent against emulated domains; -gbnf, -e10-ids, -pass2_seed")
 	v3Ruled := flag.Bool("v3-ruled", false, "E13 step 2: the agent with the E13 step 1 ruling (ask words checked, the again-branch and the escalate call the harness's); off = t3 parity")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
@@ -311,7 +313,23 @@ func main() {
 		return
 	}
 	if *dialogF != "" {
-		runDialog(l, *dialogF, *gbnfF, *e10IDs, *tag, uint32(*seed), emit)
+		var dog *agent.DomainProc
+		if *dogProc != "" {
+			lf, err := os.Create(*tag + "-dog.log")
+			if err != nil {
+				fail(err)
+			}
+			defer lf.Close()
+			if dog, err = agent.StartDomain("dog", strings.Fields(*dogProc), *dogDir, []string{"METIS_CONFIG="}, lf); err != nil {
+				fail(err)
+			}
+			defer dog.Close()
+			emit(map[string]any{"kind": "dlg-vram", "tag": *tag, "dog_pid": dog.Pid(), "self_pid": os.Getpid(), "nvidia": vramApps()})
+		}
+		runDialog(l, *dialogF, *gbnfF, *e10IDs, *tag, uint32(*seed), dog, emit)
+		if dog != nil {
+			emit(map[string]any{"kind": "dlg-vram", "tag": *tag, "at": "end", "nvidia": vramApps()})
+		}
 		return
 	}
 	if *v3F != "" {

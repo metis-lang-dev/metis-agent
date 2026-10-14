@@ -325,14 +325,17 @@ func subset(when, args map[string]any) bool {
 	return true
 }
 
-// Serve speaks the domain agent's JSON lines on r/w: intents and REPL
-// calls answered at once, {"clock":"beat"} steps the clock, writes what
-// fell due, then {"clock":"beat","beat":N}.
+// Serve speaks the domain agent's JSON lines on r/w (domain_agent.py's
+// process face, integration step 1): a ready line first; intents and REPL
+// calls answered at once and closed by {"ack": kind, "id"}; a world line
+// and a reset acked (the emulator's world is its script); {"clock":"beat"}
+// steps the clock, writes what fell due, then {"clock":"beat","beat":N}.
 func (e *Emu) Serve(r io.Reader, w io.Writer) error {
 	sc := bufio.NewScanner(r)
 	sc.Buffer(make([]byte, 1<<20), 1<<24)
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
+	_ = enc.Encode(map[string]any{"clock": "ready", "beat": e.Beat()})
 	for sc.Scan() {
 		ln := strings.TrimSpace(sc.Text())
 		if ln == "" {
@@ -354,11 +357,17 @@ func (e *Emu) Serve(r io.Reader, w io.Writer) error {
 		case str("tool") != "":
 			dom, _ := args["domain"].(string)
 			_ = enc.Encode(e.Tool(dom, str("tool"), args, str("id")))
+			_ = enc.Encode(map[string]any{"ack": "tool", "id": in["id"]})
+		case in["world"] != nil:
+			_ = enc.Encode(map[string]any{"ack": "world", "id": nil})
+		case in["reset"] != nil:
+			_ = enc.Encode(map[string]any{"clock": "ready", "beat": e.Beat()})
 		default:
 			_ = enc.Encode(e.Intent(str("id"), str("domain"), str("verb"), args))
 			for _, x := range e.Now() {
 				_ = enc.Encode(x)
 			}
+			_ = enc.Encode(map[string]any{"ack": "intent", "id": in["id"]})
 		}
 	}
 	return sc.Err()

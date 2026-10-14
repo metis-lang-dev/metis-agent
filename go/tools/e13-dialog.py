@@ -173,9 +173,15 @@ def p(at, text, allow):
     return {"at": at, "text": text, "allow": allow if isinstance(allow, list) else [allow]}
 
 
-def item(iid, what, person, scripts, expect=None):
-    return {"id": iid, "what": what, "reps": 3, "prompt": PROMPT, "person": person, "scripts": scripts,
-            "expect": expect or {}}
+def item(iid, what, person, scripts, expect=None, world=None):
+    it = {"id": iid, "what": what, "reps": 3, "prompt": PROMPT, "person": person, "scripts": scripts,
+          "expect": expect or {}}
+    if world:  # the person acting on a real domain's world (integration step 1; the emulator's world is its script)
+        it["world"] = world
+    return it
+
+
+OPENED = [{"at": 3, "domain": "dog", "lines": ["-closed(kitchen)", "+open(kitchen)"]}]   # "okay, it's open now"
 
 
 def main():
@@ -207,7 +213,7 @@ def main():
         item("D3-a", "the ask answered yes: the retry with a new id",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(3, "okay, it's open now", [a_nav("kitchen")] + TALK)],
              [dog(nav("kitchen", CLOSED), go_ok("kitchen", 3), consult=CONSULT_CLOSED), kitchen()],
-             {"bound_at": 3, **yes_kitchen}),
+             {"bound_at": 3, **yes_kitchen}, world=OPENED),
         item("D3-b", "the ask answered no: no world-changing intent",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(3, "no, I can't right now", TALK)],
              [dog(nav("kitchen", CLOSED), go_ok("kitchen", 3), consult=CONSULT_CLOSED), kitchen()],
@@ -215,7 +221,7 @@ def main():
         item("D3-c", "a kitchen report before the answer: still bound to q1",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(3, "it's open now", [a_nav("kitchen")] + TALK)],
              [dog(nav("kitchen", CLOSED), go_ok("kitchen", 3), consult=CONSULT_CLOSED), kitchen((2, SERVED))],
-             {"bound_at": 3, **yes_kitchen}),
+             {"bound_at": 3, **yes_kitchen}, world=OPENED),
         item("D3-d", "the question ignored: the new command, no retry",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(3, "sit down", a_body("SIT_DOWN"))],
              [dog(nav("kitchen", CLOSED), go_ok("kitchen", 3), consult=CONSULT_CLOSED), kitchen()],

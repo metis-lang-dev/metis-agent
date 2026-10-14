@@ -83,9 +83,12 @@ func TestServe(t *testing.T) {
 		if c, ok := m["clock"].(string); ok {
 			k = "clock:" + c
 		}
+		if c, ok := m["ack"].(string); ok {
+			k = "ack:" + c
+		}
 		kinds = append(kinds, k)
 	}
-	if strings.Join(kinds, " ") != "result:accepted result:progress clock:beat result:admitted" {
+	if strings.Join(kinds, " ") != "clock:ready result:accepted ack:intent result:progress clock:beat result:admitted ack:tool" {
 		t.Fatal(kinds)
 	}
 }
