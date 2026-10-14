@@ -20,11 +20,13 @@ from .agent_host import AgentHost
 CATALOG_ROOT = Path(__file__).resolve().parents[3] / "metis-catalog" / "domains"
 
 
-def _host_module(d, name):
+def _host_module(d, name, fresh=False):
     p = d / ("%s_host.py" % name)
     if not p.exists():
         return None
     key = "%s_host" % name
+    if fresh:
+        sys.modules.pop(key, None)                  # reload: the host re-read from disk
     if key not in sys.modules:
         sys.path.insert(0, str(d))
         spec = importlib.util.spec_from_file_location(key, p)
@@ -89,12 +91,12 @@ def reports(c, host):
     return dict(out, **{w: None for w in getattr(host, "WAITS", ("lost", "timeout"))})
 
 
-def build(name, display=None, voice="", root=CATALOG_ROOT, module=None):
+def build(name, display=None, voice="", root=CATALOG_ROOT, module=None, fresh=False, dir=None):
     """The domain module's namespace for `name` (module: the importable path
     whose `make` the kernel attaches as the plugin)."""
-    d = Path(root) / name
+    d = Path(dir) if dir else Path(root) / name          # the domain's directory (the manifest's)
     spec = yaml.safe_load((d / "intent.yaml").read_text())
-    host = _host_module(d, name)
+    host = _host_module(d, name, fresh)
     c = card(spec)
     commands = {r["atom"].split("(")[0] for r in c["rows"]}
     rep = reports(c, host) if host else {}

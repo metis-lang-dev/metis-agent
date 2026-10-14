@@ -738,7 +738,8 @@ class Process:
                  records=None, session=None):
         self.names, self.llm, self.seat = list(names), llm, seat
         self.missing_seat, self.trace, self.records, self.session_id = missing_seat, trace, records, session
-        self.modules = [importlib.import_module("metis_agent.domains." + d) for d in self.names]
+        from . import domains
+        self.modules = [domains.load(d) for d in self.names]           # from the catalog's manifests
         self.narrated = set(self.names) if narrate == "*" else set((narrate or "").split(",")) - {""}
         self.state = {"pair_dir": None}
 
@@ -789,18 +790,14 @@ class Process:
         group = [n for n in (pair or (d,)) if n in ags]
         saved = {}
         try:
+            from . import domains
             fresh = {}
             for n in group:
-                mod = ags[n].mod
-                name = mod.__name__
+                name = "metis_agent.domains." + n
                 saved[name] = sys.modules.get(name)
                 host = "%s_host" % n
-                saved[host] = sys.modules.pop(host, None)        # the host re-read from disk
-                spec = importlib.util.find_spec(name)
-                new = importlib.util.module_from_spec(spec)
-                sys.modules[name] = new                          # the plugin spec imports it by name
-                spec.loader.exec_module(new)
-                fresh[n] = new
+                saved[host] = sys.modules.get(host)
+                fresh[n] = domains.load(n, fresh=True)           # the manifest, the agent module, intent.yaml and the host re-read
             if pair:
                 old_dir = self.state["pair_dir"]
                 self.state["pair_dir"] = tempfile.mkdtemp(prefix="pair-")

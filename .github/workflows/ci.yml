@@ -142,6 +142,7 @@ jobs:
         run: |
           pip install -r metis-agent/py/requirements.txt
           pip install -e ./metispy
+          pip install -e ./metis-catalog     # the domains' loader: metis_agent.domains reads the manifests
       - name: pytest py/tests
         if: env.HAVE_READ_TOKEN == 'true'
         working-directory: metis-agent/py

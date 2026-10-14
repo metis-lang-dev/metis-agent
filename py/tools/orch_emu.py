@@ -146,7 +146,8 @@ def parity(scn, lines, intents, live=True):
     # own record; the reply carries no domain word to read it from)
     import importlib
     from metis_agent.mapper import Mapper
-    mod = importlib.import_module("metis_agent.domains." + scn["domain"])
+    from metis_agent import domains
+    mod = domains.load(scn["domain"])
     mapper = Mapper(mod.CARD)
     act = {iid: getattr(mapper.map(m), "act", None) for iid, m in intents.items()}
     ours = ["%s(%s)" % (r["status"], act[r["id"]]) for r in outcomes]
