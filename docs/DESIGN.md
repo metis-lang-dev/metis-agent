@@ -212,6 +212,33 @@ E11's items, every read held):
   surprise's difference second (E13 step 1 saw escalations describe the pot
   difference instead of what the consult found).
 
+Five more from E13 step 3 (two domains emulated, 14 timelines; ids, floor
+and signals held, the bound answer and the outcome lines did not):
+- **A bound answer is classified, not moved.** The model judges the person's
+  answer to an open question under a three-literal grammar (yes · no ·
+  something else); the harness moves: yes → the retry (after the cancel,
+  for a busy question); no → talk, the task stays refused; something else
+  → the person's turn under the intent grammar, the question closed. E2B
+  given the move chose STAND_UP on "no, I can't right now" (2/3) and
+  CHITCHAT with "Okay, I'll drop it" on "yes, drop it" (3/3) — a false
+  promise, since nothing was dropped. Under the rule the cancel precedes
+  the line, so the line is true.
+- **The outcome turn leads with the task's words by id,** from the journal,
+  whatever the domain's text says; and the domain's text names the object
+  (the narrator carries the bindings; the emulator must too). "I have
+  arrived." named no place on 12 lines.
+- **The ask check looks for the resource's key,** the handle's display name
+  where the words take one, else the object (`dog_host.KEYS`, `key(atom)`),
+  never the verb phrase: "open the way to…" rejected "Could you open the
+  kitchen door?" and three re-asks degraded it.
+- **An information turn speaks from the mirror.** "What are you doing?" is
+  a read of the journal: the speak cue inlines the mirror's line (E6: an
+  inline fact at the cue is used), the model phrases it. Mid-walk E2B said
+  "I am waiting for instructions" 3/3 without it.
+- **A read-like intent (query, look, time, date) speaks at its result,
+  not at the person's turn.** "Where are my keys?" got "I don't know" one
+  beat before the answer.
+
 ### The domain agent
 
 **Role.** The one party that understands its domain: it narrates what the

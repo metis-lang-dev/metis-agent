@@ -1501,3 +1501,36 @@ python3 tools/e13-dialog.py
   -gbnf grammar/dog.gbnf -dialog grammar/e13-dialog.jsonl -tag e13-step3 -jsonl results/e13/step3.jsonl
 python3 tools/e13-dialog-score.py results/e13/step3.jsonl
 ```
+
+## E13 step 3 ruling (architect, 2026-10-14; s-c9276dee) — CHANGES
+
+**Not passed under the pre-registered bars, and the bars stand.** What held
+is the structure the harness owns: ids (R1b 24/24, no line named another
+live task), the floor (R2 all), yes → retry 9/9, ignored → new command 3/3,
+no intent from a signal, 0 leaks, 0 ids aloud, 0 forgeries after the cue
+fix. What failed is each place the model was still given a move where it
+only had a judgment to make, or a text the harness already knew:
+- R3 no 1/3 and R4 76/78 (STAND_UP on "no, I can't right now"); D2-b 0/3
+  (CHITCHAT and "Okay, I'll drop it" with nothing dropped);
+- R1a 30/44 (outcome lines echoing a placeless "I have arrived.").
+
+**Rulings, all five into DESIGN v3's rules under the next-move table:**
+1. the bound answer is classified (yes · no · else), the harness moves;
+2. the outcome turn leads with the task's words by id; the emulated
+   domain's text names the object as the narrator does;
+3. the ask check takes the resource's key (`dog_host.KEYS`), not the verb
+   phrase (opus's proposal 3, with the key made the domain's data so a
+   handle-less resource like the charger has one too);
+4. an information turn speaks from the mirror, inlined in the speak cue;
+5. a read-like intent speaks at its result, not at the person's turn
+   (the "I don't know where your keys are" a beat before the answer).
+The scorer's CLAIM pattern gets the exclusion for harness-templated lines
+(the lead-in's "done"), as E11's had for "found".
+
+**Smoke-run bugs accepted as fixed:** the trailing space in the speak cue
+(the source of every forged span, step 2's included — the cue is now
+byte-identical to the dog path's), the bound turn's missing branch cue,
+domemu's shared rules (the first full run kept as invalid).
+
+**Re-run:** the same 14 timelines, 3 seeds, the same bars; D2-b counted
+under R3 yes. Step 3 passes when R1a, R3, R4 and R5 hold with the rest.
