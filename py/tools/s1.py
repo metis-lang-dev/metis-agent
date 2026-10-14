@@ -16,8 +16,9 @@ A corpus line (the brief's item shape; opus's py/tools/s1-corpus.py writes them)
 Writes DIR/s1-<seat>.jsonl: one record per item (the item, the calls with
 their outputs, the answer, stop, tokens, ms, `reached` = an answering
 instrument was among the calls) and a summary line; the scorer
-(py/tools/s1-score.py) reads it. Thinking: off (the gemma4 seat has no
-capped-thinking turn yet; the 256 cap of read 3 needs one).
+(py/tools/s1-score.py) reads it. Thinking: off, or --think-cap N on the
+gemma4 seat (read 3: the thought channel at every turn, ≤ N tokens; the
+records carry the thoughts; DIR/s1-gemma4-capN.jsonl).
 """
 import argparse
 import json
@@ -45,6 +46,7 @@ def main():
     ap.add_argument("--persona", default="b", choices="abc")
     ap.add_argument("--max-calls", type=int, default=8, help="when an item names none")
     ap.add_argument("--only", default="", help="comma-separated item ids")
+    ap.add_argument("--think-cap", type=int, default=0, help="gemma4: thought tokens per turn (read 3: 256)")
     ap.add_argument("--out", default=str(ROOT / "py/results/s1"))
     a = ap.parse_args()
     os.environ.setdefault("METIS_CONFIG", "")
@@ -59,8 +61,9 @@ def main():
         from metis_agent.claude_seat import ClaudeSeat
         seat, name = ClaudeSeat(model=a.claude_model), "claude"
     else:
+        from metis_agent.llm import LLM
         from metis_agent.seat import Gemma4Seat
-        seat, name = Gemma4Seat.load(a.model, n_ctx=8192), Path(a.model).name
+        seat, name = Gemma4Seat(LLM(a.model, n_ctx=8192), think_cap=a.think_cap), Path(a.model).name
 
     recs, t0 = [], time.perf_counter()
     for it in items:
@@ -68,17 +71,22 @@ def main():
                         persona=a.persona)
         for verb, arg in it.get("setup", []):
             sp.kernel.run(verb, arg)
+        if hasattr(seat, "thoughts"):
+            seat.thoughts.clear()
         r = sp.ask(it["question"])
         rec = {**it, **r, "seat": a.seat, "model": getattr(seat, "model_id", "") or name, "persona": a.persona,
-               "reached": any(c["verb"] in it.get("instruments", []) for c in r["calls"])}
+               "think_cap": a.think_cap, "reached": any(c["verb"] in it.get("instruments", []) for c in r["calls"])}
+        if a.think_cap:
+            rec["thoughts"] = list(seat.thoughts)
         recs.append(rec)
         print("%-8s %-9s reached %-5s %-50s | %s" % (it["id"], it["kind"], rec["reached"],
               " → ".join(c["verb"] for c in r["calls"])[:50], (r["answer"] or "")[:120].replace("\n", " ")), flush=True)
-    summ = {"kind": "summary", "seat": a.seat, "model": recs[0]["model"] if recs else name, "persona": a.persona,
+    summ = {"kind": "summary", "seat": a.seat, "think_cap": a.think_cap, "model": recs[0]["model"] if recs else name, "persona": a.persona,
             "items": len(recs), "reached": sum(r["reached"] for r in recs), "ms": round((time.perf_counter() - t0) * 1e3)}
     if a.seat == "claude":
         summ["cost_usd"] = round(seat.cost_usd, 4)
-    with open(out / ("s1-%s.jsonl" % a.seat), "w") as f:
+    tag = a.seat + ("-cap%d" % a.think_cap if a.think_cap else "")
+    with open(out / ("s1-%s.jsonl" % tag), "w") as f:
         for r in recs:
             f.write(json.dumps(r) + "\n")
         f.write(json.dumps(summ) + "\n")

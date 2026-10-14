@@ -1,0 +1,28 @@
+load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: control-looking token:      1 '<eos>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: '</s>' is a normal token here, removing it from EOG list
+llama_kv_cache_iswa: using full-size SWA cache (ref: https://github.com/ggml-org/llama.cpp/pull/13194#issuecomment-2868343055)
+llama_kv_cache: the V embeddings have different sizes across layers and FA is not enabled - padding V cache to 512
+llama_kv_cache: the V embeddings have different sizes across layers and FA is not enabled - padding V cache to 512
+W1       trace     reached False run                                                | The state shows that the farmer is on the far bank, the goat is on the near bank, and the wolf is on the near bank. The 
+W2       why       reached True  state → why                                        | The cabbage was eaten by the goat. This is indicated by event 3, which is an `eat` event involving the cabbage, the goat
+W3       what-if   reached False                                                    | I do not have enough information to answer your question. I need to see the model's state or trace to determine what hap
+W4       necessity reached False state → why → why → why                            | The cabbage is gone because it was eaten, and the state shows 'gone' was never produced. The event `carry[A=near,X=wolf,
+W5       why       reached True  state → why                                        | The state shows the goat is on the far bank, but the `why` command indicates that the atom `goat,far` was never produced
+W6       trace     reached True  run                                                | The boat crossed the river 3 times. The goat is at the far bank.
+B1       what-if   reached False                                                    | I do not have enough information to answer your question. I need to interact with the model's state or rules to determin
+B2       what-if   reached False                                                    | I do not have access to a model or simulation that can answer questions about a physical scenario like wick burning time
+B3       why       reached True  state → why                                        | The state shows that 'd,far' is not an atom and was never produced. Therefore, I cannot determine which crossing took 'd
+B4       necessity reached False state → why → why → graph                          | The state shows that 'd,far' was never produced and is not in the base state. Therefore, the first crossing (c and d tog
+B5       trace     reached True  run                                                | The session stopped after 1000 steps. There was 1 crossing made, and the torch is at the far bank.
+H1       trace     reached True  state                                              | The ring r1 is currently in the `clear` state, specifically as `(top_r1)` in the `state` output.
+H2       why       reached True  why                                                | The atom `ring r1 post p3` was never produced and is not in the base state.
+H3       necessity reached False why                                                | The pickup at event 3 was not necessary for ring r1 being on post p3 because p3 was never produced.
+H4       what-if   reached False state                                              | 
+K1       trace     reached True  state                                              | The blocks stacked are `arm_free`, `clear`, and `on`. The block `on_table` is on the table.
+K2       why       reached True  why                                                | The atom `block b pred(block c)` was never produced and is not in the base state. Therefore, I cannot explain why block 
+K3       necessity reached False why                                                | The atom 'b' was never produced and is not in the base state. Therefore, picking up 'b' (event 5) was not necessary for 
+K4       necessity reached True  sufficiency                                        | The intervention of forcing the pickup of `b` from the table at event 5 brings about `b` being on `c` with a probability
+K5       what-if   reached False list                                               | 
+{"kind": "summary", "seat": "gemma4", "think_cap": 0, "model": "gemma-4-E2B-it-Q4_K_M.gguf", "persona": "b", "items": 20, "reached": 10, "ms": 19597}

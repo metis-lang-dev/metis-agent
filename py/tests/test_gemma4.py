@@ -76,3 +76,55 @@ def test_graph_never_writes():
     k = Kernel(str(WGC))
     assert k.run("graph", "x.dot").startswith("refused")
     assert not (ROOT.parent / "metispy/x.dot").exists() and not Path("x.dot").exists()
+
+
+class _StubLLM:
+    """Enough of metis_agent.llm.LLM for Gemma4Seat._think: tokens are ints,
+    detokenize maps them through VOCAB, generate replays a script."""
+    VOCAB = {1: "<|tool_call>", 2: "<|channel>", 3: "<channel|>", 10: "thought\n", 11: "check ", 12: "necessity"}
+
+    def __init__(self, script):
+        self.script, self.decoded = list(script), []
+
+    def single_token(self, text):
+        return {v: k for k, v in self.VOCAB.items()}.get(text, -1)
+
+    def decode(self, toks):
+        self.decoded += toks
+
+    def chain(self, gbnf=None):
+        return None
+
+    def generate(self, ch, max_tokens, stop_ids=()):
+        out = []
+        for t in self.script[:max_tokens]:
+            out.append(t)
+            self.decode([t])
+            if t in stop_ids:
+                return out, t
+        return out, "max"
+
+    def detokenize(self, toks, special=False):
+        return "".join(self.VOCAB[t] for t in toks)
+
+
+def test_think_cap_opens_and_closes_the_thought_channel(monkeypatch):
+    from metis_agent import seat as seat_mod
+    monkeypatch.setattr(seat_mod.L, "llama_sampler_free", lambda ch: None)
+    # the model closes its own thought: the channel is opened by the seat, the
+    # close is the model's, nothing is fed after it
+    llm = _StubLLM([10, 11, 12, 3])
+    s = seat_mod.Gemma4Seat(llm, think_cap=256)
+    assert s._think() == "check necessity"
+    assert llm.decoded == [2, 10, 11, 12, 3]
+    assert s._kv == "<|channel>thought\ncheck necessity<channel|>"
+    assert s.thoughts == [{"tokens": 3, "closed": True, "text": "check necessity"}]
+    # cut at the cap: the seat feeds the close itself
+    llm = _StubLLM([10, 11, 12, 12, 12])
+    s = seat_mod.Gemma4Seat(llm, think_cap=2)
+    assert s._think() == "check"
+    assert llm.decoded == [2, 10, 11, 3]
+    assert s.thoughts[-1]["closed"] is False
+    # off by default: no channel tokens are looked up, nothing is decoded
+    llm = _StubLLM([])
+    assert seat_mod.Gemma4Seat(llm).think_cap == 0 and llm.decoded == []

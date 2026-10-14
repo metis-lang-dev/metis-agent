@@ -1,0 +1,21 @@
+W1       trace     reached True  state → events → step → state                      | Right after `carry[A=near,X=goat,B=far]` fired, the farmer and the goat are on the far bank (`farmer(far)`, `on(goat,far
+W2       why       reached True  state → why                                        | The cabbage was eaten by event 3, `eat[Y=cabbage,A=near,X=goat,B=far]`, which fires when the cabbage and the goat are on
+W3       what-if   reached True  state → events → fork → step → state → events → st | 
+W4       necessity reached True  state → ctx → necessity                            | Mostly, but not strictly: with event #1 carry[A=near,X=wolf,B=far] blocked, gone(cabbage) still happens with probability
+W5       why       reached True  state → why                                        | The goat is on the far bank because of event 1, `carry[A=near,X=goat,B=far]`: the farmer rowed it across from the near b
+W6       trace     reached True  state → run → list                                 | The boat crossed the river **3 times** in the 12 steps: once with the goat (#1 `carry[A=near,X=goat,B=far]`) and twice w
+B1       what-if   reached True  state → events → step → state                      | After firing pair8[S=near,X=c,Y=d,T=far] (c and d crossing together first), the state shows `wick :7`, so 7 minutes of w
+B2       what-if   reached True  state → events → step → events → step → state      | After firing `pair2[S=near,X=a,Y=b,T=far]` and then `solo1[S=far,X=a,T=near]`, the state shows `wick :12`, so **12 minut
+B3       why       reached True  state → why                                        | d is on the far bank because of **event 1, `pair8[S=near,X=c,Y=d,T=far]`**: d crossed from near to far together with c, 
+B4       necessity reached True  state → ctx → necessity                            | No. The first crossing, #1 pair8[S=near,X=c,Y=d,T=far], was not necessary for pos(d,far). With that event blocked from #
+B5       trace     reached True  state → events → run → state                       | The run stopped after **3 crossings**: pair8[S=near,X=c,Y=d,T=far], then solo5[S=far,X=c,T=near], then solo2[S=near,X=b,
+H1       trace     reached True  state                                              | Ring r1 is now on peg p3: the state shows on(r1,bottom_p3). It is also clear (top_r1), so nothing is stacked on it.
+H2       why       reached True  state → why                                        | Ring r1 is on post p3 because event 4, `putdown_on_post[R=r1,B=bottom_p3,P=p3,V=top_r1]`, put it there from the arm when
+H3       necessity reached True  state → ctx → necessity                            | Yes. Event #3, `pickup[T=top_r1,R=r1,P=top_r2]`, was necessary for `on(r1,bottom_p3)`, with PN ≈ 1. When #3 is blocked f
+H4       what-if   reached True  state → events → step → events → step → events     | After picking up r1 and putting it on post p2, the arm can pick up **r1** again (`pickup[T=top_r1,R=r1,P=bottom_p2]`) or
+K1       trace     reached True  state                                              | The blocks form one tower: b is on c, c is on a, and a is on the table (`on(b,c)`, `on(c,a)`, `on_table(a)`). So a is th
+K2       why       reached True  state → why                                        | Block b is on c because event 6, put_on_block[X=b,Y=c], put it there after event 5, pickup_from_table[X=b], had the arm 
+K3       necessity reached True  state → why → necessity                            | Yes. Event 5, pickup_from_table[X=b], was necessary for on(b,c): with it blocked from #4, no event can produce on(b,c), 
+K4       necessity reached True  state → ctx → sufficiency                          | Forcing event 5, pickup_from_table[X=b], raises the probability of on(b,c) to 0.5, compared with 0.25 by chance from the
+K5       what-if   reached True  state → events → step → events → undo              | After `pickup_from_table[X=b]`, the arm has exactly two options, each with p=0.5: put b back on the table (`put_on_table
+{"kind": "summary", "seat": "claude", "think_cap": 0, "model": "claude-opus-5-5", "persona": "b", "items": 20, "reached": 20, "ms": 361599, "cost_usd": 1.3349}

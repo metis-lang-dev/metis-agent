@@ -11,6 +11,13 @@ freely (greedy) until it either ends its turn — the answer — or emits the
 <|tool_call> token, after which the call is pinned by the grammar built from
 the declarations. The KV is kept between turns of one question: a cont that
 extends what was decoded costs only its new tokens.
+
+think_cap (S1 read 3, SPECIALIST §5; the one seat change before the step-2
+report): > 0 opens the thought channel at every model turn, as the Go
+adapter's SpeakCap does: per turn, no <|think|> in the system turn, so the
+prefix and the declarations stay byte-identical to thinking off. The thought
+decodes greedily to the model's <channel|> or the cap (then the close is fed),
+and the turn goes on as without it. 0 = thinking off (the default).
 """
 import time
 from dataclasses import dataclass, field
@@ -28,6 +35,7 @@ class Call:
     text: str               # the call as generated, markers included
     said: str = ""          # free text the model wrote before the call
     ms: float = 0.0
+    thought: str = ""       # the turn's thought (think_cap > 0)
 
 
 @dataclass
@@ -35,6 +43,7 @@ class Text:
     text: str
     ms: float = 0.0
     stop: str = "eog"
+    thought: str = ""
 
 
 @dataclass
@@ -42,13 +51,20 @@ class Gemma4Seat:
     llm: LLM
     max_text: int = 400     # tokens of free text per turn
     max_call: int = 120     # tokens of one pinned call
+    think_cap: int = 0      # tokens of thought per turn; 0 = thinking off
     _gbnf: dict = field(default_factory=dict)
     _kv: str = ""           # tail + cont text decoded after the prefix
+    thoughts: list = field(default_factory=list)   # per turn: {tokens, closed (by the model), text}
 
     def __post_init__(self):
         self.open_id = self.llm.single_token(gemma4.CALL_OPEN)
         if self.open_id < 0:
             raise ValueError("seat: the model has no %s token (not Gemma 4?)" % gemma4.CALL_OPEN)
+        if self.think_cap:
+            self.chan_open = self.llm.single_token("<|channel>")
+            self.chan_close = self.llm.single_token("<channel|>")
+            if self.chan_open < 0 or self.chan_close < 0:
+                raise ValueError("seat: think_cap needs the <|channel> tokens (not Gemma 4?)")
 
     @classmethod
     def load(cls, model_path, n_ctx=8192, **kw):
@@ -85,9 +101,29 @@ class Gemma4Seat:
             self._gbnf[key] = gemma4.Gbnf().call_grammar(tools)
         return self._gbnf[key]
 
+    def _think(self):
+        """The thought channel, opened by the seat, greedy, ≤ think_cap tokens."""
+        llm = self.llm
+        llm.decode([self.chan_open])
+        ch = llm.chain()
+        try:
+            toks, stop = llm.generate(ch, self.think_cap, stop_ids={self.chan_close})
+        finally:
+            L.llama_sampler_free(ch)
+        closed = stop == self.chan_close
+        if not closed:            # cut at the cap (or an end of turn): close it ourselves
+            llm.decode([self.chan_close])
+            toks = toks + [self.chan_close]
+        self._kv += llm.detokenize([self.chan_open] + toks, special=True)
+        text = llm.detokenize(toks[:-1], special=True).strip()
+        text = text[len("thought"):].strip() if text.startswith("thought") else text
+        self.thoughts.append({"tokens": len(toks) - 1, "closed": closed, "text": text})
+        return text
+
     def turn(self, system, tools, question, cont=""):
         llm, t0 = self.llm, time.perf_counter()
         self._sync(system, tools, question, cont)
+        thought = self._think() if self.think_cap else ""
         ch = llm.chain()
         try:
             toks, stop = llm.generate(ch, self.max_text, stop_ids={self.open_id})
@@ -96,7 +132,7 @@ class Gemma4Seat:
         said = llm.detokenize([t for t in toks if t != self.open_id], special=True)
         self._kv += llm.detokenize(toks, special=True)
         if stop != self.open_id:
-            return Text(llm.clean(said), (time.perf_counter() - t0) * 1e3, stop)
+            return Text(llm.clean(said), (time.perf_counter() - t0) * 1e3, stop, thought)
         ch = llm.chain(self._grammar(tools))
         try:
             ctoks, _ = llm.generate(ch, self.max_call)
@@ -108,5 +144,5 @@ class Gemma4Seat:
         parsed = gemma4.parse_call(text)
         ms = (time.perf_counter() - t0) * 1e3
         if parsed is None:
-            return Text(llm.clean(said + " " + text), ms, "bad-call")
-        return Call(parsed[0], parsed[1], text, llm.clean(said), ms)
+            return Text(llm.clean(said + " " + text), ms, "bad-call", thought)
+        return Call(parsed[0], parsed[1], text, llm.clean(said), ms, thought)
