@@ -294,17 +294,31 @@ on the orchestrator's wall clock):
   NAVIGATE kitchen 1/1. The intent pass still runs first; when its J is
   neither the refused call nor an alternative the refusal or the blocker
   offered, the harness judges the words under a three-literal grammar
-  (yes · no · neither): yes → the retry, no → the no-template's line,
-  neither → the J stands as the new command and closes the question.
-  The bound prefix is unchanged (a cue change there would reopen the step
-  3 reads).
+  (yes · neither · no; the judge cue names the J it read): yes → the
+  retry, neither → the J stands as the new command and closes the
+  question, no → the no-template's line — but only on words that carry a
+  negation (no, not, can't, don't …): a decline says so, and E2B judged
+  "sit down" no 1/3 then 2/3 with the J in hand, which dropped a command
+  the person gave. The bound prefix is unchanged (a cue change there would
+  reopen the step 3 reads). Measured live (fresh session per trial): "okay,
+  it's open now" → NAVIGATE kitchen 3/3, "I opened it" 1/1, "sit down" →
+  SIT_DOWN 3/3; the judge 171 ms mean (16 gens); the replay int-step2c
+  holds every read with int-step2b's counts, D3-d judged neither 3/3.
+- **Question-form words moved as a world command are judged info or
+  command** (two literals, the cue naming the J; QUERY, STOP and CANCEL
+  are not judged). In the console's live run "what are you doing?", right
+  after the kitchen's surprise was explained, was dispatched as MOVE
+  FORWARD; with the quiescence rule below the intent pass read it CHITCHAT
+  3/3 on its own, so the judge is the backstop, not yet seen firing live.
 - **A quiescence speaks only when it is news.** A domain's quiescence is
   spoken when it closes a task the person asked of that domain, when it is
   the domain's first since activation, or when its day is over; every
   other quiescence updates the mirror silently. The kitchen reported
   "quiet after N moves" every ~11 beats, which is noise to the person and,
   between an ask and its answer, the derailment above. The surprise
-  speaks, as it must.
+  speaks, as it must. The day's end is the reply's `over` (the py
+  domain agent sets it). Live: the kitchen spoke its first quiescence
+  and its day's end, nothing between (5 quiescences in 80 s).
 
 ### The domain agent
 
