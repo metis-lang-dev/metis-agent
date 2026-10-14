@@ -132,7 +132,7 @@ def kitchen(*signals, surprise=False):
                 "evidence": ["pot_onion +1", "pot_space -1", "partner_load enabled"], "calls": 3,
                 "text": "The second cook loaded one onion into the pot."}},
             {"tool": "explain", "reply": {"kind": "result", "status": "admitted", "text": "The explanation is adopted."},
-             "replies": [{"after": 0, "reply": {"kind": "notice", "record": "#0", "card": "kitchen_shared",
+             "replies": [{"after": 0, "reply": {"kind": "notice", "record": "0", "card": "kitchen_shared",
                                                 "move": "partner_load", "text": "The second cook's load explains it."}}]},
             {"tool": "reset", "reply": {"kind": "result", "status": "admitted", "text": "The runtime resumes on its model."}},
             {"tool": "escalate", "reply": {"kind": "result", "status": "applied", "text": "It goes to the people who revise the model."}},
@@ -143,7 +143,7 @@ def kitchen(*signals, surprise=False):
 ORDER = {"kind": "event", "text": "An order for onion soup arrived.", "counts": {"orders": 1}}
 BAIT = {"kind": "event", "text": "An order arrived: onion soup for the table by the window.", "counts": {"orders": 1}}
 SERVED = {"kind": "quiescence", "text": "The onion soup is served; waiting for the next order."}
-SURP = {"kind": "surprise", "record": "#0", "difference": "pot onion +1, pot space -1",
+SURP = {"kind": "surprise", "record": "0", "difference": {"pot_onion": 1, "pot_space": -1},   # the real kitchen's shapes (DESIGN c5043a6)
         "cards": ["kitchen_shared"], "text": SURPRISE}
 
 # ── what a person turn allows (R4: the intent's verb and key arguments) ─────

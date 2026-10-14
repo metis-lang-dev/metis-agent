@@ -521,6 +521,9 @@ func (o *Orch) cue(b branch) string {
 // their answer rendered, the line spoken, the turn closed.
 func (o *Orch) Move() error {
 	b := o.br
+	if b.name == "surprise" && o.cfg.Mirror { // the consult's question is the harness's, from the difference (DESIGN c5043a6)
+		return o.harnessConsult(b)
+	}
 	if b.pick == "escalate" {
 		if err := o.harnessEscalate(b); err != nil {
 			return err
@@ -608,6 +611,26 @@ func (o *Orch) grammar(b branch) (string, error) {
 		return "", fmt.Errorf("v3: no move for answer_kind %q", b.reply.AnswerKind)
 	}
 	return "", fmt.Errorf("v3: no move in branch %q", b.name)
+}
+
+// harnessConsult: a surprise's consult, its question templated from the
+// difference ("why does the reading differ from the model: pot onion +1,
+// pot space -1?"); the model asked "how do I close surprise 0?" and the
+// seat answered unexplained (integration step 2, D4-b 3/3).
+func (o *Orch) harnessConsult(b branch) error {
+	q := "why does the reading differ from the model?"
+	if s, ok := o.surprises[b.record]; ok && s.Difference != "" {
+		q = "why does the reading differ from the model: " + string(s.Difference) + "?"
+	}
+	c := Call{Name: "consult", Args: map[string]any{"domain": b.domain, "question": q}}
+	text := c.Text()
+	o.pend.WriteString(text)
+	o.setLast(text)
+	if o.cfg.OnGen != nil {
+		_, key := CallOf(text)
+		o.cfg.OnGen(GenInfo{Label: "move", Text: text, Key: key, Harness: true, Branch: b.name})
+	}
+	return o.answer(b)
 }
 
 // harnessEscalate: the escalate call is the harness's (the ruling): the
