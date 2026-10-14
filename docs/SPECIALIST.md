@@ -118,9 +118,13 @@ proves the loop and the corpus before the small model is judged on them.
 
 ## 5. S1 — the model as REPL user on the puzzles we hold answers for
 
-Catalogs: wolf-goat-cabbage, bridge-torch, tower of hanoi, the kitchen
-pair (metis-catalog; goldens exist). About twenty questions with known
-answers, four kinds:
+Catalogs: wolf-goat-cabbage, bridge-torch, tower of hanoi, blocks world
+(metis-catalog; goldens exist). The kitchen pair is out (ruled 2026-10-14):
+two shells on a shared env is not a bare kernel but the domain agent's job,
+and its surprise question is answered in the domain-agent consult evals
+(kitchen explains on both seats). Blocks world takes its place: a six-event
+why cone, a necessity with a real counterfactual (PN 1 against 0.25 by
+chance), sufficiency 0.5 against 0.25. Twenty items, five per kind:
 
 | kind | example | the instrument that answers it |
 |---|---|---|
@@ -199,6 +203,9 @@ decision).
   result and asking for a different tool or an answer. It applies to every
   seat, so S1 measures the model, not the loop's lack of memory. Built
   before S1.
+- **The seat is unfrozen for one pre-registered change (2026-10-14):** read
+  3's items need a capped-thinking turn in the gemma4 seat; nina adds it in
+  step 2 before the run, declarations untouched. Nothing else moves.
 - **The declarations' text is improved once, then frozen.** From the REPL
   help, generically: each verb's purpose and its argument shape (`do
   EVENT[bindings]`, an event, never an atom; `necessity N ATOM`; `fork`
