@@ -314,18 +314,40 @@ def bind_line(doc, name, display=words):
     return _SLOT.sub(fill, doc), used
 
 
-def holds_line(sentence, line, objects, agent):
+_STOP = {"that", "this", "with", "from", "there", "here", "what", "your", "have", "been", "were", "they", "them",
+         "into", "onto", "about", "would", "could", "still", "again", "only", "more", "some", "just", "then", "when"}
+
+
+def distinctive(lines, most=3):
+    """The words that tell one line's outcome from another's: in at most
+    `most` of the domain's lines (found, arrived, timed, lost), not the
+    common ones (I, the, can't, now)."""
+    seen = {}
+    for ln in set(lines):
+        for w in set(re.findall(r"[a-z']+", ln.lower())):
+            if len(w) > 3 and w not in _STOP:
+                seen[w] = seen.get(w, 0) + 1
+    return {w for w, n in seen.items() if n <= most}
+
+
+def holds_line(sentence, line, objects, agent, foreign=()):
     """The attribution check for an own-voice line: the sentence names
     every object the line binds, does not speak about the agent in the
-    third person, keeps the line's "I", and keeps most of the reason a
-    line gives after its colon ("…: I am already busy with a task" told
-    as "I am already searching" is a different reason)."""
+    third person, keeps the line's "I", keeps most of the reason a line
+    gives after its colon ("…: I am already busy with a task" told as "I
+    am already searching" is a different reason), and borrows no outcome
+    word from another line (`foreign`: the domain's distinctive words; a
+    lookup's "I tell you about the keys" told as "I found the keys" claims
+    a search the dog did not make)."""
     s = " " + sentence.lower() + " "
     if any(o.lower() not in s for o in objects):
         return False
     if agent and (" " + agent.lower() + " ") in s:
         return False
     if re.search(r"\bI\b", line) and not re.search(r"\bI\b", sentence):
+        return False
+    own = set(re.findall(r"[a-z']+", line.lower()))
+    if any(w in foreign and w not in own for w in re.findall(r"[a-z']+", sentence.lower())):
         return False
     head, sep, why = line.partition(": ")
     if sep:

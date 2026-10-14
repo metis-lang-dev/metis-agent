@@ -77,7 +77,7 @@ import sys
 import time
 
 from .mapper import Mapped, Mapper
-from .narrator import Fragment, Narrator, event_ref, from_signal, holds_line, words
+from .narrator import Fragment, Narrator, distinctive, event_ref, from_signal, holds_line, words
 from .repl_tools import scrub
 from .replier import Replier
 from .reply import reply
@@ -144,6 +144,8 @@ class DomainAgent:
                                getattr(module, "PAIRS", ()), self.display_of)
         # the domain speaks for itself (VOICE = "own": the dog's "I"; DESIGN 56da709)
         self.own_voice = getattr(module, "VOICE", "") == "own"
+        # the words that tell one of its lines' outcomes from another's (the guard's borrowed-word check)
+        self.foreign = distinctive(self.replier.docs.values()) if self.own_voice else set()
         self.host.last_row = lambda: self.repl.fired_rows[-1]
         self.case = case
         if case in ("replay", "live"):
@@ -245,7 +247,7 @@ class DomainAgent:
             # the attribution check holds the sentence to the bound line: a
             # sentence that drops its object or leaves the agent's voice is
             # not spoken, the line is
-            if text and line and not holds_line(text, line, objects, self.display):
+            if text and line and not holds_line(text, line, objects, self.display, self.foreign):
                 self.narrated[-1][1]["held"] = False
                 text = line
             out = self.replier.fired(ev, k, beat, self.repl.counts, text)   # seq as `log` numbers it

@@ -1,0 +1,97 @@
+# narrated fragments (rep 0)
+
+- **kitchen#1 event** `Fragment (the first cook, event): fetch onion; now hand free 0, held onion 1` → The first cook took an onion.
+- **kitchen_shared#1 event** `Fragment (the second cook, event): fetch onion; now hand free 0, held onion 1` → The second cook took an onion.
+- **kitchen#2 quiescence** `Fragment (the first cook, quiescence): quiet after 1 moves, waiting for the next order` → The first cook is waiting for the next order.
+- **kitchen_shared#2 quiescence** `Fragment (the second cook, quiescence): quiet after 1 moves, waiting for the next order` → The second cook is waiting for the next order.
+- **kitchen#3 event** `Fragment (the first cook, event): outside: +pot space 3; now pot space 3` → The pot has room for three.
+- **kitchen#4 event** `Fragment (the first cook, event): load; now hand free 1, held onion 0, pot onion 1, pot space 2` → The first cook drops the onion into the pot.
+- **kitchen#5 event** `Fragment (the first cook, event): fetch onion; now hand free 0, held onion 1` → The first cook took an onion.
+- **kitchen#6 event** `Fragment (the first cook, event): load; now hand free 1, held onion 0, pot onion 2, pot space 1` → The first cook drops the onion into the pot.
+- **kitchen#7 event** `Fragment (the first cook, event): fetch onion; now hand free 0, held onion 1` → The first cook took an onion.
+- **kitchen#8 event** `Fragment (the first cook, event): load; now hand free 1, held onion 0, pot onion 3, pot space 0` → The first cook drops the onion into the pot.
+- **kitchen#9 event** `Fragment (the first cook, event): cook; now cooking 1, pot onion 0` → The first cook starts the soup.
+- **kitchen#10 event** `Fragment (the first cook, event): fetch dish; now hand free 0, held dish 1` → The first cook fetches a dish.
+- **kitchen#11 event** `Fragment (the first cook, event): plate; now cooking 0, held dish 0, held soup 1` → The first cook plates the soup.
+- **kitchen_shared#3 event** `Fragment (the second cook, event): outside: +pot space 3; now pot space 3` → The second cook now has three spaces in the pot.
+- **kitchen#12 event** `Fragment (the first cook, event): serve; now hand free 1, held soup 0, served 1` → The first cook delivered the soup.
+- **kitchen_shared#4 event** `Fragment (the second cook, event): load; now hand free 1, held onion 0, pot onion 1, pot space 2` → The second cook drops an onion into the pot.
+- **kitchen#13 event** `Fragment (the first cook, event): fetch onion; now hand free 0, held onion 1` → The first cook took an onion.
+- **kitchen_shared#5 event** `Fragment (the second cook, event): fetch onion; now hand free 0, held onion 1` → The second cook took an onion.
+- **kitchen#14 quiescence** `Fragment (the first cook, quiescence): quiet after 12 moves, waiting for the next order` → The first cook is waiting for the next order.
+- **kitchen_shared#6 event** `Fragment (the second cook, event): load; now hand free 1, held onion 0, pot onion 2, pot space 1` → The second cook dropped an onion into the pot.
+- **kitchen_shared#7 event** `Fragment (the second cook, event): fetch onion; now hand free 0, held onion 1` → The second cook took an onion.
+- **kitchen_shared#8 event** `Fragment (the second cook, event): load; now hand free 1, held onion 0, pot onion 3, pot space 0` → The second cook drops an onion into the pot.
+- **kitchen_shared#9 event** `Fragment (the second cook, event): cook; now cooking 1, pot onion 0` → The second cook started the soup.
+- **kitchen_shared#10 event** `Fragment (the second cook, event): fetch dish; now hand free 0, held dish 1` → The second cook fetches a dish.
+- **kitchen_shared#11 event** `Fragment (the second cook, event): plate; now cooking 0, held dish 0, held soup 1` → The second cook plates the soup.
+- **kitchen_shared#12 event** `Fragment (the second cook, event): serve; now hand free 1, held soup 0, served 1` → The second cook delivered the soup.
+- **kitchen_shared#13 event** `Fragment (the second cook, event): fetch onion; now hand free 0, held onion 1` → The second cook took an onion.
+- **kitchen_shared#14 quiescence** `Fragment (the second cook, quiescence): quiet after 12 moves, waiting for the next order` → The second cook is waiting for the next order.
+- **kitchen#15 event** `Fragment (the first cook, event): outside: +pot space 3; now pot space 3` → The pot has room for three.
+- **kitchen#16 event** `Fragment (the first cook, event): load; now hand free 1, held onion 0, pot onion 1, pot space 2` → The first cook drops the onion into the pot.
+- **kitchen_shared#15 event** `Fragment (the second cook, event): partner load; now hand free 1, held onion 0` → The second cook dropped an onion into the first cook's pot.
+- **kitchen#17 event** `Fragment (the first cook, event): fetch onion; now hand free 0, held onion 1` → The first cook took an onion.
+- **kitchen#18 surprise** `Fragment (the first cook, surprise): surprise 0, paused: takes no new orders until it is closed; now pot onion 2, pot space 1; the model expected pot onion 1, pot space 2` → The first cook is paused.
+- **kitchen#19 result** `Fragment (the first cook, result): explain of surprise 0 admitted: card kitchen shared, move partner load; now pot onion 2, pot space 1` → The second cook dropped an onion into the first cook's pot.
+- **kitchen_shared#16 event** `Fragment (the second cook, event): fetch onion; now hand free 0, held onion 1` → The second cook took an onion.
+- **kitchen#20 event** `Fragment (the first cook, event): load; now hand free 1, held onion 0, pot onion 3, pot space 0` → The first cook drops the onion into the pot.
+- **kitchen_shared#17 quiescence** `Fragment (the second cook, quiescence): quiet after 14 moves, waiting for the next order` → The second cook is waiting for the next order.
+- **kitchen#21 event** `Fragment (the first cook, event): cook; now cooking 1, pot onion 0` → The first cook starts the soup.
+- **kitchen#22 event** `Fragment (the first cook, event): fetch dish; now hand free 0, held dish 1` → The first cook fetches a dish.
+- **kitchen#23 event** `Fragment (the first cook, event): plate; now cooking 0, held dish 0, held soup 1` → The first cook plates the soup.
+- **kitchen#24 event** `Fragment (the first cook, event): serve; now hand free 1, held soup 0, served 2` → The first cook delivered the soup.
+- **kitchen#25 event** `Fragment (the first cook, event): fetch onion; now hand free 0, held onion 1` → The first cook took an onion.
+- **kitchen#26 quiescence** `Fragment (the first cook, quiescence): quiet after 22 moves, waiting for the next order` → The first cook is waiting for the next order.
+- **kitchen_shared#18 event** `Fragment (the second cook, event): outside: +pot space 3; now pot space 3` → The second cook now has three spaces in the pot.
+- **kitchen_shared#19 event** `Fragment (the second cook, event): load; now hand free 1, held onion 0, pot onion 1, pot space 2` → The second cook drops an onion into the pot.
+- **kitchen_shared#20 event** `Fragment (the second cook, event): fetch onion; now hand free 0, held onion 1` → The second cook took an onion.
+- **kitchen_shared#21 event** `Fragment (the second cook, event): load; now hand free 1, held onion 0, pot onion 2, pot space 1` → The second cook dropped an onion into the pot.
+- **kitchen_shared#22 event** `Fragment (the second cook, event): fetch onion; now hand free 0, held onion 1` → The second cook took an onion.
+- **kitchen_shared#23 event** `Fragment (the second cook, event): load; now hand free 1, held onion 0, pot onion 3, pot space 0` → The second cook drops an onion into the pot.
+- **kitchen_shared#24 event** `Fragment (the second cook, event): cook; now cooking 1, pot onion 0` → The second cook started the soup.
+- **kitchen_shared#25 event** `Fragment (the second cook, event): fetch dish; now hand free 0, held dish 1` → The second cook fetches a dish.
+- **kitchen_shared#26 event** `Fragment (the second cook, event): plate; now cooking 0, held dish 0, held soup 1` → The second cook plates the soup.
+- **kitchen_shared#27 event** `Fragment (the second cook, event): serve; now hand free 1, held soup 0, served 2` → The second cook delivered the soup.
+- **kitchen_shared#28 event** `Fragment (the second cook, event): fetch onion; now hand free 0, held onion 1` → The second cook took an onion.
+- **kitchen_shared#29 quiescence** `Fragment (the second cook, quiescence): quiet after 25 moves, waiting for the next order` → The second cook is waiting for the next order.
+- **kitchen#27 event** `Fragment (the first cook, event): outside: +pot space 3; now pot space 3` → The pot has room for three.
+- **kitchen#28 event** `Fragment (the first cook, event): load; now hand free 1, held onion 0, pot onion 1, pot space 2` → The first cook drops the onion into the pot.
+- **kitchen#29 event** `Fragment (the first cook, event): fetch onion; now hand free 0, held onion 1` → The first cook took an onion.
+- **kitchen#30 event** `Fragment (the first cook, event): load; now hand free 1, held onion 0, pot onion 2, pot space 1` → The first cook drops the onion into the pot.
+- **kitchen#31 event** `Fragment (the first cook, event): fetch onion; now hand free 0, held onion 1` → The first cook took an onion.
+- **kitchen#32 event** `Fragment (the first cook, event): load; now hand free 1, held onion 0, pot onion 3, pot space 0` → The first cook drops the onion into the pot.
+- **kitchen#33 event** `Fragment (the first cook, event): cook; now cooking 1, pot onion 0` → The first cook starts the soup.
+- **kitchen#34 event** `Fragment (the first cook, event): fetch dish; now hand free 0, held dish 1` → The first cook fetches a dish.
+- **kitchen#35 event** `Fragment (the first cook, event): plate; now cooking 0, held dish 0, held soup 1` → The first cook plates the soup.
+- **kitchen#36 event** `Fragment (the first cook, event): serve; now hand free 1, held soup 0, served 3` → The first cook delivered the soup.
+- **kitchen#37 event** `Fragment (the first cook, event): fetch onion; now hand free 0, held onion 1` → The first cook took an onion.
+- **kitchen#38 quiescence** `Fragment (the first cook, quiescence): quiet after 33 moves, waiting for the next order` → The first cook is waiting for the next order.
+- **kitchen_shared#30 event** `Fragment (the second cook, event): outside: +pot space 3; now pot space 3` → The second cook now has three spaces in the pot.
+- **kitchen_shared#31 event** `Fragment (the second cook, event): load; now hand free 1, held onion 0, pot onion 1, pot space 2` → The second cook drops an onion into the pot.
+- **kitchen_shared#32 event** `Fragment (the second cook, event): fetch onion; now hand free 0, held onion 1` → The second cook took an onion.
+- **kitchen_shared#33 event** `Fragment (the second cook, event): load; now hand free 1, held onion 0, pot onion 2, pot space 1` → The second cook dropped an onion into the pot.
+- **kitchen_shared#34 event** `Fragment (the second cook, event): fetch onion; now hand free 0, held onion 1` → The second cook took an onion.
+- **kitchen_shared#35 event** `Fragment (the second cook, event): load; now hand free 1, held onion 0, pot onion 3, pot space 0` → The second cook drops an onion into the pot.
+- **kitchen_shared#36 event** `Fragment (the second cook, event): fetch onion; now hand free 0, held onion 1` → The second cook took an onion.
+- **kitchen_shared#37 quiescence** `Fragment (the second cook, quiescence): quiet after 32 moves, waiting for the next order` → The second cook is waiting for the next order.
+- **kitchen#39 quiescence** `Fragment (the first cook, quiescence): run over after 33 moves` → The first cook is finished with their work.
+- **kitchen_shared#38 quiescence** `Fragment (the second cook, quiescence): run over after 32 moves` → The second cook ran out of moves.
+- **dog#2 event** `Fragment (the dog, event): sit; now done(sit) 1, floor dry 1, idle 1, posture(sitting) 1; its line: "I sit down."` → I sit down.
+- **dog#4 event** `Fragment (the dog, event): go closed: kitchen; now closed(kitchen) 1, mapped(kitchen) 1, refused(go) 1; its line: "I can't go to the kitchen: the way to it is closed."` → I can't go to the kitchen because the way to it is closed.
+- **dog#6 event** `Fragment (the dog, event): stand; now battery ok 1, done(stand) 1, idle 1, posture(standing) 1; its line: "I stand up."` → I stand up.
+- **dog#8 event** `Fragment (the dog, event): go: tag3; now busy 1, mapped(tag3) 1, moving(tag3) 1, open(tag3) 1, posture(standing) 1, progress(go) 1; its line: "I set off for tag 3."` → I set off for tag 3.
+- **dog#10 event** `Fragment (the dog, event): find busy: keys, tag3; now moving(tag3) 1, refused(find) 1; its line: "I can't take that now: I am already busy with a task."` → I can't take that now because I am already searching.
+- **dog#12 event** `Fragment (the dog, event): arrive: tag3; now at(tag3) 1, done(go) 1, idle 1; its line: "I have arrived at tag 3."` → I have arrived at tag 3.
+- **dog#14 event** `Fragment (the dog, event): move wall: backward; now idle 1, posture(standing) 1, refused(move) 1, wall(backward) 1; its line: "I can't move that way: there is a wall right there."` → I can't move that way because there is a wall right there.
+- **dog#16 event** `Fragment (the dog, event): find: extinguisher; now battery ok 1, busy 1, progress(find) 1, searching(extinguisher) 1; its line: "I start looking for the fire extinguisher."` → I start looking for the fire extinguisher.
+- **dog#18 event** `Fragment (the dog, event): query seen: chair, kitchen; now done(query) 1, seen(chair) 1, where(chair,kitchen) 1; its line: "I tell you about the chair: last seen at the kitchen."` → I tell you about the chair, last seen at the kitchen.
+- **dog#20 event** `Fragment (the dog, event): find locked; now idle 1, refused(find) 1; its line: "I can't reach the fire extinguisher: it is locked away."` → I can't reach the fire extinguisher because it is locked away.
+- **dog#22 event** `Fragment (the dog, event): follow; now busy 1, following 1, person in view 1, posture(standing) 1, progress(follow) 1; its line: "I follow you."` → I follow you.
+- **dog#24 event** `Fragment (the dog, event): stop follow; now cancelled(follow) 1, done(stop) 1, idle 1; its line: "I stop following you."` → I stop following you.
+- **dog#26 event** `Fragment (the dog, event): unknown; now refused(unknown) 1; its line: "I can't do that: it is not something I can or may do."` → I can't do that because it is not something I can or may do.
+- **dog#28 event** `Fragment (the dog, event): paw; now done(paw) 1, idle 1, leg ok 1; its line: "I give you my paw."` → I give you my paw.
+- **dog#30 event** `Fragment (the dog, event): find low: bottle; now battery low 1, refused(find) 1; its line: "I can't search: the battery is too low to search."` → I can't search because the battery is too low to search.
+- **dog#32 event** `Fragment (the dog, event): sit; now done(sit) 1, floor dry 1, idle 1, posture(sitting) 1; its line: "I sit down."` → I sit down.
+- **dog#34 event** `Fragment (the dog, event): turn must stand: left, sitting; now idle 1, posture(sitting) 1, refused(turn) 1; its line: "I can't turn: I have to stand up first."` → I can't turn because I have to stand up first.
+- **dog#55 quiescence** `Fragment (the dog, quiescence): run over after 35 moves` → The dog is now quiet.

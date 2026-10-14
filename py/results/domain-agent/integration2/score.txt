@@ -1,0 +1,37 @@
+pre-registered (primary):
+
+| model | retrieval | form | setting | orch used | orch attribution | orch narration attribution | orch invented | orch ms first p50 | agent sentences | agent attribution | agent misattributed | agent invented | agent ⟪ | tok / fragment | script tok / fragment | fragment → sentence ms p50 | tok passed / h | tape tok stored | script tok resident |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| dog | flat | policy | – | – | – | – | – | – | 54 | 0.06 | 0.00 | 0.00 | 0.00 | 75 | 0 | 458 | 0 | – | – |
+| kitchen | flat | policy | – | – | – | – | – | – | 231 | 1.00 | 0.00 | 0.00 | 0.00 | 36 | 0 | 438 | 0 | – | – |
+
+names accepted (sensitivity, orchestrator only: q22, q23, q14, q20):
+
+| model | retrieval | form | setting | orch used | orch attribution | orch narration attribution | orch invented | orch ms first p50 | agent sentences | agent attribution | agent misattributed | agent invented | agent ⟪ | tok / fragment | script tok / fragment | fragment → sentence ms p50 | tok passed / h | tape tok stored | script tok resident |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+
+agent sentences not faithful:
+  ('dog', 'flat', 'policy', '') dog#2 event: agent not named: 'I sit down.'
+  ('dog', 'flat', 'policy', '') dog#4 event: agent not named: "I can't go to the kitchen because the way to it is closed."
+  ('dog', 'flat', 'policy', '') dog#6 event: agent not named: 'I stand up.'
+  ('dog', 'flat', 'policy', '') dog#8 event: agent not named: 'I set off for tag 3.'
+  ('dog', 'flat', 'policy', '') dog#10 event: agent not named: "I can't take that now because I am already searching."
+  ('dog', 'flat', 'policy', '') dog#12 event: agent not named: 'I have arrived at tag 3.'
+  ('dog', 'flat', 'policy', '') dog#14 event: agent not named: "I can't move that way because there is a wall right there."
+  ('dog', 'flat', 'policy', '') dog#16 event: agent not named: 'I start looking for the fire extinguisher.'
+  ('dog', 'flat', 'policy', '') dog#18 event: agent not named: 'I tell you about the chair, last seen at the kitchen.'
+  ('dog', 'flat', 'policy', '') dog#20 event: agent not named: "I can't reach the fire extinguisher because it is locked away."
+  ('dog', 'flat', 'policy', '') dog#22 event: agent not named: 'I follow you.'
+  ('dog', 'flat', 'policy', '') dog#24 event: agent not named: 'I stop following you.'
+  ('dog', 'flat', 'policy', '') dog#26 event: agent not named: "I can't do that because it is not something I can or may do."
+  ('dog', 'flat', 'policy', '') dog#28 event: agent not named: 'I give you my paw.'
+  ('dog', 'flat', 'policy', '') dog#30 event: agent not named: "I can't search because the battery is too low to search."
+  ('dog', 'flat', 'policy', '') dog#32 event: agent not named: 'I sit down.'
+  ('dog', 'flat', 'policy', '') dog#34 event: agent not named: "I can't turn because I have to stand up first."
+  ('dog', 'flat', 'policy', '') dog#2 event: agent not named: 'I sit down.'
+  ('dog', 'flat', 'policy', '') dog#4 event: agent not named: "I can't go to the kitchen because the way to it is closed."
+  ('dog', 'flat', 'policy', '') dog#6 event: agent not named: 'I stand up.'
+
+dog own-voice line check: 48/51 sentences held to their bound line (the rest spoke the line); third person 0
+
+dog target check: 54/54 sentences name only what the fragment carried; wrong: none

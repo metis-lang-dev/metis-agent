@@ -215,6 +215,16 @@ def test_lines_bind_their_object_in_display_names():
     busy = "I can't take that now: I am already busy with a task."
     assert holds_line("I can't take that now because I am already busy with a task.", busy, [], "the dog")
     assert not holds_line("I can't take that now because I am already searching.", busy, [], "the dog")
+    # no outcome word borrowed from another line: a lookup is not a find (integration step 2 replay)
+    from metis_agent.domain_agent import DomainAgent
+    from metis_agent.narrator import distinctive
+    foreign = distinctive(DomainAgent(dog).replier.docs.values())
+    assert "found" in foreign and "arrived" in foreign and "cannot" not in foreign
+    look = "I tell you about the keys: last seen at the kitchen."
+    assert not holds_line("I found the keys: last seen at the kitchen.", look, ["the keys", "the kitchen"], "the dog", foreign)
+    assert holds_line("I tell you about the keys: I last saw them at the kitchen.", look,
+                      ["the keys", "the kitchen"], "the dog", foreign)
+    assert holds_line("I found the keys.", "I found the keys.", ["the keys"], "the dog", foreign)
     # a fragment without its own line carries none (the kitchen's narration is unchanged)
     from metis_agent.narrator import Fragment
     assert "its line" not in Fragment(path="kitchen", seq=1, beat=1, kind="quiescence", ref="quiet").body()
