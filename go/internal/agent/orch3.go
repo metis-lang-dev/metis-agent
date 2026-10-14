@@ -57,7 +57,10 @@ func (m *mirror) see(r Reply, c Call) {
 			m.last[d] = r.Text
 		}
 	case "surprise":
-		m.surprise[d] = hashed(string(r.Record))
+		m.surprise[d] = hashed(string(r.Record)) + " open" // the id travels with its difference
+		if r.Difference != "" {
+			m.surprise[d] += ": " + string(r.Difference)
+		}
 	case "notice":
 		delete(m.surprise, d)
 	}
@@ -91,7 +94,7 @@ func (m *mirror) render(loaded []string) string {
 			s = append(s, strings.TrimPrefix(describe(t.c), "your command to ")+" ("+t.id+") in flight")
 		}
 		if rec := m.surprise[d]; rec != "" {
-			s = append(s, "surprise "+rec+" open")
+			s = append(s, "surprise "+rec)
 		}
 		if l := m.last[d]; l != "" {
 			s = append(s, "last report: "+strings.TrimSuffix(l, "."))

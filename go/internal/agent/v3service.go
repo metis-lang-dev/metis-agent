@@ -31,6 +31,9 @@ type V3Service struct {
 	Domains []DomainSpec
 	TickMs  int    // one clock tick (default 1500 ms)
 	Journal string // the journal's file ("" = none)
+	// Start, when set, holds the clock until it closes (-wait-viewer: the
+	// first page joins, so the person hears the run from its first beat)
+	Start <-chan struct{}
 }
 
 type v3 struct {

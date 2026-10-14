@@ -20,6 +20,7 @@ func main() {
 	wait := flag.Duration("wait", 6*time.Second, "listen this long after each line")
 	world := flag.String("world", "", `world lines for the dog's simulated world, e.g. "-closed(kitchen) +open(kitchen)"`)
 	domain := flag.String("domain", "dog", "the domain -world acts on")
+	mode := flag.String("mode", "intent", "say_text's mode (the page sends talk for replies: long; -loop v3 ignores it)")
 	flag.Parse()
 	c, _, err := websocket.DefaultDialer.Dial("ws://"+*addr+"/ws", nil)
 	if err != nil {
@@ -51,7 +52,7 @@ func main() {
 	}
 	for i, line := range flag.Args() {
 		fmt.Printf("%s  > %s\n", time.Now().Format("15:04:05.0"), line)
-		msg, _ := json.Marshal(map[string]any{"ev": "say_text", "id": fmt.Sprintf("s%d", i+1), "text": line, "mode": "intent"})
+		msg, _ := json.Marshal(map[string]any{"ev": "say_text", "id": fmt.Sprintf("s%d", i+1), "text": line, "mode": *mode})
 		if err := c.WriteMessage(websocket.TextMessage, msg); err != nil {
 			log.Fatal(err)
 		}

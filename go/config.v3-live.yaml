@@ -33,7 +33,13 @@ ws:
     addr: :8395
 
 # integration step 2 (s-f82a578f): -loop v3 with the real domain agents —
-#   ./bin/metis-agent -config config.v3-live.yaml -loop v3 -no-domains -ui-dir ../../fsttm-web/web
+#   ../run.sh            (from the metis-agent root: build if needed, start, print the URL; ../run.sh stop)
+# which runs
+#   ./bin/metis-agent -config config.v3-live.yaml -loop v3 -no-domains -wait-viewer -ui-dir ../../fsttm-web/web
+# -loop v3 has no talk mode: talk: above is unused and every say_text, any
+# mode, is a person turn of the orchestrator; -wait-viewer holds the clock
+# until the first page connects. World lines (the person's hand on the
+# dog's simulated world): ./bin/v3say -world "+arrived(kitchen)".
 # one domain-agent process serves the dog and the kitchen pair on one model
 # (nina ad9231b); the orchestrator owns time: each tick one dog beat and two
 # kitchen env beats; the journal is the session's record for the E13 reads.

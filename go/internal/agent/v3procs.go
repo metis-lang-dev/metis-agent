@@ -195,6 +195,19 @@ func (ld *liveDomains) record(rec map[string]any) {
 // runClock steps every domain's clock each tick and handles what fell due.
 func (v *v3) runClock(ctx context.Context, a *Agent) {
 	ld := v.live
+	if g := a.cfg.V3.Start; g != nil {
+		log.Print("[v3] the domains' clock waits for the first viewer")
+		select {
+		case <-g:
+		case <-ctx.Done():
+			for _, p := range ld.byName {
+				_ = p.Close()
+			}
+			return
+		}
+		ld.record(map[string]any{"kind": "dlg-start", "why": "first viewer"})
+		log.Print("[v3] the domains' clock runs")
+	}
 	t := time.NewTicker(ld.tick)
 	defer t.Stop()
 	beat := 0

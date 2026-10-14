@@ -87,7 +87,7 @@ func main() {
 	addr := flag.String("addr", "", "listen address (overrides ws.addr)")
 	noDomains := flag.Bool("no-domains", false, "attach no domain (the persona alone: the parity bar)")
 	loop := flag.String("loop", "v2", "v2: the dog's two-pass path; v3: the orchestrator agent (DESIGN v3; config v3:)")
-	waitViewer := flag.Bool("wait-viewer", false, "attach the domains when the first page connects (it hears the run from its start)")
+	waitViewer := flag.Bool("wait-viewer", false, "attach the domains (v2), start the domain agents' clock (v3) when the first page connects (it hears the run from its start)")
 	flag.Parse()
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 
@@ -127,7 +127,7 @@ func main() {
 		}
 	}
 	talkSys := ""
-	if cfg.Talk.Prompt != "" {
+	if cfg.Talk.Prompt != "" && *loop != "v3" { // v3 has no talk mode: every utterance is a person turn of the orchestrator
 		talkSys = strings.TrimSpace(mustRead(cfg.Talk.Prompt))
 	}
 
@@ -158,6 +158,9 @@ func main() {
 	}
 
 	srv := console.New(cfg.WS.UIDir)
+	if *waitViewer && *loop == "v3" && len(v3.Domains) > 0 {
+		v3.Start = srv.Joined()
+	}
 	a, err := agent.New(agent.Config{Persona: persona, GBNF: gbnf, StopWords: stopWords, Ages: ages,
 		Rack: cfg.Rack, Narr: cfg.Narr, Loop: *loop, V3: v3,
 		Talk: agent.TalkConfig{System: talkSys, NCtx: cfg.Talk.NCtx, Keep: cfg.Talk.Keep,
@@ -209,7 +212,7 @@ func main() {
 				return
 			}
 			q := intentQ
-			if m.Mode == "talk" {
+			if m.Mode == "talk" && *loop != "v3" { // -loop v3: the page's replies toggle is ignored, every say_text a person turn
 				q = talkQ
 			}
 			select {

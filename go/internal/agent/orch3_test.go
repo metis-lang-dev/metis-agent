@@ -114,3 +114,22 @@ func TestOwnVoice(t *testing.T) {
 		t.Fatal("ownVoice")
 	}
 }
+
+// the mirror carries an open surprise's id with its difference (agent-console
+// step 1); a notice closes it
+func TestMirrorSurpriseDifference(t *testing.T) {
+	m := newMirror()
+	var r Reply
+	if err := json.Unmarshal([]byte(`{"domain":"kitchen","kind":"surprise","record":0,"difference":{"pot_onion":1,"pot_space":-1}}`), &r); err != nil {
+		t.Fatal(err)
+	}
+	m.see(r, Call{})
+	got := m.render([]string{"kitchen"})
+	if !strings.Contains(got, "kitchen: surprise #0 open: pot onion +1, pot space -1.") {
+		t.Fatalf("mirror %q", got)
+	}
+	m.see(Reply{Domain: "kitchen", Kind: "notice"}, Call{})
+	if got := m.render([]string{"kitchen"}); !strings.Contains(got, "kitchen: idle.") {
+		t.Fatalf("after the notice: %q", got)
+	}
+}
