@@ -187,7 +187,7 @@ func main() {
 	intentQ, talkQ := make(chan console.In, 16), make(chan console.In, 16)
 	go func() {
 		for m := range intentQ {
-			t, err := a.Utterance(m.Text)
+			t, err := a.UtteranceAt(m.Text, m.At)
 			if err != nil {
 				log.Printf("[intent] %q: %v", m.Text, err)
 				srv.Error(m.ID, err)

@@ -160,6 +160,11 @@ class needs intents the dog grammar cannot express.
 
 ## 5. Part 2: the console backend and the wire
 
+> The console's wire under the orchestrator (v3) — hello, journal, catalog,
+> ports, world, activate/deactivate, the `dlg-*` journal — is frozen in
+> [WIRE.md](WIRE.md) (v1, 2026-10-14), the protocol both backends (go/, py/)
+> serve. What follows is the v2 wire it extends.
+
 `cmd/metis-agent` (new; replaces `fsttm-go` at iteration 3): loads the
 config, the model and the domains, serves the static UI from `-ui-dir`
 (the fsttm-web `web/`) and `/ws`. One agent, one session; N viewers of the

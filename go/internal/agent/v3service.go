@@ -176,14 +176,18 @@ func (d v3Domains) Call(c Call) (Reply, bool) {
 		Text: "No domain agent answers that yet."}, true
 }
 
-func (v *v3) utterance(a *Agent, text string) (Turn, error) {
+func (v *v3) utterance(a *Agent, text string, at time.Time) (Turn, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if err := v.room(a); err != nil {
 		return Turn{}, err
 	}
 	if v.live != nil {
-		v.live.record(map[string]any{"kind": "dlg-wake", "what": "person", "person": text})
+		w := map[string]any{"kind": "dlg-wake", "what": "person", "person": text}
+		if !at.IsZero() { // the turn waited this long behind the orchestrator's other work (a consult)
+			w["wait_ms"] = time.Since(at).Milliseconds()
+		}
+		v.live.record(w)
 	}
 	if keywordStop(text, a.cfg.StopWords) {
 		j := []byte(`{"intent":"STOP"}`)
@@ -261,10 +265,6 @@ func (v *v3) task(a *Agent, t Task) error {
 	}
 	_, err := v.o.Handle(Inbound{Reply: &r}, v.gbnf, a.cfg.StopWords) // the floor's rules, as in step 3's corpus
 	return err
-}
-
-func (a *Agent) v3Utterance(text string) (Turn, error) {
-	return a.v3.utterance(a, strings.TrimSpace(text))
 }
 
 func (a *Agent) v3Task(t Task) {

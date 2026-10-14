@@ -40,6 +40,7 @@ type In struct {
 	Atoms    []string        `json:"atoms"`
 	Bindings json.RawMessage `json:"bindings"`
 	Since    int             `json:"since"`
+	At       time.Time       `json:"-"` // when the frame arrived
 }
 
 type client struct {
@@ -147,6 +148,7 @@ func (s *Server) ws(rw http.ResponseWriter, r *http.Request) {
 		if json.Unmarshal(b, &m) != nil || m.Ev == "" {
 			continue
 		}
+		m.At = time.Now()
 		if m.Ev == "hello" && s.Hello != nil { // answered to this page alone, in order
 			if !s.replay(c, s.Hello(m)) {
 				return

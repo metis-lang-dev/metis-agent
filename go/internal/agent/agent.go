@@ -211,8 +211,14 @@ func (a *Agent) narrate(n Narration) {
 // TIME/DATE answered by the clock, a question about the domains from the
 // rack, a command dispatched (its outcome comes back as a Task).
 func (a *Agent) Utterance(text string) (Turn, error) {
+	return a.UtteranceAt(text, time.Time{})
+}
+
+// UtteranceAt is Utterance for words that arrived at at (-loop v3: the
+// person's wake records how long the turn waited for the orchestrator).
+func (a *Agent) UtteranceAt(text string, at time.Time) (Turn, error) {
 	if a.v3 != nil {
-		return a.v3Utterance(text)
+		return a.v3.utterance(a, strings.TrimSpace(text), at)
 	}
 	text = strings.TrimSpace(text)
 	prompt := a.Prompt()
