@@ -17,6 +17,12 @@ The card (a domain module's CARD) is rows and value tables:
 Rows of one verb are tried in order: a row whose arguments do not
 resolve gives way to the next (the dog's QUERY: a thing, else a place).
 
+The act form: an intent whose verb is no row's verb but a row's `act` is
+the domain's own dictionary — what a refusal's alternatives are written in
+(DESIGN 25dc92b: typed intents {verb, args}, rendered back as J as they
+are). Its args are keyed by the field's type: {"verb": "go", "args":
+{"place": "door"}} fills cmd_go({goal:place}); no `when` applies.
+
 An argument the atom does not carry (an angle, a colour) is reported as
 dropped, never silently lost; an argument no row or handle resolves is an
 error, never a guess.
@@ -98,7 +104,13 @@ class Mapper:
         verb, args = intent.get("verb", ""), dict(intent.get("args") or {})
         rows = [r for r in self.card["rows"] if r["verb"] == verb]
         if not rows:
-            return Unmapped("no row for verb %r" % verb)
+            acts = [r for r in self.card["rows"] if r["act"] == verb]
+            if not acts:
+                return Unmapped("no row for verb %r" % verb)
+            # the act form: the field's type names the arg; the harness's `when` is not asked
+            rows = [dict(r, when={}) for r in acts]
+            named = {typ: arg for r in acts for arg, typ in FIELD.findall(r["atom"])}
+            args = {(named[k] if k in named and named[k] not in args else k): v for k, v in args.items()}
         rows = [r for r in rows if all(str(args.get(k, "")).upper() == v for k, v in r.get("when", {}).items())]
         first_err = None
         # strict first (a later row may resolve what this one cannot), then

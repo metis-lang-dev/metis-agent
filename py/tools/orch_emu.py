@@ -10,11 +10,14 @@ the domain agent's test loop.
 The next-move table, as the emulator applies it (the harness owns the
 branch; DESIGN "The orchestrator agent"):
 
-    result.refused, alternatives  → an intent on one (logged, not sent: it would change the
-                                    scripted day) — unless it cancels a live task (busy →
+    result.refused, blocker set   → REPL consult(domain, "Why <reason>?") FIRST, alternatives
+                                    or not (DESIGN 25dc92b); the ask offers the alternatives
+                                    (a world blocker makes each a change of the person's goal)
+    result.refused, null, alternatives → an intent on one (logged, not sent: it would change
+                                    the scripted day) — unless it cancels a live task (busy →
                                     cancel): ask(person), the person decides what to drop
-    result.refused, none, blocker → REPL consult(domain, "Why <reason>?")
-    result.refused, none, null    → speak the reason; nothing to consult
+    result.refused, null, none    → speak the reason; nothing to consult
+    (alternatives are typed intents {verb, args} in the domain's own dictionary)
     surprise                      → REPL consult(domain, "Surprise N: what explains it?")
     consult.explains              → REPL explain(domain, record, card, move)
     consult.noise                 → REPL reset(domain, record)
@@ -215,12 +218,13 @@ class Orchestrator:
         for r in replies:
             if r.get("kind") == "result" and r.get("status") == "refused" and r.get("id", "").startswith("c"):
                 alts = r.get("alternatives") or []
-                if alts:
-                    move = {"ask": r.get("text", "")} if "cancel" in alts else {"intent_on": alts[0]}
-                    self.moves.append({"agent": ag.domain, "trigger": r["id"], "call": move, "replies": []})
-                elif r.get("blocker"):
+                if r.get("blocker"):
                     self.consulted(ag, self.call(ag, "consult", {"question": "Why %s?" % r.get("reason", "was it refused"),
-                                                                 "max_calls": 6}), None)
+                                                                 "max_calls": 6}), None, alts)
+                elif alts:
+                    cancels = any(a.get("verb") in ("cancel", "stop") for a in alts)
+                    move = {"ask": r.get("text", ""), "offers": alts} if cancels else {"intent_on": alts[0]}
+                    self.moves.append({"agent": ag.domain, "trigger": r["id"], "call": move, "replies": []})
                 else:
                     self.moves.append({"agent": ag.domain, "trigger": r["id"], "call": {"speak": r.get("text", "")},
                                        "replies": []})
@@ -228,9 +232,14 @@ class Orchestrator:
                 self.consulted(ag, self.call(ag, "consult", {"question": "Surprise %d in your domain: what explains it?"
                                                              % r["record"], "max_calls": 6}), r["record"])
 
-    def consulted(self, ag, out, record):
+    def consulted(self, ag, out, record, offers=()):
         c = next((r for r in out if r.get("kind") == "consult"), None)
-        if c is None or record is None:
+        if c is None:
+            return
+        if record is None:      # a refusal's consult: the ask names what is missing and offers the alternatives
+            self.moves.append({"agent": ag.domain, "call": {"ask": (c.get("resource") or {}).get("words", ""),
+                                                            "kind": c.get("answer_kind"), "offers": list(offers)},
+                               "replies": []})
             return
         kind = c["answer_kind"]
         if kind == "explains":

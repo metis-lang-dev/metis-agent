@@ -81,21 +81,28 @@ STANDING = {"tag_near", "elsewhere"}
 # fact of the world the person can change — not a consult; the replier
 # offers the catalog's alternative (stand first; cancel the running task)
 # or none, and the orchestrator speaks the reason
+STAND, CANCEL = {"verb": "stand", "args": {}}, {"verb": "cancel", "args": {}}
 NO_BLOCKER = {
-    **{r: ["stand"] for r in ("turn_must_stand", "move_must_stand", "go_must_stand", "follow_must_stand")},
-    **{r: ["cancel"] for r in ("go_busy", "go_busy_find", "go_busy_follow", "find_busy", "find_busy_find",
-                               "find_busy_follow", "follow_busy", "follow_busy_find")},
+    **{r: [STAND] for r in ("turn_must_stand", "move_must_stand", "go_must_stand", "follow_must_stand")},
+    **{r: [CANCEL] for r in ("go_busy", "go_busy_find", "go_busy_follow", "find_busy", "find_busy_find",
+                             "find_busy_follow", "follow_busy", "follow_busy_find")},
     **{r: [] for r in ("stand_already", "sit_already", "lie_already", "follow_already", "stop_still", "unknown")},
 }
+MAX_ALTERNATIVES = 2
 
 
 def alternatives(rule, counts):
+    """A refusal's alternatives as typed intents in the dog's own dictionary
+    (DESIGN 25dc92b: {verb, args} — the act form the mapper takes back —
+    at most two, in the catalog's order, never bare handles)."""
     if rule in NO_BLOCKER:
-        return list(NO_BLOCKER[rule])
+        return [dict(a, args=dict(a["args"])) for a in NO_BLOCKER[rule]]
     if rule not in PLACE_REFUSALS:
         return []
+    # the catalog's order: the counts keep dog.llp's #init order (mapped(door) first)
     places = [a[len("mapped("):-1] for a in counts if a.startswith("mapped(") and counts[a] > 0]
-    return sorted(p for p in places if counts.get("open(%s)" % p, 0) > 0 and p not in STANDING)
+    places = [p for p in places if counts.get("open(%s)" % p, 0) > 0 and p not in STANDING]
+    return [{"verb": "go", "args": {"place": p}} for p in places[:MAX_ALTERNATIVES]]
 
 
 # ── the host as the domain agent runs it ──

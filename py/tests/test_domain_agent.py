@@ -78,7 +78,10 @@ def test_dog_day_in_process():
     assert p["field_violations"] == []
     # the kitchen refusal is DESIGN.md's example reply
     r = next(l["msg"] for l in lines if l["dir"] == "in" and l["msg"].get("status") == "refused")
-    assert (r["id"], r["reason"], r["alternatives"], r["ref"]["event"]) == ("c2", "the way to it is closed", ["door", "tag3"], "go_closed[P=kitchen]")
+    assert (r["id"], r["reason"], r["alternatives"], r["ref"]["event"]) == ("c2", "the way to it is closed",
+        [{"verb": "go", "args": {"place": "door"}}, {"verb": "go", "args": {"place": "tag3"}}], "go_closed[P=kitchen]")
+    # alternatives are typed intents the mapper takes back as they are (DESIGN 25dc92b)
+    assert [Mapper(dog.CARD).map(a).atom for a in r["alternatives"]] == ["cmd_go(door)", "cmd_go(tag3)"]
     # the arrival answers the NAVIGATE that opened the task, two beats on
     done = [l["msg"] for l in lines if l["dir"] == "in" and l["msg"].get("ref", {}).get("event", "").startswith("arrive")]
     assert [d["id"] for d in done] == ["c4"]
@@ -158,3 +161,18 @@ def test_serve_acks_every_non_clock_line_and_reset_keeps_the_model():
     assert out == [{"clock": "ready", "domain": "dog", "beat": 0}, {"ack": "reset", "id": "r1"}]
     ag, out = serve(ag, {"nonsense": 1}, rebuild)
     assert out[0]["kind"] == "error" and out[-1] == {"ack": "error", "id": None}
+
+
+def test_alternatives_are_at_most_two_typed_intents():
+    # DESIGN 25dc92b: {verb, args} in the dog's own dictionary, at most two, the catalog's order, never handles
+    counts = {"mapped(door)": 1, "open(door)": 1, "mapped(kitchen)": 1, "closed(kitchen)": 1, "mapped(tag3)": 1,
+              "open(tag3)": 1, "mapped(tag5)": 1, "open(tag5)": 1, "mapped(tag_near)": 1, "open(tag_near)": 1}
+    alts = dog.alternatives("go_closed", counts)
+    assert alts == [{"verb": "go", "args": {"place": "door"}}, {"verb": "go", "args": {"place": "tag3"}}]
+    assert dog.alternatives("find_busy", {}) == [{"verb": "cancel", "args": {}}]
+    assert dog.alternatives("turn_must_stand", {}) == [{"verb": "stand", "args": {}}]
+    assert dog.alternatives("stop_still", {}) == [] and dog.alternatives("find_locked", counts) == []
+    m = Mapper(dog.CARD)
+    assert [m.map(a).atom for a in (dog.alternatives("find_busy", {}) + dog.alternatives("turn_must_stand", {}))] == \
+        ["cmd_cancel", "cmd_stand"]
+    assert m.map({"verb": "go", "args": {"place": "door"}}).dropped == {}

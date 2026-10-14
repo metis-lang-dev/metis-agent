@@ -132,7 +132,7 @@ def test_no_blocker_refusals_offer_the_catalogs_alternative():
               {"id": "c3", "verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}):
         ag.handle(m)
         out += [r for r in ag.handle({"clock": "beat"}) if r.get("status") == "refused"]
-    assert [(r["id"], r["alternatives"]) for r in out] == [("c2", ["stand"]), ("c3", [])]
+    assert [(r["id"], r["alternatives"]) for r in out] == [("c2", [{"verb": "stand", "args": {}}]), ("c3", [])]
 
 
 def test_refusal_blocker():
