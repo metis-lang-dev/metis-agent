@@ -40,6 +40,11 @@ type Orch struct {
 
 	nPast int // tokens in the dialog after the last decode
 
+	m     mirror    // step 3: the mirror's state, per domain
+	q     *question // step 3: the open question to the person
+	qseq  int
+	quiet map[string]bool // step 3: the harness's own intents (their outcomes are the journal's only)
+
 	br   branch
 	last struct {
 		call            Call
@@ -52,6 +57,7 @@ type Orch struct {
 type DialogLLM interface {
 	Inject(text string) (int, error)
 	Gen(gbnf string, sampled bool, maxTokens int, stop string) (string, int, time.Duration, time.Duration, error)
+	Rollback(mark int) error
 }
 
 // Domains answers the agent's calls: the REPL API synchronously and final,
@@ -72,6 +78,11 @@ type V3Config struct {
 	AskCheck         bool // the ask's words in the cue and checked after generation, a miss re-asked (else a required literal)
 	AgainPick        bool // the harness picks ask or escalate on the same refusal again (else the model)
 	EscalateTemplate bool // the escalate call's text is the harness's (else the model's)
+
+	// step 3 (orchestrator-agent): the mirror at the head of the harness's
+	// user turns; a spoken line the guard refuses rolled back from the KV
+	Mirror   bool
+	Rollback bool
 
 	SampleMoves bool                    // the move with the pass-2 sampler (E11's G5s), else greedy
 	OnGen       func(GenInfo)           // every generation, and every move the harness makes
@@ -100,13 +111,15 @@ type branch struct {
 	alts    []Call
 	pick    string // again with AgainPick: ask | escalate; answer with EscalateTemplate: escalate
 	words   string // the resource's words (missing)
+	alt     string // cancelask: the verb the domain offered (CANCEL | STOP)
 	again   refusal
 }
 
 // NewOrch starts the orchestrator on a dialog whose system turn is decoded.
 func NewOrch(cfg V3Config, l DialogLLM, dom Domains) *Orch {
 	return &Orch{cfg: cfg, l: l, dom: dom, api: replAPI(cfg.Catalog, cfg.Loaded),
-		byID: map[string]Call{}, answers: map[string]Reply{}, refusals: map[refusal]int{}, surprises: map[string]Reply{}}
+		byID: map[string]Call{}, answers: map[string]Reply{}, refusals: map[refusal]int{}, surprises: map[string]Reply{},
+		m: newMirror(), quiet: map[string]bool{}}
 }
 
 // ── the dialog's past and its wakes ──────────────────────────────────────────
@@ -124,7 +137,7 @@ func (o *Orch) Past(person string, intent json.RawMessage, id, spoken string) er
 // Person: the person's words wake the agent.
 func (o *Orch) Person(text string) {
 	o.closeTurn()
-	o.pend.WriteString(userTurn(text) + modelTurn)
+	o.pend.WriteString(userTurn(o.head()+text) + modelTurn)
 	o.open = true
 }
 
@@ -193,21 +206,34 @@ func (o *Orch) say(kind, line string) {
 // two-pass; Past is its record); the intent handed to the domains, its
 // acceptance kept by id for its outcome.
 func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
-	o.Person(person)
 	b := branch{name: "person"}
+	q := o.q
+	if q != nil { // the open question: this turn is its answer, bound by id
+		o.q, b.name = nil, "bound"
+		person = fmt.Sprintf("[Reply to your question %s — %q — about %s (%s), refused: %s.] %s\n%s",
+			q.id, q.text, describe(q.refused), q.refusedID, q.reason, person, cueBound(q))
+	}
+	o.Person(person)
 	o.last.call = Call{}
+	if q != nil && q.kind == "cancelask" { // the answer to "drop it?": the retry (yes) or talk (no)
+		gbnf = grammarAlts([]Call{q.refused, {J: json.RawMessage(`{"intent":"CHITCHAT"}`)}})
+	}
 	if err := o.gen("move", 0, gbnf, false, b); err != nil {
 		return "", "", err
 	}
 	c := o.last.call
 	intent = c.Text()
-	o.pend.WriteString("\n" + speakCue + " ")
-	if voice, err = o.genText("voice", b); err != nil {
+	o.pend.WriteString("\n" + speakCue) // no trailing space: the dog path's cue (a dangling space token derails E2B)
+	if voice, err = o.speakLine(b); err != nil {
 		return intent, "", err
 	}
-	if c.IsJ() {
+	if c.IsJ() && c.Verb() != "ask" {
+		if q != nil && q.kind == "cancelask" && CanonJSON(c.Text()) == CanonJSON(q.refused.Text()) {
+			o.cancelFirst(q)
+		}
 		if r, ok := o.dom.Intent(c); ok && r.ID != "" {
 			o.byID[r.ID] = c
+			o.m.see(r, c)
 		}
 	}
 	return intent, voice, o.End()
@@ -217,7 +243,7 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 // spoken line after the speak cue.
 func (o *Orch) Speak() error {
 	o.pend.WriteString(speakCue)
-	line, err := o.genText("voice", o.br)
+	line, err := o.speakLine(o.br)
 	if err != nil {
 		return err
 	}
@@ -225,18 +251,39 @@ func (o *Orch) Speak() error {
 	return o.End()
 }
 
-func (o *Orch) genText(label string, b branch) (string, error) {
+// speakLine is a spoken line; with Rollback, a line the guard refuses (a
+// forged ⟪metis …⟫ span, a call) is cut from the KV back to where it began
+// and "Okay." decoded in its place, so it cannot seed the next turn.
+func (o *Orch) speakLine(b branch) (string, error) {
+	line, mark, err := o.genText("voice", b)
+	if err != nil || !o.cfg.Rollback || !unspeakableLine(line) {
+		return line, err
+	}
+	log.Printf("[v3] forged line %q rolled back to %d", line, mark)
+	if err := o.l.Rollback(mark); err != nil {
+		return line, err
+	}
+	o.nPast = mark
+	o.pend.WriteString(" Okay.")
+	if o.cfg.OnGen != nil {
+		o.cfg.OnGen(GenInfo{Label: "rollback", Text: line, NCtx: mark, Harness: true, Branch: b.name})
+	}
+	return "Okay.", o.flush()
+}
+
+func (o *Orch) genText(label string, b branch) (string, int, error) {
 	var out string
+	var mark int
 	hook := o.cfg.OnGen
 	o.cfg.OnGen = func(g GenInfo) {
-		out = g.Text
+		out, mark = g.Text, g.NCtx
 		if hook != nil {
 			hook(g)
 		}
 	}
 	defer func() { o.cfg.OnGen = hook }()
 	err := o.gen(label, 0, "", true, b)
-	return out, err
+	return out, mark, err
 }
 
 // ── a reply in ───────────────────────────────────────────────────────────────
@@ -257,6 +304,7 @@ func (o *Orch) Reply(r Reply) (string, error) {
 	if !c.IsJ() && r.Kind == "result" && r.Status == "accepted" {
 		log.Printf("[v3] %s(%s) answered accepted: a REPL reply is final (DESIGN v3), never accepted", c.Name, r.Domain)
 	}
+	o.m.see(r, c)
 	b, err := o.branchOf(r, c)
 	if err != nil {
 		return "", err
@@ -279,11 +327,15 @@ func (o *Orch) Reply(r Reply) (string, error) {
 			if b.name == "again" {
 				s += " The same refusal as before."
 			}
-			o.pend.WriteString(userTurn(s + "\n" + note))
+			o.pend.WriteString(userTurn(o.head() + s + "\n" + note))
 		case r.Status == "accepted":
-			o.pend.WriteString(userTurn(respTag + fmt.Sprintf("%s (%s) was accepted: handed over, not done yet.", capFirst(identity(c)), r.ID) + tellNow))
+			o.pend.WriteString(userTurn(o.head() + respTag + fmt.Sprintf("%s (%s) was accepted: handed over, not done yet.", capFirst(identity(c)), r.ID) + tellNow))
 		default: // an outcome (done, expired, cancelled …): not measured by E13, step 3's corpus is
-			o.pend.WriteString(userTurn(respTag + fmt.Sprintf("%s (%s) %s.", capFirst(identity(c)), r.ID, statusWords(r.Status)) +
+			said := ""
+			if r.Text != "" && o.cfg.Mirror {
+				said = " The " + r.Domain + " says: " + r.Text
+			}
+			o.pend.WriteString(userTurn(o.head() + respTag + fmt.Sprintf("%s (%s) %s.", capFirst(identity(c)), r.ID, statusWords(r.Status)) + said +
 				" Tell the person in one short first-person sentence what happened."))
 		}
 		o.pend.WriteString(modelTurn)
@@ -325,11 +377,24 @@ func (o *Orch) branchOf(r Reply, c Call) (branch, error) {
 			return b, nil
 		}
 		for _, raw := range r.Alternatives {
+			var w string
+			if json.Unmarshal(raw, &w) == nil && (w == "cancel" || w == "stop") { // busy: it would cancel a live task
+				if live, ok := o.m.live(r.Domain, r.ID); ok {
+					b.name, b.words, b.alt = "cancelask", objectWords(live.c), strings.ToUpper(w)
+					return b, nil
+				}
+			}
 			a, err := altCall(raw, o.api)
 			if err != nil {
-				return b, err
+				log.Printf("[v3] alternative %s: %v — the reason is spoken", raw, err)
+				b.name, b.alts = "speak", nil
+				return b, nil
 			}
 			b.alts = append(b.alts, a)
+		}
+		if len(b.alts) == 0 && string(r.Blocker) == "null" { // not about the world: nothing to consult
+			b.name = "speak"
+			return b, nil
 		}
 		b.name = map[bool]string{true: "alts", false: "none"}[len(b.alts) > 0]
 		return b, nil
@@ -354,9 +419,12 @@ func (o *Orch) cue(b branch) string {
 	case b.pick == "escalate":
 		return ""
 	case b.name == "again" && b.pick == "ask":
-		return cueAskAgain(b.words)
+		return cueAskAgain(b.words, o.cfg.Mirror)
 	case b.name == "answer" && b.reply.AnswerKind == "missing" && o.cfg.AskCheck:
 		return cueAsk(b.words)
+	case b.name == "cancelask":
+		live, _ := o.m.live(b.domain, b.reply.ID)
+		return cueCancelAsk(b.refused, live)
 	}
 	return stateCue[b.name]
 }
@@ -410,7 +478,11 @@ func (o *Orch) Move() error {
 	}
 	// the ask's words, checked: a miss is answered like a repeat
 	if o.cfg.AskCheck && b.words != "" {
-		for k := 1; k <= 2 && o.last.call.Verb() == "ask" && !namesWords(o.last.call.arg("text"), b.words); k++ {
+		names := namesWords
+		if o.cfg.Mirror {
+			names = namesWordsAny
+		}
+		for k := 1; k <= 2 && o.last.call.Verb() == "ask" && !names(o.last.call.arg("text"), b.words); k++ {
 			o.pend.WriteString(turnEnd + userTurn(noteAskWords(b.words)) + modelTurn)
 			if err := o.gen("move", k, g, o.cfg.SampleMoves, b); err != nil {
 				return err
@@ -426,6 +498,8 @@ func (o *Orch) grammar(b branch) (string, error) {
 		return grammarAlts(b.alts), nil
 	case "none", "surprise":
 		return grammarConsult(b.domain), nil
+	case "cancelask":
+		return grammarAsk(), nil
 	case "again":
 		if b.pick == "ask" {
 			return grammarAsk(), nil
@@ -497,7 +571,7 @@ func (o *Orch) answer(b branch) error {
 	c := o.last.call
 	switch {
 	case c.IsJ() && c.Verb() == "ask":
-		o.say("ask", c.arg("text"))
+		o.ask(b, c)
 	case c.IsJ():
 		if r, ok := o.dom.Intent(c); ok {
 			o.closeTurn()
@@ -505,7 +579,8 @@ func (o *Orch) answer(b branch) error {
 				modelTurn + speakCue)
 			o.open = true
 			o.byID[r.ID] = c
-			line, err := o.genText("voice", b)
+			o.m.see(r, c)
+			line, err := o.speakLine(b)
 			if err != nil {
 				return err
 			}
@@ -513,6 +588,14 @@ func (o *Orch) answer(b branch) error {
 		}
 	case c.Name != "":
 		if r, ok := o.dom.Call(c); ok {
+			if r.Kind == "consult" { // a consult answers now: its answer opens the next move (step 3)
+				o.consults = append(o.consults, c)
+				o.said = &c
+				if _, err := o.Reply(r); err != nil {
+					return err
+				}
+				return o.Move()
+			}
 			if r.Status == "accepted" {
 				log.Printf("[v3] %s(%s) answered accepted: a REPL reply is final (DESIGN v3), never accepted", c.Name, r.Domain)
 			}
@@ -525,7 +608,7 @@ func (o *Orch) answer(b branch) error {
 				o.say("template", line)
 			} else {
 				o.pend.WriteString(speakCue)
-				said, err := o.genText("voice", b)
+				said, err := o.speakLine(b)
 				if err != nil {
 					return err
 				}

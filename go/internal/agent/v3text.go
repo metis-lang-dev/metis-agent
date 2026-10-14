@@ -51,9 +51,19 @@ func cueAsk(words string) string {
 	return "[Next move — the consult answered missing: ask the person, in one short question, for " + words + ". Exactly one call.]"
 }
 
-func cueAskAgain(words string) string {
+func cueAskAgain(words string, leadIn bool) string {
+	if leadIn { // the step 2 ruling: the harness says "still", the model asks
+		return "[Next move — the same refusal came back after your move. You have just said: \"" + lineStill(words) +
+			"\" Now ask the person one short question for it. Exactly one call.]"
+	}
 	return "[Next move — the same refusal came back after your move: " + words + " is still missing. " +
 		"Ask the person once more, in one short question, saying it is still missing. Exactly one call.]"
+}
+
+// lineStill is the again-ask's lead-in, the harness's (E13 step 2 ruling;
+// the catalog's words are what the person does, so "asked you to")
+func lineStill(words string) string {
+	return "I asked you to " + words + " before, and it is still not done."
 }
 
 func noteAskWords(words string) string {
@@ -318,6 +328,10 @@ var (
 	wordRe   = regexp.MustCompile(`[a-z0-9]+`)
 	stopWord = map[string]bool{"the": true, "a": true, "an": true, "my": true, "me": true, "you": true, "in": true, "of": true,
 		"is": true, "where": true, "more": true, "another": true, "some": true}
+	// the catalog's words are what the person does (dog_host WORDS): their
+	// function words are not the resource (step 3 design note)
+	stopTemplate = map[string]bool{"here": true, "that": true, "whatever": true, "once": true, "so": true, "to": true,
+		"on": true, "it": true, "i": true, "can": true, "for": true}
 	numWord = map[string]string{"five": "5", "three": "3"}
 )
 
@@ -340,6 +354,23 @@ func contentWords(s string) []string {
 
 // namesWords: every content word of the resource's words is in the ask,
 // plural-insensitive (the scorer's read-1 rule for missing, tools/e11-score.py).
+// namesWordsAny: one alternative of the words (", or ") is named, the
+// template's function words aside (step 3).
+func namesWordsAny(ask, words string) bool {
+	for _, alt := range strings.Split(words, ", or ") {
+		var keep []string
+		for _, w := range wordRe.FindAllString(strings.ToLower(alt), -1) {
+			if !stopTemplate[w] {
+				keep = append(keep, w)
+			}
+		}
+		if namesWords(ask, strings.Join(keep, " ")) {
+			return true
+		}
+	}
+	return false
+}
+
 func namesWords(ask, words string) bool {
 	have := map[string]bool{}
 	for _, w := range contentWords(ask) {

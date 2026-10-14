@@ -183,6 +183,7 @@ func main() {
 	e10IDs := flag.String("e10-ids", "", "E10: only these item ids")
 	e10Dump := flag.String("e10-dump", "", "E10: write the decide seat rendered from -e8-cards (e10-decider.txt/.gbnf) into this directory and exit")
 	v3F := flag.String("v3", "", "E13 step 2: replay these scenarios (tools/e13-corpus.py --final) through the orchestrator agent (internal/agent, -loop v3); -e10-ids, -pass2_seed")
+	dialogF := flag.String("dialog", "", "E13 step 3: the dialog-control corpus (tools/e13-dialog.py) through the orchestrator agent against emulated domains; -gbnf, -e10-ids, -pass2_seed")
 	v3Ruled := flag.Bool("v3-ruled", false, "E13 step 2: the agent with the E13 step 1 ruling (ask words checked, the again-branch and the escalate call the harness's); off = t3 parity")
 	raw := flag.Bool("raw", false, "score the pass-1 text as a call class verb[:domain] (tools/e4-activate), not as a dog intent")
 	flag.Parse()
@@ -238,7 +239,7 @@ func main() {
 	for _, u := range flag.Args() {
 		rows = append(rows, row{utt: u})
 	}
-	if len(rows) == 0 && *eventsF == "" && *spliceF == "" && *e8F == "" && *capF == "" && *e10F == "" && *v3F == "" {
+	if len(rows) == 0 && *eventsF == "" && *spliceF == "" && *e8F == "" && *capF == "" && *e10F == "" && *v3F == "" && *dialogF == "" {
 		fail(fmt.Errorf("nothing to run: -corpus, -audio, -events or utterances"))
 	}
 	// a held-out row the prompt now teaches verbatim is no longer held out
@@ -307,6 +308,10 @@ func main() {
 			fail(fmt.Errorf("-tools needs -corpus"))
 		}
 		runTools(l, rows, *toolsF, *toolsJPrompt, *gbnfF, *toolsTPrompt, *toolsNoex, *toolsRT, *toolsGbnf, *toolsRTStatus, *tag, *toolsReps, uint32(*seed), emit)
+		return
+	}
+	if *dialogF != "" {
+		runDialog(l, *dialogF, *gbnfF, *e10IDs, *tag, uint32(*seed), emit)
 		return
 	}
 	if *v3F != "" {

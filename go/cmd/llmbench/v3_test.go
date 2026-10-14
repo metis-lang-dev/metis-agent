@@ -27,6 +27,11 @@ func (f *recLLM) Inject(t string) (int, error) {
 	return 0, nil
 }
 
+func (f *recLLM) Rollback(mark int) error {
+	f.log = append(f.log, fmt.Sprintf("rollback %d", mark))
+	return nil
+}
+
 func (f *recLLM) Gen(g string, sampled bool, mx int, stop string) (string, int, time.Duration, time.Duration, error) {
 	var rules []string // the grammar's rules, comments aside
 	for _, ln := range strings.Split(g, "\n") {

@@ -92,3 +92,20 @@ func (l *LLM) Gen(gbnf string, sampled bool, maxTokens int, stop string) (string
 	}
 	return strings.TrimSpace(text), before, l.firstTok, time.Since(t0), nil
 }
+
+// Rollback drops the dialog's KV after mark (a token count Gen returned as
+// the tokens before it): a caught forgery is cut back to where it began
+// (orchestrator-agent step 2 ruling), the replacement decoded after.
+func (l *LLM) Rollback(mark int) error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if mark < 0 || mark > l.nPast {
+		return errors.New("llm: Rollback past the dialog's end")
+	}
+	mem := C.llama_get_memory(l.ctx)
+	if !bool(C.llama_memory_seq_rm(mem, 0, C.llama_pos(mark), -1)) {
+		return errors.New("llm: Rollback could not drop the KV after the mark")
+	}
+	l.nPast = mark
+	return nil
+}

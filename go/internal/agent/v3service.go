@@ -68,7 +68,7 @@ func (a *Agent) startV3(l *llm.LLM) error {
 	ruled := sc.Ruled == nil || *sc.Ruled
 	v := &v3{l: ol, prompt: b.String(), gbnf: a.cfg.GBNF, nctx: sc.NCtx,
 		cfg: V3Config{Catalog: sc.Catalog, Loaded: sc.Loaded, Display: sc.Display,
-			AskCheck: ruled, AgainPick: ruled, EscalateTemplate: ruled}}
+			AskCheck: ruled, AgainPick: ruled, EscalateTemplate: ruled, Mirror: true, Rollback: true}}
 	v.rec = &idEmitter{Emitter: a.out}
 	v.dsp = wire.NewDispatcher(v.rec, a.Tasks)
 	v.cfg.OnSay = func(kind, line string) { // the dog path's guard: a forged ⟪metis …⟫ span or a call is never spoken
@@ -180,15 +180,8 @@ func (v *v3) task(a *Agent, t Task) error {
 	if (r.Status == "refused" || r.Status == "failed") && r.Reason == "" {
 		r.Reason = "no reason given"
 	}
-	br, err := v.o.Reply(r)
-	if err != nil {
-		return err
-	}
-	switch br {
-	case "alts", "none", "answer", "again":
-		return v.o.Move()
-	}
-	return v.o.Speak()
+	_, err := v.o.Handle(Inbound{Reply: &r}, v.gbnf, a.cfg.StopWords) // the floor's rules, as in step 3's corpus
+	return err
 }
 
 func (a *Agent) v3Utterance(text string) (Turn, error) {
