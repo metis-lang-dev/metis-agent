@@ -27,7 +27,7 @@ KINDS = {
     # the console's (agent-console, s-7f3d1088): never into the orchestrator's
     # inbox — the host's world ports, and what the agent did on a line
     "ports": ("world", "pairs", "reports", "handles", "held"),
-    "trace": ("beat", "fired", "more", "narrated", "consults", "reads", "world"),
+    "trace": ("beat", "fired", "more", "narrated", "consults", "reads", "world", "records"),
 }
 
 # result.status as the table lists it (`cancelled`: a task the person

@@ -75,7 +75,12 @@ export class Journal {
       case 'dlg-say': out.chat = this.say(r); break;
       case 'dlg-dispatch': out.chat = this.dispatch(r); break;
       case 'dlg-world': out.chat = this.world(r); break;
-      case 'dlg-trace': this.domain(r.domain).trace.push(r); out.trace = r; break;
+      case 'dlg-trace': {
+        const d = this.domain(r.domain);
+        d.trace.push(r); out.trace = r;
+        for (const x of r.records ?? []) d.stream.push({ seq: r.seq, what: `record ${x.status}`, record: x.record, text: x.mined_text || `record #${x.record} ${x.status} (sunk)` });
+        break;
+      }
       case 'dlg-domain': out.chat = this.note(r, `${r.verb ?? r.op ?? 'activate'} ${r.domain}${r.by ? ' (by ' + r.by + ')' : ''}${r.error ? ': ' + r.error : ''}`); break;
     }
     return out;

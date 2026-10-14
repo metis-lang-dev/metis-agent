@@ -291,6 +291,9 @@ function traceEl(t) {
     el('pre', {}, JSON.stringify(c.answer ?? {}), c.calls?.length ? '\n' + c.calls.join('\n') : '')));
   for (const r of t.reads ?? []) parts.push(el('div', {}, `${r.tool} ${r.arg}`, el('pre', {}, r.out)));
   for (const w of t.world ?? []) parts.push(el('div', {}, `world: ${w.join(' ')}`));
+  // the records sink (e2e step 1): each surprise record and its close, as the loop console reads it
+  for (const r of t.records ?? []) parts.push(el('div', { class: r.status === 'escalated' ? 'held-no' : '' },
+    `record #${r.record} ${r.status} → ${String(r.file).split('/').slice(-3).join('/')}`, r.mined_text ? el('pre', {}, r.mined_text) : ''));
   return el('div', { class: 'trace' }, ...parts);
 }
 

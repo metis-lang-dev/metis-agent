@@ -182,6 +182,11 @@ class DomainAgent:
         if consult_missing not in ("template", "seat"):
             raise ValueError("consult_missing: template | seat, not %r" % consult_missing)
         self.consult_missing = consult_missing
+        # the records sink (e2e-workflow step 1): every surprise record and
+        # its close appended to <the domain's catalog dir>/records/<session>.jsonl
+        # (manifest key `records`); None = off (--records turns it on)
+        self.sink, self.session = None, None
+        self.sunk = []             # the lines sunk since the last trace
         # --trace (the console's REPL log): what each line made the agent do
         self.tracing = False
         self.cursor = (0, 0, 0)    # fired_rows, narrated, consults already traced
@@ -302,6 +307,7 @@ class DomainAgent:
                           text=self.narrate(f) or ("the day is over" if s.get("episode_over") else words(f.ref)))]
         if kind == "surprise":
             f = from_signal(s, None)[0]
+            self.sink_record(s["record"], "open")
             return [reply(self.name, "surprise", record=s["record"], difference=s.get("diff", {}),
                           cards=other_cards(self.repl), ref={"seq": len(self.repl.fired), "beat": beat},
                           text=self.narrate(f) or words(f.ref))]
@@ -464,7 +470,39 @@ class DomainAgent:
                 out.append(reply(self.name, "notice", record=s.get("record"), card=s.get("card"), move=s.get("move"),
                                  ref=ref, text=self.narrate(nf) or words(nf.ref)))
         self.watch.outbox.clear()
+        for r in out:      # the close (or the escalation's stamp) into the sink
+            st = str(r.get("status") or "")
+            if r.get("kind") == "result" and st.startswith("admitted"):
+                self.sink_record(rec, {"explain": "explained", "reset": "reset", "escalate": "escalated"}[verb],
+                                 **({"card": args.get("card"), "move": args.get("move")} if verb == "explain" else {}))
         return self.voiced(out)
+
+    def sink_record(self, k, status, **extra):
+        """One line into the records sink: the kernel's surprise record k
+        (the `sink` wire metispy loads) with its close — status open ·
+        explained · reset · escalated (mined_text stamped by the watch) —
+        the beat, the session, the catalog's hash."""
+        if self.sink is None:
+            return
+        try:
+            k = int(k)
+            rec = dict(self.repl.loop.records[k])
+        except (TypeError, ValueError, IndexError):
+            return
+        now = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        line = {**rec, "record": k, "domain": self.name, "session": self.session, "ts": now,
+                "catalog_hash": self.repl.key,
+                "close": {"status": status, "beat": self.beat_no(), "ts": now,
+                          **{a: b for a, b in extra.items() if b not in (None, "")}}}
+        try:
+            self.sink.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.sink, "a") as fh:
+                fh.write(json.dumps(line, default=str) + "\n")
+        except OSError as e:
+            print("[records] %s: %s" % (self.sink, e), file=sys.stderr)
+            return
+        self.sunk.append({"record": k, "status": status, "beat": self.beat_no(), "file": str(self.sink),
+                          "mined_text": rec.get("mined_text", "")})
 
     def step(self):
         """One watch step (a fired move, an entry into quiescence, or one
@@ -526,7 +564,8 @@ class DomainAgent:
         rows, nar, cons = self.repl.fired_rows[f0:], self.narrated[n0:], self.consults[c0:]
         self.cursor = (len(self.repl.fired_rows), len(self.narrated), len(self.consults))
         reads, worlds, self.reads, self.worlds = self.reads, self.worlds, [], []
-        if not (rows or nar or cons or reads or worlds):
+        sunk, self.sunk = self.sunk, []
+        if not (rows or nar or cons or reads or worlds or sunk):
             return None
         fired = []
         for i, (kind, stage, ev) in enumerate(rows[-40:], f0 + max(0, len(rows) - 40) + 1):
@@ -541,7 +580,17 @@ class DomainAgent:
         return reply(self.name, "trace", beat=self.beat_no(), fired=fired or None,
                      **({"more": len(rows) - 40} if len(rows) > 40 else {}),
                      narrated=narrated or None, consults=consults or None, reads=reads or None,
-                     world=worlds or None, ref={"seq": len(self.repl.fired), "beat": self.beat_no()})
+                     world=worlds or None, records=sunk or None, ref={"seq": len(self.repl.fired), "beat": self.beat_no()})
+
+
+def records_path(module, where, session):
+    """Where a domain's records go: the manifest's `records` (default
+    records/) under its catalog directory — metis-catalog domains/<name>/
+    (DIR/<name>/ when --records DIR names another root)."""
+    from pathlib import Path
+    root = (Path(__file__).resolve().parents[3] / "metis-catalog" / "domains") if where == "catalog" else Path(where)
+    sub = getattr(module, "RECORDS", "records")
+    return root / module.NAME / sub / ("%s.jsonl" % session)
 
 
 def kind_of(msg):
@@ -692,6 +741,10 @@ def main():
                     help="hosted (default): the host's own day; replay: no script, no end — the driver brings "
                          "the person (intents) and the world (world lines); live: the same on the orchestrator's "
                          "wall-clock beats")
+    ap.add_argument("--records", nargs="?", const="catalog", default=None, metavar="DIR",
+                    help="the records sink: every surprise record and its close appended to "
+                         "DIR/<domain>/records/<session>.jsonl (bare: the metis-catalog checkout's domains/)")
+    ap.add_argument("--session", default=None, help="the sink's session id (default: the start time)")
     ap.add_argument("--trace", action="store_true", help="a trace reply per line (the console's REPL log): "
                     "the fired rows, narrated fragments, consults, reads and world lines it caused")
     a = ap.parse_args()
@@ -729,6 +782,9 @@ def main():
             if m.NAME not in narrated:
                 ag.narrator = None
             ag.tracing = a.trace
+            if a.records:
+                ag.session = state.setdefault("session", a.session or time.strftime("%Y%m%d-%H%M%S"))
+                ag.sink = records_path(m, a.records, ag.session)
             ags.append(ag)
         return ags[0] if len(ags) == 1 else Domains(ags)
 

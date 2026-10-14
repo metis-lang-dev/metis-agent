@@ -110,3 +110,50 @@ def test_live_report_clears_the_wait():
               {"world": ["+arrived(kitchen)"], "domain": "dog"}, B] + [B] * 18 + [find] + [B] * 6:
         ends += [(r["id"], r["status"]) for r in ag.handle(m) if r.get("status") in ("done", "expired")]
     assert ends == [("c1", "done"), ("c2", "done")]
+
+
+def test_records_sink_open_escalate_explain(tmp_path):
+    """e2e-workflow step 1 (a): the domain agent sinks every surprise record
+    and its close into <dir>/<domain>/records/<session>.jsonl; the escalate's
+    mined_text (the watch's stamp) is on the line; the loop console loads
+    the file with metispy's own `sink` and `record N` adopts the mined text."""
+    import json
+    import os
+    import tempfile
+    from metis_agent.domain_agent import DomainAgent, records_path
+    from metis_agent.domains import kitchen, kitchen_shared
+    os.environ["METIS_PAIR_DIR"] = tempfile.mkdtemp()
+    try:
+        a, b = DomainAgent(kitchen), DomainAgent(kitchen_shared)
+        a.session, a.sink, a.tracing = "s1", records_path(kitchen, str(tmp_path), "s1"), True
+        assert a.sink == tmp_path / "kitchen" / "records" / "s1.jsonl"
+        while a.watch.open is None:
+            for ag in (a, b):
+                ag.handle({"clock": "step"})
+                if a.watch.open is not None:
+                    break
+        out = a.handle({"tool": "escalate", "id": "e1", "args": {"record": 0, "text": "someone else loaded the pot"}})
+        assert out[0]["status"] == "admitted" and a.watch.open == 0      # escalated: still open, observe-only
+        a.handle({"tool": "explain", "id": "x1", "args": {"record": 0, "card": "kitchen_shared", "move": "partner_load"}})
+        lines = [json.loads(l) for l in a.sink.read_text().splitlines()]
+        assert [(l["record"], l["close"]["status"]) for l in lines] == [(0, "open"), (0, "escalated"), (0, "explained")]
+        assert all(l["session"] == "s1" and l["domain"] == "kitchen" and l["catalog_hash"] == a.repl.key for l in lines)
+        assert lines[1]["mined_text"].endswith("someone else loaded the pot") and "observed" in lines[0]
+        assert (lines[2]["close"]["card"], lines[2]["close"]["move"]) == ("kitchen_shared", "partner_load")
+        tr = a.trace()                                                   # the console's domain tab sees the same rows
+        assert [r["status"] for r in tr["records"]] == ["open", "escalated", "explained"]
+        # the loop console's side: metispy loads the sink, `record 1` adopts the mined text
+        from metis.lang.repl import Repl
+        import io
+        r = Repl(kitchen.CATALOG, seed=1, stdout=io.StringIO(), plugin=kitchen.PLUGIN, host=True)
+        assert r.cmd_sink(str(a.sink))["ok"] and r.cmd_record("1")["ok"]
+        assert r.loop.text.endswith("someone else loaded the pot")
+    finally:
+        del os.environ["METIS_PAIR_DIR"]
+
+
+def test_no_sink_without_the_flag(tmp_path):
+    from metis_agent.domain_agent import DomainAgent
+    ag = DomainAgent(dog)
+    ag.sink_record(0, "open")                                            # sink None: nothing, no error
+    assert ag.sink is None and not ag.sunk
