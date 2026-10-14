@@ -18,7 +18,7 @@ func TestRollbackLeavesNoTrace(t *testing.T) {
 	if _, err := os.Stat(gemmaPath); err != nil {
 		t.Skip("model not present")
 	}
-	promptPath := "../../grammar/dog-prompt.txt"
+	promptPath := "../../../../metis-catalog/domains/dog/intent/dog-prompt.txt"
 	if p := os.Getenv("ROLLBACK_PROMPT"); p != "" { // reproduce with another prompt
 		promptPath = p
 	}
@@ -30,7 +30,7 @@ func TestRollbackLeavesNoTrace(t *testing.T) {
 	if err != nil {
 		t.Skip("prompt not present")
 	}
-	gbnf, err := os.ReadFile("../../grammar/dog.gbnf")
+	gbnf, err := os.ReadFile("../../../../metis-catalog/domains/dog/intent/dog.gbnf")
 	if err != nil {
 		t.Skip("grammar not present")
 	}

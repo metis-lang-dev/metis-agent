@@ -116,7 +116,7 @@ func TestDumpDialogTrace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gb, err := os.ReadFile("grammar/dog.gbnf")
+	gb, err := os.ReadFile("../../metis-catalog/domains/dog/intent/dog.gbnf")
 	if err != nil {
 		t.Fatal(err)
 	}

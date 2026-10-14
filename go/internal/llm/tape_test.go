@@ -20,9 +20,9 @@ func TestTapeSurvivesTurnsAndMatchesSetTape(t *testing.T) {
 	l, err := Load(Config{ModelPath: e2bPath, NCtx: 4096, NBatch: 512, NThreads: 8, NGpuLayers: 99, Template: "gemma4"})
 	gputest.LoadOK(t, err)
 	defer l.Close()
-	b1, _ := os.ReadFile("../../grammar/dog-prompt.txt")
-	b2, _ := os.ReadFile("../../grammar/pass2-examples-gemma4.txt")
-	gb, _ := os.ReadFile("../../grammar/dog.gbnf")
+	b1, _ := os.ReadFile("../../../../metis-catalog/domains/dog/intent/dog-prompt.txt")
+	b2, _ := os.ReadFile("../../../../metis-catalog/domains/dog/intent/dog-spoken.txt")
+	gb, _ := os.ReadFile("../../../../metis-catalog/domains/dog/intent/dog.gbnf")
 	sys, gbnf := string(b1)+string(b2), string(gb)
 
 	entries := []string{

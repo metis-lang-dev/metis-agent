@@ -190,7 +190,7 @@ def loop_examples():
 
 
 def prompt():
-    dog = ((GO / "grammar/dog-prompt.txt").read_text() + (GO / "grammar/pass2-examples-gemma4.txt").read_text()
+    dog = ((GO / "../../metis-catalog/domains/dog/intent/dog-prompt.txt").read_text() + (GO / "../../metis-catalog/domains/dog/intent/dog-spoken.txt").read_text()
            + e10.IO_J + e10.io_examples("J-text"))
     dtext, _ = e10.decider()
     decl = "".join(e9.declaration(t) for t in API)

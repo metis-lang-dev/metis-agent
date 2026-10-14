@@ -51,7 +51,7 @@ func (t tapeAdapter) Set(text string) (int, time.Duration, error) {
 func main() {
 	model := flag.String("model", "models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf", "GGUF (the harness's E2B Q4)")
 	ngl := flag.Int("ngl", 99, "n_gpu_layers")
-	prompts := flag.String("prompt", "grammar/dog-prompt.txt,grammar/pass2-examples-gemma4.txt", "system prompt files, concatenated (config.ws.yaml prompt + prompt_extra)")
+	prompts := flag.String("prompt", "../../metis-catalog/domains/dog/intent/dog-prompt.txt,../../metis-catalog/domains/dog/intent/dog-spoken.txt", "system prompt files, concatenated (config.ws.yaml prompt + prompt_extra)")
 	epF := flag.String("episodes", "", "episode lines (python -m metis.domains.kitchen.eval episodes)")
 	arms := flag.String("arms", "A,B,C", "arms to run")
 	dir := flag.String("dir", "../../metispy", "metispy checkout (the runtime's working directory)")

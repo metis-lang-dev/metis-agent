@@ -39,8 +39,8 @@ func TestLoopFlag(t *testing.T) {
 		}
 		return string(b)
 	}
-	persona := read("grammar/dog-prompt.txt") + read("grammar/pass2-examples-gemma4.txt")
-	gbnf := read("grammar/dog.gbnf")
+	persona := read("../../metis-catalog/domains/dog/intent/dog-prompt.txt") + read("../../metis-catalog/domains/dog/intent/dog-spoken.txt")
+	gbnf := read("../../metis-catalog/domains/dog/intent/dog.gbnf")
 
 	// v2: the dog's path — the same intent as the two-pass itself, no orchestrator
 	s2 := &sinkRec{}

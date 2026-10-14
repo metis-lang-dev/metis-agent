@@ -1,6 +1,6 @@
 {
   "domain": "dog",
-  "about": "dog_host.py's SCRIPT as intents: the person's command of each beat, typed as the executive types it (go/grammar/dog.gbnf); the world's changes and answers stay the host's. After the day, the REPL API reads of dog-transcript.md.",
+  "about": "dog_host.py's SCRIPT as intents: the person's command of each beat, typed as the executive types it (metis-catalog domains/dog/intent/dog.gbnf); the world's changes and answers stay the host's. After the day, the REPL API reads of dog-transcript.md.",
   "reference": "../metis-catalog/domains/dog/dog-transcript.md",
   "beats": {
     "1": [

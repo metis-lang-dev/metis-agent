@@ -4,11 +4,11 @@
 // MODEL-EXPERIMENTS.md E1 (Gemma 4 E2B/E4B vs gemma3:4b).
 //
 //	llmbench -model ~/.ollama/models/blobs/sha256-aeda... -ngl 99 \
-//	         -corpus grammar/dog-corpus.tsv                    # gemma, GPU
+//	         -corpus ../../metis-catalog/domains/dog/intent/dog-corpus.tsv                    # gemma, GPU
 //	llmbench -model Phi-3-mini-4k-instruct-Q4_K_M.gguf -ngl 0 \
-//	         -corpus grammar/dog-corpus.tsv                    # phi3, CPU
+//	         -corpus ../../metis-catalog/domains/dog/intent/dog-corpus.tsv                    # phi3, CPU
 //	llmbench -model <gguf> "go to the chair next to the window"
-//	llmbench -model gemma-4-E2B-it-Q4_K_M.gguf -corpus grammar/dog-corpus.tsv \
+//	llmbench -model gemma-4-E2B-it-Q4_K_M.gguf -corpus ../../metis-catalog/domains/dog/intent/dog-corpus.tsv \
 //	         -think -vram -prefix-check -jsonl out.jsonl       # E1 row
 //
 // With -corpus every row runs and the intent CLASS (not the wording) is
@@ -127,9 +127,9 @@ type summaryRec struct {
 
 func main() {
 	model := flag.String("model", "", "GGUF model path")
-	promptF := flag.String("prompt", "grammar/dog-prompt.txt", "system prompt file")
+	promptF := flag.String("prompt", "../../metis-catalog/domains/dog/intent/dog-prompt.txt", "system prompt file")
 	kernelCards := flag.String("kernel-cards", "", "runtime-wire step 4: append the runtime section rendered from these cards (the cards op's JSON) — the harness's one prefix")
-	gbnfF := flag.String("gbnf", "grammar/dog.gbnf", "GBNF grammar file")
+	gbnfF := flag.String("gbnf", "../../metis-catalog/domains/dog/intent/dog.gbnf", "GBNF grammar file")
 	corpusF := flag.String("corpus", "", "TSV: utterance<TAB>expected_intent[<TAB>source]")
 	tmpl := flag.String("template", "auto", "chat template: auto | gemma | gemma4 | phi3 | ...")
 	ngl := flag.Int("ngl", 99, "n_gpu_layers (0 = CPU)")
@@ -170,12 +170,12 @@ func main() {
 	e8K := flag.Int("e8-k", 12, "E8: the orchestrator's flat insertion, passed fragments per question (the harness's rack.k)")
 	eventsF := flag.String("events", "", "narrate corpus (intent<TAB>args JSON<TAB>result<TAB>detail): each task outcome through the harness's taskCue + Narrate + guard")
 	toolsF := flag.String("tools", "", "E9: the dog intents as native tool calls — arms J,J-free,T,T-rt,T-free,T-noex (T-think with -think) on -corpus; -tools-reps seeded pass-2 repeats from -pass2_seed")
-	toolsJPrompt := flag.String("tools-j-prompt", "grammar/dog-prompt.txt,grammar/pass2-examples-gemma4.txt", "E9: arm J's prompt files, concatenated (the harness's prompt + prompt_extra)")
-	toolsTPrompt := flag.String("tools-prompt", "grammar/dog-tools-prompt.txt", "E9: the T prompt (tools/e9-tools.py)")
-	toolsNoex := flag.String("tools-prompt-noex", "grammar/dog-tools-prompt-noex.txt", "E9: the T prompt without the intent examples")
-	toolsRT := flag.String("tools-prompt-rt", "grammar/dog-tools-prompt-rt.txt", "E9: the T-rt prompt (pass-2 examples as round-trips)")
+	toolsJPrompt := flag.String("tools-j-prompt", "../../metis-catalog/domains/dog/intent/dog-prompt.txt,../../metis-catalog/domains/dog/intent/dog-spoken.txt", "E9: arm J's prompt files, concatenated (the harness's prompt + prompt_extra)")
+	toolsTPrompt := flag.String("tools-prompt", "../../metis-catalog/domains/dog/intent/bench/dog-tools-prompt.txt", "E9: the T prompt (tools/e9-tools.py)")
+	toolsNoex := flag.String("tools-prompt-noex", "../../metis-catalog/domains/dog/intent/bench/dog-tools-prompt-noex.txt", "E9: the T prompt without the intent examples")
+	toolsRT := flag.String("tools-prompt-rt", "../../metis-catalog/domains/dog/intent/bench/dog-tools-prompt-rt.txt", "E9: the T-rt prompt (pass-2 examples as round-trips)")
 	toolsRTStatus := flag.String("tools-rt-status", "accepted", "E9: T-rt's result turn, {status:<this>}")
-	toolsGbnf := flag.String("tools-gbnf", "grammar/dog-tools.gbnf", "E9: the call grammar (tools/e9-tools.py)")
+	toolsGbnf := flag.String("tools-gbnf", "../../metis-catalog/domains/dog/intent/bench/dog-tools.gbnf", "E9: the call grammar (tools/e9-tools.py)")
 	toolsReps := flag.Int("tools-reps", 5, "E9: pass-2 repeats per row and mode")
 	e10F := flag.String("e10", "", "E10 corpus (tools/e10-corpus.py): the executive's IO round-trip, J-text vs T-api, over scripted dialogs; seeds from -pass2_seed")
 	e10Arms := flag.String("e10-arms", "", "E10: only these arms (J-text,T-api; empty = all)")

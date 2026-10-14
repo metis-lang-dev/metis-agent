@@ -7,7 +7,7 @@
 #   tools/bench-models.sh                      # all models below, GPU
 #   tools/bench-models.sh -o results/e1 models/gemma4/*.gguf
 #   NGL=0 tools/bench-models.sh                # CPU
-#   PROMPT=results/step1-prompt.txt tools/bench-models.sh   # pin the prompt (default: the live grammar/dog-prompt.txt)
+#   PROMPT=results/step1-prompt.txt tools/bench-models.sh   # pin the prompt (default: the live ../../metis-catalog/domains/dog/intent/dog-prompt.txt)
 #   EXTRA=-narrate P2TURN=1 tools/bench-models.sh            # + single-pass Narrate, + a pass-2-as-own-turn row
 #
 # Re-run on every model release; add the new GGUF to MODELS (or pass it).
@@ -38,9 +38,9 @@ if [ ${#MODELS[@]} -eq 0 ]; then
 fi
 NGL=${NGL:-99}
 NCTX=${NCTX:-4096}
-CORPUS=${CORPUS:-grammar/dog-corpus.tsv}
-PROMPT=${PROMPT:-grammar/dog-prompt.txt}   # pin it: the prompt is tuned in the harness, the bench compares models
-GBNF=${GBNF:-grammar/dog.gbnf}
+CORPUS=${CORPUS:-../../metis-catalog/domains/dog/intent/dog-corpus.tsv}
+PROMPT=${PROMPT:-../../metis-catalog/domains/dog/intent/dog-prompt.txt}   # pin it: the prompt is tuned in the harness, the bench compares models
+GBNF=${GBNF:-../../metis-catalog/domains/dog/intent/dog.gbnf}
 THINK_MODELS=${THINK_MODELS:-gemma-4}   # substring: models that get a +think run
 P2TURN=${P2TURN:-}                      # 1: also a +p2turn row per model (pass 2 as its own chat turn)
 P2CUE=${P2CUE:-Now answer the person out loud: one short spoken sentence in the first person, no JSON.}
@@ -48,7 +48,7 @@ EXTRA=${EXTRA:-}                        # e.g. EXTRA=-narrate
 # pass-2 examples appended to PROMPT for the models that need them (gemma4:
 # CANCEL/UNKNOWN voices leaked JSON in E1); the harness prompt stays as is.
 # P2EX= (empty) benches the bare prompt on every model.
-P2EX=${P2EX-grammar/pass2-examples-gemma4.txt}
+P2EX=${P2EX-../../metis-catalog/domains/dog/intent/dog-spoken.txt}
 P2EX_MODELS=${P2EX_MODELS:-gemma-4}
 
 [ -x bin/llmbench ] || ./build.sh llmbench

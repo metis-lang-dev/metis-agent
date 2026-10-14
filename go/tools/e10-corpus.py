@@ -256,7 +256,7 @@ def decider_j(text):
 
 def prompts():
     dtext, ddecl = decider()
-    j = ((GO / "grammar/dog-prompt.txt").read_text() + (GO / "grammar/pass2-examples-gemma4.txt").read_text()
+    j = ((GO / "../../metis-catalog/domains/dog/intent/dog-prompt.txt").read_text() + (GO / "../../metis-catalog/domains/dog/intent/dog-spoken.txt").read_text()
          + IO_J + io_examples("J-text") + decider_j(dtext) + domains_section("J-text"))
     tools = e9.load_tools()
     rt, _ = e9.t_prompt(tools, True, rt=True)
@@ -290,8 +290,8 @@ def grammars():
 
 ARMS = ("J-text", "T-api")
 P = {"J-text": "grammar/e10-prompt-j.txt", "T-api": "grammar/e10-prompt-t.txt"}
-G = {"J-text": {"dog": "grammar/dog.gbnf", "decide": "grammar/e10-decide-j.gbnf", "activate": "grammar/e10-activate-j.gbnf"},
-     "T-api": {"dog": "grammar/dog-tools.gbnf", "decide": "grammar/e10-decider.gbnf", "activate": "tools/e4-activate/toolcall.gbnf"}}
+G = {"J-text": {"dog": "../../metis-catalog/domains/dog/intent/dog.gbnf", "decide": "grammar/e10-decide-j.gbnf", "activate": "grammar/e10-activate-j.gbnf"},
+     "T-api": {"dog": "../../metis-catalog/domains/dog/intent/bench/dog-tools.gbnf", "decide": "grammar/e10-decider.gbnf", "activate": "tools/e4-activate/toolcall.gbnf"}}
 CLOSE = {"op": "inject", "text": END}
 
 
@@ -401,7 +401,7 @@ def main():
         r = json.loads(ln)
         if r.get("kind") == "turn":
             ref[r["utt"]] = json.loads(r["json"])
-    rows = [ln.split("\t") for ln in (GO / "grammar/dog-corpus.tsv").read_text().splitlines()
+    rows = [ln.split("\t") for ln in (GO / "../../metis-catalog/domains/dog/intent/dog-corpus.tsv").read_text().splitlines()
             if ln and not ln.startswith("#")]
     pair = [json.loads(ln) for ln in open(GO / "grammar/e7-pair.jsonl")]
     sur = next(r for r in pair if r.get("signal") == "surprise")

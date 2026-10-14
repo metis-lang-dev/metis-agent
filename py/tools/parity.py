@@ -87,8 +87,8 @@ def main():
     if a.mapper:
         return mapper_parity(a.ref, a.out_dir)
 
-    persona = (GO / "grammar/dog-prompt.txt").read_text() + (GO / "grammar/pass2-examples-gemma4.txt").read_text()
-    gbnf = (GO / "grammar/dog.gbnf").read_text()
+    persona = (GO / "../../metis-catalog/domains/dog/intent/dog-prompt.txt").read_text() + (GO / "../../metis-catalog/domains/dog/intent/dog-spoken.txt").read_text()
+    gbnf = (GO / "../../metis-catalog/domains/dog/intent/dog.gbnf").read_text()
     rows = [json.loads(l) for l in Path(a.ref).read_text().splitlines() if l.strip()]
     turns = [r for r in rows if r.get("kind") == "turn"]
     summ = next((r for r in rows if r.get("kind") == "summary"), {})

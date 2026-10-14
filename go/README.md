@@ -50,7 +50,7 @@ any GGUF; `llm.template: auto` takes the chat template from the GGUF,
 #   -wait-viewer   attach the domains when the first page connects
 #   -no-domains    the persona alone (the parity bar)
 node --experimental-websocket ../../fsttm-web/test/parity.mjs ws://localhost:8395/ws   # 54-row corpus
-./bin/llmbench -model <gguf> -ngl 99 -corpus grammar/dog-corpus.tsv                     # GPU; -ngl 0 = CPU
+./bin/llmbench -model <gguf> -ngl 99 -corpus ../../metis-catalog/domains/dog/intent/dog-corpus.tsv                     # GPU; -ngl 0 = CPU
 ```
 
 `config.agent.yaml`: `llm`, the intent persona (`prompt`, `prompt_extra`,

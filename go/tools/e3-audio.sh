@@ -23,9 +23,9 @@ PAIRS=("$@")
   models/gemma4/gemma-4-E4B-it-Q5_K_M.gguf:models/gemma4/mmproj-E4B-F16.gguf
 )
 MAN=${MAN:-models/corpus-wav/manifest.tsv}
-PROMPT=${PROMPT:-grammar/dog-prompt.txt}
-P2EX=${P2EX-grammar/pass2-examples-gemma4.txt}
-GBNF=${GBNF:-grammar/dog.gbnf}
+PROMPT=${PROMPT:-../../metis-catalog/domains/dog/intent/dog-prompt.txt}
+P2EX=${P2EX-../../metis-catalog/domains/dog/intent/dog-spoken.txt}
+GBNF=${GBNF:-../../metis-catalog/domains/dog/intent/dog.gbnf}
 NGL=${NGL:-99}
 EXTRA=${EXTRA:-}   # e.g. EXTRA=-think for the +think rows
 

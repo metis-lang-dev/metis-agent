@@ -31,6 +31,9 @@ type V3Service struct {
 	Domains []DomainSpec
 	TickMs  int    // one clock tick (default 1500 ms)
 	Journal string // the journal's file ("" = none)
+	// Listed: the consoles' list of the catalog (metis_catalog.index(), via
+	// the loader; domain-catalog step 2) — what the catalog frame shows
+	Listed []Listed
 	// Start, when set, holds the clock until it closes (-wait-viewer: the
 	// first page joins, so the person hears the run from its first beat)
 	Start <-chan struct{}
@@ -47,6 +50,7 @@ type v3 struct {
 	dsp    *intent.Dispatcher
 	rec    *idEmitter
 	live   *liveDomains // the real domain agents (nil: the dog's dispatcher)
+	listed []Listed     // the catalog's list (the console's catalog frame)
 	// inside a person turn the lines said are held: the one that is the
 	// turn's own voice goes to the page in the intent frame, so its
 	// narration is marked v3-turn (the page does not voice it twice)
@@ -84,6 +88,7 @@ func (a *Agent) startV3(l *llm.LLM) error {
 	v := &v3{l: ol, prompt: b.String(), gbnf: a.cfg.GBNF, nctx: sc.NCtx,
 		cfg: V3Config{Catalog: sc.Catalog, Loaded: sc.Loaded, Display: sc.Display,
 			AskCheck: ruled, AgainPick: ruled, EscalateTemplate: ruled, Mirror: true, Rollback: true}}
+	v.listed = sc.Listed
 	v.rec = &idEmitter{Emitter: a.out}
 	v.dsp = wire.NewDispatcher(v.rec, a.Tasks)
 	v.cfg.OnSay = func(kind, line string) { // the dog path's guard: a forged ⟪metis …⟫ span or a call is never spoken

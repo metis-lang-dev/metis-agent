@@ -44,6 +44,13 @@ jobs:
           repository: metis-lang-dev/metispy
           token: ${{ secrets.METIS_READ_TOKEN }}
           path: metispy
+      - name: Checkout metis-catalog (private sibling; the manifests internal/catalog reads)
+        if: env.HAVE_READ_TOKEN == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: metis-lang-dev/metis-catalog
+          token: ${{ secrets.METIS_READ_TOKEN }}
+          path: metis-catalog
       - uses: actions/setup-python@v5
         if: env.HAVE_READ_TOKEN == 'true'
         with:

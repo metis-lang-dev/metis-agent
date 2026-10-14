@@ -4,8 +4,8 @@
 # harness's own framing (agent.TaskCue, a5d22c0 F8), Narrate, and the
 # harness guard (sanitizeAck + taskVoiceOK → template on reject), for each
 # model under the prompt its harness config uses:
-#   gemma3  grammar/dog-prompt.txt
-#   gemma4  grammar/dog-prompt.txt + pass2-examples-gemma4.txt (config.agent.yaml)
+#   gemma3  ../../metis-catalog/domains/dog/intent/dog-prompt.txt
+#   gemma4  ../../metis-catalog/domains/dog/intent/dog-prompt.txt + pass2-examples-gemma4.txt (config.agent.yaml)
 #
 #   tools/narrate-bench.sh [-o results/narrate] [model.gguf ...]
 set -euo pipefail
@@ -18,8 +18,8 @@ shift $((OPTIND - 1))
 MODELS=("$@")
 [ ${#MODELS[@]} -gt 0 ] || MODELS=(models/gemma3-4b-it-Q4_K_M.ollama-a2af6cc3.gguf models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf)
 EVENTS=${EVENTS:-grammar/narrate-events.tsv}
-PROMPT=${PROMPT:-grammar/dog-prompt.txt}
-P2EX=${P2EX-grammar/pass2-examples-gemma4.txt}
+PROMPT=${PROMPT:-../../metis-catalog/domains/dog/intent/dog-prompt.txt}
+P2EX=${P2EX-../../metis-catalog/domains/dog/intent/dog-spoken.txt}
 NGL=${NGL:-99}
 [ -x bin/llmbench ] || ./build.sh llmbench
 mkdir -p "$OUT"; JSONL=$OUT/records.jsonl; : > "$JSONL"

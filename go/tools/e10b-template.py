@@ -6,7 +6,7 @@ The template is read from the model (tokenizer.chat_template; E2B and E4B
 carry the same one) and rendered with jinja2 on the tools as JSON in the
 OpenAI function shape, the way llama.cpp --jinja hands them over:
 
-  dog      grammar/dog-tools.json, $defs expanded (the template does not
+  dog      ../../metis-catalog/domains/dog/intent/bench/dog-tools.json, $defs expanded (the template does not
            resolve $ref)
   decider  kernel.NewDecider's three, built by hand in decide.go: the same
            fields as JSON here

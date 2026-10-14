@@ -18,7 +18,7 @@ func TestTailTokensMatchWholePrompt(t *testing.T) {
 	if _, err := os.Stat(gemmaPath); err != nil {
 		t.Skip("model not present")
 	}
-	prompt, err := os.ReadFile("../../grammar/dog-prompt.txt")
+	prompt, err := os.ReadFile("../../../../metis-catalog/domains/dog/intent/dog-prompt.txt")
 	if err != nil {
 		t.Skip("prompt not present")
 	}

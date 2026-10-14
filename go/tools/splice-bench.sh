@@ -20,7 +20,7 @@ run() {  # tag model extra-args...
   local tag=$1 model=$2; shift 2
   echo "=== $tag  $(date +%T)" | tee -a "$OUT/run.log"
   echo "--- nvidia-smi before: $(nvidia-smi --query-gpu=memory.used --format=csv,noheader 2>/dev/null || echo n/a)" | tee -a "$OUT/run.log"
-  bin/llmbench -model "$MD/$model" -template gemma4 -prompt grammar/dog-prompt.txt \
+  bin/llmbench -model "$MD/$model" -template gemma4 -prompt ../../metis-catalog/domains/dog/intent/dog-prompt.txt \
     -splice grammar/splice-corpus.jsonl -splice-dialog grammar/splice-dialog.json \
     -tag "$tag" -vram -jsonl "$REC" "$@" 2>&1 | grep -v '^\[llm\]\|^llama_\|^load\|^print_info\|^\.\+$' | tee -a "$OUT/$tag.log" | grep '^==\|vram'
 }

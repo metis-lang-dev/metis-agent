@@ -3,14 +3,14 @@
 # of the intent corpus spoken by RHVoice (the harness's own TTS voice), as
 # 16 kHz mono s16le WAV, plus a manifest the ASR benches read.
 #
-#   tools/render-corpus.sh [-c grammar/dog-corpus.tsv] [-o models/corpus-wav] [-p SLT]
+#   tools/render-corpus.sh [-c ../../metis-catalog/domains/dog/intent/dog-corpus.tsv] [-o models/corpus-wav] [-p SLT]
 #
 # manifest.tsv: wav<TAB>utterance<TAB>expected_intent<TAB>source
 # Synthetic speech is the floor, not the test: add real recordings to the same
 # directory (16 kHz mono) and append them to the manifest by hand.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-CORPUS=grammar/dog-corpus.tsv; OUT=models/corpus-wav; VOICE=SLT
+CORPUS=../../metis-catalog/domains/dog/intent/dog-corpus.tsv; OUT=models/corpus-wav; VOICE=SLT
 while getopts "c:o:p:h" opt; do
   case $opt in
     c) CORPUS=$OPTARG ;; o) OUT=$OPTARG ;; p) VOICE=$OPTARG ;;

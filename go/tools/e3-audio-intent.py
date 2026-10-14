@@ -47,8 +47,8 @@ def main():
     ap.add_argument("-m", required=True, help="Gemma 4 text GGUF")
     ap.add_argument("-mm", required=True, help="its mmproj (audio) GGUF")
     ap.add_argument("-manifest", default="models/corpus-wav/manifest.tsv")
-    ap.add_argument("-prompt", default="grammar/dog-prompt.txt")  # the live prompt
-    ap.add_argument("-gbnf", default="grammar/dog.gbnf")
+    ap.add_argument("-prompt", default="../../metis-catalog/domains/dog/intent/dog-prompt.txt")  # the live prompt
+    ap.add_argument("-gbnf", default="../../metis-catalog/domains/dog/intent/dog.gbnf")
     ap.add_argument("-ngl", type=int, default=99)
     ap.add_argument("-n", type=int, default=80)
     ap.add_argument("-o", default=None, help="results dir (default results/e3-<model>)")

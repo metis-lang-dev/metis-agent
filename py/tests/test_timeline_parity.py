@@ -19,7 +19,7 @@ from test_orchestrator_parity import Rec  # noqa: E402
 
 TRACES = [json.loads(ln) for ln in (ROOT / "py/tests/data/dialog-trace.jsonl").read_text().splitlines() if ln.strip()]
 ITEMS = {it["id"]: it for it in load_timelines(ROOT / "go/grammar/e13-dialog.jsonl")}
-GBNF = (ROOT / "go/grammar/dog.gbnf").read_text()
+GBNF = (ROOT / "go/../../metis-catalog/domains/dog/intent/dog.gbnf").read_text()
 
 
 @pytest.mark.parametrize("tr", TRACES, ids=["%s/%d" % (t["id"], t["rep"]) for t in TRACES])

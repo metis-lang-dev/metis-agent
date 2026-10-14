@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -23,6 +24,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/agent"
+	"github.com/metis-lang-dev/metis-agent/go/internal/catalog"
 	"github.com/metis-lang-dev/metis-agent/go/internal/console"
 	"github.com/metis-lang-dev/metis-agent/go/internal/kernel"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
@@ -78,6 +80,16 @@ type config struct {
 		Addr  string `yaml:"addr"`
 		UIDir string `yaml:"ui_dir"`
 	} `yaml:"ws"`
+	// the catalog's manifests (domain-catalog step 2, metis-catalog
+	// CATALOG.md): the intent pass's files from the intent domain's
+	// manifest (prompt, examples[template], grammar replace the keys above),
+	// the domains' display names, clocks, partners and directories, and the
+	// console's list by the catalog's loader
+	Catalog struct {
+		Root   string `yaml:"root"`
+		Python string `yaml:"python"` // an interpreter the loader runs on (python -m metis_catalog)
+		Intent string `yaml:"intent"` // the domain the intent pass maps for (dog)
+	} `yaml:"catalog"`
 }
 
 var defaultStopWords = []string{"stop", "halt", "freeze", "health"}
@@ -100,6 +112,23 @@ func main() {
 	var cfg config
 	if err := yaml.Unmarshal(raw, &cfg); err != nil {
 		log.Fatal(err)
+	}
+	var manifests map[string]catalog.Manifest
+	if cfg.Catalog.Root != "" {
+		if manifests, err = catalog.Scan(cfg.Catalog.Root); err != nil {
+			log.Fatalf("[catalog] %v", err)
+		}
+		if d := cfg.Catalog.Intent; d != "" {
+			m, ok := manifests[d]
+			if !ok || m.Intent.Grammar == "" || m.Intent.Prompt == "" {
+				log.Fatalf("[catalog] no intent pass for %q in %s (domain.yaml intent: grammar, prompt)", d, cfg.Catalog.Root)
+			}
+			cfg.Prompt, cfg.Grammar, cfg.PromptExtra = m.Path(m.Intent.Prompt), m.Path(m.Intent.Grammar), nil
+			if ex := m.Intent.Examples[cfg.LLM.Template]; ex != "" {
+				cfg.PromptExtra = []string{m.Path(ex)}
+			}
+			log.Printf("[catalog] the intent pass: %s's manifest (%s, %s, %v)", d, cfg.Prompt, cfg.Grammar, cfg.PromptExtra)
+		}
 	}
 	if *uiDir != "" {
 		cfg.WS.UIDir = *uiDir
@@ -157,6 +186,25 @@ func main() {
 		}
 		v3.Catalog, v3.Loaded, v3.Display, v3.NCtx, v3.Ruled = cfg.V3.Catalog, cfg.V3.Loaded, cfg.V3.Display, cfg.V3.NCtx, cfg.V3.Ruled
 		v3.Domains, v3.TickMs, v3.Journal = cfg.V3.Domains, cfg.V3.TickMs, cfg.V3.Journal
+		if manifests != nil {
+			fromManifests(&v3, manifests)
+			if cfg.Catalog.Python != "" {
+				es, err := catalog.List(cfg.Catalog.Python, cfg.Catalog.Root)
+				if err != nil {
+					log.Printf("[catalog] the console's list: %v (the served domains only)", err)
+				}
+				in := map[string]bool{}
+				for _, e := range es {
+					in[e.Name] = true
+					v3.Listed = append(v3.Listed, agent.Listed{Name: e.Name, Kind: e.Kind, Display: e.Display, Line: e.Line, Has: e.Has})
+				}
+				for n, m := range manifests { // a partner the loader lists under its lead (kitchen_shared): its own row
+					if !in[n] && m.PartnerOf != "" {
+						v3.Listed = append(v3.Listed, agent.Listed{Name: n, Kind: "partner", Display: m.Display, Line: m.Line})
+					}
+				}
+			}
+		}
 	}
 
 	srv := console.New(cfg.WS.UIDir)
@@ -312,6 +360,49 @@ func main() {
 	srv.Domains(a.Domains())
 	<-ctx.Done()
 	log.Print("bye.")
+}
+
+// fromManifests fills what the config leaves out from the domains'
+// manifests: the display names (the harness's lines say "The <name>"),
+// each domain process's clock lines (clock.beats), its quiet partners
+// (partner_of), the directories watched for a reload.
+func fromManifests(v3 *agent.V3Service, ms map[string]catalog.Manifest) {
+	if v3.Display == nil {
+		v3.Display = map[string]string{}
+	}
+	for n, m := range ms {
+		if _, set := v3.Display[n]; !set && m.Display != "" {
+			v3.Display[n] = m.DisplayName()
+		}
+	}
+	for i := range v3.Domains {
+		s := &v3.Domains[i]
+		doms := s.Domains
+		if len(doms) == 0 {
+			doms = []string{s.Name}
+		}
+		derive := len(s.Clocks) == 0
+		if s.Watch == nil {
+			s.Watch = map[string]string{}
+		}
+		for _, d := range doms {
+			m, ok := ms[d]
+			if !ok {
+				continue
+			}
+			if _, set := s.Watch[d]; !set && m.Program != "" && filepath.Dir(m.Path(m.Program)) == m.Dir {
+				s.Watch[d] = m.Dir // a domain whose program is its own directory's
+			}
+			if !derive {
+				continue
+			}
+			if m.PartnerOf != "" {
+				s.Quiet = append(s.Quiet, d) // stepped inside its lead's clock, not heard alone
+				continue
+			}
+			s.Clocks = append(s.Clocks, agent.ClockSpec{Domain: d, N: max(m.Clock.Beats, 1)})
+		}
+	}
 }
 
 func mustRead(path string) string {

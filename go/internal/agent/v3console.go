@@ -13,6 +13,12 @@ import (
 // deactivate from the page, a domain's world ports, and every spoken line's
 // source (dlg-say src).
 
+// Listed is one row of the catalog's list (metis_catalog.index()).
+type Listed struct {
+	Name, Kind, Display, Line string
+	Has                       json.RawMessage
+}
+
 // V3Frame is one frame for the page: {ev, …F}.
 type V3Frame struct {
 	Ev string
@@ -141,13 +147,22 @@ func (v *v3) catalog() []map[string]any {
 		}
 	}
 	add(v.cfg.Loaded...)
+	listed := map[string]Listed{}
+	for _, e := range v.listed {
+		listed[e.Name] = e
+	}
 	for _, s := range ld.specs {
 		if len(s.Domains) == 0 {
 			add(s.Name)
 		}
 		add(s.Domains...)
 	}
-	add(v.cfg.Catalog...)
+	if len(v.listed) == 0 { // no catalog list: the system turn's catalog stands in for it
+		add(v.cfg.Catalog...)
+	}
+	for _, e := range v.listed {
+		add(e.Name)
+	}
 	quiet := ld.quiet()
 	out := make([]map[string]any, 0, len(names))
 	for _, n := range names {
@@ -164,6 +179,12 @@ func (v *v3) catalog() []map[string]any {
 		}
 		e := map[string]any{"name": n, "display": v.cfg.Display[n], "loaded": loaded,
 			"served": served, "state": state}
+		if l, ok := listed[n]; ok { // the catalog's: its line, what it has, its kind
+			e["line"], e["has"], e["kind"] = l.Line, l.Has, l.Kind
+			if l.Display != "" {
+				e["display"] = l.Display
+			}
+		}
 		if c := ld.changed[n]; c != "" {
 			e["changed"] = c // on disk since it was loaded: reload takes it
 		}

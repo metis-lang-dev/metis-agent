@@ -6,7 +6,7 @@ the person speaks, the inbox is handled one wake at a time in the floor's
 order. Every dispatch, wake, generation and spoken line is a dlg-* record
 (the Go shapes) for go/tools/e13-dialog-score.py.
 
-    python -m metis_agent.timeline go/grammar/e13-dialog.jsonl --gbnf go/grammar/dog.gbnf \\
+    python -m metis_agent.timeline go/grammar/e13-dialog.jsonl --gbnf go/../../metis-catalog/domains/dog/intent/dog.gbnf \\
         --model …/gemma-4-E2B-it-Q4_K_M.gguf --n-ctx 16384 --seed 1 --tag py --jsonl out.jsonl
 """
 import argparse
