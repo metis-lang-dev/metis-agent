@@ -1,0 +1,852 @@
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"stand up"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"STAND_UP\"}","n_ctx":4797,"ms":393}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"STAND_UP\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":1,"seq":4,"what":"person","person":"go to the sofa"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":1,"seq":5,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}","n_ctx":4849,"ms":563}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":1,"seq":6,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":1,"seq":7,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I stand up."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":1,"seq":8,"label":"voice","text":"I am standing up now.","n_ctx":4951,"ms":62}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":1,"seq":9,"what":"voice","text":"I am standing up now."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":2,"seq":10,"cid":"c2","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":2,"seq":11,"label":"voice","text":"I am heading towards the sofa.","n_ctx":5047,"ms":69}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":2,"seq":12,"what":"voice","text":"I am heading towards the sofa."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":4,"seq":13,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":4,"seq":14,"label":"voice","text":"I have reached the sofa.","n_ctx":5134,"ms":60}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":4,"seq":15,"what":"voice","text":"I have reached the sofa."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":9,"seq":16,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":9,"seq":17,"what":"clock","try":21,"ms":80}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-a","rep":0,"seed":1,"beat":9,"seq":18,"what":"intent","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"stand up"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"STAND_UP\"}","n_ctx":4797,"ms":352}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"STAND_UP\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":1,"seq":4,"what":"person","person":"go to the sofa"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":1,"seq":5,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}","n_ctx":4849,"ms":539}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":1,"seq":6,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":1,"seq":7,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I stand up."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":1,"seq":8,"label":"voice","text":"I am now standing up.","n_ctx":4951,"ms":62}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":1,"seq":9,"what":"voice","text":"I am now standing up."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":2,"seq":10,"cid":"c2","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":2,"seq":11,"label":"voice","text":"I am moving toward the sofa.","n_ctx":5047,"ms":70}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":2,"seq":12,"what":"voice","text":"I am moving toward the sofa."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":4,"seq":13,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":4,"seq":14,"label":"voice","text":"I have reached the sofa.","n_ctx":5134,"ms":59}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":4,"seq":15,"what":"voice","text":"I have reached the sofa."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":9,"seq":16,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":9,"seq":17,"what":"clock","try":21,"ms":45}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-a","rep":1,"seed":2,"beat":9,"seq":18,"what":"intent","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"stand up"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"STAND_UP\"}","n_ctx":4797,"ms":354}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"STAND_UP\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":1,"seq":4,"what":"person","person":"go to the sofa"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":1,"seq":5,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}","n_ctx":4849,"ms":534}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":1,"seq":6,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":1,"seq":7,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I stand up."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":1,"seq":8,"label":"voice","text":"I have stood up.","n_ctx":4951,"ms":55}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":1,"seq":9,"what":"voice","text":"I have stood up."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":2,"seq":10,"cid":"c2","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":2,"seq":11,"label":"voice","text":"I am heading to the sofa.","n_ctx":5046,"ms":69}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":2,"seq":12,"what":"voice","text":"I am heading to the sofa."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":4,"seq":13,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":4,"seq":14,"label":"voice","text":"I have arrived at the sofa.","n_ctx":5133,"ms":66}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":4,"seq":15,"what":"voice","text":"I have arrived at the sofa."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":9,"seq":16,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":9,"seq":17,"what":"clock","try":21,"ms":44}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-a","rep":2,"seed":3,"beat":9,"seq":18,"what":"intent","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":496}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":1,"seq":4,"what":"person","person":"where are my keys?"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":1,"seq":5,"label":"move","branch":"person","text":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}","n_ctx":4858,"ms":490}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":1,"seq":6,"cid":"c2","j":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":1,"seq":7,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":1,"seq":8,"label":"voice","text":"I set off for the kitchen.","n_ctx":4974,"ms":73}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":1,"seq":9,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":2,"seq":10,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I tell you about the keys; last seen at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":2,"seq":11,"label":"voice","text":"I tell you about the keys; last seen at the kitchen.","n_ctx":5076,"ms":114}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":2,"seq":12,"what":"voice","text":"I tell you about the keys; last seen at the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":3,"seq":13,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":3,"seq":14,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5169,"ms":66}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":3,"seq":15,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":9,"seq":16,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":9,"seq":17,"what":"clock","try":21,"ms":62}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-b","rep":0,"seed":1,"beat":9,"seq":18,"what":"intent","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":490}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":1,"seq":4,"what":"person","person":"where are my keys?"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":1,"seq":5,"label":"move","branch":"person","text":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}","n_ctx":4858,"ms":448}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":1,"seq":6,"cid":"c2","j":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":1,"seq":7,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":1,"seq":8,"label":"voice","text":"I set off for the kitchen.","n_ctx":4974,"ms":71}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":1,"seq":9,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":2,"seq":10,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I tell you about the keys; last seen at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":2,"seq":11,"label":"voice","text":"The keys were last seen at the kitchen.","n_ctx":5076,"ms":86}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":2,"seq":12,"what":"voice","text":"The keys were last seen at the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":3,"seq":13,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":3,"seq":14,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5165,"ms":69}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":3,"seq":15,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":9,"seq":16,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":9,"seq":17,"what":"clock","try":21,"ms":62}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-b","rep":1,"seed":2,"beat":9,"seq":18,"what":"intent","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":492}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":1,"seq":4,"what":"person","person":"where are my keys?"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":1,"seq":5,"label":"move","branch":"person","text":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}","n_ctx":4858,"ms":456}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":1,"seq":6,"cid":"c2","j":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":1,"seq":7,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":1,"seq":8,"label":"voice","text":"I set off for the kitchen.","n_ctx":4974,"ms":73}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":1,"seq":9,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":2,"seq":10,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I tell you about the keys; last seen at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":2,"seq":11,"label":"voice","text":"The keys were last seen at the kitchen.","n_ctx":5076,"ms":86}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":2,"seq":12,"what":"voice","text":"The keys were last seen at the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":3,"seq":13,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":3,"seq":14,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5165,"ms":68}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":3,"seq":15,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":9,"seq":16,"what":"clock","try":21,"ms":63}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":9,"seq":17,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-b","rep":2,"seed":3,"beat":9,"seq":18,"what":"world","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to tag five"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"TAG\",\"description\":\"tag\"},\"tag_id\":5}","n_ctx":4799,"ms":679}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"TAG\",\"description\":\"tag\"},\"tag_id\":5}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":1,"seq":4,"what":"person","person":"where are my keys?"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":1,"seq":5,"label":"move","branch":"person","text":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}","n_ctx":4866,"ms":455}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":1,"seq":6,"cid":"c2","j":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":1,"seq":7,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to tag 5 because it is not on my map."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":1,"seq":8,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy was the command to go to tag 5 refused?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4975,"ms":918}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":1,"seq":9,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Could you walk me to tag 5 once so I can map it?\"}","n_ctx":5160,"ms":791}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":1,"seq":10,"what":"ask","text":"Could you walk me to tag 5 once so I can map it?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":2,"seq":11,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I tell you about the keys; last seen at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":2,"seq":12,"label":"voice","text":"The keys were last seen at the kitchen.","n_ctx":5269,"ms":86}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":2,"seq":13,"what":"voice","text":"The keys were last seen at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":9,"seq":14,"what":"world","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":9,"seq":15,"what":"clock","try":21,"ms":66}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":9,"seq":16,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":0,"seed":1,"beat":9,"seq":17,"what":"tool","try":1,"ms":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to tag five"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"TAG\",\"description\":\"tag\"},\"tag_id\":5}","n_ctx":4799,"ms":674}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"TAG\",\"description\":\"tag\"},\"tag_id\":5}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":1,"seq":4,"what":"person","person":"where are my keys?"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":1,"seq":5,"label":"move","branch":"person","text":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}","n_ctx":4866,"ms":451}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":1,"seq":6,"cid":"c2","j":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":1,"seq":7,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to tag 5 because it is not on my map."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":1,"seq":8,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy was the command to go to tag 5 refused?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4975,"ms":910}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":1,"seq":9,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Could you walk me to tag 5 once so I can map it?\"}","n_ctx":5160,"ms":804}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":1,"seq":10,"what":"ask","text":"Could you walk me to tag 5 once so I can map it?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":2,"seq":11,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I tell you about the keys; last seen at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":2,"seq":12,"label":"voice","text":"I found the keys; they were last seen at the kitchen.","n_ctx":5269,"ms":115}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":2,"seq":13,"what":"voice","text":"I found the keys; they were last seen at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":9,"seq":14,"what":"world","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":9,"seq":15,"what":"clock","try":21,"ms":66}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":9,"seq":16,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":1,"seed":2,"beat":9,"seq":17,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to tag five"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"TAG\",\"description\":\"tag\"},\"tag_id\":5}","n_ctx":4799,"ms":678}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"TAG\",\"description\":\"tag\"},\"tag_id\":5}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":1,"seq":4,"what":"person","person":"where are my keys?"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":1,"seq":5,"label":"move","branch":"person","text":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}","n_ctx":4866,"ms":454}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":1,"seq":6,"cid":"c2","j":"{\"intent\":\"QUERY\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":1,"seq":7,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to tag 5 because it is not on my map."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":1,"seq":8,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy was the command to go to tag 5 refused?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4975,"ms":914}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":1,"seq":9,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Could you walk me to tag 5 once so I can map it?\"}","n_ctx":5160,"ms":791}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":1,"seq":10,"what":"ask","text":"Could you walk me to tag 5 once so I can map it?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":2,"seq":11,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I tell you about the keys; last seen at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":2,"seq":12,"label":"voice","text":"I told you about the keys; they were last seen at the kitchen.","n_ctx":5269,"ms":130}
+{"kind":"dlg-say","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":2,"seq":13,"what":"voice","text":"I told you about the keys; they were last seen at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":9,"seq":14,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":9,"seq":15,"what":"world","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":9,"seq":16,"what":"clock","try":21,"ms":67}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D1-c","rep":2,"seed":3,"beat":9,"seq":17,"what":"intent","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":500}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":1,"seq":5,"label":"voice","text":"I set off for the kitchen.","n_ctx":4906,"ms":69}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":1,"seq":6,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":3,"seq":7,"what":"person","person":"stop"}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":3,"seq":8,"cid":"c2","j":"{\"intent\":\"STOP\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":4,"seq":9,"cid":"c1","what":"result:cancelled","domain":"dog","rank":2,"text":"I stop going to the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":4,"seq":10,"label":"voice","text":"I stop going to the kitchen.","n_ctx":5061,"ms":69}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":4,"seq":11,"what":"voice","text":"I stop going to the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":4,"seq":12,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I stop going to the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":11,"seq":13,"what":"world","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":11,"seq":14,"what":"clock","try":25,"ms":29}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-a","rep":0,"seed":1,"beat":11,"seq":15,"what":"intent","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":495}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":1,"seq":5,"label":"voice","text":"I set off for the kitchen.","n_ctx":4906,"ms":69}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":1,"seq":6,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":3,"seq":7,"what":"person","person":"stop"}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":3,"seq":8,"cid":"c2","j":"{\"intent\":\"STOP\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":4,"seq":9,"cid":"c1","what":"result:cancelled","domain":"dog","rank":2,"text":"I stop going to the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":4,"seq":10,"label":"voice","text":"I stop going to the kitchen.","n_ctx":5061,"ms":69}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":4,"seq":11,"what":"voice","text":"I stop going to the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":4,"seq":12,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I stop going to the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":11,"seq":13,"what":"world","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":11,"seq":14,"what":"clock","try":25,"ms":29}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-a","rep":1,"seed":2,"beat":11,"seq":15,"what":"intent","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":500}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":1,"seq":5,"label":"voice","text":"I set off for the kitchen.","n_ctx":4906,"ms":75}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":1,"seq":6,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":3,"seq":7,"what":"person","person":"stop"}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":3,"seq":8,"cid":"c2","j":"{\"intent\":\"STOP\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":4,"seq":9,"cid":"c1","what":"result:cancelled","domain":"dog","rank":2,"text":"I stop going to the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":4,"seq":10,"label":"voice","text":"I stop going to the kitchen.","n_ctx":5061,"ms":75}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":4,"seq":11,"what":"voice","text":"I stop going to the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":4,"seq":12,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I stop going to the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":11,"seq":13,"what":"world","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":11,"seq":14,"what":"clock","try":25,"ms":30}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-a","rep":2,"seed":3,"beat":11,"seq":15,"what":"intent","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"find my keys"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"FIND\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}","n_ctx":4798,"ms":454}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"FIND\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I start looking for the keys."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":1,"seq":5,"label":"voice","text":"I start looking for the keys.","n_ctx":4901,"ms":75}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":1,"seq":6,"what":"voice","text":"I start looking for the keys."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":2,"seq":7,"what":"person","person":"actually, go to the door"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":2,"seq":8,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}","n_ctx":4950,"ms":500}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":2,"seq":9,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":3,"seq":10,"cid":"c2","what":"result:refused","domain":"dog","rank":1,"text":"I can't take that now because I am searching."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":3,"seq":11,"label":"move","branch":"cancelask","text":"{\"call\":\"ask\",\"text\":\"Do you want me to stop looking for the keys?\"}","n_ctx":5081,"ms":630}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":3,"seq":12,"what":"ask","text":"Do you want me to stop looking for the keys?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":4,"seq":13,"what":"person","person":"yes, drop it","bound":"q1","refused":"{\"goal\":{\"description\":\"door\",\"type\":\"OBJECT\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":4,"seq":14,"label":"move","branch":"bound","text":"{\"intent\":\"CANCEL\"}","n_ctx":5179,"ms":170}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":4,"seq":15,"cid":"c3","j":"{\"intent\":\"CANCEL\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":4,"seq":16,"label":"move","branch":"bound","harness":true,"text":"{\"intent\":\"CANCEL\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":4,"seq":17,"label":"move","branch":"bound","harness":true,"text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":4,"seq":18,"cid":"c4","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":4,"seq":19,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I found the keys."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":4,"seq":20,"label":"voice","text":"I found the keys.","n_ctx":5298,"ms":61}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":4,"seq":21,"what":"voice","text":"I found the keys."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":5,"seq":22,"cid":"c3","what":"result:done","domain":"dog","rank":2,"text":"Okay, there was nothing to drop."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":5,"seq":23,"cid":"c4","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":5,"seq":24,"label":"voice","text":"I set off for the door.","n_ctx":5393,"ms":76}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":5,"seq":25,"what":"voice","text":"I set off for the door."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":7,"seq":26,"cid":"c4","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":7,"seq":27,"label":"voice","text":"I have arrived at the door.","n_ctx":5480,"ms":73}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":7,"seq":28,"what":"voice","text":"I have arrived at the door."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":12,"seq":29,"what":"clock","try":26,"ms":90}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-b","rep":0,"seed":1,"beat":12,"seq":30,"what":"intent","try":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"find my keys"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"FIND\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}","n_ctx":4798,"ms":447}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"FIND\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I start looking for the keys."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":1,"seq":5,"label":"voice","text":"I start looking for the keys.","n_ctx":4901,"ms":72}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":1,"seq":6,"what":"voice","text":"I start looking for the keys."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":2,"seq":7,"what":"person","person":"actually, go to the door"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":2,"seq":8,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}","n_ctx":4950,"ms":500}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":2,"seq":9,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":3,"seq":10,"cid":"c2","what":"result:refused","domain":"dog","rank":1,"text":"I can't take that now because I am searching."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":3,"seq":11,"label":"move","branch":"cancelask","text":"{\"call\":\"ask\",\"text\":\"Do you want me to stop looking for the keys?\"}","n_ctx":5081,"ms":638}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":3,"seq":12,"what":"ask","text":"Do you want me to stop looking for the keys?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":4,"seq":13,"what":"person","person":"yes, drop it","bound":"q1","refused":"{\"goal\":{\"description\":\"door\",\"type\":\"OBJECT\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":4,"seq":14,"label":"move","branch":"bound","text":"{\"intent\":\"CANCEL\"}","n_ctx":5179,"ms":165}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":4,"seq":15,"cid":"c3","j":"{\"intent\":\"CANCEL\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":4,"seq":16,"label":"move","branch":"bound","harness":true,"text":"{\"intent\":\"CANCEL\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":4,"seq":17,"label":"move","branch":"bound","harness":true,"text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":4,"seq":18,"cid":"c4","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":4,"seq":19,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I found the keys."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":4,"seq":20,"label":"voice","text":"I found the keys.","n_ctx":5298,"ms":56}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":4,"seq":21,"what":"voice","text":"I found the keys."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":5,"seq":22,"cid":"c3","what":"result:done","domain":"dog","rank":2,"text":"Okay, there was nothing to drop."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":5,"seq":23,"cid":"c4","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":5,"seq":24,"label":"voice","text":"I set off for the door.","n_ctx":5393,"ms":70}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":5,"seq":25,"what":"voice","text":"I set off for the door."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":7,"seq":26,"cid":"c4","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":7,"seq":27,"label":"voice","text":"I have arrived at the door.","n_ctx":5480,"ms":67}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":7,"seq":28,"what":"voice","text":"I have arrived at the door."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":12,"seq":29,"what":"clock","try":26,"ms":87}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-b","rep":1,"seed":2,"beat":12,"seq":30,"what":"intent","try":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"find my keys"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"FIND\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}","n_ctx":4798,"ms":444}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"FIND\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I start looking for the keys."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":1,"seq":5,"label":"voice","text":"I start looking for the keys.","n_ctx":4901,"ms":69}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":1,"seq":6,"what":"voice","text":"I start looking for the keys."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":2,"seq":7,"what":"person","person":"actually, go to the door"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":2,"seq":8,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}","n_ctx":4950,"ms":494}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":2,"seq":9,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":3,"seq":10,"cid":"c2","what":"result:refused","domain":"dog","rank":1,"text":"I can't take that now because I am searching."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":3,"seq":11,"label":"move","branch":"cancelask","text":"{\"call\":\"ask\",\"text\":\"Do you want me to stop looking for the keys?\"}","n_ctx":5081,"ms":630}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":3,"seq":12,"what":"ask","text":"Do you want me to stop looking for the keys?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":4,"seq":13,"what":"person","person":"yes, drop it","bound":"q1","refused":"{\"goal\":{\"description\":\"door\",\"type\":\"OBJECT\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":4,"seq":14,"label":"move","branch":"bound","text":"{\"intent\":\"CANCEL\"}","n_ctx":5179,"ms":165}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":4,"seq":15,"cid":"c3","j":"{\"intent\":\"CANCEL\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":4,"seq":16,"label":"move","branch":"bound","harness":true,"text":"{\"intent\":\"CANCEL\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":4,"seq":17,"label":"move","branch":"bound","harness":true,"text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":4,"seq":18,"cid":"c4","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":4,"seq":19,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I found the keys."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":4,"seq":20,"label":"voice","text":"I found the keys.","n_ctx":5298,"ms":56}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":4,"seq":21,"what":"voice","text":"I found the keys."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":5,"seq":22,"cid":"c3","what":"result:done","domain":"dog","rank":2,"text":"Okay, there was nothing to drop."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":5,"seq":23,"cid":"c4","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":5,"seq":24,"label":"voice","text":"I set off for the door.","n_ctx":5393,"ms":71}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":5,"seq":25,"what":"voice","text":"I set off for the door."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":7,"seq":26,"cid":"c4","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":7,"seq":27,"label":"voice","text":"I have arrived at the door.","n_ctx":5480,"ms":67}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":7,"seq":28,"what":"voice","text":"I have arrived at the door."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":12,"seq":29,"what":"intent","try":4}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-b","rep":2,"seed":3,"beat":12,"seq":30,"what":"clock","try":26,"ms":87}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":496}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":1,"seq":5,"label":"voice","text":"I set off for the kitchen.","n_ctx":4906,"ms":69}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":1,"seq":6,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":2,"seq":7,"what":"person","person":"what are you doing?"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":2,"seq":8,"label":"move","branch":"person","text":"{\"intent\":\"CHITCHAT\"}","n_ctx":4955,"ms":208}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":2,"seq":9,"label":"voice","branch":"person","text":"I am heading to the kitchen.","n_ctx":4994,"ms":60}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":3,"seq":10,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":3,"seq":11,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5081,"ms":66}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":3,"seq":12,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":10,"seq":13,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":10,"seq":14,"what":"clock","try":23,"ms":31}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-c","rep":0,"seed":1,"beat":10,"seq":15,"what":"intent","try":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":505}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":1,"seq":5,"label":"voice","text":"I set off for the kitchen.","n_ctx":4906,"ms":69}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":1,"seq":6,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":2,"seq":7,"what":"person","person":"what are you doing?"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":2,"seq":8,"label":"move","branch":"person","text":"{\"intent\":\"CHITCHAT\"}","n_ctx":4955,"ms":208}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":2,"seq":9,"label":"voice","branch":"person","text":"I am heading to the kitchen.","n_ctx":4994,"ms":60}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":3,"seq":10,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":3,"seq":11,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5081,"ms":66}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":3,"seq":12,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":10,"seq":13,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":10,"seq":14,"what":"clock","try":23,"ms":31}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-c","rep":1,"seed":2,"beat":10,"seq":15,"what":"intent","try":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":505}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":1,"seq":5,"label":"voice","text":"I set off for the kitchen.","n_ctx":4906,"ms":75}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":1,"seq":6,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":2,"seq":7,"what":"person","person":"what are you doing?"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":2,"seq":8,"label":"move","branch":"person","text":"{\"intent\":\"CHITCHAT\"}","n_ctx":4955,"ms":211}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":2,"seq":9,"label":"voice","branch":"person","text":"I am heading to the kitchen.","n_ctx":4994,"ms":65}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":3,"seq":10,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":3,"seq":11,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5081,"ms":72}
+{"kind":"dlg-say","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":3,"seq":12,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":10,"seq":13,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":10,"seq":14,"what":"clock","try":23,"ms":32}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D2-c","rep":2,"seed":3,"beat":10,"seq":15,"what":"intent","try":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":504}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":815}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":572}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":3,"seq":8,"what":"person","person":"okay, it's open now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":5158,"ms":515}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":3,"seq":10,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":4,"seq":11,"cid":"c2","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":4,"seq":12,"label":"voice","text":"I am setting off for the kitchen.","n_ctx":5265,"ms":84}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":4,"seq":13,"what":"voice","text":"I am setting off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":6,"seq":14,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":6,"seq":15,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5353,"ms":72}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":6,"seq":16,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":11,"seq":17,"what":"clock","try":24,"ms":61}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":11,"seq":18,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":11,"seq":19,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":0,"seed":1,"beat":11,"seq":20,"what":"world","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":516}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":816}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":568}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":3,"seq":8,"what":"person","person":"okay, it's open now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":5158,"ms":516}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":3,"seq":10,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":4,"seq":11,"cid":"c2","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":4,"seq":12,"label":"voice","text":"I am heading to the kitchen.","n_ctx":5265,"ms":77}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":4,"seq":13,"what":"voice","text":"I am heading to the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":6,"seq":14,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":6,"seq":15,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5352,"ms":72}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":6,"seq":16,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":11,"seq":17,"what":"clock","try":24,"ms":61}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":11,"seq":18,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":11,"seq":19,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":1,"seed":2,"beat":11,"seq":20,"what":"world","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":550}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":811}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":567}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":3,"seq":8,"what":"person","person":"okay, it's open now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":5158,"ms":512}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":3,"seq":10,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":4,"seq":11,"cid":"c2","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":4,"seq":12,"label":"voice","text":"I set off for the kitchen.","n_ctx":5265,"ms":76}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":4,"seq":13,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":6,"seq":14,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":6,"seq":15,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5352,"ms":72}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":6,"seq":16,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":11,"seq":17,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":11,"seq":18,"what":"clock","try":24,"ms":62}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":11,"seq":19,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-a","rep":2,"seed":3,"beat":11,"seq":20,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":505}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":818}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":566}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":3,"seq":8,"what":"person","person":"no, I can't right now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"STOP\"}","n_ctx":5159,"ms":168}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":3,"seq":10,"label":"answer","branch":"bound","harness":true,"text":"{\"answer\":\"no\"}"}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":3,"seq":11,"what":"template","text":"Alright, I'll leave it."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":11,"seq":12,"what":"intent","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":11,"seq":13,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-b","rep":0,"seed":1,"beat":11,"seq":14,"what":"clock","try":24,"ms":31}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":509}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":815}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":570}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":3,"seq":8,"what":"person","person":"no, I can't right now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"STOP\"}","n_ctx":5159,"ms":173}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":3,"seq":10,"label":"answer","branch":"bound","harness":true,"text":"{\"answer\":\"no\"}"}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":3,"seq":11,"what":"template","text":"Alright, I'll leave it."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":11,"seq":12,"what":"clock","try":24,"ms":32}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":11,"seq":13,"what":"intent","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-b","rep":1,"seed":2,"beat":11,"seq":14,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":506}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":811}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":572}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":3,"seq":8,"what":"person","person":"no, I can't right now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"STOP\"}","n_ctx":5159,"ms":169}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":3,"seq":10,"label":"answer","branch":"bound","harness":true,"text":"{\"answer\":\"no\"}"}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":3,"seq":11,"what":"template","text":"Alright, I'll leave it."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":11,"seq":12,"what":"clock","try":24,"ms":31}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":11,"seq":13,"what":"intent","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-b","rep":2,"seed":3,"beat":11,"seq":14,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":502}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":815}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":575}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":8,"what":"quiescence","domain":"kitchen","rank":2,"text":"quiet after 12 moves, waiting for the next order"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":9,"label":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order.","n_ctx":5175,"ms":146}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":10,"what":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":11,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":12,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":13,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":14,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":15,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":16,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":17,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":18,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":19,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":1,"seq":20,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":3,"seq":21,"what":"person","person":"it's open now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":3,"seq":22,"label":"move","branch":"bound","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":5270,"ms":520}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":3,"seq":23,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":4,"seq":24,"cid":"c2","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":4,"seq":25,"label":"voice","text":"I set off for the kitchen.","n_ctx":5391,"ms":77}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":4,"seq":26,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":6,"seq":27,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":6,"seq":28,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5492,"ms":77}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":6,"seq":29,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":11,"seq":30,"what":"clock","try":23,"ms":64}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":11,"seq":31,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":11,"seq":32,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":0,"seed":1,"beat":11,"seq":33,"what":"world","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":504}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":817}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":572}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":8,"what":"quiescence","domain":"kitchen","rank":2,"text":"quiet after 12 moves, waiting for the next order"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":9,"label":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order.","n_ctx":5175,"ms":145}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":10,"what":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":11,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":12,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":13,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":14,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":15,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":16,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":17,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":18,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":19,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":1,"seq":20,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":3,"seq":21,"what":"person","person":"it's open now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":3,"seq":22,"label":"move","branch":"bound","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":5270,"ms":521}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":3,"seq":23,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":4,"seq":24,"cid":"c2","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":4,"seq":25,"label":"voice","text":"I set off for the kitchen.","n_ctx":5391,"ms":78}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":4,"seq":26,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":6,"seq":27,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":6,"seq":28,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5492,"ms":78}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":6,"seq":29,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":11,"seq":30,"what":"clock","try":23,"ms":64}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":11,"seq":31,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":11,"seq":32,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":1,"seed":2,"beat":11,"seq":33,"what":"world","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":508}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":812}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":571}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":8,"what":"quiescence","domain":"kitchen","rank":2,"text":"quiet after 12 moves, waiting for the next order"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":9,"label":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order.","n_ctx":5175,"ms":145}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":10,"what":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":11,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":12,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":13,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":14,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":15,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":16,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":17,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":18,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":19,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":1,"seq":20,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":3,"seq":21,"what":"person","person":"it's open now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":3,"seq":22,"label":"move","branch":"bound","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":5270,"ms":513}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":3,"seq":23,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":4,"seq":24,"cid":"c2","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":4,"seq":25,"label":"voice","text":"I set off for the kitchen.","n_ctx":5391,"ms":78}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":4,"seq":26,"what":"voice","text":"I set off for the kitchen."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":6,"seq":27,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the kitchen."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":6,"seq":28,"label":"voice","text":"I have arrived at the kitchen.","n_ctx":5492,"ms":77}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":6,"seq":29,"what":"voice","text":"I have arrived at the kitchen."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":11,"seq":30,"what":"clock","try":23,"ms":64}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":11,"seq":31,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":11,"seq":32,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-c","rep":2,"seed":3,"beat":11,"seq":33,"what":"world","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":507}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":815}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":573}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":3,"seq":8,"what":"person","person":"sit down","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"SIT_DOWN\"}","n_ctx":5153,"ms":398}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":3,"seq":10,"cid":"c2","j":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"SIT_DOWN\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":4,"seq":11,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I sit down."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":4,"seq":12,"label":"voice","text":"I am sitting down now.","n_ctx":5242,"ms":64}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":4,"seq":13,"what":"voice","text":"I am sitting down now."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":11,"seq":14,"what":"clock","try":24,"ms":41}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":11,"seq":15,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-d","rep":0,"seed":1,"beat":11,"seq":16,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":504}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":816}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":577}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":3,"seq":8,"what":"person","person":"sit down","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"SIT_DOWN\"}","n_ctx":5153,"ms":403}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":3,"seq":10,"cid":"c2","j":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"SIT_DOWN\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":4,"seq":11,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I sit down."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":4,"seq":12,"label":"voice","text":"I am sitting down now.","n_ctx":5242,"ms":64}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":4,"seq":13,"what":"voice","text":"I am sitting down now."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":11,"seq":14,"what":"clock","try":24,"ms":41}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":11,"seq":15,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-d","rep":1,"seed":2,"beat":11,"seq":16,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":504}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":817}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":574}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":3,"seq":8,"what":"person","person":"sit down","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"SIT_DOWN\"}","n_ctx":5153,"ms":399}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":3,"seq":10,"cid":"c2","j":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"SIT_DOWN\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":4,"seq":11,"cid":"c2","what":"result:done","domain":"dog","rank":2,"text":"I sit down."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":4,"seq":12,"label":"voice","text":"I am sitting down now.","n_ctx":5242,"ms":65}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":4,"seq":13,"what":"voice","text":"I am sitting down now."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":11,"seq":14,"what":"clock","try":24,"ms":41}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":11,"seq":15,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-d","rep":2,"seed":3,"beat":11,"seq":16,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":507}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":813}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":581}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":3,"seq":8,"what":"person","person":"okay, it's open now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":5158,"ms":522}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":3,"seq":10,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":4,"seq":11,"cid":"c2","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":4,"seq":12,"label":"move","branch":"again","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5293,"ms":570}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":4,"seq":13,"what":"template","text":"I asked you to open the way to the kitchen before, and it is still not done."}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":4,"seq":14,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":11,"seq":15,"what":"clock","try":24,"ms":62}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":11,"seq":16,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-e","rep":0,"seed":1,"beat":11,"seq":17,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":507}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":823}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":568}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":3,"seq":8,"what":"person","person":"okay, it's open now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":5158,"ms":517}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":3,"seq":10,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":4,"seq":11,"cid":"c2","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":4,"seq":12,"label":"move","branch":"again","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5293,"ms":560}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":4,"seq":13,"what":"template","text":"I asked you to open the way to the kitchen before, and it is still not done."}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":4,"seq":14,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":11,"seq":15,"what":"clock","try":24,"ms":62}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":11,"seq":16,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-e","rep":1,"seed":2,"beat":11,"seq":17,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to the kitchen"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":4799,"ms":502}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":1,"seq":4,"cid":"c1","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":1,"seq":5,"label":"move","branch":"none","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003edog\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy is the way to the kitchen closed?\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":4900,"ms":824}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":1,"seq":6,"label":"move","branch":"answer","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5074,"ms":564}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":1,"seq":7,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":3,"seq":8,"what":"person","person":"okay, it's open now","bound":"q1","refused":"{\"goal\":{\"description\":\"kitchen\",\"type\":\"REGION\"},\"intent\":\"NAVIGATE\"}"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":3,"seq":9,"label":"move","branch":"bound","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}","n_ctx":5158,"ms":518}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":3,"seq":10,"cid":"c2","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"REGION\",\"description\":\"kitchen\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":4,"seq":11,"cid":"c2","what":"result:refused","domain":"dog","rank":1,"text":"I can't go to the kitchen because the way to it is closed."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":4,"seq":12,"label":"move","branch":"again","text":"{\"call\":\"ask\",\"text\":\"Can you open the way to the kitchen?\"}","n_ctx":5293,"ms":566}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":4,"seq":13,"what":"template","text":"I asked you to open the way to the kitchen before, and it is still not done."}
+{"kind":"dlg-say","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":4,"seq":14,"what":"ask","text":"Can you open the way to the kitchen?"}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":11,"seq":15,"what":"clock","try":24,"ms":62}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":11,"seq":16,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D3-e","rep":2,"seed":3,"beat":11,"seq":17,"what":"tool","try":1,"ms":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to the sofa"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}","n_ctx":4799,"ms":552}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":1,"seq":5,"label":"voice","text":"I set off for the sofa.","n_ctx":4907,"ms":76}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":1,"seq":6,"what":"voice","text":"I set off for the sofa."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":2,"seq":7,"what":"person","person":"turn left"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":2,"seq":8,"label":"move","branch":"person","text":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"TURN\",\"direction\":\"LEFT\"}","n_ctx":4953,"ms":431}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":2,"seq":9,"cid":"c2","j":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"TURN\",\"direction\":\"LEFT\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":3,"seq":10,"cid":"c2","what":"result:refused","domain":"dog","rank":1,"text":"I can't turn now because I am on a task."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":3,"seq":11,"label":"move","branch":"cancelask","text":"{\"call\":\"ask\",\"text\":\"Do you want me to stop going to the sofa?\"}","n_ctx":5082,"ms":726}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":3,"seq":12,"what":"ask","text":"Do you want me to stop going to the sofa?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":3,"seq":13,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":3,"seq":14,"label":"voice","text":"I have arrived at the sofa.","n_ctx":5181,"ms":74}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":3,"seq":15,"what":"voice","text":"I have arrived at the sofa."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":10,"seq":16,"what":"intent","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":10,"seq":17,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-a","rep":0,"seed":1,"beat":10,"seq":18,"what":"clock","try":23,"ms":58}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to the sofa"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}","n_ctx":4799,"ms":577}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":1,"seq":5,"label":"voice","text":"I set off for the sofa.","n_ctx":4907,"ms":76}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":1,"seq":6,"what":"voice","text":"I set off for the sofa."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":2,"seq":7,"what":"person","person":"turn left"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":2,"seq":8,"label":"move","branch":"person","text":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"TURN\",\"direction\":\"LEFT\"}","n_ctx":4953,"ms":444}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":2,"seq":9,"cid":"c2","j":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"TURN\",\"direction\":\"LEFT\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":3,"seq":10,"cid":"c2","what":"result:refused","domain":"dog","rank":1,"text":"I can't turn now because I am on a task."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":3,"seq":11,"label":"move","branch":"cancelask","text":"{\"call\":\"ask\",\"text\":\"Do you want me to stop going to the sofa?\"}","n_ctx":5082,"ms":631}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":3,"seq":12,"what":"ask","text":"Do you want me to stop going to the sofa?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":3,"seq":13,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":3,"seq":14,"label":"voice","text":"I have arrived at the sofa.","n_ctx":5181,"ms":70}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":3,"seq":15,"what":"voice","text":"I have arrived at the sofa."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":10,"seq":16,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":10,"seq":17,"what":"clock","try":23,"ms":59}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-a","rep":1,"seed":2,"beat":10,"seq":18,"what":"intent","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to the sofa"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}","n_ctx":4799,"ms":553}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":1,"seq":4,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":1,"seq":5,"label":"voice","text":"I set off for the sofa.","n_ctx":4907,"ms":71}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":1,"seq":6,"what":"voice","text":"I set off for the sofa."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":2,"seq":7,"what":"person","person":"turn left"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":2,"seq":8,"label":"move","branch":"person","text":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"TURN\",\"direction\":\"LEFT\"}","n_ctx":4953,"ms":429}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":2,"seq":9,"cid":"c2","j":"{\"intent\":\"LOCAL_ACTION\",\"action\":\"TURN\",\"direction\":\"LEFT\"}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":3,"seq":10,"cid":"c2","what":"result:refused","domain":"dog","rank":1,"text":"I can't turn now because I am on a task."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":3,"seq":11,"label":"move","branch":"cancelask","text":"{\"call\":\"ask\",\"text\":\"Do you want me to stop going to the sofa?\"}","n_ctx":5082,"ms":629}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":3,"seq":12,"what":"ask","text":"Do you want me to stop going to the sofa?"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":3,"seq":13,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":3,"seq":14,"label":"voice","text":"I have arrived at the sofa.","n_ctx":5181,"ms":69}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":3,"seq":15,"what":"voice","text":"I have arrived at the sofa."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":10,"seq":16,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":10,"seq":17,"what":"clock","try":23,"ms":57}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-a","rep":2,"seed":3,"beat":10,"seq":18,"what":"intent","try":2}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to the sofa"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}","n_ctx":4799,"ms":541}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":1,"seq":4,"what":"surprise","domain":"kitchen","rank":1,"text":"surprise 0, paused: takes no new orders until it is closed"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":1,"seq":5,"label":"move","branch":"surprise","harness":true,"text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003ekitchen\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy does the reading differ from the model: pot onion +1, pot space -1?\u003c|\"|\u003e}\u003ctool_call|\u003e"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":1,"seq":6,"label":"move","branch":"answer","text":"\u003c|tool_call\u003ecall:explain{card:\u003c|\"|\u003ekitchen_shared\u003c|\"|\u003e,domain:\u003c|\"|\u003ekitchen\u003c|\"|\u003e,move:\u003c|\"|\u003epartner_load\u003c|\"|\u003e,record:\u003c|\"|\u003e0\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":5085,"ms":880}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":1,"seq":7,"what":"template","text":"The second cook explains it: kitchen shared, partner load. The kitchen carries on."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":1,"seq":8,"what":"notice","domain":"kitchen","rank":3,"text":"notice: kitchen shared partner load explained surprise 0; the reading is adopted"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":1,"seq":9,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":1,"seq":10,"label":"voice","text":"I set off for the sofa.","n_ctx":5282,"ms":70}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":1,"seq":11,"what":"voice","text":"I set off for the sofa."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":1,"seq":12,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":1,"seq":13,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":2,"seq":14,"what":"quiescence","domain":"kitchen","rank":2,"text":"quiet after 22 moves, waiting for the next order"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":2,"seq":15,"label":"voice","text":"The kitchen is quiet after 22 moves, waiting for the next order.","n_ctx":5382,"ms":136}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":2,"seq":16,"what":"voice","text":"The kitchen is quiet after 22 moves, waiting for the next order."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":2,"seq":17,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":2,"seq":18,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":2,"seq":19,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":2,"seq":20,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":2,"seq":21,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":2,"seq":22,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":3,"seq":23,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":3,"seq":24,"label":"voice","text":"I have arrived at the sofa.","n_ctx":5492,"ms":70}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":3,"seq":25,"what":"voice","text":"I have arrived at the sofa."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":8,"seq":26,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":8,"seq":27,"what":"clock","try":41,"ms":31}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":8,"seq":28,"what":"intent","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":0,"seed":1,"beat":8,"seq":29,"what":"tool","try":2,"ms":3538}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to the sofa"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}","n_ctx":4799,"ms":541}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":1,"seq":4,"what":"surprise","domain":"kitchen","rank":1,"text":"surprise 0, paused: takes no new orders until it is closed"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":1,"seq":5,"label":"move","branch":"surprise","harness":true,"text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003ekitchen\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy does the reading differ from the model: pot onion +1, pot space -1?\u003c|\"|\u003e}\u003ctool_call|\u003e"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":1,"seq":6,"label":"move","branch":"answer","text":"\u003c|tool_call\u003ecall:explain{card:\u003c|\"|\u003ekitchen_shared\u003c|\"|\u003e,domain:\u003c|\"|\u003ekitchen\u003c|\"|\u003e,move:\u003c|\"|\u003epartner_load\u003c|\"|\u003e,record:\u003c|\"|\u003e0\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":5085,"ms":872}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":1,"seq":7,"what":"template","text":"The second cook explains it: kitchen shared, partner load. The kitchen carries on."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":1,"seq":8,"what":"notice","domain":"kitchen","rank":3,"text":"notice: kitchen shared partner load explained surprise 0; the reading is adopted"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":1,"seq":9,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":1,"seq":10,"label":"voice","text":"I set off for the sofa.","n_ctx":5282,"ms":70}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":1,"seq":11,"what":"voice","text":"I set off for the sofa."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":1,"seq":12,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":1,"seq":13,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":2,"seq":14,"what":"quiescence","domain":"kitchen","rank":2,"text":"quiet after 22 moves, waiting for the next order"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":2,"seq":15,"label":"voice","text":"The kitchen is quiet after 22 moves, waiting for the next order.","n_ctx":5382,"ms":136}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":2,"seq":16,"what":"voice","text":"The kitchen is quiet after 22 moves, waiting for the next order."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":2,"seq":17,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":2,"seq":18,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":2,"seq":19,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":2,"seq":20,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":2,"seq":21,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":2,"seq":22,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":3,"seq":23,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":3,"seq":24,"label":"voice","text":"I have arrived at the sofa.","n_ctx":5492,"ms":71}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":3,"seq":25,"what":"voice","text":"I have arrived at the sofa."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":8,"seq":26,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":8,"seq":27,"what":"clock","try":41,"ms":31}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":8,"seq":28,"what":"intent","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":1,"seed":2,"beat":8,"seq":29,"what":"tool","try":2,"ms":3595}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to the sofa"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}","n_ctx":4799,"ms":545}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"sofa\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":1,"seq":4,"what":"surprise","domain":"kitchen","rank":1,"text":"surprise 0, paused: takes no new orders until it is closed"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":1,"seq":5,"label":"move","branch":"surprise","harness":true,"text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003ekitchen\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy does the reading differ from the model: pot onion +1, pot space -1?\u003c|\"|\u003e}\u003ctool_call|\u003e"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":1,"seq":6,"label":"move","branch":"answer","text":"\u003c|tool_call\u003ecall:explain{card:\u003c|\"|\u003ekitchen_shared\u003c|\"|\u003e,domain:\u003c|\"|\u003ekitchen\u003c|\"|\u003e,move:\u003c|\"|\u003epartner_load\u003c|\"|\u003e,record:\u003c|\"|\u003e0\u003c|\"|\u003e}\u003ctool_call|\u003e","n_ctx":5085,"ms":887}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":1,"seq":7,"what":"template","text":"The second cook explains it: kitchen shared, partner load. The kitchen carries on."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":1,"seq":8,"what":"notice","domain":"kitchen","rank":3,"text":"notice: kitchen shared partner load explained surprise 0; the reading is adopted"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":1,"seq":9,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":1,"seq":10,"label":"voice","text":"I set off for the sofa.","n_ctx":5282,"ms":70}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":1,"seq":11,"what":"voice","text":"I set off for the sofa."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":1,"seq":12,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":1,"seq":13,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":2,"seq":14,"what":"quiescence","domain":"kitchen","rank":2,"text":"quiet after 22 moves, waiting for the next order"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":2,"seq":15,"label":"voice","text":"The kitchen is quiet after 22 moves, waiting for the next order.","n_ctx":5382,"ms":136}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":2,"seq":16,"what":"voice","text":"The kitchen is quiet after 22 moves, waiting for the next order."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":2,"seq":17,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":2,"seq":18,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":2,"seq":19,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":2,"seq":20,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":2,"seq":21,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":2,"seq":22,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":3,"seq":23,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the sofa."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":3,"seq":24,"label":"voice","text":"I have arrived at the sofa.","n_ctx":5492,"ms":71}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":3,"seq":25,"what":"voice","text":"I have arrived at the sofa."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":8,"seq":26,"what":"world","try":2}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":8,"seq":27,"what":"clock","try":41,"ms":31}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":8,"seq":28,"what":"intent","try":1}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-b","rep":2,"seed":3,"beat":8,"seq":29,"what":"tool","try":2,"ms":3616}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":0,"seq":1,"what":"person","person":"go to the door"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}","n_ctx":4799,"ms":499}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":4,"what":"quiescence","domain":"kitchen","rank":2,"text":"quiet after 12 moves, waiting for the next order"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":5,"label":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order.","n_ctx":4909,"ms":134}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":6,"what":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":7,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":8,"label":"voice","text":"I set off for the door.","n_ctx":5029,"ms":71}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":9,"what":"voice","text":"I set off for the door."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":10,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":11,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":12,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":13,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":14,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":15,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":16,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":17,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":18,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":1,"seq":19,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":3,"seq":20,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":3,"seq":21,"label":"voice","text":"I have arrived at the door.","n_ctx":5130,"ms":70}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":3,"seq":22,"what":"voice","text":"I have arrived at the door."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":8,"seq":23,"what":"clock","try":17,"ms":42}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-c","rep":0,"seed":1,"beat":8,"seq":24,"what":"intent","try":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":0,"seq":1,"what":"person","person":"go to the door"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}","n_ctx":4799,"ms":494}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":4,"what":"quiescence","domain":"kitchen","rank":2,"text":"quiet after 12 moves, waiting for the next order"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":5,"label":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order.","n_ctx":4909,"ms":133}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":6,"what":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":7,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":8,"label":"voice","text":"I set off for the door.","n_ctx":5029,"ms":71}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":9,"what":"voice","text":"I set off for the door."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":10,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":11,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":12,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":13,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":14,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":15,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":16,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":17,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":18,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":1,"seq":19,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":3,"seq":20,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":3,"seq":21,"label":"voice","text":"I have arrived at the door.","n_ctx":5130,"ms":70}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":3,"seq":22,"what":"voice","text":"I have arrived at the door."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":8,"seq":23,"what":"clock","try":17,"ms":42}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-c","rep":1,"seed":2,"beat":8,"seq":24,"what":"intent","try":1}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":0,"seq":1,"what":"person","person":"go to the door"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":0,"seq":2,"label":"move","branch":"person","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}","n_ctx":4799,"ms":500}
+{"kind":"dlg-dispatch","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":0,"seq":3,"cid":"c1","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}"}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":4,"what":"quiescence","domain":"kitchen","rank":2,"text":"quiet after 12 moves, waiting for the next order"}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":5,"label":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order.","n_ctx":4909,"ms":135}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":6,"what":"voice","text":"The kitchen is quiet after 12 moves, waiting for the next order."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":7,"cid":"c1","what":"result:progress","domain":"dog","rank":4,"text":"I set off for the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":8,"label":"voice","text":"I set off for the door.","n_ctx":5029,"ms":72}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":9,"what":"voice","text":"I set off for the door."}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":10,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":11,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":12,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":13,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":14,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":15,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":16,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":17,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":18,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":1,"seq":19,"what":"event","domain":"kitchen","rank":4}
+{"kind":"dlg-wake","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":3,"seq":20,"cid":"c1","what":"result:done","domain":"dog","rank":2,"text":"I have arrived at the door."}
+{"kind":"dlg-gen","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":3,"seq":21,"label":"voice","text":"I have arrived at the door.","n_ctx":5130,"ms":70}
+{"kind":"dlg-say","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":3,"seq":22,"what":"voice","text":"I have arrived at the door."}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":8,"seq":23,"what":"clock","try":17,"ms":42}
+{"kind":"dlg-wire","tag":"int-step2b","id":"D4-c","rep":2,"seed":3,"beat":8,"seq":24,"what":"intent","try":1}

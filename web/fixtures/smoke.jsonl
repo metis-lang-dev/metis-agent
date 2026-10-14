@@ -1,0 +1,47 @@
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":2,"rep":0,"seq":1,"t":"2026-10-14T13:08:58.990666414+03:00","text":"quiet after 1 moves, waiting for the next order","what":"quiescence"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":129,"n_ctx":4849,"rep":0,"seq":2,"t":"2026-10-14T13:08:59.12803447+03:00","text":"The kitchen is quiet after one move, waiting for the next order.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":3,"t":"2026-10-14T13:08:59.128083019+03:00","text":"The kitchen is quiet after one move, waiting for the next order.","what":"voice"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":2,"rep":0,"seq":4,"t":"2026-10-14T13:08:59.139269565+03:00","text":"quiet after 12 moves, waiting for the next order","what":"quiescence"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":158,"n_ctx":4947,"rep":0,"seq":5,"t":"2026-10-14T13:08:59.306096951+03:00","text":"The kitchen reports that it is quiet after 12 moves, waiting for the next order.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":6,"t":"2026-10-14T13:08:59.306156782+03:00","text":"The kitchen reports that it is quiet after 12 moves, waiting for the next order.","what":"voice"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":7,"t":"2026-10-14T13:08:59.308722234+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":8,"t":"2026-10-14T13:08:59.308738405+03:00","text":"outside: +pot space 3","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":9,"t":"2026-10-14T13:08:59.308743695+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":10,"t":"2026-10-14T13:08:59.308747176+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":11,"t":"2026-10-14T13:08:59.308751658+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":12,"t":"2026-10-14T13:08:59.308754459+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":13,"t":"2026-10-14T13:08:59.308757274+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":14,"t":"2026-10-14T13:08:59.308759915+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":15,"t":"2026-10-14T13:08:59.308771509+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":16,"t":"2026-10-14T13:08:59.308774556+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":17,"t":"2026-10-14T13:08:59.308776964+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":18,"t":"2026-10-14T13:08:59.308779081+03:00","text":"","what":"event"}
+{"id":"live","kind":"dlg-wake","person":"go to the door","rep":0,"seq":19,"t":"2026-10-14T13:09:01.720710401+03:00","what":"person"}
+{"branch":"person","harness":false,"id":"live","kind":"dlg-gen","label":"move","ms":553,"n_ctx":5007,"rep":0,"seq":20,"t":"2026-10-14T13:09:02.282784972+03:00","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}","try":0}
+{"cid":"c1","id":"live","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}","kind":"dlg-dispatch","rep":0,"seq":21,"t":"2026-10-14T13:09:02.282832483+03:00"}
+{"beat":4,"cid":"c1","domain":"dog","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":22,"t":"2026-10-14T13:09:04.555973851+03:00","text":"I set off for the door.","what":"result:progress"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":71,"n_ctx":5123,"rep":0,"seq":23,"t":"2026-10-14T13:09:04.634529256+03:00","text":"I set off for the door.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":24,"t":"2026-10-14T13:09:04.634585302+03:00","text":"I set off for the door.","what":"voice"}
+{"beat":6,"cid":"c1","domain":"dog","id":"live","kind":"dlg-wake","rank":2,"rep":0,"seq":25,"t":"2026-10-14T13:09:06.805673165+03:00","text":"I have arrived at the door.","what":"result:done"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":71,"n_ctx":5219,"rep":0,"seq":26,"t":"2026-10-14T13:09:06.882963458+03:00","text":"I have arrived at the door.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":27,"t":"2026-10-14T13:09:06.882999785+03:00","text":"I have arrived at the door.","what":"voice"}
+{"id":"live","kind":"dlg-wake","person":"what are you doing?","rep":0,"seq":28,"t":"2026-10-14T13:09:09.723619984+03:00","what":"person"}
+{"branch":"person","harness":false,"id":"live","kind":"dlg-gen","label":"move","ms":224,"n_ctx":5268,"rep":0,"seq":29,"t":"2026-10-14T13:09:09.956555827+03:00","text":"{\"intent\":\"CHITCHAT\"}","try":0}
+{"branch":"person","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":62,"n_ctx":5307,"rep":0,"seq":30,"t":"2026-10-14T13:09:10.02349979+03:00","text":"I am just idle right now.","try":0}
+{"beat":12,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":31,"t":"2026-10-14T13:09:15.451520887+03:00","text":"outside: +pot space 3","what":"event"}
+{"beat":13,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":1,"rep":0,"seq":32,"t":"2026-10-14T13:09:16.955245696+03:00","text":"surprise 0, paused: takes no new orders until it is closed","what":"surprise"}
+{"branch":"surprise","harness":false,"id":"live","kind":"dlg-gen","label":"move","ms":808,"n_ctx":5384,"rep":0,"seq":33,"t":"2026-10-14T13:09:17.772794724+03:00","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003ekitchen\u003c|\"|\u003e,question:\u003c|\"|\u003ehow do I close surprise 0?\u003c|\"|\u003e}\u003ctool_call|\u003e","try":0}
+{"branch":"answer","harness":true,"id":"live","kind":"dlg-gen","label":"move","ms":0,"n_ctx":0,"rep":0,"seq":34,"t":"2026-10-14T13:09:22.705663008+03:00","text":"\u003c|tool_call\u003ecall:escalate{domain:\u003c|\"|\u003ekitchen\u003c|\"|\u003e,record:\u003c|\"|\u003e0\u003c|\"|\u003e,text:\u003c|\"|\u003eThe reading differs from the model because the model expected 1 onion in the pot, but 2 onions are present. This suggests that a shared kitchen scenario might be at play; pot onion +1, pot space -1\u003c|\"|\u003e}\u003ctool_call|\u003e","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":35,"t":"2026-10-14T13:09:22.712811213+03:00","text":"I've passed this to the people who revise the model.","what":"template"}
+{"beat":13,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":36,"t":"2026-10-14T13:09:22.756814977+03:00","text":"","what":"event"}
+{"beat":13,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":37,"t":"2026-10-14T13:09:22.756825674+03:00","text":"","what":"event"}
+{"id":"live","kind":"dlg-wake","person":"find my keys","rep":0,"seq":38,"t":"2026-10-14T13:09:22.756844073+03:00","what":"person"}
+{"branch":"person","harness":false,"id":"live","kind":"dlg-gen","label":"move","ms":483,"n_ctx":5688,"rep":0,"seq":39,"t":"2026-10-14T13:09:23.248553343+03:00","text":"{\"intent\":\"FIND\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}","try":0}
+{"cid":"c2","id":"live","j":"{\"intent\":\"FIND\",\"target\":{\"type\":\"OBJECT\",\"description\":\"keys\"}}","kind":"dlg-dispatch","rep":0,"seq":40,"t":"2026-10-14T13:09:23.24860822+03:00"}
+{"beat":15,"cid":"c2","domain":"dog","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":41,"t":"2026-10-14T13:09:24.171813525+03:00","text":"I start looking for the keys.","what":"result:progress"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":72,"n_ctx":5805,"rep":0,"seq":42,"t":"2026-10-14T13:09:24.250709902+03:00","text":"I start looking for the keys.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":43,"t":"2026-10-14T13:09:24.25075338+03:00","text":"I start looking for the keys.","what":"voice"}
+{"beat":18,"cid":"c2","domain":"dog","id":"live","kind":"dlg-wake","rank":2,"rep":0,"seq":44,"t":"2026-10-14T13:09:27.740761054+03:00","text":"I found the keys.","what":"result:done"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":58,"n_ctx":5903,"rep":0,"seq":45,"t":"2026-10-14T13:09:27.805675845+03:00","text":"I found the keys.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":46,"t":"2026-10-14T13:09:27.805726952+03:00","text":"I found the keys.","what":"voice"}
+{"beat":21,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":47,"t":"2026-10-14T13:09:31.948329184+03:00","text":"outside: +pot space 3","what":"event"}

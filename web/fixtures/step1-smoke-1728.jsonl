@@ -1,0 +1,65 @@
+{"id":"live","kind":"dlg-start","rep":0,"seq":1,"t":"2026-10-14T17:27:47.133686942+03:00","why":"first viewer"}
+{"id":"live","kind":"dlg-wake","person":"go to the door","rep":0,"seq":2,"t":"2026-10-14T17:27:47.134024822+03:00","what":"person"}
+{"branch":"person","harness":false,"id":"live","kind":"dlg-gen","label":"move","ms":604,"n_ctx":4799,"rep":0,"seq":3,"t":"2026-10-14T17:27:47.74659391+03:00","text":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}","try":0}
+{"cid":"c1","id":"live","j":"{\"intent\":\"NAVIGATE\",\"goal\":{\"type\":\"OBJECT\",\"description\":\"door\"}}","kind":"dlg-dispatch","rep":0,"seq":4,"t":"2026-10-14T17:27:47.746670163+03:00"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":2,"rep":0,"seq":5,"t":"2026-10-14T17:27:49.737168678+03:00","text":"quiet after 1 moves, waiting for the next order","what":"quiescence"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":120,"n_ctx":4907,"rep":0,"seq":6,"t":"2026-10-14T17:27:49.864450313+03:00","text":"The kitchen is quiet after one move and waiting for the next order.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":7,"t":"2026-10-14T17:27:49.864496896+03:00","text":"The kitchen is quiet after one move and waiting for the next order.","what":"voice"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":2,"rep":0,"seq":8,"t":"2026-10-14T17:27:49.867242574+03:00","text":"quiet after 12 moves, waiting for the next order","what":"quiescence"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":121,"n_ctx":5014,"rep":0,"seq":9,"t":"2026-10-14T17:27:49.996328134+03:00","text":"The kitchen is quiet after twelve moves and waiting for the next order.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":10,"t":"2026-10-14T17:27:49.996370793+03:00","text":"The kitchen is quiet after twelve moves and waiting for the next order.","what":"voice"}
+{"beat":1,"cid":"c1","domain":"dog","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":11,"t":"2026-10-14T17:27:49.998835329+03:00","text":"I set off for the door.","what":"result:progress"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":71,"n_ctx":5132,"rep":0,"seq":12,"t":"2026-10-14T17:27:50.079504611+03:00","text":"I set off for the door.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":13,"t":"2026-10-14T17:27:50.079544101+03:00","text":"I set off for the door.","what":"voice"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":14,"t":"2026-10-14T17:27:50.081782916+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":15,"t":"2026-10-14T17:27:50.081802534+03:00","text":"outside: +pot space 3","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":16,"t":"2026-10-14T17:27:50.081809862+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":17,"t":"2026-10-14T17:27:50.081813506+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":18,"t":"2026-10-14T17:27:50.081817017+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":19,"t":"2026-10-14T17:27:50.081820216+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":20,"t":"2026-10-14T17:27:50.081823166+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":21,"t":"2026-10-14T17:27:50.08182569+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":22,"t":"2026-10-14T17:27:50.081833738+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":23,"t":"2026-10-14T17:27:50.081836684+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":24,"t":"2026-10-14T17:27:50.081845932+03:00","text":"","what":"event"}
+{"beat":1,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":25,"t":"2026-10-14T17:27:50.081848383+03:00","text":"","what":"event"}
+{"beat":3,"cid":"c1","domain":"dog","id":"live","kind":"dlg-wake","rank":2,"rep":0,"seq":26,"t":"2026-10-14T17:27:51.988487812+03:00","text":"I have arrived at the door.","what":"result:done"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":70,"n_ctx":5228,"rep":0,"seq":27,"t":"2026-10-14T17:27:52.065218394+03:00","text":"I have arrived at the door.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":28,"t":"2026-10-14T17:27:52.065288202+03:00","text":"I have arrived at the door.","what":"voice"}
+{"id":"live","kind":"dlg-wake","person":"what are you doing?","rep":0,"seq":29,"t":"2026-10-14T17:27:59.14035565+03:00","what":"person"}
+{"branch":"person","harness":false,"id":"live","kind":"dlg-gen","label":"move","ms":249,"n_ctx":5277,"rep":0,"seq":30,"t":"2026-10-14T17:27:59.397299044+03:00","text":"{\"intent\":\"CHITCHAT\"}","try":0}
+{"branch":"person","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":55,"n_ctx":5316,"rep":0,"seq":31,"t":"2026-10-14T17:27:59.456171918+03:00","text":"I am just standing here.","try":0}
+{"beat":12,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":32,"t":"2026-10-14T17:28:05.140631763+03:00","text":"outside: +pot space 3","what":"event"}
+{"beat":13,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":1,"record":"0","rep":0,"seq":33,"t":"2026-10-14T17:28:06.645445977+03:00","text":"surprise 0, paused: takes no new orders until it is closed","what":"surprise"}
+{"branch":"surprise","harness":true,"id":"live","kind":"dlg-gen","label":"move","ms":0,"n_ctx":0,"rep":0,"seq":34,"t":"2026-10-14T17:28:06.645570327+03:00","text":"\u003c|tool_call\u003ecall:consult{domain:\u003c|\"|\u003ekitchen\u003c|\"|\u003e,question:\u003c|\"|\u003ewhy does the reading differ from the model: pot onion +1, pot space -1?\u003c|\"|\u003e}\u003ctool_call|\u003e","try":0}
+{"branch":"answer","harness":false,"id":"live","kind":"dlg-gen","label":"move","ms":906,"n_ctx":5602,"rep":0,"seq":35,"t":"2026-10-14T17:28:14.715554031+03:00","text":"\u003c|tool_call\u003ecall:explain{card:\u003c|\"|\u003ekitchen_shared\u003c|\"|\u003e,domain:\u003c|\"|\u003ekitchen\u003c|\"|\u003e,move:\u003c|\"|\u003epartner_load\u003c|\"|\u003e,record:\u003c|\"|\u003e0\u003c|\"|\u003e}\u003ctool_call|\u003e","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":36,"t":"2026-10-14T17:28:14.726877454+03:00","text":"The second cook explains it: kitchen shared, partner load. The kitchen carries on.","what":"template"}
+{"beat":13,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":3,"record":"0","rep":0,"seq":37,"t":"2026-10-14T17:28:14.744452363+03:00","text":"notice: kitchen shared partner load explained surprise 0; the reading is adopted","what":"notice"}
+{"beat":13,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":38,"t":"2026-10-14T17:28:14.744471906+03:00","text":"","what":"event"}
+{"beat":13,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":39,"t":"2026-10-14T17:28:14.744476227+03:00","text":"","what":"event"}
+{"beat":14,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":2,"rep":0,"seq":40,"t":"2026-10-14T17:28:14.754360093+03:00","text":"quiet after 22 moves, waiting for the next order","what":"quiescence"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":137,"n_ctx":5793,"rep":0,"seq":41,"t":"2026-10-14T17:28:14.896431776+03:00","text":"The kitchen is quiet after twenty-two moves and waiting for the next order.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":42,"t":"2026-10-14T17:28:14.896476147+03:00","text":"The kitchen is quiet after twenty-two moves and waiting for the next order.","what":"voice"}
+{"beat":14,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":43,"t":"2026-10-14T17:28:14.898803131+03:00","text":"","what":"event"}
+{"beat":14,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":44,"t":"2026-10-14T17:28:14.898814872+03:00","text":"","what":"event"}
+{"beat":14,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":45,"t":"2026-10-14T17:28:14.898818929+03:00","text":"","what":"event"}
+{"beat":14,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":46,"t":"2026-10-14T17:28:14.8988219+03:00","text":"","what":"event"}
+{"beat":14,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":47,"t":"2026-10-14T17:28:14.898824632+03:00","text":"","what":"event"}
+{"beat":14,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":48,"t":"2026-10-14T17:28:14.898830181+03:00","text":"","what":"event"}
+{"beat":22,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":49,"t":"2026-10-14T17:28:26.139439999+03:00","text":"outside: +pot space 3","what":"event"}
+{"beat":23,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":2,"rep":0,"seq":50,"t":"2026-10-14T17:28:27.645170676+03:00","text":"quiet after 33 moves, waiting for the next order","what":"quiescence"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":146,"n_ctx":5893,"rep":0,"seq":51,"t":"2026-10-14T17:28:27.801709899+03:00","text":"The kitchen is quiet after thirty-three moves and waiting for the next order.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":52,"t":"2026-10-14T17:28:27.80176969+03:00","text":"The kitchen is quiet after thirty-three moves and waiting for the next order.","what":"voice"}
+{"beat":23,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":53,"t":"2026-10-14T17:28:27.804415733+03:00","text":"","what":"event"}
+{"beat":23,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":54,"t":"2026-10-14T17:28:27.8044294+03:00","text":"","what":"event"}
+{"beat":23,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":55,"t":"2026-10-14T17:28:27.804434491+03:00","text":"","what":"event"}
+{"beat":23,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":56,"t":"2026-10-14T17:28:27.804438424+03:00","text":"","what":"event"}
+{"beat":23,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":57,"t":"2026-10-14T17:28:27.804442281+03:00","text":"","what":"event"}
+{"beat":23,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":58,"t":"2026-10-14T17:28:27.804445316+03:00","text":"","what":"event"}
+{"beat":23,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":59,"t":"2026-10-14T17:28:27.804449546+03:00","text":"","what":"event"}
+{"beat":23,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":60,"t":"2026-10-14T17:28:27.804452654+03:00","text":"","what":"event"}
+{"beat":23,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":61,"t":"2026-10-14T17:28:27.804455407+03:00","text":"","what":"event"}
+{"beat":23,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":4,"rep":0,"seq":62,"t":"2026-10-14T17:28:27.804457932+03:00","text":"","what":"event"}
+{"beat":34,"cid":"","domain":"kitchen","id":"live","kind":"dlg-wake","rank":2,"rep":0,"seq":63,"t":"2026-10-14T17:28:44.14091953+03:00","text":"the day is over","what":"quiescence"}
+{"branch":"","harness":false,"id":"live","kind":"dlg-gen","label":"voice","ms":91,"n_ctx":5977,"rep":0,"seq":64,"t":"2026-10-14T17:28:44.244972232+03:00","text":"The kitchen reports that the day is over.","try":0}
+{"id":"live","kind":"dlg-say","rep":0,"seq":65,"t":"2026-10-14T17:28:44.245029486+03:00","text":"The kitchen reports that the day is over.","what":"voice"}

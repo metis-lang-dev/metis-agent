@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>metis-agent console</title>
+<link rel="stylesheet" href="console.css">
+</head>
+<body>
+<header>
+  <h1>metis-agent <span>console</span></h1>
+  <span id="conn" class="pill">connecting…</span>
+  <span id="floor" class="pill quiet" title="the page's floor (fsttm-web lib/dialog.js)">floor —</span>
+  <span class="grow"></span>
+  <label class="tog" title="speak the agent's lines (speechSynthesis)"><input type="checkbox" id="voiceOn" checked> voice</label>
+  <button id="micBtn" title="the recognizer: what you say is a person turn">🎤 mic off</button>
+  <button id="legendBtn" class="ghost" title="what the source labels mean">sources?</button>
+</header>
+
+<div id="replayBar" hidden>
+  <b>replay</b> <span id="replayName"></span>
+  <select id="replayPick" title="a recorded journal"></select>
+  <button id="replayStep" title="the next record">step</button>
+  <button id="replayPlay">▶ play</button>
+  <label>speed <select id="replaySpeed"><option>1</option><option>4</option><option selected>10</option><option>50</option></select>×</label>
+  <span id="replayPos" class="quiet"></span>
+</div>
+
+<div id="legend" hidden>
+  <div><span class="src s-person">you</span> your turn, typed or spoken: every utterance is a person turn of the orchestrator</div>
+  <div><span class="src s-model">model · branch</span> the orchestrator's model wrote the line on that branch (person, outcome, answer, again …)</div>
+  <div><span class="src s-relay">model · copies the dog's narrator</span> the model's line is the domain's own text word for word: its narrator's sentence, or its <code>%%</code> line when the narrator's did not hold</div>
+  <div><span class="src s-harness">harness · template</span> the harness's fixed words, no model (a bound "no", a surprise closed, an escalation)</div>
+  <div><span class="src s-cut">cut</span> you barged in: what was heard of the line, the rest unsaid</div>
+  <div class="quiet">"derived": the journal had no <code>src</code> on the line (before agent-console step 1); the page read it off the records before the line. Click any label for the records it rests on.</div>
+</div>
+
+<main>
+  <section id="chatPane" class="pane">
+    <h2>orchestrator <span class="quiet">· every line with its source</span></h2>
+    <div id="chat" class="scroll"></div>
+    <form id="say">
+      <input id="sayText" autocomplete="off" placeholder="say something — go to the door · what are you doing? · stop">
+      <button>send</button>
+    </form>
+  </section>
+
+  <section id="sidePane">
+    <div class="pane" id="domainsPane">
+      <h2>domains <span class="quiet">· the installed catalog</span></h2>
+      <div id="domains"></div>
+    </div>
+    <div class="pane" id="tabsPane">
+      <nav id="tabs"></nav>
+      <nav id="subtabs">
+        <button data-sub="stream" class="on">stream</button>
+        <button data-sub="repl">REPL log</button>
+        <button data-sub="world">world ports</button>
+      </nav>
+      <div id="tabBody" class="scroll"></div>
+    </div>
+  </section>
+</main>
+
+<section class="pane" id="journalPane">
+  <h2>journal <span class="quiet">· the dlg-* lines the E13 reads consume</span>
+    <span class="grow"></span>
+    <span id="kindFilter"></span>
+    <select id="domFilter"><option value="">every domain</option></select>
+    <input id="textFilter" placeholder="filter text">
+    <label class="tog"><input type="checkbox" id="showEvents"> clause events</label>
+  </h2>
+  <div id="journal" class="scroll mono"></div>
+</section>
+
+<script type="importmap">
+{ "imports": { "fsttm-web/fsttm": "./lib/fsttm.js", "fsttm-web/attention": "./lib/attention.js",
+               "fsttm-web/dialog": "./lib/dialog.js", "fsttm-web/tts": "./lib/tts.js" } }
+</script>
+<script type="module" src="console.js"></script>
+</body>
+</html>
