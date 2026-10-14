@@ -1,0 +1,17 @@
+# py/ (the specialist, the domain agent): pinned to the dev venv (py/.venv,
+# 2026-10-14). metispy is a sibling checkout, installed editable beside this
+# (pip install -e ../metispy); it is not on PyPI.
+# llama_cpp_python builds from source (CPU in CI: CMAKE_ARGS in ci.yml);
+# seat.py imports it at module level, so every test file needs it importable
+# even though no test loads weights.
+llama_cpp_python==0.3.36
+diskcache==5.6.3
+Jinja2==3.1.6
+MarkupSafe==3.0.4
+numpy==2.5.4
+typing_extensions==4.16.0
+pytest==9.1.1
+iniconfig==2.3.1
+packaging==26.3
+pluggy==1.6.0
+Pygments==2.21.0

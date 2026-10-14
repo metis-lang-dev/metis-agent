@@ -1,0 +1,140 @@
+name: ci
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # the pin: the archive checkout the harness is built and benched against
+  LLAMA_COMMIT: 8ad8aef447703e76cdcf74ed78dab16b92ec231a
+  # metispy and metis-catalog are PRIVATE siblings: read with METIS_READ_TOKEN
+  # (Contents: read on both), as metispy's own ci.yml reads metis-catalog
+  HAVE_READ_TOKEN: ${{ secrets.METIS_READ_TOKEN != '' }}
+
+jobs:
+  # go/: cgo against a CPU-only llama.cpp at the pin (cached on the commit);
+  # vet, every cmd built, every package tested. Model-gated tests skip
+  # without weights (go/models is not in git); the metispy-backed kernel test
+  # runs when the token lets metispy be checked out, else skips.
+  go:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: metis-agent
+      - name: Checkout metispy (private sibling; needs METIS_READ_TOKEN)
+        if: env.HAVE_READ_TOKEN == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: metis-lang-dev/metispy
+          token: ${{ secrets.METIS_READ_TOKEN }}
+          path: metispy
+      - uses: actions/setup-python@v5
+        if: env.HAVE_READ_TOKEN == 'true'
+        with:
+          python-version: '3.12'
+      - name: metispy's runtime for the kernel test
+        if: env.HAVE_READ_TOKEN == 'true'
+        run: |
+          pip install -e ./metispy
+          echo "METISPY=$GITHUB_WORKSPACE/metispy" >> "$GITHUB_ENV"
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: metis-agent/go/go.mod
+          cache-dependency-path: metis-agent/go/go.sum
+      - name: Cache llama.cpp (CPU, the pinned commit)
+        id: llama
+        uses: actions/cache@v4
+        with:
+          path: llama.cpp
+          key: llama-cpu-${{ runner.os }}-${{ env.LLAMA_COMMIT }}-${{ hashFiles('metis-agent/go/ci/llama-cpu.sh') }}
+      - name: Build llama.cpp (CPU)
+        if: steps.llama.outputs.cache-hit != 'true'
+        run: metis-agent/go/ci/llama-cpu.sh "$GITHUB_WORKSPACE/llama.cpp" "$LLAMA_COMMIT"
+      - name: go vet
+        working-directory: metis-agent/go
+        env:
+          LLAMA_DIR: ${{ github.workspace }}/llama.cpp
+        run: ./build.sh vet ./...
+      - name: Build every cmd (metis-agent, llmbench, episodes, domemu)
+        working-directory: metis-agent/go
+        env:
+          LLAMA_DIR: ${{ github.workspace }}/llama.cpp
+        run: |
+          ./build.sh
+          for c in metis-agent llmbench episodes domemu; do test -x "bin/$c" || { echo "::error::cmd $c not built"; exit 1; }; done
+      - name: go test ./...
+        working-directory: metis-agent/go
+        env:
+          LLAMA_DIR: ${{ github.workspace }}/llama.cpp
+        run: |
+          rc=0
+          ./build.sh test -count=1 -v ./... > go-test.log 2>&1 || rc=$?
+          grep -E '^(ok|FAIL|--- FAIL|panic)|^\s+\S+_test\.go:[0-9]+:' go-test.log || true
+          {
+            echo "### go test: $(grep -c -- '--- PASS' go-test.log) passed, $(grep -c -- '--- SKIP' go-test.log) skipped, $(grep -c -- '--- FAIL' go-test.log) failed"
+            echo '```'
+            grep -B1 -- '--- SKIP' go-test.log | grep -v -- '--- SKIP' | grep -v '^--$' | sed 's/^ *//' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $rc
+
+  # py/: the specialist and the domain agent (py/tests). Every test file
+  # imports metispy and reads metis-catalog (domains/dog, wolf-goat-cabbage),
+  # both PRIVATE: without METIS_READ_TOKEN nothing can run, and the job says
+  # so (a warning and the summary), never a silent green.
+  py:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: No METIS_READ_TOKEN — py/ tests NOT run
+        if: env.HAVE_READ_TOKEN != 'true'
+        run: |
+          echo "::warning::py/ tests NOT run: they need metispy and metis-catalog (private); set METIS_READ_TOKEN (Contents: read on metis-lang-dev/metispy and metis-lang-dev/metis-catalog)"
+          echo "### NOT run (needs METIS_READ_TOKEN): py/tests — all four files import metispy and read metis-catalog" >> "$GITHUB_STEP_SUMMARY"
+      # py/ finds its siblings beside the repo (ROOT.parent/metis-catalog)
+      - uses: actions/checkout@v4
+        if: env.HAVE_READ_TOKEN == 'true'
+        with:
+          path: metis-agent
+      - name: Checkout metispy (private sibling)
+        if: env.HAVE_READ_TOKEN == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: metis-lang-dev/metispy
+          token: ${{ secrets.METIS_READ_TOKEN }}
+          path: metispy
+      - name: Checkout metis-catalog (private sibling)
+        if: env.HAVE_READ_TOKEN == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: metis-lang-dev/metis-catalog
+          token: ${{ secrets.METIS_READ_TOKEN }}
+          path: metis-catalog
+      - uses: actions/setup-python@v5
+        if: env.HAVE_READ_TOKEN == 'true'
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: metis-agent/py/requirements.txt
+      - name: Install (llama_cpp_python builds CPU-only from source; the pip cache keeps the wheel)
+        if: env.HAVE_READ_TOKEN == 'true'
+        env:
+          CMAKE_ARGS: -DGGML_NATIVE=OFF -DGGML_CUDA=OFF -DLLAMA_BUILD_TESTS=OFF -DLLAMA_BUILD_EXAMPLES=OFF -DLLAMA_BUILD_SERVER=OFF -DLLAMA_CURL=OFF
+        run: |
+          pip install -r metis-agent/py/requirements.txt
+          pip install -e ./metispy
+      - name: pytest py/tests
+        if: env.HAVE_READ_TOKEN == 'true'
+        working-directory: metis-agent/py
+        run: python -m pytest -q tests

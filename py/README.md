@@ -25,6 +25,10 @@ CUDACXX=/usr/local/cuda/bin/nvcc CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITE
 py/.venv/bin/pip install -e ../metispy pytest
 ```
 
+`py/requirements.txt` pins what this venv has (CI installs it, with
+llama-cpp-python built CPU-only). metispy and metis-catalog are private
+siblings: CI runs `py/tests` only with `METIS_READ_TOKEN`.
+
 ## Run (from metis-agent/)
 
 ```bash

@@ -28,9 +28,15 @@ Go ≥ 1.24 and a built llama.cpp checkout (CMake, `-DGGML_CUDA=ON` for the
 GPU).
 
 ```bash
-./build.sh                 # bin/metis-agent bin/llmbench bin/episodes
+./build.sh                 # bin/metis-agent bin/llmbench bin/episodes bin/domemu
 ./build.sh test            # go test ./... (model-gated tests skip)
+./build.sh vet             # go vet ./... with the same cgo flags
 ```
+
+CI (`.github/workflows/ci.yml`) builds llama.cpp CPU-only at the pinned
+commit with `ci/llama-cpu.sh DIR` (cached on the commit) and runs vet, the
+build and the tests against it; `ci/llama-cpu.sh` + `LLAMA_DIR=DIR` is the
+same thing locally.
 
 The model is the GGUF ollama holds for its tag (`~/.ollama/models/…`) or
 any GGUF; `llm.template: auto` takes the chat template from the GGUF,
