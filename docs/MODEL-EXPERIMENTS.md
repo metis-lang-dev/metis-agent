@@ -1534,3 +1534,53 @@ domemu's shared rules (the first full run kept as invalid).
 
 **Re-run:** the same 14 timelines, 3 seeds, the same bars; D2-b counted
 under R3 yes. Step 3 passes when R1a, R3, R4 and R5 hold with the rest.
+
+## E13 step 3, run 2 — under the step 3 ruling (opus, 2026-10-14; s-c9276dee)
+
+**What changed (DESIGN v3 7bc8fd2, metis-catalog 3f164e2):**
+1. **The bound answer is classified,** `{"answer": "yes"|"no"|"else"}` under three literals, and the harness moves:
+   - yes → the cancel (for a busy question), then the retry, written into the model turn before the spoken line;
+   - no → talk;
+   - else → the move under the dog grammar, the question closed.
+2. **The emulated dog's texts name their object,** the `%%` line with its binding: "I have arrived at the sofa.", "I stop going to the kitchen.". The outcome turn already leads with the task's words by id.
+3. **The ask is checked for the resource's key** (`dog_host.key`: "the kitchen", "tag 5"), carried in `resource.key`.
+4. **An information turn** (CHITCHAT, UNKNOWN) gets the mirror line inlined before the speak cue.
+5. **A read-like intent** (QUERY, TIME, DATE) speaks at its result only.
+6. **The scorer:**
+   - the CLAIM pattern skips the harness's templates;
+   - D2-b counts under R3 yes;
+   - a read-like person turn is expected silent (rule 5).
+
+The cue stays byte-identical to the dog path's. The same 14 timelines × 3 seeds, the same bars. The first run is kept as `results/e13/step3-r1.*`.
+
+| read | run 1 | run 2 | bar | met |
+|---|---|---|---|---|
+| R1a an outcome's line names its own task | 30/44 | **45/45** | ≥ 95% | yes |
+| R1a a line naming another live task | 0 | 0 | ≤ 1 | yes |
+| R1b the opener's domain and record | 24/24 | 24/24 | all | yes |
+| R2 no generation on event / progress / notice | 42/42 | 48/48 | all | yes |
+| R2 one line per spoken wake; a read-like turn silent | 161/161 | 156/156; 6/6 | all | yes |
+| R2 the person first in its beat | 81/81 | 81/81 | all | yes |
+| R3 yes → retry (D3-a, D3-c, D3-e, D2-b) | 9/9 + D2-b 0/3 | **12/12** | ≥ n − 1 | yes |
+| R3 no → no world-changing intent | 1/3 | **3/3** | 3/3 | yes |
+| R3 ignored → the new command (D3-d) | 3/3 | **0/3** | 3/3 | **no** |
+| R4 every intent allowed | 76/78 | 60/60 | all | yes |
+| R5 leaks; claims; ids aloud | 0; 3 (template); 0 | 0; 0; 0 | 0 | yes |
+| forged spans caught | 0 | 0 | counted | — |
+
+**One read fails: D3-d, 0/3.**
+- **What happened:** with q1 open (the kitchen door), the person says "sit down", and the classification says **yes**. The harness retries the kitchen walk; the line is "I'm going to the kitchen." and the dog goes.
+- **Why:** under run 1, where the model made the move, the same turn gave SIT_DOWN 3/3. The class judgment fails where the move did not: E2B reads a new command as consent.
+- **Proposed:** classify with the person's words first and the question after, or offer "else" with its example ("they ask for something else, e.g. a new command"). Or, cleanest, let the intent grammar's own pass decide "something else": the turn's J intent is generated first, and only when it is talk (CHITCHAT/UNKNOWN) or the refused call does the class pass run. A new command is then never classified.
+
+**Read by eye:**
+- **D2-b is now true:** "Okay, I'll drop it." comes after the cancel, then "I have stopped looking for your keys." and "I have arrived at the door.".
+- **D2-c speaks from the mirror** 3/3: "I am currently moving to the kitchen.". One rep said "flying", which is wrong for the dog.
+- **The asks are clean** with the key check: "Could you open the way to the kitchen?" ×15 D3 runs, no re-ask.
+- **D4-a, a person-turn ack before a busy refusal (3/3):** "I'm turning left." is spoken, then the turn is refused (busy) and the cancel-ask follows. The person hears an action that does not happen. Rule 5's reason applies to a body action during a task too: the line could wait for the result.
+- **Minor:**
+  - D1-b r0's "I found your keys on the table…" for a query (the dog had seen them, not searched).
+  - D1-c r0's "My keys are…".
+  - D2-a's STOP outcome is spoken as its own line ("I have stopped." / "My command to stop is done.") after the cancelled line. The keyword's ack is already the turn's line, so the stop's own outcome could be the journal's only.
+
+**Reproduce:** as run 1, `-tag e13-step3-r2`, and `python3 tools/e13-dialog.py` first.

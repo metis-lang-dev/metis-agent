@@ -320,14 +320,26 @@ func unspeakableLine(t string) bool {
 	return strings.ContainsAny(t, "{}[]<>") || forgedFact(t)
 }
 
-// cueBound names the bound answer's branch (E11: the cue names the branch).
+// cueBound asks for the bound answer's class (step 3 ruling: the model
+// judges, the harness moves).
 func cueBound(q *question) string {
+	yes := "it lets that command go ahead"
 	if q.kind == "cancelask" {
-		return "[Next move — if the person agrees, make that command again exactly (the robot drops " +
-			strings.TrimPrefix(describe(q.live.c), "your command to ") + " first); if not, CHITCHAT. Exactly one JSON call.]"
+		yes = "drop " + strings.TrimPrefix(describe(q.live.c), "your command to ") + " for it"
 	}
-	return "[Next move — if the answer lets that command go ahead, make it again exactly; if the person asks for something else, " +
-		"do that; otherwise reply in kind. Exactly one JSON call.]"
+	return "[Next move — judge the person's answer: yes (" + yes + "), no, or else (they ask for something else). " +
+		"Exactly one of {\"answer\":\"yes\"}, {\"answer\":\"no\"}, {\"answer\":\"else\"}.]"
+}
+
+const grammarAnswer = `root ::= "{\"answer\":\"yes\"}" | "{\"answer\":\"no\"}" | "{\"answer\":\"else\"}"` + "\n"
+
+func answerClass(text string) string {
+	for _, c := range []string{"yes", "no", "else"} {
+		if strings.Contains(text, `"`+c+`"`) {
+			return c
+		}
+	}
+	return "else"
 }
 
 func cueCancelAsk(refused Call, live mTask) string {

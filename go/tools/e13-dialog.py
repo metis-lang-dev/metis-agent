@@ -13,7 +13,10 @@ null; body actions and queries are immediate otherwise; stop and cancel
 end the task in flight. Its refusals carry the blocking atom; a missing
 answer's resource.words are dog_host.words(atom, the handles' display
 names) (dd7e40b), never a model's. Its texts are the rules' %% lines or a
-narrator's sentence. One emulation latency: D1-c's unmapped refusal lands
+narrator's sentence: the %% line with its binding, as the narrator
+carries it ("I have arrived at the sofa.", step 3 ruling). A missing
+answer's resource carries its key, dog_host.key(atom, names) (metis-catalog
+3f164e2): what the ask must name. One emulation latency: D1-c's unmapped refusal lands
 2 beats after the accept (the runtime refuses at accept time).
 
 The kitchen has no intents (its orders come from the env): it reports
@@ -42,6 +45,10 @@ def words(atom):
     return dog_host.words(atom, NAMES)
 
 
+def key(atom):
+    return dog_host.key(atom, NAMES)
+
+
 # ── the dog's rules ──────────────────────────────────────────────────────────
 
 def res(status, after, text=None, of=None, **kw):
@@ -59,13 +66,13 @@ def nav(desc, *replies, typ="REGION"):
     return {"verb": "NAVIGATE", "slot": "task", "when": {"goal.description": desc}, "replies": list(replies)}
 
 
-def go_ok(desc, done, text="I have arrived."):
-    return nav(desc, res("progress", 1), res("done", done, text))
+def go_ok(desc, done):
+    return nav(desc, res("progress", 1), res("done", done, "I have arrived at the %s." % desc))
 
 
 def find_ok(thing, done):
     return {"verb": "FIND", "slot": "task", "when": {"target.description": thing},
-            "replies": [res("progress", 1), res("done", done, "I found it.")]}
+            "replies": [res("progress", 1), res("done", done, "I found your %s." % thing)]}
 
 
 def query(thing, text):
@@ -77,9 +84,11 @@ def body(action, text, **when):
     return {"verb": "LOCAL_ACTION", "slot": "body", "repeat": True, "when": w, "replies": [res("done", 0, text)]}
 
 
-STOP = {"verb": "STOP", "repeat": True, "replies": [res("cancelled", 0, "I stop going there.", of="inflight"), res("done", 0)]}
-CANCEL = {"verb": "CANCEL", "repeat": True,
-          "replies": [res("cancelled", 0, "Okay, I drop that: I am no longer on it.", of="inflight"), res("done", 0)]}
+def stop(live):
+    """stop and cancel end the task in flight; their texts name it (live: "going to the kitchen")."""
+    return [{"verb": "STOP", "repeat": True, "replies": [res("cancelled", 0, "I stop %s." % live, of="inflight"), res("done", 0)]},
+            {"verb": "CANCEL", "repeat": True,
+             "replies": [res("cancelled", 0, "Okay, I drop that: I am no longer %s." % live, of="inflight"), res("done", 0)]}]
 BUSY_TASK = {"kind": "result", "status": "refused", "reason": "I am already busy with a task", "blocker": None,
              "alternatives": ["cancel"], "text": "I can't take that now: I am already busy with a task."}
 BUSY_BODY = {"kind": "result", "status": "refused", "reason": "I am on a task", "blocker": None,
@@ -89,9 +98,9 @@ BODY = [body("STAND_UP", "I stand up."), body("SIT_DOWN", "I sit down."), body("
 KEYS = query("keys", "Your keys are on the table by the window.")
 
 
-def dog(*rules, consult=None):
+def dog(*rules, consult=None, live="on that task"):
     s = {"domain": "dog", "busy_task": BUSY_TASK, "busy_body": BUSY_BODY,
-         "intents": list(rules) + BODY + [KEYS, STOP, CANCEL]}
+         "intents": list(rules) + BODY + [KEYS] + stop(live)}
     if consult:
         s["tools"] = [{"tool": "consult", "repeat": True, "reply": consult}]
     return s
@@ -99,11 +108,11 @@ def dog(*rules, consult=None):
 
 def missing(atom_blocker, atom_need, text, cid="k1"):
     return {"kind": "consult", "id": cid, "answer_kind": "missing",
-            "resource": {"atom": atom_need, "words": words(atom_blocker)},
+            "resource": {"atom": atom_need, "words": words(atom_blocker), "key": key(atom_blocker)},
             "evidence": [atom_need + " 0"], "calls": 2, "text": text}
 
 
-CLOSED = res("refused", 1, "I can't go there: the way to it is closed.", reason="the way to it is closed", blocker="closed(kitchen)")
+CLOSED = res("refused", 1, "I can't go to the kitchen: the way to it is closed.", reason="the way to it is closed", blocker="closed(kitchen)")
 CONSULT_CLOSED = missing("closed(kitchen)", "open(kitchen)", "The kitchen door is shut, so the way is closed.")
 
 # ── the kitchen ──────────────────────────────────────────────────────────────
@@ -180,17 +189,18 @@ def main():
              [dog(go_ok("kitchen", 5)), kitchen()]),
         item("D1-c", "the refusal of the first task after the second's outcome: the loop on c1",
              [p(0, "go to tag five", a_tag(5)), p(1, "where are my keys?", a_keys())],
-             [dog(nav("tag", res("refused", 2, "I can't go there: that place is not on my map.",
+             [dog(nav("tag", res("refused", 2, "I can't go to tag 5: that place is not on my map.",
                                   reason="that place is not on my map", blocker="unmapped(tag5)")),
                   consult=missing("unmapped(tag5)", "mapped(tag5)", "Tag 5 is not on my map: I have never been there.")),
               kitchen()]),
         item("D2-a", "stop mid-task: the cancelled line about the kitchen, the progress unspoken",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(3, "stop", [{"intent": "STOP"}])],
-             [dog(nav("kitchen", res("progress", 1), res("progress", 2), res("done", 6, "I have arrived."))), kitchen()]),
+             [dog(nav("kitchen", res("progress", 1), res("progress", 2), res("done", 6, "I have arrived at the kitchen.")),
+                  live="going to the kitchen"), kitchen()]),
         item("D2-b", "a busy refusal asks before it cancels; yes → cancel (harness) → the retry",
              [p(0, "find my keys", a_keys()), p(2, "actually, go to the door", a_nav("door")),
               p(3, "yes, drop it", [a_nav("door")] + TALK)],
-             [dog(find_ok("keys", 8), go_ok("door", 3)), kitchen()], {"bound_at": 3, "bound": "retry"}),
+             [dog(find_ok("keys", 8), go_ok("door", 3), live="searching for your keys"), kitchen()], {"bound_at": 3, "bound": "retry"}),
         item("D2-c", "what are you doing? mid-task: no new world intent, the line says the kitchen",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(2, "what are you doing?", TALK)],
              [dog(go_ok("kitchen", 6)), kitchen()]),

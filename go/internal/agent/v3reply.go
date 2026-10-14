@@ -44,6 +44,7 @@ type Reply struct {
 	Resource *struct {
 		Atom  string `json:"atom"`
 		Words string `json:"words"`
+		Key   string `json:"key,omitempty"` // what an ask for it must name (dog_host.key)
 	} `json:"resource,omitempty"`
 	Evidence []string        `json:"evidence,omitempty"`
 	Calls    int             `json:"calls,omitempty"`

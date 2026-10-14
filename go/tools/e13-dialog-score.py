@@ -9,9 +9,11 @@ steps/step3-design.md (v1 5a297ba7ff2f) with the review's item changes.
   R2 the floor      0 generations on event / progress / notice / accepted;
                     one spoken line per spoken wake (a lead-in and its
                     question are one); the person's turn first in its beat
-  R3 the answer     bound yes → the refused call again (D3-a, D3-c, D3-e:
-                    ≥ 8/9; D2-b reported beside); no → no world-changing
-                    intent; ignored → the new command, no retry
+  R3 the answer     bound: the model classifies the answer (yes · no ·
+                    else), the harness moves (step 3 ruling). yes → class
+                    yes and the refused call dispatched again (D3-a, D3-c,
+                    D3-e, D2-b: ≥ n − 1); no → class no, no world-changing
+                    intent; ignored → class else, the new command
   R4 signals        every intent of a person turn is one the item allows
   R5 speech         leaks, completion claims, ids aloud: 0 over every
                     spoken line; forged spans caught and rolled back, counted
@@ -33,7 +35,7 @@ _spec.loader.exec_module(e9)
 WORLD = {"NAVIGATE", "LOCAL_ACTION", "FIND", "FOLLOW"}
 IDS = re.compile(r"\b(c\d+|q\d+)\b|#\d+")
 NUM = {"5": "five", "3": "three"}
-YES = ("D3-a", "D3-c", "D3-e")
+YES = ("D3-a", "D3-c", "D3-e", "D2-b")   # D2-b under R3 yes (step 3 ruling)
 
 
 def jload(s):
@@ -116,8 +118,8 @@ def lines_of(follow):
         elif r["kind"] == "dlg-gen" and r.get("label", "") == "voice" and r.get("branch", "") in ("person", "bound"):
             out.append(("voice", r["text"], None))
         elif r["kind"] == "dlg-say":
-            if r["what"] == "ask" and out and out[-1][0] == "template":
-                out[-1] = ("ask", out[-1][1] + " " + r["text"], None)
+            if r["what"] == "ask" and out and out[-1][0] == "template":  # the lead-in and its question: one line
+                out[-1] = ("ask", out[-1][1] + " " + r["text"], None, out[-1][1])
             else:
                 out.append((r["what"], r["text"], None))
     return out
@@ -146,8 +148,8 @@ def main(argv):
             what, cid = w["what"], w.get("cid", "")
             gens = [r for r in follow if r["kind"] == "dlg-gen"]
             spoken = lines_of(follow)
-            for kind, text, forged in spoken:
-                allspoken.append((tag, what, kind, text))
+            for kind, text, forged, *lead in spoken:
+                allspoken.append((tag, what, kind, text, lead[0] if lead else (text if kind == "template" else "")))
                 if forged:
                     rolled.append((tag, forged))
             # R2: no generation on what never wakes the model; one line per spoken wake
@@ -155,6 +157,9 @@ def main(argv):
                 R["R2 no gen on event/progress/notice"].append((not gens, "%s b%d %s: %d gens" % (tag, w["beat"], what, len(gens))))
             elif w.get("person") and w["person"].strip().lower() in ("stop", "halt", "freeze"):
                 pass  # the keyword path: the ack is the harness's, no model
+            elif what == "person" and any(g.get("label") == "move" and (jload(g["text"]) or {}).get("intent") in ("QUERY", "TIME", "DATE")
+                                          for g in gens):
+                R["R2 a read-like turn silent until its result"].append((not spoken, "%s b%d: %s" % (tag, w["beat"], [x[1] for x in spoken])))
             elif gens or spoken:
                 R["R2 one line per spoken wake"].append((len(spoken) == 1, "%s b%d %s: %s" % (tag, w["beat"], what, [s[1] for s in spoken])))
             # R1(a): an outcome's line names its own task, not another live one
@@ -195,27 +200,38 @@ def main(argv):
                 j = jload(move["text"]) if move else None
                 if p and j is not None:
                     R["R4 intents allowed"].append((allowed(j, p["allow"]), "%s %r → %s" % (tag, w["person"], move["text"])))
-                if w.get("bound") and j is not None:
+                if w.get("bound"):
                     exp = it["expect"].get("bound")
-                    retry = canon(j) == w.get("refused")
+                    cls = next((jload(g["text"]) or {} for g in gens if g.get("label", "") == "answer"), {}).get("answer")
+                    retried = any(r["kind"] == "dlg-dispatch" and canon(jload(r["j"])) == w.get("refused") for r in follow)
+                    worldly = any(r["kind"] == "dlg-dispatch" and (jload(r["j"]) or {}).get("intent") in WORLD for r in follow)
+                    note = "%s %r → %s%s" % (tag, w["person"], cls, (" then " + move["text"]) if move else "")
                     if exp == "retry":
-                        key = "R3 yes → retry" if iid in YES else "R3 yes → retry (D2-b, beside)"
-                        R[key].append((retry, "%s %r → %s" % (tag, w["person"], move["text"])))
+                        R["R3 yes → retry"].append((cls == "yes" and retried, note))
                     elif exp == "none":
-                        R["R3 no → no world intent"].append((j.get("intent") not in WORLD, "%s → %s" % (tag, move["text"])))
+                        R["R3 no → no world intent"].append((cls == "no" and not worldly, note))
                     elif exp == "new":
-                        R["R3 ignored → the new command"].append((not retry and j.get("intent") == "LOCAL_ACTION",
-                                                                  "%s → %s" % (tag, move["text"])))
+                        R["R3 ignored → the new command"].append((cls == "else" and not retried and j is not None
+                                                                  and j.get("intent") == "LOCAL_ACTION", note))
             # live tasks (accepted, not finished)
             for r in follow:
                 if r["kind"] == "dlg-dispatch":
                     live.append(r["cid"])
             live = [c for c in live if c not in finished]
+    # R2: the person first in its beat
+    for (iid, rep), recs in sorted(runs.items()):
+        beats = defaultdict(list)
+        for r in recs:
+            if r["kind"] == "dlg-wake":
+                beats[r["beat"]].append(r["what"])
+        for b, ws in beats.items():
+            if "person" in ws:
+                R["R2 person first in its beat"].append((ws[0] == "person", "%s r%d b%d %s" % (iid, rep, b, ws)))
     # R5: speech
-    for tag, what, kind, text in allspoken:
+    for tag, what, kind, text, harness in allspoken:
         lk = e9.leak(text)
         R["R5 leaks"].append((not lk, "%s %s: %r (%s)" % (tag, what, text, lk)))
-        claim = bool(e9.CLAIM.search(text))
+        claim = bool(e9.CLAIM.search(text.replace(harness, "", 1) if harness else text))  # the harness's templates excluded
         after_done = what in ("result:done",)
         R["R5 claims (not after its done)"].append((not (claim and not after_done), "%s %s: %r" % (tag, what, text)))
         R["R5 ids aloud"].append((not IDS.search(text), "%s %s: %r" % (tag, what, text)))
@@ -223,6 +239,8 @@ def main(argv):
     bars = {"R1a own task named": lambda ok, n: n and ok / n >= 0.95, "R1a another task's line": lambda ok, n: n - ok <= 1,
             "R1b move carries opener": lambda ok, n: ok == n, "R2 no gen on event/progress/notice": lambda ok, n: ok == n,
             "R2 one line per spoken wake": lambda ok, n: ok == n, "R3 yes → retry": lambda ok, n: ok >= n - 1,
+            "R2 person first in its beat": lambda ok, n: ok == n,
+            "R2 a read-like turn silent until its result": lambda ok, n: ok == n,
             "R3 no → no world intent": lambda ok, n: ok == n, "R3 ignored → the new command": lambda ok, n: ok == n,
             "R4 intents allowed": lambda ok, n: ok == n, "R5 leaks": lambda ok, n: ok == n,
             "R5 claims (not after its done)": lambda ok, n: ok == n, "R5 ids aloud": lambda ok, n: ok == n}
@@ -242,7 +260,7 @@ def main(argv):
             if not ok:
                 print("- %s — %s" % (k, note))
     print("\n## Every spoken line (for reading)\n")
-    for tag, what, kind, text in allspoken:
+    for tag, what, kind, text, _ in allspoken:
         print("- %s · %s · %s: %s" % (tag, what, kind, text))
     return 0
 

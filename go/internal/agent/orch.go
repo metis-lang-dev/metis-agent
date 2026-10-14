@@ -112,6 +112,7 @@ type branch struct {
 	pick    string // again with AgainPick: ask | escalate; answer with EscalateTemplate: escalate
 	words   string // the resource's words (missing)
 	alt     string // cancelask: the verb the domain offered (CANCEL | STOP)
+	key     string // the resource's key: what the ask must name (the domain's data, step 3 ruling)
 	again   refusal
 }
 
@@ -215,28 +216,72 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 	}
 	o.Person(person)
 	o.last.call = Call{}
-	if q != nil && q.kind == "cancelask" { // the answer to "drop it?": the retry (yes) or talk (no)
-		gbnf = grammarAlts([]Call{q.refused, {J: json.RawMessage(`{"intent":"CHITCHAT"}`)}})
-	}
-	if err := o.gen("move", 0, gbnf, false, b); err != nil {
-		return "", "", err
-	}
-	c := o.last.call
-	intent = c.Text()
-	o.pend.WriteString("\n" + speakCue) // no trailing space: the dog path's cue (a dangling space token derails E2B)
-	if voice, err = o.speakLine(b); err != nil {
-		return intent, "", err
-	}
-	if c.IsJ() && c.Verb() != "ask" {
-		if q != nil && q.kind == "cancelask" && CanonJSON(c.Text()) == CanonJSON(q.refused.Text()) {
-			o.cancelFirst(q)
+	var c Call
+	if q != nil {
+		// the step 3 ruling: the model judges the answer, the harness moves
+		class, _, err := o.genCapture("answer", grammarAnswer, b)
+		if err != nil {
+			return "", "", err
 		}
+		switch answerClass(class) {
+		case "yes": // the retry, after the cancel for a busy question: the line after it is true
+			if q.kind == "cancelask" {
+				o.cancelFirst(q)
+			}
+			c = q.refused
+			o.pend.WriteString("\n" + c.Text())
+			if o.cfg.OnGen != nil {
+				o.cfg.OnGen(GenInfo{Label: "move", Text: c.Text(), Harness: true, Branch: "bound"})
+			}
+		case "no": // talk; the task stays refused
+		default: // something else: the person's turn under the intent grammar, the question closed
+			o.pend.WriteString("\n")
+			if err := o.gen("move", 0, gbnf, false, b); err != nil {
+				return "", "", err
+			}
+			c = o.last.call
+		}
+	} else {
+		if err := o.gen("move", 0, gbnf, false, b); err != nil {
+			return "", "", err
+		}
+		c = o.last.call
+	}
+	intent = c.Text()
+	verb := c.Verb()
+	readLike := o.cfg.Mirror && c.IsJ() && (verb == "QUERY" || verb == "TIME" || verb == "DATE")
+	if !readLike { // a read-like intent speaks at its result (step 3 ruling)
+		if o.cfg.Mirror && (verb == "CHITCHAT" || verb == "UNKNOWN") { // an information turn speaks from the mirror
+			o.pend.WriteString("\n" + o.m.render(o.cfg.Loaded))
+		}
+		o.pend.WriteString("\n" + speakCue) // the dog path's cue, byte for byte (a dangling space derails E2B)
+		if voice, err = o.speakLine(b); err != nil {
+			return intent, "", err
+		}
+	}
+	if c.IsJ() && verb != "ask" {
 		if r, ok := o.dom.Intent(c); ok && r.ID != "" {
 			o.byID[r.ID] = c
 			o.m.see(r, c)
 		}
 	}
 	return intent, voice, o.End()
+}
+
+// genCapture is one generation's text and the tokens before it.
+func (o *Orch) genCapture(label, g string, b branch) (string, int, error) {
+	var out string
+	var mark int
+	hook := o.cfg.OnGen
+	o.cfg.OnGen = func(gi GenInfo) {
+		out, mark = gi.Text, gi.NCtx
+		if hook != nil {
+			hook(gi)
+		}
+	}
+	defer func() { o.cfg.OnGen = hook }()
+	err := o.gen(label, 0, g, false, b)
+	return out, mark, err
 }
 
 // Speak: a reply that wants no move (an outcome, an acceptance) gets its
@@ -352,7 +397,7 @@ func (o *Orch) branchOf(r Reply, c Call) (branch, error) {
 		b := o.br // the refusal it answers: its call, domain and record
 		b.name, b.reply, b.alts, b.pick, b.words = "answer", r, nil, "", ""
 		if r.Resource != nil {
-			b.words = r.Resource.Words
+			b.words, b.key = r.Resource.Words, r.Resource.Key
 		}
 		o.answers[r.Domain] = r
 		if o.cfg.EscalateTemplate && r.AnswerKind == "unexplained" {
@@ -371,7 +416,7 @@ func (o *Orch) branchOf(r Reply, c Call) (branch, error) {
 			if o.cfg.AgainPick {
 				b.pick = "escalate"
 				if a := o.answers[r.Domain]; a.AnswerKind == "missing" && o.refusals[k] == 2 && a.Resource != nil {
-					b.pick, b.words = "ask", a.Resource.Words
+					b.pick, b.words, b.key = "ask", a.Resource.Words, a.Resource.Key
 				}
 			}
 			return b, nil
@@ -478,11 +523,13 @@ func (o *Orch) Move() error {
 	}
 	// the ask's words, checked: a miss is answered like a repeat
 	if o.cfg.AskCheck && b.words != "" {
-		names := namesWords
-		if o.cfg.Mirror {
+		names, want := namesWords, b.words
+		if b.key != "" { // the resource's key, never the verb phrase (step 3 ruling)
+			want = b.key
+		} else if o.cfg.Mirror {
 			names = namesWordsAny
 		}
-		for k := 1; k <= 2 && o.last.call.Verb() == "ask" && !names(o.last.call.arg("text"), b.words); k++ {
+		for k := 1; k <= 2 && o.last.call.Verb() == "ask" && !names(o.last.call.arg("text"), want); k++ {
 			o.pend.WriteString(turnEnd + userTurn(noteAskWords(b.words)) + modelTurn)
 			if err := o.gen("move", k, g, o.cfg.SampleMoves, b); err != nil {
 				return err
