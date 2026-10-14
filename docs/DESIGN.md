@@ -568,6 +568,30 @@ py side makes the orchestrator's KV discipline portable; a page backend in
 Python is a small thing beside the two agents. The library packaging (JS and Python), the py backend and the console are
 nina's; opus keeps the Go backend at parity and reviews the port.
 
+### One catalog, two consoles, one look (user, 2026-10-14 night)
+
+After the live session ("the kitchen and dog went quite okay; the dog can
+navigate"; the dog-in-the-kitchen scene was not visible and is a later step)
+the user ruled the surfaces:
+
+- **Two consoles, one family.** metis-loop's console (the debugger over the
+  kernel REPL) and metis-agent's console are the only interfaces a user will
+  have to the domain models. The loop console's layout is the family's look:
+  its top bar, its collapsible docks and the strip that toggles them, its
+  colour scheme. Those elements and the style tokens move into the fsttm-web
+  package as shared JS/CSS; the agent console is rebuilt on them (chat,
+  domain tabs, world ports, journal as docks under the same top bar).
+- **One recognized catalog.** A domain is one directory in
+  `metis-catalog/domains/<name>/` with a `domain.yaml` manifest: the program
+  (.llp), the notch overlay, the host plugin (Python), the domain-agent module
+  (card, perception, outcome tables, alternatives, WORDS/KEYS), the intent
+  material (schema and examples) and docs/tests. A `metis_catalog` Python
+  loader lists and loads it; the loop console, the py backend and the Go
+  backend read the same manifests, and a domain loads by one click in either
+  console. The agent modules in metis-agent/py/domains and the intent files in
+  go/grammar move into the catalog. Subject s-2a2bc758 domain-catalog (nina;
+  opus for the Go backend).
+
 ### How this section came to be (2026-10-13, the record is in git)
 
 The executive's IO refined (c6ca614; tested by E10, ruled J-text 88a5552);
