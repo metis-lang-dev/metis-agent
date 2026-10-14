@@ -297,7 +297,8 @@ class DomainAgent:
             elif self.quiescence != "every":
                 return []
             f = from_signal(s, None)[0]
-            return [reply(self.name, "quiescence", goal_pending=False, ref={"seq": len(self.repl.fired), "beat": beat},
+            return [reply(self.name, "quiescence", goal_pending=False, over=True if s.get("episode_over") else None,
+                          ref={"seq": len(self.repl.fired), "beat": beat},
                           text=self.narrate(f) or ("the day is over" if s.get("episode_over") else words(f.ref)))]
         if kind == "surprise":
             f = from_signal(s, None)[0]

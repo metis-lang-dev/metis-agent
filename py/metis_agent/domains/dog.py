@@ -148,6 +148,7 @@ class AgentHost:
     def live(self):
         self.replay()
         self.live_case = True
+        self.live_waits = set()    # the waits scheduled here, (beat, do-line)
 
     def world(self, lines):
         """World changes from the driver ("-closed(kitchen)", "+open(kitchen)"):
@@ -187,6 +188,11 @@ class AgentHost:
         dos = [d for d in dos if not (d.startswith("+") and d[1:].split("(")[0].split()[0] in self.commands)]
         if self.live_case and self.world_lines:   # the person's report stands for the scheduled one
             sent = set(self.world_lines)
+            # a report ends the task it answers (one task runs at a time): the
+            # wait scheduled for it goes too, or it fires into the next task
+            if any(l[1:].split("(")[0] in REPORTS for l in sent if l.startswith("+")):
+                sent |= {d for _, d in self.live_waits}
+                self.live_waits = set()
             self.inner.due = tuple(x for x in self.inner.due if x[1] not in sent)
         dos += self.world_lines
         self.world_lines = []
@@ -217,15 +223,17 @@ class AgentHost:
             for b, d in self.inner.due:
                 if (b, d) not in before and d in ("+timeout", "+lost"):
                     b = self.inner.beat + self.LIVE_WAIT
+                    self.live_waits.add((b, d))
                 due.append((b, d))
             self.inner.due = tuple(due)
 
     def snapshot(self):
-        return (self.inner.snapshot(), copy.deepcopy((self.queue, self.inflight, self.acted, self.world_lines)))
+        return (self.inner.snapshot(), copy.deepcopy((self.queue, self.inflight, self.acted, self.world_lines,
+                                                      getattr(self, "live_waits", set()))))
 
     def restore(self, snap):
         self.inner.restore(snap[0])
-        self.queue, self.inflight, self.acted, self.world_lines = copy.deepcopy(snap[1])
+        self.queue, self.inflight, self.acted, self.world_lines, self.live_waits = copy.deepcopy(snap[1])
 
 
 def _host_module():

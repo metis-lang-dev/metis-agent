@@ -94,3 +94,19 @@ def test_live_walk_waits_for_the_person():
     assert _walk("live") == [(2 + dog.AgentHost.LIVE_WAIT, "expired")]
     B = {"clock": "beat", "domain": "dog"}
     assert _walk("live", [B, B, {"world": ["+arrived(kitchen)"], "domain": "dog"}]) == [(4, "done")]
+
+
+def test_live_report_clears_the_wait():
+    """Live: the person's +arrived ends the walk, and the walk's 30 s wait
+    goes with it — it must not fire into the next task (the live smoke's
+    'I could not find your keys in time', 2 s after find)."""
+    from metis_agent.domain_agent import DomainAgent
+    ag = DomainAgent(dog, case="live")
+    B = {"clock": "beat", "domain": "dog"}
+    go = {"id": "c1", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}
+    find = {"id": "c2", "domain": "dog", "verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "keys"}}}
+    ends = []
+    for m in [B, {"world": ["-closed(kitchen)", "+open(kitchen)"], "domain": "dog"}, B, go, B, B,
+              {"world": ["+arrived(kitchen)"], "domain": "dog"}, B] + [B] * 18 + [find] + [B] * 6:
+        ends += [(r["id"], r["status"]) for r in ag.handle(m) if r.get("status") in ("done", "expired")]
+    assert ends == [("c1", "done"), ("c2", "done")]

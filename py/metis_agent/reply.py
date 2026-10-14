@@ -19,7 +19,7 @@ KINDS = {
     "result": ("id", "status", "reason", "alternatives", "blocker"),
     "read": ("tool", "output"),
     "event": ("counts",),
-    "quiescence": ("goal_pending",),
+    "quiescence": ("goal_pending", "over"),    # over: the day's end (episode_over)
     "surprise": ("record", "difference", "cards"),
     "notice": ("record", "card", "move"),
     "error": ("id", "error"),
