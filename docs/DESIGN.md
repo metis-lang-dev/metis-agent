@@ -568,6 +568,25 @@ py side makes the orchestrator's KV discipline portable; a page backend in
 Python is a small thing beside the two agents. The library packaging (JS and Python), the py backend and the console are
 nina's; opus keeps the Go backend at parity and reviews the port.
 
+**What parity means for the two backends** (architect's ruling, agent-console
+step 2). Parity is *logic parity*: driven by the same inputs and answered by
+the same generations, the py orchestrator decodes the same chunks, generates
+under the same grammars and samplers and writes the same `dlg-*` records as
+the Go one — checked without the model against traces the Go side dumps
+(`go/cmd/llmbench` `TestDumpV3Trace`, `TestDumpDialogTrace`; py
+`tests/test_orchestrator_parity.py` 180/180, `tests/test_timeline_parity.py`
+42/42, mutation-checked) — and, on the model, every read holding with the same
+counts (the 14 timelines' R1–R5; E13 t3's E11 reads; the integration replay
+with the real dog and kitchen). Generation-for-generation identity is a
+property of one llama.cpp build, not of the port: Go links llama.cpp
+**8ad8aef** (ggml 0.13.0), the py side llama_cpp_python 0.3.36's vendored
+llama.cpp (ggml 0.25.3); on E13 t3 py reproduces 90 of t3's 114 generations,
+every first divergence at a token-equal context (19 greedy near-ties, 3
+sampled draws; flash attention auto vs off changes nothing, 90/114 both), none
+changing a read. Aligning the builds is a separate infrastructure item, parked;
+when either pin moves, the traces and the reads are the regression, not the
+114 generations.
+
 ### One catalog, two consoles, one look (user, 2026-10-14 night)
 
 After the live session ("the kitchen and dog went quite okay; the dog can
