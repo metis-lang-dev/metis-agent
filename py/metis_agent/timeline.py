@@ -24,13 +24,63 @@ DISPLAY = {"kitchen_shared": "second cook"}
 STOP = ["stop", "halt", "freeze", "health"]
 
 
+DOG_TAIL = 8     # beats the replay runs past the last person turn with the real dog
+
+
+class Real:
+    """The real domain agents in-process (integration's -dog-proc and
+    -kitchen-real, without the process): dog, kitchen and kitchen_shared on
+    the narrator's model, reset to a fresh world for every run."""
+
+    def __init__(self, llm, kitchen=False):
+        from .domain_agent import Process, serve
+        from .seat import Gemma4Seat
+        self.serve, self.kitchen = serve, kitchen
+        self.proc = Process(["dog", "kitchen", "kitchen_shared"], narrate="dog", llm=llm, seat=Gemma4Seat(llm))
+        self.agents = self.proc.build(1, "replay")
+
+    def reset(self):
+        self.agents = self.proc.build(1, "replay")
+
+    def do(self, msg):
+        self.agents, out = self.serve(self.agents, msg, self.proc.build, self.proc.reload)
+        return [r for r in out if "ack" not in r and "clock" not in r and r.get("kind") != "trace"]
+
+    def beat(self, d, n=1):
+        return self.do({"clock": "beat", "domain": d, "n": n})
+
+
+def heard(rs):
+    """The pair's second cook speaks to its env, not to the person."""
+    return [r for r in rs if r.get("domain") != "kitchen_shared"]
+
+
 class Domains:
     """The harness's side of the wire: an intent gets its id and goes to the
     domain; talk (CHITCHAT, UNKNOWN) goes nowhere; a REPL call goes to its
-    domain's agent."""
+    domain's agent — the real one when given (the dog, the kitchen pair)."""
 
-    def __init__(self, emu, note):
-        self.emu, self.note, self.n = emu, note, 0
+    def __init__(self, emu, note, real=None):
+        self.emu, self.note, self.n, self.real, self.pend = emu, note, 0, real, []
+
+    def split(self, rs, iid, tool):
+        hit = None
+        for r in rs:
+            if hit is None and ((iid and r.get("id") == iid and (r.get("status") == "accepted" or r.get("kind") == "error")) or
+                                (tool and (r.get("kind") in ("consult", "read", "error") or
+                                           (r.get("kind") == "result" and r.get("status") != "progress")))):
+                hit = r
+                continue
+            self.pend.append(r)
+        return (O.Reply(hit), True) if hit is not None else (O.Reply(), False)
+
+    def step(self):
+        out = self.emu.step()
+        if self.real:
+            out += self.real.beat("dog")
+            if self.real.kitchen:
+                out += heard(self.real.beat("kitchen"))
+        return out
 
     def intent(self, c):
         try:
@@ -46,15 +96,22 @@ class Domains:
         self.n += 1
         cid = "c%d" % self.n
         self.note(cid, c.text())
+        if self.real:
+            return self.split(self.real.do({"id": cid, "domain": "dog", "verb": verb, "args": j}), cid, False)
         return O.Reply(self.emu.intent(cid, "dog", verb, j)), True
 
     def call(self, c):
         dom = (c.args or {}).get("domain")
         dom = dom if isinstance(dom, str) else ""
+        if self.real and (dom == "dog" or (dom == "kitchen" and self.real.kitchen)):
+            args = {k: v for k, v in _plain(c.args or {}).items() if k != "domain"}
+            return self.split(self.real.do({"tool": c.name, "domain": dom, "args": args}), "", True)
         return O.Reply(self.emu.tool(dom, c.name, _plain(c.args or {}), "")), True
 
     def now(self):
-        return self.emu.now()
+        out = self.emu.now() + heard(self.pend)
+        self.pend = []
+        return out
 
 
 def _plain(v):
@@ -69,8 +126,9 @@ def _plain(v):
     return v
 
 
-def run(l, item, gbnf, emit, tag="", rep=0, seed=0):
-    """One timeline (one repeat) on the dialog l (its system turn decoded)."""
+def run(l, item, gbnf, emit, tag="", rep=0, seed=0, real=None, no_premise=False):
+    """One timeline (one repeat) on the dialog l (its system turn decoded);
+    real: the real dog (and kitchen pair) in place of their scripts."""
     st = {"seq": 0, "beat": 0}
 
     def rec(r):
@@ -80,8 +138,11 @@ def run(l, item, gbnf, emit, tag="", rep=0, seed=0):
         out.update({k: v for k, v in r.items() if v not in (None, "", 0, False)})
         emit(out)
 
-    emu = Emu(item.get("scripts") or [])
-    doms = Domains(emu, lambda cid, j: rec({"kind": "dlg-dispatch", "cid": cid, "j": j}))
+    scripts = item.get("scripts") or []
+    if real:
+        scripts = [s for s in scripts if s["domain"] != "dog" and not (real.kitchen and s["domain"] == "kitchen")]
+    emu = Emu(scripts)
+    doms = Domains(emu, lambda cid, j: rec({"kind": "dlg-dispatch", "cid": cid, "j": j}), real)
     cfg = O.V3Config(CATALOG, LOADED, DISPLAY, ask_check=True, again_pick=True, escalate_template=True,
                      mirror=True, rollback=True,
                      on_gen=lambda g: rec({"kind": "dlg-gen", "label": g.label, "try": g.try_, "branch": g.branch,
@@ -93,10 +154,22 @@ def run(l, item, gbnf, emit, tag="", rep=0, seed=0):
 
     def as_in(rs):
         return [O.Inbound(reply=O.Reply(m)) for m in rs]
+    if real:   # the timeline's premise world (at < 0), applied on a setup tick; the pair's day run ahead
+        pre = [ln for w in item.get("world") or [] if w.get("at", 0) < 0 and w.get("domain") == "dog" for ln in w["lines"]]
+        if pre and not no_premise:
+            real.do({"world": pre, "domain": "dog"})
+            real.beat("dog")
+        if real.kitchen:
+            for _ in range(int(item.get("kitchen_ahead") or 0)):
+                real.beat("kitchen")
     for beat in range(0, 41):
         st["beat"] = beat
         queue = [O.Inbound(person=p["text"]) for p in item.get("person") or [] if p.get("at", 0) == beat]
-        queue += as_in(emu.now() if beat == 0 else emu.step())
+        if real:
+            for w in item.get("world") or []:
+                if w.get("at") == beat and w.get("domain") == "dog" and not (no_premise and w.get("premise")):
+                    real.do({"world": w["lines"], "domain": "dog"})
+        queue += as_in(doms.now() if beat == 0 else doms.step())
         while queue:
             queue = O.floor_order(queue)
             inb = queue.pop(0)
@@ -114,7 +187,7 @@ def run(l, item, gbnf, emit, tag="", rep=0, seed=0):
             rec(w)
             o.handle(inb, gbnf, STOP)
             queue += as_in(doms.now())
-        if beat >= last and emu.pending() == 0:
+        if beat >= last and emu.pending() == 0 and (real is None or beat >= last + DOG_TAIL):
             break
 
 
@@ -128,9 +201,18 @@ def main():
     ap.add_argument("--ids", default="")
     ap.add_argument("--tag", default="py")
     ap.add_argument("--jsonl", required=True)
+    ap.add_argument("--real-dog", action="store_true", help="the real dog in-process (integration's -dog-proc), on the same model")
+    ap.add_argument("--kitchen-real", action="store_true", help="the kitchen pair real too (integration step 2)")
+    ap.add_argument("--dog-as-is", action="store_true", help="the emulator's premises off")
     a = ap.parse_args()
     from .llm import LLM
-    l = LLM(a.model, n_ctx=a.n_ctx)
+    real = None
+    if a.real_dog:
+        narr = LLM(a.model, n_ctx=8192)
+        real = Real(narr, kitchen=a.kitchen_real)
+        l = narr.sibling(a.n_ctx)           # one model: the orchestrator's context beside the narrator's
+    else:
+        l = LLM(a.model, n_ctx=a.n_ctx)
     gbnf = Path(a.gbnf).read_text()
     want = {x.strip() for x in a.ids.split(",") if x.strip()}
     t0 = time.time()
@@ -149,8 +231,10 @@ def main():
                 sd = a.seed + rep if a.seed else 0
                 l.set_seed(sd)
                 l.begin_dialog(prompt)
+                if real:
+                    real.reset()
                 try:
-                    run(l, it, gbnf, emit, a.tag, rep, sd)
+                    run(l, it, gbnf, emit, a.tag, rep, sd, real, a.dog_as_is)
                 except Exception as e:   # noqa: BLE001 — the record says it, the corpus goes on
                     emit({"kind": "dlg-error", "tag": a.tag, "id": it["id"], "rep": rep, "seed": sd, "err": str(e)})
                     print("%-5s rep %d ERROR %s" % (it["id"], rep, e), file=sys.stderr)

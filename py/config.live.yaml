@@ -1,0 +1,32 @@
+# The standalone agent (metis_agent.service; agent-console s-7f3d1088 step 2):
+# the py backend of the console, the Go one's config.v3-live.yaml in its terms.
+# Paths are relative to py/.
+model: ../go/models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf
+intent:                          # the person turn's intent pass (the dog's grammar, generated in the catalog)
+    grammar: ../../metis-catalog/domains/dog/intent/dog.gbnf
+stop_words: [stop, halt, freeze, quiet]
+v3:
+    prompt: [../go/grammar/e13-prompt-base.txt]
+    catalog: [kitchen, nav, xtraffic, sysadmin, social, votes]
+    loaded: [dog, kitchen]
+    display: {kitchen_shared: second cook}
+    n_ctx: 16384                 # integration step 4 ruling
+    tick_ms: 1500
+    journal: ../go/results/live/session-py.jsonl
+domains:                         # in-process (no spawn), on the one loaded model
+    names: [dog, kitchen, kitchen_shared]
+    narrate: dog
+    case: live
+    seed: 1
+    clocks: [{domain: dog, n: 1}, {domain: kitchen, n: 2}]
+    quiet: [kitchen_shared]
+    pairs: [[kitchen, kitchen_shared]]   # step and wait as one (one env)
+    trace: true
+    records: catalog             # metis-catalog/domains/<name>/records/<session>.jsonl
+    narrator_n_ctx: 8192
+    seat_n_ctx: 8192             # the consult's own context: another domain's narration never waits on it
+    watch: {dog: ../../metis-catalog/domains/dog}
+ws:
+    addr: 127.0.0.1:8395
+    ui: ../web
+    lib: ../../fsttm-web/lib

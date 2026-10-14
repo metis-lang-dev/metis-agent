@@ -7,6 +7,11 @@ per backend label, so the Go backend and the py port compare side by side.
 
 Rows (ms; n, median, p90, max):
   person wait        dlg-wake person wait_ms: queued behind the orchestrator's other work
+  dispatch wait      dlg-dispatch wait_ms: the person's words to the intent's dispatch (py; Go
+                     writes no wait_ms on dispatch, its cell is —)
+  dispatch → line    a dispatch to the first spoken line about its id (src.wake a result of the cid)
+  … during a consult the same two, for dispatches inside another domain's consult (a surprise
+                     wake to its consult's dlg-wake answer, or to its template line)
   move gen           dlg-gen label move, model (person / bound branch)
   judge gen          dlg-gen label answer, model (the bound / info judges)
   voice gen          dlg-gen label voice
@@ -41,7 +46,8 @@ def stats(v):
 
 
 def rows(sessions):
-    R = {k: [] for k in ("person wait", "move gen", "judge gen", "voice gen", "refusal → ask",
+    R = {k: [] for k in ("person wait", "dispatch wait", "dispatch → line", "dispatch wait, during a consult",
+                         "dispatch → line, during a consult", "move gen", "judge gen", "voice gen", "refusal → ask",
                          "surprise → line", "reply → line", "wire intent", "wire tool", "wire world",
                          "wire ports", "wire clock (mean per 40)", "wire clock max")}
     for rs in sessions:
@@ -61,6 +67,30 @@ def rows(sessions):
                     R["wire clock max"].append(r.get("max_ms", r["ms"]))
                 elif "wire " + r["what"] in R:
                     R["wire " + r["what"]].append(r["ms"])
+        # the consult windows: a surprise wake to the consult's answer (or its template line)
+        windows = []
+        for r in rs:
+            if r["kind"] == "dlg-wake" and r.get("what") == "surprise":
+                end = next((x for x in rs if x["seq"] > r["seq"] and ((x["kind"] == "dlg-wake" and x.get("what") == "consult")
+                                                                       or (x["kind"] == "dlg-say" and x.get("what") == "template"))), None)
+                if end:
+                    windows.append((t(r), t(end), r.get("domain")))
+        for r in rs:
+            if r["kind"] != "dlg-dispatch":
+                continue
+            inside = any(a <= t(r) <= b for a, b, _ in windows)
+            if "wait_ms" in r:
+                R["dispatch wait"].append(r["wait_ms"])
+                if inside:
+                    R["dispatch wait, during a consult"].append(r["wait_ms"])
+            woke = {x["seq"] for x in rs if x["kind"] == "dlg-wake" and x.get("cid") == r.get("cid")
+                    and str(x.get("what", "")).startswith("result:") and x.get("what") != "result:accepted"}
+            first = next((x for x in says if x["seq"] > r["seq"] and x.get("src", {}).get("wake") in woke), None)
+            if first:
+                ms = (t(first) - t(r)).total_seconds() * 1000
+                R["dispatch → line"].append(ms)
+                if inside:
+                    R["dispatch → line, during a consult"].append(ms)
         for r in rs:
             if r["kind"] != "dlg-wake" or r.get("what") == "person":
                 continue

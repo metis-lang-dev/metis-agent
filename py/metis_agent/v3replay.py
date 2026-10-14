@@ -82,10 +82,11 @@ def main():
     ap.add_argument("--ruled", action="store_true")
     ap.add_argument("--tag", default="py-v3")
     ap.add_argument("--jsonl", required=True)
+    ap.add_argument("--flash-attn", type=int, default=0, help="llama.cpp flash_attn_type: 0 off (the py default), -1 auto (Go's: it never sets it), 1 on")
     ap.add_argument("--compare", default="", help="t3's generations ({id, rep, gens}): count identical")
     a = ap.parse_args()
     from .llm import LLM
-    l = LLM(a.model, n_ctx=a.n_ctx)
+    l = LLM(a.model, n_ctx=a.n_ctx, flash_attn=a.flash_attn)
     prompts, t0, got = {}, time.time(), {}
     with open(a.jsonl, "w") as out:
         for s in scenarios(a.scenarios):

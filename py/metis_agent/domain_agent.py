@@ -728,6 +728,104 @@ class _Now:
         return self.c.get(a, 0)
 
 
+class Process:
+    """The domain agents one process serves (several on one model: dog,
+    kitchen, kitchen_shared), built, rebuilt (reset) and reloaded — the
+    JSON-lines main() and the py service (in-process, no spawn) alike.
+    narrate: None, "*" (every domain) or "dog,kitchen"."""
+
+    def __init__(self, names, narrate=None, llm=None, seat=None, missing_seat=False, trace=False,
+                 records=None, session=None):
+        self.names, self.llm, self.seat = list(names), llm, seat
+        self.missing_seat, self.trace, self.records, self.session_id = missing_seat, trace, records, session
+        self.modules = [importlib.import_module("metis_agent.domains." + d) for d in self.names]
+        self.narrated = set(self.names) if narrate == "*" else set((narrate or "").split(",")) - {""}
+        self.state = {"pair_dir": None}
+
+    def build(self, seed, case, pair_dir=None):
+        # the model (llm, seat) is built once and kept across resets; a pair
+        # hosted here gets a fresh env each build (its own dir, unless given)
+        import shutil
+        import tempfile
+        state = self.state
+        if any(getattr(m, "PAIR", None) for m in self.modules):
+            if state["pair_dir"] and not os.environ.get("METIS_PAIR_DIR_KEEP"):
+                shutil.rmtree(state["pair_dir"], ignore_errors=True)
+            state["pair_dir"] = pair_dir or (tempfile.mkdtemp(prefix="pair-") if len(self.modules) > 1 or pair_dir
+                                             else os.environ.get("METIS_PAIR_DIR"))
+            if state["pair_dir"]:
+                os.environ["METIS_PAIR_DIR"] = state["pair_dir"]
+        state["seed"], state["case"] = seed, case
+        ags = [self.make(m, seed, case) for m in self.modules]
+        return ags[0] if len(ags) == 1 else Domains(ags)
+
+    def make(self, m, seed, case):
+        ag = DomainAgent(m, seed=seed, llm=self.llm, consult_seat=self.seat,
+                         consult_missing="seat" if self.missing_seat else "template", case=case)
+        if m.NAME not in self.narrated:
+            ag.narrator = None
+        ag.tracing = self.trace
+        if self.records:
+            ag.session = self.state.setdefault("session", self.session_id or time.strftime("%Y%m%d-%H%M%S"))
+            ag.sink = records_path(m, self.records, ag.session)
+        return ag
+
+    def reload(self, agent, d):
+        """reload(domain) (e2e-workflow step 3, WIRE.md): the domain's
+        module built again from the files on disk — its intent.yaml and
+        host for a data domain — and its agent rebuilt on it (the program
+        recompiled; the model, the tracing and the records sink kept; the
+        live case's host live again); the kitchen pair together, on a fresh
+        pair env. Any failure leaves the old domain running: an error reply."""
+        import importlib.util
+        import shutil
+        import tempfile
+        ags = agent.agents if isinstance(agent, Domains) else {agent.name: agent}
+        if d not in ags:
+            return agent, [reply(agent.name, "error", error="reload: no domain %r here" % d)]
+        pair = next((tuple(g) for g in (getattr(x.mod, "PAIR", None) for x in ags.values()) if g and d in g), None)
+        if pair and d != pair[0]:
+            return agent, [reply(d, "error", error="reload: %s reloads with its pair — reload %s" % (d, pair[0]))]
+        group = [n for n in (pair or (d,)) if n in ags]
+        saved = {}
+        try:
+            fresh = {}
+            for n in group:
+                mod = ags[n].mod
+                name = mod.__name__
+                saved[name] = sys.modules.get(name)
+                host = "%s_host" % n
+                saved[host] = sys.modules.pop(host, None)        # the host re-read from disk
+                spec = importlib.util.find_spec(name)
+                new = importlib.util.module_from_spec(spec)
+                sys.modules[name] = new                          # the plugin spec imports it by name
+                spec.loader.exec_module(new)
+                fresh[n] = new
+            if pair:
+                old_dir = self.state["pair_dir"]
+                self.state["pair_dir"] = tempfile.mkdtemp(prefix="pair-")
+                os.environ["METIS_PAIR_DIR"] = self.state["pair_dir"]
+            built = {n: self.make(fresh[n], self.state["seed"], self.state["case"]) for n in group}
+        except Exception as e:
+            for name, m in saved.items():
+                if m is not None:
+                    sys.modules[name] = m
+            if pair and "old_dir" in locals():
+                shutil.rmtree(self.state["pair_dir"], ignore_errors=True)
+                self.state["pair_dir"] = old_dir
+                os.environ["METIS_PAIR_DIR"] = old_dir or ""
+            return agent, [reply(d, "error", error="reload: %s: %s" % (type(e).__name__, e))]
+        if pair and old_dir and not os.environ.get("METIS_PAIR_DIR_KEEP"):
+            shutil.rmtree(old_dir, ignore_errors=True)
+        for n, ag in built.items():
+            ag.sunk = ags[n].sunk          # sunk lines not yet traced go on with the new agent
+        if isinstance(agent, Domains):
+            agent.agents.update(built)
+        else:
+            agent = built[d]
+        return agent, [reply(n, "reloaded", key=ag.repl.key) for n, ag in built.items()]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--domain", default="dog", help="a module under metis_agent.domains, or several "
@@ -762,93 +860,11 @@ def main():
     if a.consult == "claude":
         from .claude_seat import ClaudeSeat
         seat = ClaudeSeat()
-    names = [d.strip() for d in a.domain.split(",") if d.strip()]
-    modules = [importlib.import_module("metis_agent.domains." + d) for d in names]
-    narrated = set(names) if a.narrate == "*" else set((a.narrate or "").split(",")) - {""}
-    state = {"pair_dir": None}
-
-    def build(seed, case, pair_dir=None):
-        # the model (llm, seat) is built once and kept across resets; a pair
-        # hosted here gets a fresh env each build (its own dir, unless given)
-        import shutil
-        import tempfile
-        if any(getattr(m, "PAIR", None) for m in modules):
-            if state["pair_dir"] and not os.environ.get("METIS_PAIR_DIR_KEEP"):
-                shutil.rmtree(state["pair_dir"], ignore_errors=True)
-            state["pair_dir"] = pair_dir or (tempfile.mkdtemp(prefix="pair-") if len(modules) > 1 or pair_dir
-                                             else os.environ.get("METIS_PAIR_DIR"))
-            if state["pair_dir"]:
-                os.environ["METIS_PAIR_DIR"] = state["pair_dir"]
-        state["seed"], state["case"] = seed, case
-        ags = [make(m, seed, case) for m in modules]
-        return ags[0] if len(ags) == 1 else Domains(ags)
-
-    def make(m, seed, case):
-        ag = DomainAgent(m, seed=seed, llm=llm, consult_seat=seat,
-                         consult_missing="seat" if a.missing_seat else "template", case=case)
-        if m.NAME not in narrated:
-            ag.narrator = None
-        ag.tracing = a.trace
-        if a.records:
-            ag.session = state.setdefault("session", a.session or time.strftime("%Y%m%d-%H%M%S"))
-            ag.sink = records_path(m, a.records, ag.session)
-        return ag
-
-    def reload(agent, d):
-        """reload(domain) (e2e-workflow step 3, WIRE.md): the domain's
-        module built again from the files on disk — its intent.yaml and
-        host for a data domain — and its agent rebuilt on it (the program
-        recompiled; the model, the tracing and the records sink kept; the
-        live case's host live again); the kitchen pair together, on a fresh
-        pair env. Any failure leaves the old domain running: an error reply."""
-        import importlib.util
-        import shutil
-        import tempfile
-        ags = agent.agents if isinstance(agent, Domains) else {agent.name: agent}
-        if d not in ags:
-            return agent, [reply(agent.name, "error", error="reload: no domain %r here" % d)]
-        pair = next((tuple(g) for g in (getattr(x.mod, "PAIR", None) for x in ags.values()) if g and d in g), None)
-        if pair and d != pair[0]:
-            return agent, [reply(d, "error", error="reload: %s reloads with its pair — reload %s" % (d, pair[0]))]
-        group = [n for n in (pair or (d,)) if n in ags]
-        saved = {}
-        try:
-            fresh = {}
-            for n in group:
-                mod = ags[n].mod
-                name = mod.__name__
-                saved[name] = sys.modules.get(name)
-                host = "%s_host" % n
-                saved[host] = sys.modules.pop(host, None)        # the host re-read from disk
-                spec = importlib.util.find_spec(name)
-                new = importlib.util.module_from_spec(spec)
-                sys.modules[name] = new                          # the plugin spec imports it by name
-                spec.loader.exec_module(new)
-                fresh[n] = new
-            if pair:
-                old_dir = state["pair_dir"]
-                state["pair_dir"] = tempfile.mkdtemp(prefix="pair-")
-                os.environ["METIS_PAIR_DIR"] = state["pair_dir"]
-            built = {n: make(fresh[n], state["seed"], state["case"]) for n in group}
-        except Exception as e:
-            for name, m in saved.items():
-                if m is not None:
-                    sys.modules[name] = m
-            if pair and "old_dir" in locals():
-                shutil.rmtree(state["pair_dir"], ignore_errors=True)
-                state["pair_dir"] = old_dir
-                os.environ["METIS_PAIR_DIR"] = old_dir or ""
-            return agent, [reply(d, "error", error="reload: %s: %s" % (type(e).__name__, e))]
-        if pair and old_dir and not os.environ.get("METIS_PAIR_DIR_KEEP"):
-            shutil.rmtree(old_dir, ignore_errors=True)
-        for n, ag in built.items():
-            ag.sunk = ags[n].sunk          # sunk lines not yet traced go on with the new agent
-        if isinstance(agent, Domains):
-            agent.agents.update(built)
-        else:
-            agent = built[d]
-        return agent, [reply(n, "reloaded", key=ag.repl.key) for n, ag in built.items()]
-
+    proc = Process([d.strip() for d in a.domain.split(",") if d.strip()],
+                   narrate=(None if not a.narrate else "*" if a.narrate == "*" else a.narrate),
+                   llm=llm, seat=seat, missing_seat=a.missing_seat, trace=a.trace,
+                   records=a.records, session=a.session)
+    build, reload = proc.build, proc.reload
     agent = build(a.seed, a.case)
     print(json.dumps(ready(agent)), flush=True)
     for line in sys.stdin:
