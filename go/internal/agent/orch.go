@@ -31,12 +31,13 @@ type Orch struct {
 	pend strings.Builder // rendered, not yet decoded
 	open bool            // a model turn is open
 
-	byID      map[string]Call  // the journal by id: the call each id answered
-	said      *Call            // the T call awaiting its synchronous reply
-	consults  []Call           // the consults made: the guard's keys
-	answers   map[string]Reply // domain → its last consult reply
-	refusals  map[refusal]int  // a refusal → how often it came
-	surprises map[string]Reply // record → the surprise
+	byID      map[string]Call            // the journal by id: the call each id answered
+	said      *Call                      // the T call awaiting its synchronous reply
+	consults  []Call                     // the consults made: the guard's keys
+	answers   map[string]Reply           // domain → its last consult reply
+	refusals  map[refusal]int            // a refusal → how often it came
+	surprises map[string]Reply           // record → the surprise
+	deferred  map[string]deferredConsult // domain → the surprise whose consult is out
 
 	nPast int // tokens in the dialog after the last decode
 
@@ -93,6 +94,11 @@ type V3Config struct {
 	SampleMoves bool                    // the move with the pass-2 sampler (E11's G5s), else greedy
 	OnGen       func(GenInfo)           // every generation, and every move the harness makes
 	OnSay       func(kind, line string) // what the person hears unasked: voice | template | ask
+	// Defer, when set, takes the surprise's harness consult off the
+	// orchestrator's turn (integration step 4 ruling): the caller runs it
+	// and hands its answer back as an inbound (kind consult); meanwhile
+	// the person goes first and the mirror shows the surprise open
+	Defer func(c Call)
 }
 
 // GenInfo is one generation (or a harness move, Harness true).
@@ -127,7 +133,8 @@ type branch struct {
 func NewOrch(cfg V3Config, l DialogLLM, dom Domains) *Orch {
 	return &Orch{cfg: cfg, l: l, dom: dom, api: replAPI(cfg.Catalog, cfg.Loaded),
 		byID: map[string]Call{}, answers: map[string]Reply{}, refusals: map[refusal]int{}, surprises: map[string]Reply{},
-		m: newMirror(), quiet: map[string]bool{}, spoke: map[string]bool{}, asked: map[string]bool{}, qHeard: map[string]bool{}}
+		m: newMirror(), quiet: map[string]bool{}, spoke: map[string]bool{}, asked: map[string]bool{}, qHeard: map[string]bool{},
+		deferred: map[string]deferredConsult{}}
 }
 
 // ── the dialog's past and its wakes ──────────────────────────────────────────
@@ -232,6 +239,13 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 	c := o.last.call
 	verb := c.Verb()
 	talk := c.IsJ() && (verb == "CHITCHAT" || verb == "UNKNOWN" || infoQuery(c)) // an information turn is never an intent (56da709)
+	clock := ""
+	if c.IsJ() && (verb == "TIME" || verb == "DATE") && o.cfg.Mirror { // from the clock, never dispatched; an open question stays open
+		clock, talk = clockLine(verb), true
+		if q != nil {
+			o.q, q = q, nil
+		}
+	}
 	if c.IsJ() && !talk && verb != "QUERY" && verb != "STOP" && verb != "CANCEL" && strings.HasSuffix(words, "?") {
 		// question-form words moved as a world command: judged info or
 		// command (integration step 2 ruling: after the kitchen's lines,
@@ -318,8 +332,11 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 	intent = c.Text()
 	// nothing is spoken at the person's turn: the intent's first reply speaks
 	// (step 3 ruling); talk is its own reply, spoken now, from the mirror
-	if saidNo && o.cfg.Mirror { // the task stays refused: the harness's line, not the model's ("I will stop…")
+	if (saidNo || clock != "") && o.cfg.Mirror { // the task stays refused: the harness's line, not the model's ("I will stop…"); the time from the clock
 		voice = lineLeaveIt
+		if clock != "" {
+			voice = clock
+		}
 		o.pend.WriteString("\n" + speakCue + " " + voice)
 		o.say("template", voice)
 	} else if !o.cfg.Mirror || talk {
@@ -668,11 +685,7 @@ func (o *Orch) grammar(b branch) (string, error) {
 // pot space -1?"); the model asked "how do I close surprise 0?" and the
 // seat answered unexplained (integration step 2, D4-b 3/3).
 func (o *Orch) harnessConsult(b branch) error {
-	q := "why does the reading differ from the model?"
-	if s, ok := o.surprises[b.record]; ok && s.Difference != "" {
-		q = "why does the reading differ from the model: " + string(s.Difference) + "?"
-	}
-	c := Call{Name: "consult", Args: map[string]any{"domain": b.domain, "question": q}}
+	c := o.surpriseConsult(b.domain, b.record)
 	text := c.Text()
 	o.pend.WriteString(text)
 	o.setLast(text)
@@ -681,6 +694,53 @@ func (o *Orch) harnessConsult(b branch) error {
 		o.cfg.OnGen(GenInfo{Label: "move", Text: text, Key: key, Harness: true, Branch: b.name})
 	}
 	return o.answer(b)
+}
+
+func (o *Orch) surpriseConsult(domain, record string) Call {
+	q := "why does the reading differ from the model?"
+	if s, ok := o.surprises[record]; ok && s.Difference != "" {
+		q = "why does the reading differ from the model: " + string(s.Difference) + "?"
+	}
+	return Call{Name: "consult", Args: map[string]any{"domain": domain, "question": q}}
+}
+
+type deferredConsult struct {
+	surprise Reply
+	call     Call
+}
+
+// consultAnswered: the deferred consult's answer, as the synchronous path
+// has it — the surprise's wake, the harness's consult call, its answer,
+// then the next move (explain, reset or escalate).
+func (o *Orch) consultAnswered(d deferredConsult, r Reply) error {
+	o.Wake(d.surprise)
+	text := d.call.Text()
+	o.pend.WriteString(text)
+	o.setLast(text)
+	if o.cfg.OnGen != nil {
+		_, key := CallOf(text)
+		o.cfg.OnGen(GenInfo{Label: "move", Text: text, Key: key, Harness: true, Branch: "surprise"})
+	}
+	c := d.call
+	o.consults = append(o.consults, c)
+	o.said = &c
+	if _, err := o.Reply(r); err != nil {
+		return err
+	}
+	return o.Move()
+}
+
+// DropDeferred: the deferred consult of the domain failed; the surprise
+// stays open in the mirror.
+func (o *Orch) DropDeferred(domain string) { delete(o.deferred, domain) }
+
+// clockLine: TIME and DATE are the harness's, from the clock (integration
+// step 4 ruling), never dispatched.
+func clockLine(verb string) string {
+	if verb == "DATE" {
+		return "It's " + time.Now().Format("Monday, January 2") + "."
+	}
+	return "It's " + time.Now().Format("3:04 PM") + "."
 }
 
 // harnessEscalate: the escalate call is the harness's (the ruling): the

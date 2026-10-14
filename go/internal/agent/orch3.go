@@ -167,7 +167,7 @@ func floorRank(in Inbound) int {
 		return 0
 	}
 	switch r.Kind {
-	case "surprise":
+	case "surprise", "consult": // a consult's answer continues its surprise
 		return 1
 	case "result":
 		switch r.Status {
@@ -238,8 +238,23 @@ func (o *Orch) Handle(in Inbound, gbnf string, stopWords []string) (woke bool, e
 		return true, o.Speak()
 	case "surprise":
 		o.m.see(r, Call{})
+		if o.cfg.Defer != nil && o.cfg.Mirror { // the consult off the orchestrator's turn: the person goes first meanwhile
+			o.surprises[string(r.Record)] = r
+			c := o.surpriseConsult(r.Domain, string(r.Record))
+			o.deferred[r.Domain] = deferredConsult{surprise: r, call: c}
+			o.cfg.Defer(c)
+			return false, nil
+		}
 		o.Wake(r)
 		return true, o.Move()
+	case "consult": // a deferred consult's answer
+		d, ok := o.deferred[r.Domain]
+		if !ok {
+			o.m.see(r, Call{})
+			return false, nil
+		}
+		delete(o.deferred, r.Domain)
+		return true, o.consultAnswered(d, r)
 	case "quiescence", "error":
 		o.m.see(r, Call{})
 		if r.Kind == "quiescence" && !o.quiescenceSpoken(r) { // the mirror only

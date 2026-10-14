@@ -198,7 +198,41 @@ func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journa
 			return v.domainVerb(verb, dom, bindings, by)
 		}}
 	v.live = ld
+	v.cfg.Defer = func(c Call) { go v.runConsult(a, c) }
 	return v.restart(a)
+}
+
+// runConsult runs a surprise's harness consult off the orchestrator's turn
+// and hands its answer to the inbox (integration step 4 ruling).
+func (v *v3) runConsult(a *Agent, c Call) {
+	ld := v.live
+	dom, _ := c.Args["domain"].(string)
+	args := map[string]any{}
+	for k, x := range c.Args {
+		if k != "domain" {
+			args[k] = x
+		}
+	}
+	var rs []map[string]any
+	var err error
+	if p := ld.procs[dom]; p == nil {
+		err = fmt.Errorf("no domain agent serves %s", dom)
+	} else {
+		rs, err = p.ToolTo(dom, c.Name, args, "")
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	rs = ld.sift(rs)
+	answered := false
+	for _, r := range rs {
+		answered = answered || r["kind"] == "consult"
+	}
+	if err != nil || !answered {
+		log.Printf("[v3] the deferred consult of %s: no answer (%v); the surprise stays open", dom, err)
+		v.o.DropDeferred(dom)
+	}
+	v.handleDue(a, -1, rs)
+	v.pushCatalog()
 }
 
 func slicesContains(xs []string, x string) bool {

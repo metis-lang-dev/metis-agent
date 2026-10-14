@@ -222,3 +222,65 @@ func TestInfoJudge(t *testing.T) {
 		t.Fatal("negated")
 	}
 }
+
+// integration step 4: the surprise's consult off the orchestrator's turn —
+// the surprise opens no turn, the mirror shows it with its difference, the
+// person goes first, and the consult's answer resumes the surprise branch
+func TestDeferredConsult(t *testing.T) {
+	var out []Call
+	explain := `<|tool_call>call:explain{card:<|"|>kitchen_shared<|"|>,domain:<|"|>kitchen<|"|>,move:<|"|>partner_load<|"|>,record:<|"|>0<|"|>}<tool_call|>`
+	f := &fakeDialog{outs: []string{`{"intent":"CHITCHAT"}`, "I am idle right now.", explain, "The kitchen carries on."}}
+	o := NewOrch(V3Config{Loaded: []string{"dog", "kitchen"}, Mirror: true, Defer: func(c Call) { out = append(out, c) }}, f, noDomains{})
+	var r Reply
+	_ = json.Unmarshal([]byte(`{"domain":"kitchen","kind":"surprise","record":0,"difference":{"pot_onion":1,"pot_space":-1},"text":"surprise 0, paused"}`), &r)
+	woke, err := o.Handle(Inbound{Reply: &r}, "", nil)
+	if err != nil || woke || len(out) != 1 || f.n != 0 {
+		t.Fatalf("the surprise: woke %v err %v deferred %d gens %d", woke, err, len(out), f.n)
+	}
+	if !strings.Contains(out[0].Text(), "pot onion +1, pot space -1") {
+		t.Fatalf("the consult's question %s", out[0].Text())
+	}
+	if !strings.Contains(o.m.render(o.cfg.Loaded), "kitchen: surprise #0 open: pot onion +1, pot space -1") {
+		t.Fatal("the mirror does not show the open surprise")
+	}
+	if _, voice, err := o.Turn("what are you doing?", ""); err != nil || voice == "" { // the person first
+		t.Fatalf("the person's turn: %q %v", voice, err)
+	}
+	woke, err = o.Handle(Inbound{Reply: &Reply{Domain: "kitchen", Kind: "consult", AnswerKind: "explains",
+		Text: "kitchen_shared/partner_load explains it"}}, "", nil)
+	if err != nil || !woke {
+		t.Fatalf("the consult's answer: woke %v err %v", woke, err)
+	}
+	log := strings.Join(f.log, "\n")
+	i, j := strings.Index(log, "call:consult"), strings.Index(log, "gen "+explain)
+	if i < 0 || j < i {
+		t.Fatalf("the consult call is not decoded before the next move:\n%s", log)
+	}
+	if len(o.deferred) != 0 {
+		t.Fatal("the deferred consult is still pending")
+	}
+}
+
+// integration step 4: TIME and DATE from the clock, never dispatched; an
+// open question stays open
+func TestClockTurns(t *testing.T) {
+	for _, verb := range []string{"TIME", "DATE"} {
+		f := &fakeDialog{outs: []string{`{"intent":"` + verb + `"}`}}
+		d := &countDomains{}
+		o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true}, f, d)
+		q := &question{id: "q1", kind: "none", refused: Call{J: []byte(`{"intent":"NAVIGATE","goal":{"type":"REGION","description":"kitchen"}}`)}}
+		o.q = q
+		_, voice, err := o.Turn("what time is it?", "")
+		if err != nil || !strings.HasPrefix(voice, "It's ") || d.n != 0 || o.q != q || f.n != 1 {
+			t.Fatalf("%s: voice %q err %v dispatched %d question kept %v gens %d", verb, voice, err, d.n, o.q == q, f.n)
+		}
+	}
+}
+
+type countDomains struct{ n int }
+
+func (d *countDomains) Call(c Call) (Reply, bool) { d.n++; return Reply{}, false }
+func (d *countDomains) Intent(c Call) (Reply, bool) {
+	d.n++
+	return Reply{Domain: "dog", Kind: "result", ID: "c1", Status: "accepted"}, true
+}

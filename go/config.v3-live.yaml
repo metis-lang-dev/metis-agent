@@ -48,7 +48,7 @@ v3:
     catalog: [kitchen, nav, xtraffic, sysadmin, social, votes]
     loaded: [dog, kitchen]
     display: {kitchen_shared: second cook}
-    n_ctx: 8192
+    n_ctx: 16384                # integration step 4 ruling: ~10k tokens of dialog room (+106 MiB); was 8192
     tick_ms: 1500
     journal: results/live/session.jsonl
     domains:

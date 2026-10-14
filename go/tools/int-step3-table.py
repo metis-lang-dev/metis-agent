@@ -72,7 +72,7 @@ def rows(sessions):
                 if ask and (nxt is None or ask["seq"] < nxt["seq"] or nxt.get("what") != "person"):
                     R["refusal → ask"].append((t(ask) - t(r)).total_seconds() * 1000)
             elif w == "surprise":
-                s = next((s for s in says if s["seq"] > r["seq"] and s.get("src", {}).get("what") == "surprise"), None)
+                s = next((s for s in says if s["seq"] > r["seq"] and s.get("src", {}).get("what") in ("surprise", "consult")), None)
                 if s:
                     R["surprise → line"].append((t(s) - t(r)).total_seconds() * 1000)
             elif first and (w.startswith("result:") or w == "quiescence"):
