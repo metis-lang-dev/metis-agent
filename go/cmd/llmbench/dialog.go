@@ -29,6 +29,7 @@ type dlgPerson struct {
 }
 
 type dlgWorld struct { // the timeline's person acting on a real domain's world (integration step 1)
+	Premise bool     `json:"premise,omitempty"` // a line that makes the emulator's premise (an arrival the world does not answer); off with -dog-as-is
 	At     int      `json:"at"`
 	Domain string   `json:"domain"`
 	Lines  []string `json:"lines"`
@@ -90,6 +91,10 @@ func readDialog(path string) ([]dlgItem, error) {
 	}
 	return out, sc.Err()
 }
+
+// noPremise: -dog-as-is — the dog's world as dog.llp has it, only the
+// person's own acts (the door opened) applied: the emulator's premises off
+var noPremise bool
 
 // dogTail: beats the replay runs past the last person turn with the real
 // dog (its pending answers are its own; the emulator's Pending is not)
@@ -310,6 +315,24 @@ func dialogRun(l agent.DialogLLM, it dlgItem, gbnf, tag string, rep int, sd uint
 		}
 		return out
 	}
+	if dog != nil { // the timeline's premise world (at < 0): applied on a setup tick before beat 0
+		var pre []string
+		for _, w := range it.World {
+			if w.At < 0 && w.Domain == "dog" {
+				pre = append(pre, w.Lines...)
+			}
+		}
+		if len(pre) > 0 && !noPremise {
+			if err := dog.World(pre); err != nil {
+				return err
+			}
+			if rs, err := dog.Beat(); err != nil {
+				return err
+			} else if len(rs) > 0 {
+				rec(dlgRec{Kind: "dlg-wire", What: "premise-tick", Text: fmt.Sprint(rs)})
+			}
+		}
+	}
 	for beat = 0; beat <= 40; beat++ {
 		var queue []agent.Inbound
 		for _, p := range it.Person {
@@ -318,7 +341,7 @@ func dialogRun(l agent.DialogLLM, it dlgItem, gbnf, tag string, rep int, sd uint
 			}
 		}
 		for _, w := range it.World {
-			if w.At == beat && w.Domain == "dog" && dog != nil {
+			if w.At == beat && w.Domain == "dog" && dog != nil && !(noPremise && w.Premise) {
 				if err := dog.World(w.Lines); err != nil {
 					return err
 				}

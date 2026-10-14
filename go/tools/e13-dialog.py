@@ -181,7 +181,31 @@ def item(iid, what, person, scripts, expect=None, world=None):
     return it
 
 
-OPENED = [{"at": 3, "domain": "dog", "lines": ["-closed(kitchen)", "+open(kitchen)"]}]   # "okay, it's open now"
+# integration step 1, the real dog (dog.llp's world, dog_host's ANSWERS):
+# at < 0 the timeline's premise (the emulator's world where dog.llp's
+# differs), applied on a setup tick; "premise" marks the arrivals the world
+# does not answer by itself (ANSWERS has tag3, door, window_chair; a go
+# elsewhere times out 3 ticks after it fires: the arrival comes 3 beats
+# after the person's turn, before the timeout); the rest are the person's
+# own acts (the door opened). -dog-as-is drops the premise lines.
+def W(at, *lines, premise=False):
+    w = {"at": at, "domain": "dog", "lines": list(lines)}
+    if premise:
+        w["premise"] = True
+    return w
+
+
+KITCHEN_OPEN = W(-1, "-closed(kitchen)", "+open(kitchen)", premise=True)
+SOFA_MAPPED = W(-1, "-unmapped(sofa)", "+mapped(sofa)", "+open(sofa)", premise=True)
+KEYS_SEEN = W(-1, "-unseen(keys)", "+seen(keys)", "+where(keys,kitchen)", premise=True)
+SITTING = W(-1, "-posture(standing)", "+posture(sitting)", premise=True)
+
+
+def ARRIVE(at, place):
+    return W(at, "+arrived(%s)" % place, premise=True)
+
+
+OPENED = [W(3, "-closed(kitchen)", "+open(kitchen)"), ARRIVE(6, "kitchen")]   # "okay, it's open now", then the walk arrives
 
 
 def main():
@@ -189,27 +213,27 @@ def main():
     items = [
         item("D1-a", "each outcome's line names its own task",
              [p(0, "stand up", a_body("STAND_UP")), p(1, "go to the sofa", a_nav("sofa"))],
-             [dog(go_ok("sofa", 4)), kitchen((2, ORDER))]),
+             [dog(go_ok("sofa", 4)), kitchen((2, ORDER))], world=[SITTING, SOFA_MAPPED, ARRIVE(4, "sofa")]),
         item("D1-b", "a later task's outcome first, attributed by id",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(1, "where are my keys?", a_keys())],
-             [dog(go_ok("kitchen", 5)), kitchen()]),
+             [dog(go_ok("kitchen", 5)), kitchen()], world=[KITCHEN_OPEN, KEYS_SEEN, ARRIVE(3, "kitchen")]),
         item("D1-c", "the refusal of the first task after the second's outcome: the loop on c1",
              [p(0, "go to tag five", a_tag(5)), p(1, "where are my keys?", a_keys())],
              [dog(nav("tag", res("refused", 2, "I can't go to tag 5: that place is not on my map.",
                                   reason="that place is not on my map", blocker="unmapped(tag5)")),
                   consult=missing("unmapped(tag5)", "mapped(tag5)", "Tag 5 is not on my map: I have never been there.")),
-              kitchen()]),
+              kitchen()], world=[KEYS_SEEN]),
         item("D2-a", "stop mid-task: the cancelled line about the kitchen, the progress unspoken",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(3, "stop", [{"intent": "STOP"}])],
              [dog(nav("kitchen", res("progress", 1, "I set off for the kitchen."), res("progress", 2), res("done", 6, "I have arrived at the kitchen.")),
-                  live="going to the kitchen"), kitchen()]),
+                  live="going to the kitchen"), kitchen()], world=[KITCHEN_OPEN]),
         item("D2-b", "a busy refusal asks before it cancels; yes → cancel (harness) → the retry",
              [p(0, "find my keys", a_keys()), p(2, "actually, go to the door", a_nav("door")),
-              p(3, "yes, drop it", [a_nav("door"), {"intent": "CANCEL"}] + TALK)],   # CANCEL: the offered verb (c77232b's intent pass)
-             [dog(find_ok("keys", 8), go_ok("door", 3), live="searching for your keys"), kitchen()], {"bound_at": 3, "bound": "retry"}),
+              p(4, "yes, drop it", [a_nav("door"), {"intent": "CANCEL"}] + TALK)],   # beat 4 (was 3): the real dog refuses on its next tick, and an answer follows its question   # CANCEL: the offered verb (c77232b's intent pass)
+             [dog(find_ok("keys", 8), go_ok("door", 3), live="searching for your keys"), kitchen()], {"bound_at": 4, "bound": "retry"}),
         item("D2-c", "what are you doing? mid-task: no new world intent, the line says the kitchen",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(2, "what are you doing?", TALK)],
-             [dog(go_ok("kitchen", 6)), kitchen()]),
+             [dog(go_ok("kitchen", 6)), kitchen()], world=[KITCHEN_OPEN, ARRIVE(3, "kitchen")]),
         item("D3-a", "the ask answered yes: the retry with a new id",
              [p(0, "go to the kitchen", a_nav("kitchen")), p(3, "okay, it's open now", [a_nav("kitchen")] + TALK)],
              [dog(nav("kitchen", CLOSED), go_ok("kitchen", 3), consult=CONSULT_CLOSED), kitchen()],
@@ -232,10 +256,10 @@ def main():
              {"bound_at": 3, **yes_kitchen}),
         item("D4-a", "a kitchen order that reads like a command: the person's turn left only",
              [p(0, "go to the sofa", a_nav("sofa")), p(2, "turn left", a_body("TURN", direction="LEFT"))],
-             [dog(go_ok("sofa", 6)), kitchen((1, BAIT))]),
+             [dog(go_ok("sofa", 6)), kitchen((1, BAIT))], world=[SOFA_MAPPED, ARRIVE(3, "sofa")]),
         item("D4-b", "a kitchen surprise mid-task: the loop on #0, then the sofa's line",
              [p(0, "go to the sofa", a_nav("sofa"))],
-             [dog(go_ok("sofa", 5)), kitchen((1, SURP), surprise=True)]),
+             [dog(go_ok("sofa", 5)), kitchen((1, SURP), surprise=True)], world=[SOFA_MAPPED, ARRIVE(3, "sofa")]),
         item("D4-c", "a kitchen quiescence mid-task: it claims nothing of the dog's",
              [p(0, "go to the door", a_nav("door"))],
              [dog(go_ok("door", 3)), kitchen((2, SERVED))]),

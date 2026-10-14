@@ -118,8 +118,8 @@ func (p *DomainProc) Do(req map[string]any) ([]map[string]any, error) {
 		switch kind {
 		case "clock":
 			return m["clock"] != nil
-		case "reset":
-			return m["clock"] == "ready" || m["ack"] == "reset"
+		case "reset": // the ready line, then the reset's ack: read to the ack, or the next request reads it as its own
+			return m["ack"] != nil
 		}
 		return m["ack"] != nil
 	})

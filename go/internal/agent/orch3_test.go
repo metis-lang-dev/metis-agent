@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -61,5 +62,31 @@ func TestRollbackForgedLine(t *testing.T) {
 	}
 	if mark := f.nPast; mark != o.Tokens() {
 		t.Fatalf("the dialog's length %d, the orchestrator's %d", mark, o.Tokens())
+	}
+}
+
+// DESIGN 25dc92b: a world blocker consults first whatever the alternatives,
+// and the alternatives are typed intents rendered as J.
+func TestWorldBlockerConsultsFirst(t *testing.T) {
+	f := &fakeDialog{outs: []string{`{"intent":"NAVIGATE","goal":{"type":"REGION","description":"kitchen"}}`}}
+	o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true, AskCheck: true}, f, noDomains{})
+	if _, _, err := o.Turn("go to the kitchen", ""); err != nil {
+		t.Fatal(err)
+	}
+	r := Reply{Domain: "dog", Kind: "result", ID: "c1", Status: "refused", Reason: "the way to it is closed",
+		Blocker: []byte(`"closed(kitchen)"`), Alternatives: []json.RawMessage{
+			[]byte(`{"verb":"NAVIGATE","args":{"goal":{"type":"OBJECT","description":"door"}}}`)}}
+	br, err := o.Reply(r)
+	if err != nil || br != "none" {
+		t.Fatalf("branch %q %v", br, err)
+	}
+	if len(o.br.offers) != 1 || o.br.offers[0].Text() != `{"intent":"NAVIGATE","goal":{"type":"OBJECT","description":"door"}}` {
+		t.Fatalf("offers %+v", o.br.offers)
+	}
+	r2 := Reply{Domain: "dog", Kind: "result", ID: "c2", Status: "refused", Reason: "I am on a task", Blocker: []byte("null"),
+		Alternatives: []json.RawMessage{[]byte(`{"verb":"LOCAL_ACTION","args":{"action":"STAND_UP"}}`)}}
+	o.byID["c2"] = Call{J: []byte(`{"intent":"LOCAL_ACTION","action":"TURN","direction":"LEFT"}`)}
+	if br, _ := o.Reply(r2); br != "alts" || o.br.alts[0].Text() != `{"intent":"LOCAL_ACTION","action":"STAND_UP"}` {
+		t.Fatalf("blocker null keeps take-one: %q %+v", br, o.br.alts)
 	}
 }

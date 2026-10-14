@@ -114,6 +114,7 @@ type branch struct {
 	words   string // the resource's words (missing)
 	alt     string // cancelask: the verb the domain offered (CANCEL | STOP)
 	key     string // the resource's key: what the ask must name (the domain's data, step 3 ruling)
+	offers  []Call // a world blocker's alternatives: consulted first, offered in the ask (DESIGN 25dc92b)
 	again   refusal
 }
 
@@ -403,8 +404,8 @@ func (o *Orch) Reply(r Reply) (string, error) {
 func (o *Orch) branchOf(r Reply, c Call) (branch, error) {
 	switch {
 	case r.Kind == "consult":
-		b := o.br // the refusal it answers: its call, domain and record
-		b.name, b.reply, b.alts, b.pick, b.words = "answer", r, nil, "", ""
+		b := o.br                                                           // the refusal it answers: its call, domain and record
+		b.name, b.reply, b.alts, b.pick, b.words = "answer", r, nil, "", "" // b.offers kept: the ask offers them
 		if r.Resource != nil {
 			b.words, b.key = r.Resource.Words, r.Resource.Key
 		}
@@ -450,6 +451,12 @@ func (o *Orch) branchOf(r Reply, c Call) (branch, error) {
 			b.name = "speak"
 			return b, nil
 		}
+		if bl := string(r.Blocker); bl != "" && bl != "null" && len(b.alts) > 0 {
+			// a world blocker: every alternative changes the person's goal —
+			// consult first, the ask offers them (DESIGN 25dc92b)
+			b.name, b.offers, b.alts = "none", b.alts, nil
+			return b, nil
+		}
 		b.name = map[bool]string{true: "alts", false: "none"}[len(b.alts) > 0]
 		return b, nil
 	case r.Kind == "surprise":
@@ -474,6 +481,8 @@ func (o *Orch) cue(b branch) string {
 		return ""
 	case b.name == "again" && b.pick == "ask":
 		return cueAskAgain(b.words, o.cfg.Mirror)
+	case b.name == "answer" && b.reply.AnswerKind == "missing" && o.cfg.AskCheck && len(b.offers) > 0:
+		return cueAskOffer(b.words, b.offers)
 	case b.name == "answer" && b.reply.AnswerKind == "missing" && o.cfg.AskCheck:
 		return cueAsk(b.words)
 	case b.name == "cancelask":

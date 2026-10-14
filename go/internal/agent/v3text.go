@@ -51,6 +51,20 @@ func cueAsk(words string) string {
 	return "[Next move — the consult answered missing: ask the person, in one short question, for " + words + ". Exactly one call.]"
 }
 
+// cueAskOffer: a world blocker's ask offers the domain's alternatives
+// beside the resource (DESIGN 25dc92b: they change the person's goal, so
+// the person chooses).
+func cueAskOffer(words string, offers []Call) string {
+	var o []string
+	for _, c := range offers {
+		o = append(o, strings.TrimPrefix(describe(c), "your command to "))
+	}
+	return "[Next move — the consult answered missing: ask the person, in one short question, for " + words +
+		", or whether to " + strings.Join(o, " or ") + " instead. Exactly one call.]"
+}
+
+func strconvQuote(s string) string { b, _ := json.Marshal(s); return string(b) }
+
 func cueAskAgain(words string, leadIn bool) string {
 	if leadIn { // the step 2 ruling: the harness says "still", the model asks
 		return "[Next move — the same refusal came back after your move. You have just said: \"" + lineStill(words) +
@@ -172,6 +186,19 @@ func APIDeclarations(catalog, loaded []string) string {
 func altCall(raw json.RawMessage, api []apiTool) (Call, error) {
 	var s string
 	if json.Unmarshal(raw, &s) != nil {
+		var typed struct {
+			Verb string          `json:"verb"`
+			Args json.RawMessage `json:"args"`
+		}
+		if json.Unmarshal(raw, &typed) == nil && typed.Verb != "" { // a typed intent in the domain's dictionary (DESIGN 25dc92b): J as it is
+			inner := strings.TrimSpace(compactJSON(typed.Args))
+			inner = strings.TrimSuffix(strings.TrimPrefix(inner, "{"), "}")
+			j := `{"intent":` + strconvQuote(typed.Verb)
+			if inner != "" && inner != "null" {
+				j += "," + inner
+			}
+			return Call{J: json.RawMessage(j + "}")}, nil
+		}
 		return Call{J: raw}, nil
 	}
 	i, j := strings.IndexByte(s, '('), strings.LastIndexByte(s, ')')
