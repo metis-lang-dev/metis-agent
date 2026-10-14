@@ -433,7 +433,15 @@ func (o *Orch) branchOf(r Reply, c Call) (branch, error) {
 		}
 		for _, raw := range r.Alternatives {
 			var w string
-			if json.Unmarshal(raw, &w) == nil && (w == "cancel" || w == "stop") { // busy: it would cancel a live task
+			var typed struct {
+				Verb string `json:"verb"`
+			}
+			if json.Unmarshal(raw, &typed) == nil && typed.Verb != "" { // a typed alternative in the domain's dictionary (25dc92b)
+				w = strings.ToLower(typed.Verb)
+			} else {
+				_ = json.Unmarshal(raw, &w)
+			}
+			if w == "cancel" || w == "stop" { // busy: it would cancel a live task
 				if live, ok := o.m.live(r.Domain, r.ID); ok {
 					b.name, b.words, b.alt = "cancelask", objectWords(live.c), strings.ToUpper(w)
 					return b, nil

@@ -337,6 +337,17 @@ func identity(c Call) string {
 			d = "the " + d
 		}
 		return fmt.Sprintf("your command to %s %s", map[string]string{"FIND": "find", "QUERY": "look at", "FOLLOW": "follow"}[i], d)
+	case "go", "look": // the domain's own dictionary (a typed alternative, 25dc92b)
+		what := map[string]string{"go": "go to ", "look": "look at "}[i]
+		p := strings.ReplaceAll(str(j, "place"), "_", " ")
+		if !strings.HasPrefix(p, "tag") {
+			p = "the " + p
+		}
+		return "your command to " + what + p
+	case "find", "query":
+		return "your command to " + map[string]string{"find": "find", "query": "look for"}[i] + " the " + strings.ReplaceAll(str(j, "thing"), "_", " ")
+	case "stand", "sit", "lie":
+		return "your command to " + map[string]string{"stand": "stand up", "sit": "sit down", "lie": "lie down"}[i]
 	default:
 		return "your command " + strings.ToLower(i)
 	}
