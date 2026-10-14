@@ -206,6 +206,60 @@ with thinking off and with a 256 cap.
 reads 1 and 2 hold for gemma4 E2B or E4B. The C++ IR runtime gets REPL
 instruments only after that, and only the ones S1 used.
 
+### 5b. S1 result and the one re-registration, S1b (architect, 2026-10-14; nina's step-2 report, metis-agent 94cbaea + df1db14)
+
+**Result, as scored (reached / faithful of 20):** E2B off 10 / 1; E2B cap
+256 16 / 6; E4B off 16 / 8; E4B cap 256 19 / 7; claude 20 / 15 (18 by
+hand). Read 1 holds for E2B with the cap and for E4B; read 2 fails on
+every gemma seat. **Under §5's rule the specialist line does not continue
+on the metispy runtime as it stands.**
+
+**Rulings on the reads.**
+- **Read 3:** kernel-grounded answers count. W3's capped answer on the seen
+  catalog ("in the classic puzzle the wolf would eat the goat") is prior
+  knowledge, not the kernel's, so the cap adds 2 on E2B, under the bar; on
+  E4B it adds 0. The cap is not adopted as a default. What it does do is
+  end the zero-call class (3 → 0 on both sizes) and fix two argument
+  forms, which is recorded for S1b.
+- **Read 4:** necessity is where the small model is furthest behind on
+  every seat (claude 5/5, gemma ≤ 2). That is the interpreter-in-the-model
+  horizon §5 named, measured.
+
+**What the misses say.** About half of gemma's misses at thinking off are
+before narration: a call whose argument the kernel cannot hold (E2B 7 of
+19, E4B 3 of 12) or no call at all (3, 2). The argument misses have one
+cause: `state` prints atoms grouped by predicate (`on  (b,c) (c,a)`) while
+why, necessity and sufficiency take `pred(args)`, a form no output the
+model sees ever prints; when the model writes it anyway it reads the answer
+right. The refusal is then reported as the answer. This is the class every
+E-series found and fixed on the harness side, not a model lever.
+
+**S1b, one re-registration, as step 3** (queued behind integration step 1,
+the user's build order):
+1. metispy: `state` prints each atom in the instruments' form,
+   `pred(args)`, one per line or as a grouped row with the canonical form
+   beside it; a refusal of why / necessity / sufficiency names the nearest
+   held atom (the harness's first read, as E11's consult gets the refusing
+   row). Opus, the metis line.
+2. The declarations' argument line is re-frozen once with the form named
+   ("an atom as `state` prints it"); nothing else in the text moves. Nina.
+3. The scorer: the padding strip (B3) and the form misses (grouped rows,
+   quotes) fixed; paraphrase stays a hand read. Opus.
+4. Nothing changes in the model, the seats, the persona or the loop.
+
+**Bars, pre-registered:** the same twenty items on E4B off and E2B cap 256;
+read 1 ≥ 16 reached; read 2 ≥ 16 of 20 faithful, kernel-grounded, read by
+hand beside the scorer. **If S1b fails read 2 on both seats, the specialist
+line stops on the metispy runtime:** the consultant stays in the domain
+agent only for the restricted, measured use it already has (a surprise
+with cards, kinds and moves pinned: kitchen explains on both seats), and
+the free-form specialist waits for a stronger small model. No C++ IR
+instruments either way until a seat passes.
+
+**Noted for phase 3 step 3:** E4B at thinking off is the better seat on
+what-if and trace at 2.6 s per item; whether it fits as the domain agent's
+consultant seat beside the orchestrator's E2B is the VRAM question there.
+
 ## 6. Iterations (on demand)
 
 1. **Runtime + loop, one puzzle.** llama-cpp-python installed with CUDA,
