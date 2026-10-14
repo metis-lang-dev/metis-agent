@@ -256,8 +256,16 @@ domain-independent, the last two generated from the catalog at load:
    a refusal the kind is computed, not chosen:** the host hands its pairs
    to the agent at load (dog_host.py `PAIRS`, `flips`); the replier puts
    the blocker on the result; the consultant's kind is `missing` when the
-   blocker flips and `unexplained` otherwise, and the model's whole task is
-   the `resource.words` and the sentence. A blocker that held from the
+   blocker flips and `unexplained` otherwise, and the `resource.words` are
+   the host's table's (`WORDS`, with the handle's display name). **A
+   computed `missing` therefore needs no model call:** kind, atom and words
+   are the harness's, and its `text` is templated from the refusing rule's
+   `%%` line (the narrator's refusal sentence, already spoken). The seat is
+   consulted only where something is open: a surprise, a failure, a
+   non-flippable blocker, a host without a table. Ruled 2026-10-14 after
+   the words landed (nina, 4976cc4): with kind, atom and words fixed, E2B's
+   sentence on a wall refusal still blamed the closed kitchen, and nothing
+   downstream reads it. A blocker that held from the
    start (in the base state, no producer) is still `missing`; "nobody put
    it there" is not a reason, the pair is. A
    refusal with no blocker ("already stopped", "must stand first") is not
