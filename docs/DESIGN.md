@@ -245,6 +245,30 @@ and signals held, the bound answer and the outcome lines did not):
   agent answers on its next tick, one beat after the emulator did
   (integration step 1); a timeline's person answer sits after the ask it
   answers, never on the same beat.
+- **A stop or cancel acts on the tick it arrives, before the world's due
+  answers.** The real dog's stop reached the runtime on the timeout's tick
+  and lost to it (integration step 1, D2-a): the host applies command
+  lines first, then what fell due.
+- **The domain's text names its object, in the domain's voice.** The
+  catalog's `%%` line carries the binding where one belongs (`{P}`, `{T}`:
+  "I have arrived at {P}.", "I found {T}"), the narrator fills it before
+  the model phrases, and the attribution scorer holds it to the line. A
+  text that does not bind its object is not copied: the outcome turn
+  leads with the task's words by id regardless. The dog speaks first
+  person because its lines do; "The dog is going to the kitchen" was the
+  narrator leaving its material.
+- **Every busy refusal offers the way out:** cancel for a task, stop for a
+  body action, so the table's busy → ask holds for both.
+- **A standing handle (elsewhere, tag_near) has no words and no key:** a
+  refusal on one speaks the reason, nothing to consult or ask ("walk me to
+  elsewhere once so I can map it" reached the person). The mapper's
+  fallback to such a handle applies to a named place it does not know,
+  never to an absent argument: "what are you doing?" is an information
+  turn, not a look at elsewhere.
+- **A stop or cancel with nothing in flight is "no" to the classifier.**
+  After an offer-ask ("can you open it, or shall I go to the door?"), E2B's
+  intent pass read "no, I can't right now" as STOP (3/3); with no live
+  task that is a refusal of the offer, not a command.
 - **No intent speaks at the person's turn; the first reply speaks.** Every
   intent comes back at once as done, refused or progress (the domain
   agent narrates "I set off…" itself), so a person-turn acknowledgement

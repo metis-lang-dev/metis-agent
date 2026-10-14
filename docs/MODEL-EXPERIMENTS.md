@@ -1676,3 +1676,28 @@ the harness's branch knowledge, the bars untouched.
 control against emulated domains (ids, floor, bound answers, signals,
 speech) under rules the harness owns; the model classifies and speaks.
 Nine harness rules came out of E13's three steps, all in DESIGN v3.
+
+## Integration step 1 ruling (architect, 2026-10-14; s-f82a578f) — CHANGES
+
+**The real dog behind the orchestrator, 14 × 3, the same bars as run 3b.**
+The orchestrator's control held: R1b 27/27, R2 all four, R3 12/12 · 3/3 ·
+3/3, R5 0/0/0; the wire costs 0–1 ms a request; a beat costs the dog's
+narrator (~120 ms); both E2B instances resident at 4.6–4.7 GB of 8. Two
+reads missed, both the real dog's behaviour: R1a 42/45 (a stop losing the
+tick to a timeout; a placeless expired line) and R4 75/78 ("no" read as
+STOP after an offer-ask). The as-is run (dog.llp's own world) holds the
+same structure with the world's refusals and timeouts; it is the record of
+what a priori premise the timelines assert.
+
+**Ruled, opus's five, all adopted** (DESIGN rules under the next-move
+table): a stop/cancel acts first on its tick (host); the domain's text
+names its object in the domain's voice — the catalog's `%%` lines now
+carry `{P}`/`{T}` (metis-catalog d847f02) and the narrator fills them;
+busy body actions offer stop; no words or key for a standing handle
+(d847f02), and the mapper never falls back to one for an absent argument;
+STOP/CANCEL with nothing in flight is "no" to the classifier. The
+disagreements go the real dog's way in every case; the emulator's scripts
+are the findings.
+
+**Re-run:** the same timelines and bars with the rules in; step 1 passes
+when R1a and R4 hold with the rest.
