@@ -23,11 +23,12 @@ def test_difference_words():
     assert difference_words({"moist": 1, "dry": -1}) == "dry -1, moist +1"
 
 
-def test_the_plants_day(tmp_path):
+def test_the_plants_day(tmp_path, monkeypatch):
     try:
         catalog().get("plant")
     except Exception:
         pytest.skip("no plant in the catalog")
+    _plant_without_packs(tmp_path, monkeypatch)
     proc = Process(["plant"], records=str(tmp_path), session="t1")
     agent = proc.build(1, "live")
     journal = []
@@ -51,3 +52,13 @@ def test_the_plants_day(tmp_path):
     consult = next(m for m in journal if m["kind"] == "move" and m["tool"] == "consult")
     assert consult["args"]["question"] == "why does the reading differ from the model: dry -1, moist +1?"
     assert json.loads(sink.read_text().splitlines()[0])["close"]["status"] == "open"
+
+
+def _plant_without_packs(tmp_path, monkeypatch):
+    """The plant as authored, on a scratch copy without the operator's packs
+    (the served program is the program plus packs/*.llp: a visitor pack in
+    the checkout models the very visit this test needs unmodeled)."""
+    import shutil
+    src = catalog().get("plant").dir
+    shutil.copytree(src, tmp_path / "cat/domains/plant", ignore=shutil.ignore_patterns("packs", "records", "__pycache__"))
+    monkeypatch.setenv("METIS_CATALOG", str(tmp_path / "cat"))

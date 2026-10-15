@@ -228,3 +228,40 @@ def test_orders_are_refused_while_a_surprise_is_open(tmp_path):
         assert len(a.repl.loop.records) == 1
     finally:
         del os.environ["METIS_PAIR_DIR"]
+
+
+def test_a_pack_applied_then_reloaded_is_the_served_program(tmp_path, monkeypatch):
+    """human-loop step 1, the architect's ruling after A6: the served program
+    is the program plus every packs/*.llp. On a scratch copy of the plant:
+    without the pack the visitor's watering is an unmodeled surprise; the
+    loop console applies packs/visitor.llp, the domain reloads, and the key
+    covers the union — the next visit is the program's own visitor_waters,
+    no surprise, nothing to escalate."""
+    import shutil
+    from metis_agent.domain_agent import Process, serve
+    from metis_agent.domains import catalog
+    src = catalog().get("plant").dir
+    d = tmp_path / "domains/plant"
+    shutil.copytree(src, d, ignore=shutil.ignore_patterns("records", "__pycache__", "packs"))
+    monkeypatch.setenv("METIS_CATALOG", str(tmp_path))
+    p = Process(["plant"])
+
+    def day(ag):
+        sigs = []
+        while not ag.watch.done:
+            for s in ag.watch.step():
+                sigs.append(s)
+        return [s for s in sigs if s["signal"] == "surprise"]
+    ag = p.build(1, "hosted")
+    k0 = ag.repl.key
+    assert ag.packs == [] and len(day(ag)) == 1                             # the visitor: unmodeled
+    (d / "packs").mkdir()
+    (d / "packs/visitor.llp").write_text(                                   # apply (the loop console)
+        "catalog visitor 1.\nextends plant.\n\nstage main {\n"
+        "  %% A visitor has watered me; my soil is moist again.\n"
+        "  visitor_waters [dyn] : dry -o moist.\n}\n")
+    ag, out = serve(ag, {"reload": {}, "domain": "plant"}, p.build, p.reload)
+    assert any(r.get("kind") == "reloaded" for r in out) and ag.repl.key != k0
+    assert [x.name for x in ag.packs] == ["visitor.llp"]
+    assert ag.replier.docs["visitor_waters"] == "A visitor has watered me; my soil is moist again."
+    assert day(ag) == [] and "visitor_waters" in ag.repl.fired                 # modeled now: no surprise

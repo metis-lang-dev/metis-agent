@@ -47,6 +47,7 @@ class _Loader(importlib.abc.Loader):
 
     def exec_module(self, mod):
         d = catalog().get(self.name)
+        mod.__dict__.pop("PACKS", None)           # a re-exec (reload) reads them again
         agent = d.agent
         mod.__dict__.update(NAME=d.name, DISPLAY=d.display, VOICE=d.manifest.get("voice", ""), CATALOG=d.program)
         if agent is not None:
@@ -63,6 +64,12 @@ class _Loader(importlib.abc.Loader):
         else:
             raise ImportError("domain %r has neither an agent module nor an intent.spec (%s)" % (self.name, d.dir))
         mod.MANIFEST = d
+        # the served program is the program plus every packs/*.llp (human-loop
+        # step 1): the packs extend THE manifest's program — a module serving
+        # another catalog (the kitchen's pair scene) has none of them
+        if "PACKS" not in mod.__dict__:
+            prog = Path(str(mod.__dict__.get("CATALOG") or "")).resolve()
+            mod.PACKS = d.packs() if d.program is not None and prog == d.program else []
         self.fresh = False
 
 

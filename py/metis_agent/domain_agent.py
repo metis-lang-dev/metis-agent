@@ -75,6 +75,7 @@ import json
 import os
 import sys
 import time
+from pathlib import Path
 
 from .mapper import Mapped, Mapper
 from .narrator import Fragment, Narrator, distinctive, event_ref, from_signal, holds_line, words
@@ -95,6 +96,35 @@ def rule_docs(path):
     from metis.loop.cards import _words
     cat = parser.parse_file(str(path))
     return {r.name: _words(r.doc)[0] for d in cat.decls if isinstance(d, Stage) for r in d.rules}
+
+
+def pack_text(src):
+    """A pack's approved text: its leading `%` comment block (the loop
+    console's `load` convention) — what its %% docs quote at the gate."""
+    head = []
+    for line in src.splitlines():
+        if line.startswith("%"):
+            head.append(line.lstrip("%").strip())
+        elif line.strip():
+            break
+    return "\n".join(head) or "extension pack"
+
+
+def apply_packs(repl, packs):
+    """The served program = the program plus its packs (human-loop step 1):
+    each pack gated against the program and accepted, in order — the loop's
+    own llp → gate → accept, as the loop console's copy + packs. The key
+    covers the union. A pack not admitted raises (a reload keeps the old)."""
+    for p in packs:
+        src = Path(p).read_text()
+        repl.cmd_text(pack_text(src))
+        repl.cmd_llp(src)
+        rep = repl.cmd_gate("")
+        if not rep.get("ok"):
+            found = rep.get("findings") or [rep.get("error", "rejected")]
+            raise ValueError("pack %s not admitted: %s" % (Path(p).name, "; ".join(map(str, found))[:600]))
+        repl.cmd_accept("")
+        repl.loop.text = ""
 
 
 def mirror_atoms(text):
@@ -127,6 +157,8 @@ class DomainAgent:
         self.name = module.NAME
         plugin = getattr(module, "PLUGIN", None)
         self.repl = Repl(str(module.CATALOG), seed=seed, plugin=plugin, host=bool(plugin))
+        self.packs = list(getattr(module, "PACKS", None) or [])
+        apply_packs(self.repl, self.packs)        # the served program: the program plus its packs
         self.host = self.repl.plugin
         if plugin and self.host is None:
             raise RuntimeError("domain agent: host %s did not attach" % plugin)
@@ -139,7 +171,10 @@ class DomainAgent:
         self.host_words, self.handle_names = getattr(module, "words", None), getattr(module, "HANDLE_NAMES", {})
         handles = getattr(module, "HANDLE_NAMES", {})
         self.display_of = lambda v: handles.get(v, words(v))   # a binding's display name (the kitchen, tag 3)
-        self.replier = Replier(self.name, rule_docs(module.CATALOG), module.OUTCOMES, self.mapper.commands,
+        docs = rule_docs(module.CATALOG)
+        for p in self.packs:                      # the packs' rules speak their own %% lines
+            docs.update(rule_docs(p))
+        self.replier = Replier(self.name, docs, module.OUTCOMES, self.mapper.commands,
                                getattr(module, "alternatives", None), mirror_atoms(self.repl.text),
                                getattr(module, "PAIRS", ()), self.display_of)
         # the domain speaks for itself (VOICE = "own": the dog's "I"; DESIGN 56da709)
