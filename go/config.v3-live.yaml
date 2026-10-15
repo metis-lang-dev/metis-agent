@@ -66,5 +66,7 @@ v3:
     domains:
         - name: agents
           argv: [.venv/bin/python, -m, metis_agent.domain_agent, --domain, "dog,kitchen,kitchen_shared", --case, live, --narrate, dog, --trace, --records]
+          # --records: the py domain agent's sink (DomainAgent.sink_record), the py service's own:
+          # metis-catalog/domains/<n>/records/<session>.jsonl, session = the process's start time
           dir: ../py
           domains: [dog, kitchen, kitchen_shared]   # clocks (clock.beats), quiet partners (partner_of), the watched directories: their manifests
