@@ -34,7 +34,7 @@ class LLM:
     """One model, one context, one sequence (seq 0)."""
 
     def __init__(self, model_path, n_ctx=4096, n_batch=512, n_threads=6,
-                 n_gpu_layers=99, flash_attn=0, verbose=False):
+                 n_gpu_layers=99, flash_attn=-1, verbose=False):
         if not verbose:
             L.llama_log_set(_LOG_CB, ctypes.c_void_p())
         L.llama_backend_init()
@@ -49,7 +49,7 @@ class LLM:
         cp.n_batch = n_batch
         cp.n_threads = n_threads
         cp.n_threads_batch = n_threads
-        cp.flash_attn_type = flash_attn  # 0 off: parity with the Go adapter (54/54; auto → on here gives 53/54)
+        cp.flash_attn_type = flash_attn  # -1 AUTO, Go's default (it never sets it): on 0c1e570 54/54 vs Go, off 53/54; 1.75x faster decode at 6k (llama-pin step 3)
         self.ctx = L.llama_init_from_model(self.model, cp)
         if not self.ctx:
             raise RuntimeError("llm: cannot create context")

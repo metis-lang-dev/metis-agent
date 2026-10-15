@@ -2,7 +2,7 @@
 """Parity of the Python runtime against the Go adapter (SPECIALIST.md §4):
 the 54-row dog corpus through metis_agent.llm's two-pass turn, the intent
 class and the pass-1 JSON compared byte for byte with the Go reference
-(fsttm-web test/fixtures/harness-e2b.jsonl: llmbench on internal/llm, E2B
+(py/tests/data/harness-e2b.jsonl: llmbench on internal/llm at the pinned llama.cpp, E2B
 Q4, the agent's persona = dog-prompt + the gemma4 pass-2 examples).
 
     py/.venv/bin/python py/tools/parity.py [--out rows.jsonl]     # from metis-agent/
@@ -27,7 +27,7 @@ sys.path.insert(0, str(ROOT / "py"))
 from metis_agent.llm import LLM, llama_cpp_info  # noqa: E402
 
 GO = ROOT / "go"
-REF = ROOT.parent / "fsttm-web/test/fixtures/harness-e2b.jsonl"
+REF = ROOT / "py/tests/data/harness-e2b.jsonl"   # Go on the pin (llama-pin s-aeb12858 step 3); re-blessed when the pin moves
 
 
 def intent_of(js):
@@ -57,7 +57,7 @@ def mapper_parity(ref, out_dir):
             f.write(json.dumps(rec) + "\n")
     n = sum("atom" in rec for rec in recs)
     md = ["# the dog's mapper on the 54 corpus rows (no model)", "",
-          "The Go pass-1 JSON of each row (fsttm-web test/fixtures/harness-e2b.jsonl) as an intent: "
+          "The Go pass-1 JSON of each row (py/tests/data/harness-e2b.jsonl) as an intent: "
           "verb = its `intent`, args = the rest. **%d/%d mapped to a command atom**, %d the mapper's error." % (
               n, len(recs), len(recs) - n), "",
           "| # | utterance | src | verb | args | command atom | dropped |", "|---|---|---|---|---|---|---|"]
@@ -82,7 +82,7 @@ def main():
     ap.add_argument("--model", default=str(GO / "models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf"))
     ap.add_argument("--ref", default=str(REF))
     ap.add_argument("--out", default="")
-    ap.add_argument("--flash-attn", type=int, default=0, help="-1 auto, 0 off (default, the parity setting), 1 on")
+    ap.add_argument("--flash-attn", type=int, default=-1, help="-1 auto (default, Go's and the parity setting), 0 off, 1 on")
     a = ap.parse_args()
     if a.mapper:
         return mapper_parity(a.ref, a.out_dir)
