@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/metis-lang-dev/metis-agent/go/internal/repltools"
 	"log"
 	"net/http"
 	"os"
@@ -252,6 +253,23 @@ func main() {
 		}
 	}
 
+	// the REPL API's declarations (repl-tools step 3, the architect's
+	// ruling): from the served packages' bundles in activation order — the
+	// first one's, every other carrying the same (a mismatch: re-emit that
+	// package); a missing bundle is emitted first when the catalog's python
+	// is set; none served is a startup error
+	var tools []repltools.Tool
+	if served := servedPackages(*loop, v3, cfg.Domains); len(served) > 0 || *loop == "v3" {
+		if cfg.Catalog.Root == "" {
+			log.Fatalf("[catalog] the REPL API is read from the served packages' bundles: set catalog.root (and emit a bundle)")
+		}
+		if tools, err = agent.ServedTools(cfg.Catalog.Root, cfg.Catalog.Python, served); err != nil {
+			log.Fatalf("[catalog] the REPL API: %v", err)
+		}
+		v3.Tools = tools
+		log.Printf("[catalog] the REPL API: %d tools from %s's bundle", len(tools), served[0])
+	}
+
 	if *printGrammar {
 		g := gbnf
 		if len(v3.Intents) > 0 {
@@ -290,7 +308,7 @@ func main() {
 		v3.Start = srv.Joined()
 	}
 	a, err := agent.New(agent.Config{Persona: persona, GBNF: gbnf, GBNFPath: cfg.Grammar, StopWords: stopWords, Ages: ages,
-		Rack: cfg.Rack, Narr: cfg.Narr, Loop: *loop, V3: v3,
+		Rack: cfg.Rack, Narr: cfg.Narr, Loop: *loop, V3: v3, Tools: tools,
 		Talk: agent.TalkConfig{System: talkSys, NCtx: cfg.Talk.NCtx, Keep: cfg.Talk.Keep,
 			Sampling: llm.Sampling{Temp: cfg.Talk.Temperature, TopK: cfg.Talk.TopK, TopP: cfg.Talk.TopP,
 				MinP: cfg.Talk.MinP, Repeat: cfg.Talk.Repeat, MaxToks: cfg.Talk.MaxTokens}}}, l, srv)
@@ -486,4 +504,23 @@ func mustRead(path string) string {
 		log.Fatal(err)
 	}
 	return string(b)
+}
+
+// servedPackages are the packages this run serves, in activation order:
+// -loop v3's domain processes' domains, else the attached domains.
+func servedPackages(loop string, v3 agent.V3Service, domains []agent.DomainConfig) []string {
+	var out []string
+	if loop == "v3" {
+		for _, s := range v3.Domains {
+			if len(s.Domains) == 0 {
+				out = append(out, s.Name)
+			}
+			out = append(out, s.Domains...)
+		}
+		return out
+	}
+	for _, d := range domains {
+		out = append(out, d.Name)
+	}
+	return out
 }

@@ -4,34 +4,40 @@ package agent
 // byte as the hand-built table did (the -loop v3 system turn unchanged).
 
 import (
-	"os"
 	"path/filepath"
-	"reflect"
+	"strings"
 	"testing"
 
-	"github.com/metis-lang-dev/metis-agent/go/internal/rt"
+	"github.com/metis-lang-dev/metis-agent/go/internal/repltools"
 )
 
-func TestTheBundlesREPLAPIIsTheOrchestrators(t *testing.T) {
+// The declarations render from the bundle's data: every verb, a domain's
+// enum filled from its set; the -loop v3 system turn is checked byte for
+// byte against HEAD's in the step's report (-print-turn) and by llmbench's
+// e13 prompt (cmd/llmbench v3_test).
+func TestTheREPLAPIRendersFromTheBundle(t *testing.T) {
+	tools := testTools(t)
+	decl := APIDeclarations(tools, []string{"kitchen"}, []string{"dog", "kitchen"})
+	for _, want := range []string{"declaration:activate{", "declaration:keep{", "declaration:why{", "declaration:escalate{",
+		`domain:{description:<|"|>the catalog domain (card)<|"|>,enum:[<|"|>kitchen<|"|>]`,
+		`domain:{description:<|"|>a loaded domain<|"|>,enum:[<|"|>dog<|"|>,<|"|>kitchen<|"|>]`} {
+		if !strings.Contains(decl, want) {
+			t.Fatalf("declarations lack %s:\n%s", want, decl)
+		}
+	}
+	if n := strings.Count(decl, "<|tool>declaration:"); n != len(tools) {
+		t.Fatalf("%d declarations for %d tools", n, len(tools))
+	}
+}
+
+// testTools is the REPL API as a bundle carries it (metispy's golden
+// bundle: no copy in this tree).
+func testTools(t testing.TB) []repltools.Tool {
+	t.Helper()
 	dir, _ := filepath.Abs("../../../../metispy/tests/goldens/artifact/plant.metis")
-	if _, err := os.Stat(filepath.Join(dir, "tools.json")); err != nil {
-		t.Skip("no metispy golden bundle with tools.json")
-	}
-	tools, err := rt.ReadTools(dir)
+	tools, err := repltools.Read(dir)
 	if err != nil {
-		t.Fatal(err)
+		t.Skipf("no metispy golden bundle with tools.json: %v", err)
 	}
-	for _, c := range []struct{ catalog, loaded []string }{
-		{[]string{"dog", "kitchen", "plant"}, []string{"dog"}},
-		{[]string{"plant"}, []string{"plant", "kitchen", "kitchen_shared"}},
-		{nil, nil},
-	} {
-		got, err := replAPIFrom(tools, c.catalog, c.loaded)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if want := replAPI(c.catalog, c.loaded); !reflect.DeepEqual(got, want) {
-			t.Fatalf("the REPL API from the bundle differs:\n want %+v\n got  %+v", want, got)
-		}
-	}
+	return tools
 }

@@ -133,7 +133,11 @@ func (a *Agent) Attach(cfgs []DomainConfig) error {
 			continue
 		}
 		if a.first == nil {
-			dec = kernel.NewDecider(cards)
+			var err error
+			if dec, err = kernel.NewDecider(cards, a.cfg.Tools); err != nil {
+				log.Printf("[kernel] triage off: %v", err)
+				break
+			}
 			a.first = d.h
 			d.h.Dec, d.h.LLM = dec, a.L
 			d.h.Prompt = a.cfg.Persona + block + dec.System

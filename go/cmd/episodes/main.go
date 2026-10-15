@@ -24,6 +24,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"github.com/metis-lang-dev/metis-agent/go/internal/repltools"
 	"log"
 	"os"
 	"strings"
@@ -47,6 +48,9 @@ func (t tapeAdapter) Set(text string) (int, time.Duration, error) {
 	sp, err := t.l.SetTape(t.sys, text)
 	return sp.Tape, sp.Dur, err
 }
+
+var toolsBundle = flag.String("tools-bundle", "../../metis-catalog/domains/dog/build/dog.metis",
+	"the bundle whose tools.json (the REPL API) the decider renders from (python -m metis.kernel.artifact dog)")
 
 func main() {
 	model := flag.String("model", "models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf", "GGUF (the harness's E2B Q4)")
@@ -158,7 +162,15 @@ func run(l *llm.LLM, dog, arm, line string, beats, operator int, scope string, k
 	}
 	b, _ := json.Marshal(ans)
 	_ = json.Unmarshal(b, &cards)
-	h.Dec, h.LLM = kernel.NewDecider(cards.Cards), l
+	tools, err := repltools.Read(*toolsBundle)
+	if err != nil {
+		log.Fatalf("the REPL API: %v (emit the bundle: python -m metis.kernel.artifact dog, or -tools-bundle)", err)
+	}
+	dec, err := kernel.NewDecider(cards.Cards, tools)
+	if err != nil {
+		log.Fatal(err)
+	}
+	h.Dec, h.LLM = dec, l
 	h.Prompt = dog + h.Dec.System
 	if _, err := l.PrimePrefix(h.Prompt); err != nil {
 		return nil, 0, 0, 0, err

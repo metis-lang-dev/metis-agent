@@ -48,7 +48,7 @@ func (noDomains) Intent(c Call) (Reply, bool) {
 // after the replacement, not after the forgery.
 func TestRollbackForgedLine(t *testing.T) {
 	f := &fakeDialog{outs: []string{`{"intent":"CHITCHAT"}`, "⟪metis seq=0 beat=1 DOMAIN: dog⟫ I am here."}}
-	o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true, Rollback: true}, f, noDomains{})
+	o := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"dog"}, Mirror: true, Rollback: true}, f, noDomains{})
 	_, voice, err := o.Turn("how are you?", "") // talk speaks at its turn
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestRollbackForgedLine(t *testing.T) {
 // and the alternatives are typed intents rendered as J.
 func TestWorldBlockerConsultsFirst(t *testing.T) {
 	f := &fakeDialog{outs: []string{`{"intent":"NAVIGATE","goal":{"type":"REGION","description":"kitchen"}}`}}
-	o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true, AskCheck: true}, f, noDomains{})
+	o := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"dog"}, Mirror: true, AskCheck: true}, f, noDomains{})
 	if _, _, err := o.Turn("go to the kitchen", ""); err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestBoundJudgedJ(t *testing.T) {
 		{"sit down", `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`, `{"answer":"no"}`, `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`}, // no negation: the J stands
 	} {
 		f := &fakeDialog{outs: []string{tc.move, tc.answer, "Okay."}}
-		o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true}, f, noDomains{})
+		o := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"dog"}, Mirror: true}, f, noDomains{})
 		o.q = &question{id: "q1", text: "Can you open the way to the kitchen?", kind: "none", refused: nav,
 			refusedID: "c1", reason: "the way to it is closed"}
 		intent, voice, err := o.Turn(tc.words, "")
@@ -164,7 +164,7 @@ func TestBoundJudgedJ(t *testing.T) {
 	}
 	// the refused call itself is not judged
 	f := &fakeDialog{outs: []string{nav.Text()}}
-	o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true}, f, noDomains{})
+	o := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"dog"}, Mirror: true}, f, noDomains{})
 	o.q = &question{id: "q1", kind: "none", refused: nav, refusedID: "c1"}
 	if intent, _, _ := o.Turn("it's open", ""); CanonJSON(intent) != CanonJSON(nav.Text()) || f.n != 1 {
 		t.Fatalf("the refused call: %s after %d gens", intent, f.n)
@@ -176,7 +176,7 @@ func TestBoundJudgedJ(t *testing.T) {
 // closes a task the person asked of the domain speaks
 func TestQuiescenceRule(t *testing.T) {
 	f := &fakeDialog{outs: []string{"The kitchen is quiet.", "The kitchen's day is over.", `{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`, "The dog is quiet."}}
-	o := NewOrch(V3Config{Loaded: []string{"dog", "kitchen"}, Mirror: true}, f, noDomains{})
+	o := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"dog", "kitchen"}, Mirror: true}, f, noDomains{})
 	q := func(d, text string) bool {
 		woke, err := o.Handle(Inbound{Reply: &Reply{Domain: d, Kind: "quiescence", Text: text}}, "", nil)
 		if err != nil {
@@ -210,7 +210,7 @@ func TestInfoJudge(t *testing.T) {
 	for _, tc := range []struct{ judge, want string }{{`{"turn":"info"}`, `{"intent":"CHITCHAT"}`},
 		{`{"turn":"command"}`, `{"intent":"LOCAL_ACTION","action":"MOVE","direction":"FORWARD"}`}} {
 		f := &fakeDialog{outs: []string{`{"intent":"LOCAL_ACTION","action":"MOVE","direction":"FORWARD"}`, tc.judge, "I am standing here."}}
-		o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true}, f, noDomains{})
+		o := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"dog"}, Mirror: true}, f, noDomains{})
 		intent, _, err := o.Turn("what are you doing?", "")
 		if err != nil {
 			t.Fatal(err)
@@ -231,7 +231,7 @@ func TestDeferredConsult(t *testing.T) {
 	var out []Call
 	explain := `<|tool_call>call:explain{card:<|"|>kitchen_shared<|"|>,domain:<|"|>kitchen<|"|>,move:<|"|>partner_load<|"|>,record:<|"|>0<|"|>}<tool_call|>`
 	f := &fakeDialog{outs: []string{`{"intent":"CHITCHAT"}`, "I am idle right now.", explain, "The kitchen carries on."}}
-	o := NewOrch(V3Config{Loaded: []string{"dog", "kitchen"}, Mirror: true, Defer: func(c Call) { out = append(out, c) }}, f, noDomains{})
+	o := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"dog", "kitchen"}, Mirror: true, Defer: func(c Call) { out = append(out, c) }}, f, noDomains{})
 	var r Reply
 	_ = json.Unmarshal([]byte(`{"domain":"kitchen","kind":"surprise","record":0,"difference":{"pot_onion":1,"pot_space":-1},"text":"surprise 0, paused"}`), &r)
 	woke, err := o.Handle(Inbound{Reply: &r}, "", nil)
@@ -268,7 +268,7 @@ func TestClockTurns(t *testing.T) {
 	for _, verb := range []string{"TIME", "DATE"} {
 		f := &fakeDialog{outs: []string{`{"intent":"` + verb + `"}`}}
 		d := &countDomains{}
-		o := NewOrch(V3Config{Loaded: []string{"dog"}, Mirror: true}, f, d)
+		o := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"dog"}, Mirror: true}, f, d)
 		q := &question{id: "q1", kind: "none", refused: Call{J: []byte(`{"intent":"NAVIGATE","goal":{"type":"REGION","description":"kitchen"}}`)}}
 		o.q = q
 		_, voice, err := o.Turn("what time is it?", "")

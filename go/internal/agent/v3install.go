@@ -238,7 +238,7 @@ func (o *Orch) restartDialog(n int, cfg V3Config) {
 	o.pend.Reset()
 	o.open, o.said, o.nPast = false, nil, n
 	o.cfg.Catalog, o.cfg.Loaded, o.cfg.Display, o.cfg.IntentDomains, o.cfg.Asks = cfg.Catalog, cfg.Loaded, cfg.Display, cfg.IntentDomains, cfg.Asks
-	o.api = replAPI(cfg.Catalog, cfg.Loaded)
+	o.api = replAPIFrom(o.cfg.Tools, cfg.Catalog, cfg.Loaded)
 }
 
 // reloadIntents re-reads a reloaded domain's intent material from its

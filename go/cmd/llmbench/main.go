@@ -219,7 +219,7 @@ func main() {
 		if err := json.Unmarshal(b, &cards); err != nil {
 			fail(err)
 		}
-		prompt = append(prompt, kernel.NewDecider(cards).System...)
+		prompt = append(prompt, newDecider(cards).System...)
 	}
 	gbnf, err := os.ReadFile(*gbnfF)
 	if err != nil {

@@ -2,9 +2,37 @@ package kernel
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/metis-lang-dev/metis-agent/go/internal/repltools"
 )
+
+// replTools is the REPL API's data as a bundle carries it (metispy's
+// golden bundle: no copy in this tree).
+func replTools(t *testing.T) []repltools.Tool {
+	t.Helper()
+	dir, _ := filepath.Abs("../../../../metispy/tests/goldens/artifact/plant.metis")
+	if _, err := os.Stat(filepath.Join(dir, "tools.json")); err != nil {
+		t.Skip("no metispy golden bundle with tools.json")
+	}
+	tools, err := repltools.Read(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tools
+}
+
+func newDecider(t *testing.T, cards []Card) *Decider {
+	t.Helper()
+	d, err := NewDecider(cards, replTools(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return d
+}
 
 var kitchenCards = []Card{
 	{Name: "kitchen", Relation: "served", Text: "a one-cook kitchen"},
@@ -12,7 +40,7 @@ var kitchenCards = []Card{
 }
 
 func TestDeciderRendersCardsAndGrammar(t *testing.T) {
-	d := NewDecider(kitchenCards)
+	d := newDecider(t, kitchenCards)
 	for _, want := range []string{"- kitchen_shared [sibling]: a shared kitchen", "moves: partner_load (changes pot onion +1, pot space -1)",
 		"<|tool>declaration:reset{", "<|tool>declaration:explain{", `enum:[<|"|>kitchen_shared<|"|>]`, "<|tool>declaration:escalate{"} {
 		if !strings.Contains(d.System, want) {
@@ -24,7 +52,7 @@ func TestDeciderRendersCardsAndGrammar(t *testing.T) {
 		t.Errorf("grammar:\n%s", d.GBNF)
 	}
 	// no sibling move → no explain at all
-	if d := NewDecider(kitchenCards[:1]); strings.Contains(d.GBNF, "explain") || strings.Contains(d.System, "declaration:explain") {
+	if d := newDecider(t, kitchenCards[:1]); strings.Contains(d.GBNF, "explain") || strings.Contains(d.System, "declaration:explain") {
 		t.Errorf("explain offered without a sibling move:\n%s", d.GBNF)
 	}
 }
@@ -62,7 +90,7 @@ func TestMovesBareOrWithEffects(t *testing.T) {
 	if cs[0].Moves[0].Name != "m1" || cs[1].Effects[0].effect() != "x -1, y +2" {
 		t.Errorf("%+v", cs)
 	}
-	if d := NewDecider(cs); !strings.Contains(d.System, "m2 (changes x -1, y +2)") {
+	if d := newDecider(t, cs); !strings.Contains(d.System, "m2 (changes x -1, y +2)") {
 		t.Errorf("effects not rendered:\n%s", d.System)
 	}
 }
@@ -91,5 +119,39 @@ func TestFragmentsByteExact(t *testing.T) {
 		if got := Fragment(Signal{Kind: f["signal"].(string), Seq: int(f["seq"].(float64)), Path: "kitchen", F: f}); got != c.want {
 			t.Errorf("\n got %s\nwant %s", got, c.want)
 		}
+	}
+}
+
+// The decider's declarations are the REPL API's, from the data (repl-tools
+// step 3): the three watch verbs, no domain or record, card and move
+// enums; and a bundle without the verbs is refused.
+func TestTheDeciderRendersTheREPLAPI(t *testing.T) {
+	d := newDecider(t, kitchenCards)
+	q := `<|"|>`
+	for _, want := range []string{
+		"<|tool>declaration:reset{description:" + q + "the reading was noise: set it aside and resume on the model" + q + "}<tool|>",
+		"<|tool>declaration:explain{description:" + q + "a sibling card's move explains it" + q +
+			",parameters:{properties:{card:{description:" + q + "the sibling card" + q + ",enum:[" + q + "kitchen_shared" + q + "],type:" + q + "STRING" + q +
+			"},move:{description:" + q + "the card's move" + q + ",enum:[" + q + "partner_load" + q + "],type:" + q + "STRING" + q +
+			"}},required:[" + q + "card" + q + "," + q + "move" + q + "],type:" + q + "OBJECT" + q + "}}<tool|>",
+		"<|tool>declaration:escalate{description:" + q + "nothing explains it: describe it for the people who revise the model" + q +
+			",parameters:{properties:{text:{description:" + q + "one plain sentence: what was seen" + q + ",type:" + q + "STRING" + q +
+			"}},required:[" + q + "text" + q + "],type:" + q + "OBJECT" + q + "}}<tool|>",
+	} {
+		if !strings.Contains(d.System, want) {
+			t.Errorf("system lacks %s", want)
+		}
+	}
+	if strings.Contains(d.System, "record") || strings.Contains(d.System, "domain:{") {
+		t.Errorf("the decider declares the harness's domain/record")
+	}
+	var tools []repltools.Tool
+	for _, x := range replTools(t) {
+		if x.Name != "explain" {
+			tools = append(tools, x)
+		}
+	}
+	if _, err := NewDecider(kitchenCards, tools); err == nil || !strings.Contains(err.Error(), "re-emit") {
+		t.Fatalf("a REPL API without explain: %v", err)
 	}
 }

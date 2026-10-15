@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/metis-lang-dev/metis-agent/go/internal/repltools"
 	"regexp"
 	"sort"
 	"strings"
@@ -114,38 +115,11 @@ type apiTool struct {
 	Required   []string
 }
 
-// replAPI is the REPL API's twelve verbs (DESIGN v3; keep is E4's): catalog
-// the domains activate can attach, loaded the domains the others act on.
-func replAPI(catalog, loaded []string) []apiTool {
-	dom := apiParam{Name: "domain", Type: "STRING", Desc: "a loaded domain", Enum: loaded}
-	card := apiParam{Name: "domain", Type: "STRING", Desc: "the catalog domain (card)", Enum: catalog}
-	rec := apiParam{Name: "record", Type: "STRING", Desc: "the id of the reply this closes: the refused call's id, or the surprise's record (#N)"}
-	return []apiTool{
-		{"activate", "attach a catalog domain to the runtime tree",
-			[]apiParam{card, {Name: "bindings", Type: "STRING", Desc: "the card's bindings, when any"}}, []string{"domain"}},
-		{"deactivate", "detach a catalog domain from the runtime tree", []apiParam{card}, []string{"domain"}},
-		{"keep", "change nothing: the context change needs no domain attached or detached", nil, nil},
-		{"state", "the domain's current state, as its agent reads it", []apiParam{dom}, []string{"domain"}},
-		{"ctx", "the domain's context band: catalog, stage, beat, what is enabled", []apiParam{dom}, []string{"domain"}},
-		{"events", "the domain's recent events", []apiParam{dom}, []string{"domain"}},
-		{"why", "why an atom holds or not, in the domain", []apiParam{dom, {Name: "atom", Type: "STRING", Desc: "the atom"}}, []string{"domain", "atom"}},
-		{"findings", "what the domain's agent has found so far", []apiParam{dom}, []string{"domain"}},
-		{"consult", "ask the domain's agent a question; its reply has kind consult and an answer_kind",
-			[]apiParam{dom, {Name: "question", Type: "STRING", Desc: "one question, usually why <the reason>?"},
-				{Name: "max_calls", Type: "INTEGER", Desc: "the agent's call budget, when you set one"}}, []string{"domain", "question"}},
-		{"reset", "the reading was noise: set it aside and resume on the model", []apiParam{dom, rec}, []string{"domain", "record"}},
-		{"explain", "a sibling card's move explains it", []apiParam{dom, rec, {Name: "card", Type: "STRING", Desc: "the sibling card"},
-			{Name: "move", Type: "STRING", Desc: "the card's move"}}, []string{"domain", "record", "card", "move"}},
-		{"escalate", "nothing explains it: describe it for the people who revise the model",
-			[]apiParam{dom, rec, {Name: "text", Type: "STRING", Desc: "one plain sentence: what was seen"}}, []string{"domain", "record", "text"}},
-	}
-}
-
 // APIDeclarations is the REPL API as the template declares tools
 // (tools/gemma_tools.py declaration: the GGUF template's macros, ported).
-func APIDeclarations(catalog, loaded []string) string {
+func APIDeclarations(tools []repltools.Tool, catalog, loaded []string) string {
 	var b strings.Builder
-	for _, t := range replAPI(catalog, loaded) {
+	for _, t := range replAPIFrom(tools, catalog, loaded) {
 		b.WriteString("<|tool>declaration:" + t.Name + "{description:" + q3 + t.Desc + q3)
 		if len(t.Params) > 0 {
 			b.WriteString(",parameters:{properties:{")

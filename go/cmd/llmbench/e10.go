@@ -271,7 +271,7 @@ func dumpE10(cardsPath, dir string) {
 	if err := json.Unmarshal(b, &cards); err != nil {
 		fail(err)
 	}
-	d := kernel.NewDecider(cards)
+	d := newDecider(cards)
 	for name, s := range map[string]string{"e10-decider.txt": d.System, "e10-decider.gbnf": d.GBNF} {
 		if err := os.WriteFile(dir+"/"+name, []byte(s), 0o644); err != nil {
 			fail(err)

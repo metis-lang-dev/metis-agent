@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -90,7 +91,7 @@ func TestV3ParityT3(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(string(prompt), agent.APIDeclarations(v3Catalog, v3Loaded)) {
+	if !strings.HasSuffix(string(prompt), agent.APIDeclarations(replTools(), v3Catalog, v3Loaded)) {
 		t.Error("the prompt's REPL API declarations are not the agent's")
 	}
 	load := func(p string) string {
@@ -200,4 +201,11 @@ func TestV3Ruled(t *testing.T) {
 	if len(gens) != 2 || !has(f, "Your question does not name you in front of me.") || has(f, `pre `) {
 		t.Errorf("G3-07: %+v\n%s", gens, strings.Join(f.log, "\n---\n"))
 	}
+}
+
+// the tests render the REPL API from metispy's golden bundle (no copy here)
+func TestMain(m *testing.M) {
+	abs, _ := filepath.Abs("../../../../metispy/tests/goldens/artifact/plant.metis") // a test may chdir
+	*toolsBundle = abs
+	os.Exit(m.Run())
 }

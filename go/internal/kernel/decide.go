@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/metis-lang-dev/metis-agent/go/internal/repltools"
 	"regexp"
 	"sort"
 	"strings"
@@ -118,8 +119,11 @@ type LLM interface {
 
 const q = `<|"|>` // Gemma 4's string quote token
 
-// NewDecider renders the tool declarations and the grammar from the cards.
-func NewDecider(cards []Card) *Decider {
+// NewDecider renders the tool declarations from the REPL API's data (the
+// bundle's tools.json, repl-tools step 3: the watch's three verbs without
+// the domain and the record, which the harness fills; the card and move
+// enums from the cards) and the grammar from the cards.
+func NewDecider(cards []Card, tools []repltools.Tool) (*Decider, error) {
 	var pairs []string // card:move the explain call may name
 	var b strings.Builder
 	b.WriteString("\n\n## The runtime\n" +
@@ -165,13 +169,6 @@ func NewDecider(cards []Card) *Decider {
 		b.WriteString("\n")
 	}
 	sort.Strings(pairs)
-	enum := func(xs []string) string {
-		var e []string
-		for _, x := range xs {
-			e = append(e, q+x+q)
-		}
-		return "[" + strings.Join(e, ",") + "]"
-	}
 	var cardNames, moveNames []string
 	seen := map[string]bool{}
 	for _, p := range pairs {
@@ -183,17 +180,20 @@ func NewDecider(cards []Card) *Decider {
 			moveNames, seen["m"+m] = append(moveNames, m), true
 		}
 	}
-	b.WriteString("<|tool>declaration:reset{description:" + q + "the reading was noise: set it aside and resume on the model" + q + "}<tool|>")
-	if len(pairs) > 0 {
-		b.WriteString("<|tool>declaration:explain{description:" + q + "a sibling card's move explains the reading" + q +
-			",parameters:{properties:{card:{description:" + q + "the sibling card" + q + ",enum:" + enum(cardNames) +
-			",type:" + q + "STRING" + q + "},move:{description:" + q + "the card's move that produced the difference" + q +
-			",enum:" + enum(moveNames) + ",type:" + q + "STRING" + q + "}},required:[" + q + "card" + q + "," + q + "move" + q +
-			"],type:" + q + "OBJECT" + q + "}}<tool|>")
+	byName := map[string]repltools.Tool{}
+	for _, t := range tools {
+		byName[t.Name] = t
 	}
-	b.WriteString("<|tool>declaration:escalate{description:" + q + "nothing explains the reading: describe it for the revision loop" + q +
-		",parameters:{properties:{text:{description:" + q + "one plain sentence: what was seen" + q + ",type:" + q + "STRING" + q +
-		"}},required:[" + q + "text" + q + "],type:" + q + "OBJECT" + q + "}}<tool|>")
+	for _, n := range []string{"reset", "explain", "escalate"} {
+		if _, ok := byName[n]; !ok {
+			return nil, fmt.Errorf("the REPL API (tools.json) has no %s: a stale bundle, re-emit it", n)
+		}
+	}
+	b.WriteString(declaration(byName["reset"], nil))
+	if len(pairs) > 0 {
+		b.WriteString(declaration(byName["explain"], map[string][]string{"card": cardNames, "move": moveNames}))
+	}
+	b.WriteString(declaration(byName["escalate"], nil))
 
 	g := []string{
 		`root ::= "<|tool_call>call:" call "<tool_call|>"`,
@@ -209,7 +209,58 @@ func NewDecider(cards []Card) *Decider {
 		}
 		g = append(g, "explain ::= "+strings.Join(alts, " | "))
 	}
-	return &Decider{System: b.String(), GBNF: strings.Join(g, "\n") + "\n", Cards: cards}
+	return &Decider{System: b.String(), GBNF: strings.Join(g, "\n") + "\n", Cards: cards}, nil
+}
+
+// declaration is one Gemma 4 tool declaration (the GGUF template's
+// macros): the verb without its domain and record (the harness's), its
+// parameters sorted, an enum filled from enums.
+func declaration(t repltools.Tool, enums map[string][]string) string {
+	var b strings.Builder
+	b.WriteString("<|tool>declaration:" + t.Name + "{description:" + q + t.Description + q)
+	var props []repltools.Prop
+	var req []string
+	if t.Parameters != nil {
+		for _, p := range t.Parameters.Properties {
+			if p.Name != "domain" && p.Name != "record" {
+				props = append(props, p)
+			}
+		}
+		for _, r := range t.Parameters.Required {
+			if r != "domain" && r != "record" {
+				req = append(req, r)
+			}
+		}
+	}
+	if len(props) > 0 {
+		sort.Slice(props, func(i, j int) bool { return props[i].Name < props[j].Name })
+		b.WriteString(",parameters:{properties:{")
+		for i, p := range props {
+			if i > 0 {
+				b.WriteString(",")
+			}
+			b.WriteString(p.Name + ":{description:" + q + p.Description + q)
+			if e := enums[p.Name]; len(e) > 0 {
+				qs := make([]string, len(e))
+				for k, x := range e {
+					qs[k] = q + x + q
+				}
+				b.WriteString(",enum:[" + strings.Join(qs, ",") + "]")
+			}
+			b.WriteString(",type:" + q + p.Type + q + "}")
+		}
+		b.WriteString("},")
+		if len(req) > 0 {
+			qs := make([]string, len(req))
+			for k, r := range req {
+				qs[k] = q + r + q
+			}
+			b.WriteString("required:[" + strings.Join(qs, ",") + "],")
+		}
+		b.WriteString("type:" + q + "OBJECT" + q + "}")
+	}
+	b.WriteString("}<tool|>")
+	return b.String()
 }
 
 // Call is one parsed tool call.

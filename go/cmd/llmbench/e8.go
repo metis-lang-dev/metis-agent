@@ -183,7 +183,7 @@ func runE8(l *llm.LLM, prompt, pairF, corpusF, cardsF, scriptsF, formsS, tag str
 			frags = append(frags, f)
 		}
 	}
-	orch := prompt + kernel.NewDecider(cards).System
+	orch := prompt + newDecider(cards).System
 	if _, err := l.PrimePrefix(orch); err != nil {
 		fail(err)
 	}

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"github.com/metis-lang-dev/metis-agent/go/internal/repltools"
 	"log"
 	"strings"
 	"sync"
@@ -58,6 +59,9 @@ type V3Service struct {
 	// override, for a hot-installed domain
 	Policy    map[string]string
 	ReloadCfg any
+	// Tools: the REPL API's declarations, from the served packages' bundles
+	// (ServedTools; repl-tools step 3)
+	Tools []repltools.Tool
 }
 
 type v3 struct {
@@ -107,7 +111,7 @@ func SystemTurn(sc V3Service) (string, error) {
 			return "", err
 		}
 	}
-	return turn + APIDeclarations(sc.Catalog, sc.Loaded), nil
+	return turn + APIDeclarations(sc.Tools, sc.Catalog, sc.Loaded), nil
 }
 
 func (a *Agent) startV3(l *llm.LLM) error {
@@ -133,7 +137,7 @@ func (a *Agent) startV3(l *llm.LLM) error {
 		}
 	}
 	v := &v3{l: ol, prompt: b.String(), gbnf: gbnf, nctx: sc.NCtx, sc: sc,
-		cfg: V3Config{Catalog: sc.Catalog, Loaded: sc.Loaded, Display: sc.Display, IntentDomains: domainNames(sc.Intents), Asks: asksOf(sc.Intents),
+		cfg: V3Config{Tools: sc.Tools, Catalog: sc.Catalog, Loaded: sc.Loaded, Display: sc.Display, IntentDomains: domainNames(sc.Intents), Asks: asksOf(sc.Intents),
 			AskCheck: ruled, AgainPick: ruled, EscalateTemplate: ruled, Mirror: true, Rollback: true}}
 	v.listed = sc.Listed
 	v.rec = &idEmitter{Emitter: a.out}

@@ -63,10 +63,10 @@ func TestLoopFlag(t *testing.T) {
 	// v3: E13's system turn (its declarations the agent's own)
 	catalog := []string{"kitchen", "nav", "xtraffic", "sysadmin", "social", "votes"}
 	loaded := []string{"dog", "kitchen"}
-	sys := strings.TrimSuffix(read("grammar/e13-prompt-t.txt"), APIDeclarations(catalog, loaded))
+	sys := strings.TrimSuffix(read("grammar/e13-prompt-t.txt"), APIDeclarations(testTools(t), catalog, loaded))
 	s3 := &sinkRec{}
 	a3, err := New(Config{Persona: persona, GBNF: gbnf, StopWords: []string{"stop"}, Loop: "v3",
-		V3: V3Service{Prompt: []string{sys}, Catalog: catalog, Loaded: loaded, NCtx: 8192}}, l, s3)
+		V3: V3Service{Tools: testTools(t), Prompt: []string{sys}, Catalog: catalog, Loaded: loaded, NCtx: 8192}}, l, s3)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -108,7 +108,7 @@ func (d v3Domains) Call(c agent.Call) (agent.Reply, bool)   { return d.match(c) 
 func (d v3Domains) Intent(c agent.Call) (agent.Reply, bool) { return d.match(c) }
 
 func v3Config(ruled bool) agent.V3Config {
-	return agent.V3Config{Catalog: v3Catalog, Loaded: v3Loaded, Display: v3Display,
+	return agent.V3Config{Tools: replTools(), Catalog: v3Catalog, Loaded: v3Loaded, Display: v3Display,
 		AskCheck: ruled, AgainPick: ruled, EscalateTemplate: ruled}
 }
 
@@ -179,7 +179,7 @@ func runV3(l *llm.LLM, path, ids, tag string, seed uint32, ruled bool, emit func
 				fail(err)
 			}
 			p = string(b)
-			if !strings.HasSuffix(p, agent.APIDeclarations(v3Catalog, v3Loaded)) {
+			if !strings.HasSuffix(p, agent.APIDeclarations(replTools(), v3Catalog, v3Loaded)) {
 				fail(fmt.Errorf("v3: %s does not end with the agent's REPL API declarations", src))
 			}
 			prompts[src] = p

@@ -3,6 +3,7 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/metis-lang-dev/metis-agent/go/internal/repltools"
 	"log"
 	"slices"
 	"strings"
@@ -77,8 +78,9 @@ type Domains interface {
 
 // V3Config is the orchestrator's configuration.
 type V3Config struct {
-	Catalog []string // the domains activate can attach
-	Loaded  []string // the loaded domains
+	Tools   []repltools.Tool // the REPL API's declarations (the bundles' tools.json)
+	Catalog []string         // the domains activate can attach
+	Loaded  []string         // the loaded domains
 	// IntentDomains: the served domains with intent material, in the
 	// system turn's order; two or more: every J names its domain
 	// (e2e-workflow step 4), an alternative a domain offers is named for it
@@ -136,7 +138,7 @@ type branch struct {
 
 // NewOrch starts the orchestrator on a dialog whose system turn is decoded.
 func NewOrch(cfg V3Config, l DialogLLM, dom Domains) *Orch {
-	return &Orch{cfg: cfg, l: l, dom: dom, api: replAPI(cfg.Catalog, cfg.Loaded),
+	return &Orch{cfg: cfg, l: l, dom: dom, api: replAPIFrom(cfg.Tools, cfg.Catalog, cfg.Loaded),
 		byID: map[string]Call{}, answers: map[string]Reply{}, refusals: map[refusal]int{}, surprises: map[string]Reply{},
 		m: newMirror(), quiet: map[string]bool{}, spoke: map[string]bool{}, asked: map[string]bool{}, qHeard: map[string]bool{},
 		deferred: map[string]deferredConsult{}}

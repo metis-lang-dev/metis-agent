@@ -72,7 +72,7 @@ func runCap(l *llm.LLM, prompt, cardsF, capsS, tag string, reps int, seed uint32
 		}
 		caps = append(caps, n)
 	}
-	sys := prompt + kernel.NewDecider(cards).System // the orchestrator's prefix, as -e7/-e8
+	sys := prompt + newDecider(cards).System // the orchestrator's prefix, as -e7/-e8
 	if _, err := l.PrimePrefix(sys); err != nil {
 		fail(err)
 	}

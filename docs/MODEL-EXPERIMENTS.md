@@ -1739,3 +1739,25 @@ query's result line says what the dog did (a lookup is "I last saw…", not
 last seen at {P}.", metis-catalog 7e57d62, so the narrator has the
 material); an ask is a question, not an imperative with a "?" (the ask
 grammar). None moves a bar; step 2 carries them.
+
+## The decider's declarations from the REPL API's data (repl-tools s-0c6879a1 step 3, opus, 2026-10-15) — a prompt change, recorded
+
+`kernel.NewDecider` no longer hand-builds its three declarations. It renders them from the REPL API's data: metispy's `metis.lang.repl_api`, carried by every bundle as tools.json. It takes the watch's reset, explain and escalate, drops domain and record (the harness fills them), and fills the card and move enums from the cards (the architect's ruling a).
+
+The decider's system text changes in three descriptions to the REPL API's wording:
+
+| | before | now |
+|---|---|---|
+| explain | "a sibling card's move explains the reading" | "a sibling card's move explains it" |
+| its move | "the card's move that produced the difference" | "the card's move" |
+| escalate | "nothing explains the reading: describe it for the revision loop" | "nothing explains it: describe it for the people who revise the model" |
+
+reset, the card and text parameters, the structure and the grammar are unchanged.
+
+**What this affects:** the arms that prime this prefix, which are E7/E8 (`-e7`/`-e8`, capcheck), E10's T-api and decider dumps, `cmd/episodes`, and `-loop v2`'s triage.
+- Their recorded results stand as run, on the old text.
+- A re-run takes the new one.
+
+**The check:** the catalog-t3 replay on the model, in go-domain-agent step 5's GPU window, not now.
+
+**Unchanged:** the `-loop v3` orchestrator's REPL API declarations. `-print-turn` on config.v3-live.yaml is byte-identical before and after, and llmbench's E13 prompt still ends with them.

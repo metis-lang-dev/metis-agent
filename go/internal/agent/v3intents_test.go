@@ -152,7 +152,7 @@ func (r *recDomains) Intent(c Call) (Reply, bool) {
 // "Nothing is running."
 func TestStopGoesWhereTasksRun(t *testing.T) {
 	dom := &recDomains{}
-	o := NewOrch(V3Config{Loaded: []string{"dog", "kitchen", "plant"}, IntentDomains: []string{"dog", "plant"}, Mirror: true}, &fakeDialog{}, dom)
+	o := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"dog", "kitchen", "plant"}, IntentDomains: []string{"dog", "plant"}, Mirror: true}, &fakeDialog{}, dom)
 	if _, voice, err := o.Stop("stop"); err != nil || voice != lineNothingRunning || len(dom.sent) != 0 {
 		t.Fatalf("idle: %q %v %v", voice, dom.sent, err)
 	}
@@ -167,7 +167,7 @@ func TestStopGoesWhereTasksRun(t *testing.T) {
 	}
 	// one intent domain: its STOP untagged, as before
 	dom.sent = nil
-	o1 := NewOrch(V3Config{Loaded: []string{"dog"}, IntentDomains: []string{"dog"}, Mirror: true}, &fakeDialog{}, dom)
+	o1 := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"dog"}, IntentDomains: []string{"dog"}, Mirror: true}, &fakeDialog{}, dom)
 	o1.m.see(Reply{Domain: "dog", Kind: "result", ID: "c1", Status: "accepted"}, Call{J: []byte(`{"intent":"FIND"}`)})
 	if o1.Stop("stop"); strings.Join(dom.sent, " ") != `{"intent":"STOP"}` {
 		t.Fatalf("one domain: %v", dom.sent)
@@ -177,7 +177,7 @@ func TestStopGoesWhereTasksRun(t *testing.T) {
 // A command while a surprise is open (the architect's ruling): its one
 // templated refusal is spoken each time — not consulted, not "again".
 func TestSurpriseOpenIsSpokenEveryTime(t *testing.T) {
-	o := NewOrch(V3Config{Loaded: []string{"plant"}, Mirror: true, AgainPick: true}, &fakeDialog{}, noDomains{})
+	o := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"plant"}, Mirror: true, AgainPick: true}, &fakeDialog{}, noDomains{})
 	c := Call{J: []byte(`{"intent":"WATER"}`)}
 	r := Reply{Domain: "plant", Kind: "result", ID: "c4", Status: "refused", Reason: "surprise_open"}
 	for i := 0; i < 2; i++ {

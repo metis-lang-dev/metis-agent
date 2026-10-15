@@ -17,6 +17,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/metis-lang-dev/metis-agent/go/internal/repltools"
 	"log"
 	"strconv"
 	"strings"
@@ -43,6 +44,9 @@ type Config struct {
 	Talk      TalkConfig
 	Loop      string    // "" or v2: the dog's two-pass path; v3: the orchestrator (DESIGN v3, orchestrator-agent step 2)
 	V3        V3Service // -loop v3's system turn and world
+	// Tools: the REPL API's declarations (the served packages' bundles'
+	// tools.json, repl-tools step 3): the triage decider renders from them
+	Tools []repltools.Tool
 }
 
 // Sink is where the agent's events go: the console backend's wire
