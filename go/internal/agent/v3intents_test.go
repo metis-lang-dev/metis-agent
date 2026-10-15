@@ -173,3 +173,16 @@ func TestStopGoesWhereTasksRun(t *testing.T) {
 		t.Fatalf("one domain: %v", dom.sent)
 	}
 }
+
+// A command while a surprise is open (the architect's ruling): its one
+// templated refusal is spoken each time — not consulted, not "again".
+func TestSurpriseOpenIsSpokenEveryTime(t *testing.T) {
+	o := NewOrch(V3Config{Loaded: []string{"plant"}, Mirror: true, AgainPick: true}, &fakeDialog{}, noDomains{})
+	c := Call{J: []byte(`{"intent":"WATER"}`)}
+	r := Reply{Domain: "plant", Kind: "result", ID: "c4", Status: "refused", Reason: "surprise_open"}
+	for i := 0; i < 2; i++ {
+		if b, err := o.branchOf(r, c); err != nil || b.name != "speak" {
+			t.Fatalf("refusal %d: %q %v", i+1, b.name, err)
+		}
+	}
+}

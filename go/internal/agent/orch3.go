@@ -300,7 +300,7 @@ func (o *Orch) Activated(d string) { delete(o.qHeard, d) }
 // keyword: a stop word fires the intent without the model (the dog path's
 // keyword stop); the turn is kept as the dialog's past.
 func (o *Orch) keyword(person, j string) error {
-	_, voice, err := o.Stop(o.head() + person)
+	_, voice, err := o.stop(person, true)
 	if voice == lineNothingRunning {
 		o.say("template", voice)
 	}
@@ -316,7 +316,17 @@ const lineNothingRunning = "Nothing is running."
 // flight nothing is sent and the line says so. A J to a domain other than
 // the one intent domain names it. The turn is kept as the dialog's past;
 // the acknowledgement or the nothing-running line is returned.
-func (o *Orch) Stop(person string) (j, voice string, err error) {
+func (o *Orch) Stop(person string) (j, voice string, err error) { return o.stop(person, false) }
+
+// stop: head, the mirror before the person's words in the past — as it
+// stands after the STOP went out (the keyword path's, byte for byte).
+func (o *Orch) stop(person string, head bool) (j, voice string, err error) {
+	said := func() string {
+		if head {
+			return o.head() + person
+		}
+		return person
+	}
 	base := Call{J: json.RawMessage(`{"intent":"STOP"}`)}
 	o.q = nil
 	var targets []string
@@ -326,7 +336,7 @@ func (o *Orch) Stop(person string) (j, voice string, err error) {
 		}
 	}
 	if len(targets) == 0 {
-		return base.Text(), lineNothingRunning, o.Past(person, base.J, "", lineNothingRunning)
+		return base.Text(), lineNothingRunning, o.Past(said(), base.J, "", lineNothingRunning)
 	}
 	id := ""
 	j = base.Text()
@@ -349,7 +359,7 @@ func (o *Orch) Stop(person string) (j, voice string, err error) {
 	if id == "" {
 		return j, "", nil
 	}
-	return j, ackTemplate["STOP"], o.Past(person, json.RawMessage(j), id, ackTemplate["STOP"])
+	return j, ackTemplate["STOP"], o.Past(said(), json.RawMessage(j), id, ackTemplate["STOP"])
 }
 
 // cancelFirst: the person agreed to drop the live task for the refused one

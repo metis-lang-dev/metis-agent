@@ -504,6 +504,10 @@ func (o *Orch) branchOf(r Reply, c Call) (branch, error) {
 		if b.record == "" {
 			b.record = r.ID
 		}
+		if r.Reason == "surprise_open" { // the domain is paused on an open surprise (the architect's ruling): its line, every time — never consulted, never "again"
+			b.name = "speak"
+			return b, nil
+		}
 		k := refusal{r.Domain, c.Verb(), r.Reason}
 		o.refusals[k]++
 		if o.refusals[k] > 1 {
