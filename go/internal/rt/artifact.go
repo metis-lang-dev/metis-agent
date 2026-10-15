@@ -45,8 +45,9 @@ type Sidecar struct {
 type Program struct {
 	*Runtime
 	Sidecar
-	Dir  string // the version directory the artifact was read from
-	Wire *Wire  // its ground.wire as data (the event table, the canonical body)
+	Dir   string // the version directory the artifact was read from
+	Wire  *Wire  // its ground.wire as data (the event table, the canonical body)
+	Tools []Tool // its tools.json: the REPL API's declarations
 }
 
 // ReadSidecar parses an artifact directory's sidecar.json.
@@ -104,6 +105,10 @@ func Load(dir string) (*Program, error) {
 	if err != nil {
 		return nil, err
 	}
+	tools, err := ReadTools(real)
+	if err != nil {
+		return nil, err
+	}
 	r := New()
 	if err := r.LoadWire(filepath.Join(real, "ground.wire"), s.canon(), s.Stages); err != nil {
 		r.Close()
@@ -117,7 +122,7 @@ func Load(dir string) (*Program, error) {
 		r.Close()
 		return nil, err
 	}
-	return &Program{Runtime: r, Sidecar: s, Dir: real, Wire: w}, nil
+	return &Program{Runtime: r, Sidecar: s, Dir: real, Wire: w, Tools: tools}, nil
 }
 
 // Reload swaps in the artifact `dir` now holds (a rebuild through the
@@ -131,10 +136,14 @@ func (p *Program) Reload(dir string) error {
 	if err != nil {
 		return err
 	}
+	tools, err := ReadTools(real)
+	if err != nil {
+		return err
+	}
 	if err := p.ReloadWire(filepath.Join(real, "ground.wire"), s.canon(), s.Stages); err != nil {
 		return err
 	}
-	p.Sidecar, p.Dir, p.Wire = s, real, w
+	p.Sidecar, p.Dir, p.Wire, p.Tools = s, real, w, tools
 	return nil
 }
 

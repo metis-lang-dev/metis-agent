@@ -529,7 +529,7 @@ func TestTheHandle(t *testing.T) {
 	if err := os.Mkdir(ver, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	for _, f := range []string{"ground.wire", "sidecar.json"} {
+	for _, f := range []string{"ground.wire", "sidecar.json", "tools.json"} {
 		b, err := os.ReadFile(filepath.Join(src, f))
 		if err != nil {
 			t.Fatal(err)
@@ -553,6 +553,19 @@ func TestTheHandle(t *testing.T) {
 	}
 	if err := p.Reload(link); err != nil {
 		t.Fatal(err)
+	}
+	// the bundle carries the REPL API (tools.json); one without it is stale
+	if len(p.Tools) != 12 || p.Tools[0].Name != "activate" || p.Tools[0].Parameters.Properties[0].EnumFrom != "catalog" {
+		t.Fatalf("the bundle's tools: %+v", p.Tools)
+	}
+	if err := os.Remove(filepath.Join(ver, "tools.json")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Load(link); err == nil || !strings.Contains(err.Error(), "a stale bundle") {
+		t.Fatalf("a bundle without tools.json: %v", err)
+	}
+	if err := p.Reload(link); err == nil {
+		t.Fatal("reload onto a stale bundle")
 	}
 }
 
