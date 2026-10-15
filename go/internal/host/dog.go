@@ -3,6 +3,7 @@ package host
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 )
 
@@ -112,4 +113,21 @@ func (d *Dog) Restore(b json.RawMessage) error {
 		}
 	}
 	return nil
+}
+
+// DogAnswerKinds is dog_host.py's ANSWERS as the agent's ports read it:
+// act -> the report kinds the world answers it with (sorted).
+func DogAnswerKinds() map[string][]string {
+	out := map[string][]string{}
+	for act, table := range dogAnswers {
+		seen := map[string]bool{}
+		for _, a := range table {
+			if !seen[a.kind] {
+				seen[a.kind] = true
+				out[act] = append(out[act], a.kind)
+			}
+		}
+		sort.Strings(out[act])
+	}
+	return out
 }
