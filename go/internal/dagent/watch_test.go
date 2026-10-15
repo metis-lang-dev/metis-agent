@@ -119,7 +119,14 @@ func TestTheWatchIsPys(t *testing.T) {
 				if p.Key != c.Key {
 					t.Fatalf("%s: the bundle's key %s is not the agent's %s", d, p.Key, c.Key)
 				}
-				if ProgramKey(c.Canonical, c.Stage, toCounts(t, c.Counts).N) != c.Key {
+				body, err := p.Wire.CanonicalBody(p.Stages)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if body != c.Canonical {
+					t.Fatalf("%s: the wire's canonical body is not py's:\n%s\n---\n%s", d, body, c.Canonical)
+				}
+				if rt.ProgramKey(body, c.Stage, toCounts(t, c.Counts).N) != c.Key {
 					t.Fatalf("%s: ProgramKey at the start is not the key", d)
 				}
 				if err := p.Seed(1); err != nil {
@@ -152,7 +159,7 @@ func TestTheWatchIsPys(t *testing.T) {
 				if err := json.Unmarshal(p.Cards, &cards); err != nil {
 					t.Fatal(err)
 				}
-				if w, err = NewWatch(sh, c.Canonical, cards); err != nil {
+				if w, err = NewWatch(sh, body, cards); err != nil {
 					t.Fatal(err)
 				}
 				sink = &Sink{Path: filepath.Join(t.TempDir(), "records", "fixture.jsonl"), Session: "fixture",

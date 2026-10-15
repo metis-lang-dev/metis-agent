@@ -8,9 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"sort"
-	"strings"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/host"
 )
@@ -76,26 +73,4 @@ func envRecord(snap json.RawMessage) (*EnvRecord, error) {
 		out.Data = json.RawMessage(text)
 	}
 	return out, nil
-}
-
-// ProgramKey is metispy's program_key of the bundle's program grounded at
-// (counts, stage): grounding does not read the init, so canonical_bytes is
-// the bundle's canonical body (every line before init-stage) then the
-// init-stage and the init lines, content-sorted bytewise.
-func ProgramKey(body, stage string, counts map[string]int) string {
-	var b strings.Builder
-	b.WriteString(body)
-	fmt.Fprintf(&b, "init-stage %s\n", stage)
-	var lines []string
-	for a, n := range counts {
-		if n > 0 {
-			lines = append(lines, fmt.Sprintf("i %s:%d", a, n))
-		}
-	}
-	sort.Strings(lines)
-	for _, l := range lines {
-		b.WriteString(l + "\n")
-	}
-	h := sha256.Sum256([]byte(b.String()))
-	return hex.EncodeToString(h[:])
 }

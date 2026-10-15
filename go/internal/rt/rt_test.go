@@ -614,3 +614,26 @@ func TestTickAndArgs(t *testing.T) {
 		t.Fatalf("args %v of %s", ev.Args, ev.Name)
 	}
 }
+
+// the wire as data: every domain golden's canonical body, at its #init,
+// hashes to the sidecar's key (metispy's program_key)
+func TestTheWireKeysTheBundle(t *testing.T) {
+	py := metispyDir(t)
+	for _, n := range []string{"dog", "plant", "kitchen", "kitchen_shared"} {
+		p, err := Load(filepath.Join(py, "tests/goldens/artifact", n+".metis"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		k, err := p.Wire.Key(p.Stages)
+		p.Close()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if k != p.Key {
+			t.Fatalf("%s: the wire keys %s, the sidecar says %s", n, k, p.Key)
+		}
+		if len(p.Wire.Events) != len(p.Events) {
+			t.Fatalf("%s: %d wire events, %d sidecar events", n, len(p.Wire.Events), len(p.Events))
+		}
+	}
+}

@@ -309,7 +309,7 @@ func (w *Watch) record(reading map[string]int) (*Record, error) {
 		obs[a] = n
 	}
 	rec := &Record{Format: "metis-surprise", Version: 1,
-		ProgramKey: ProgramKey(w.Body, w.cp.stage, w.cp.counts),
+		ProgramKey: rt.ProgramKey(w.Body, w.cp.stage, w.cp.counts),
 		Steps:      steps, Init: w.cp.counts, Observed: obs, Likelihood: like, Kind: kind,
 		Meta: Meta{Path: w.Path, Beat: w.Beat, Fired: len(sh.Fired), Stage: w.cp.stage,
 			Since: append([]string{}, sh.Fired[w.cp.fired:]...), Host: hostSpec}}
