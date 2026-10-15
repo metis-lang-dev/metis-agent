@@ -81,7 +81,7 @@ export class Journal {
         for (const x of r.records ?? []) d.stream.push({ seq: r.seq, what: `record ${x.status}`, record: x.record, text: x.mined_text || `record #${x.record} ${x.status} (sunk)` });
         break;
       }
-      case 'dlg-domain': out.chat = this.note(r, `${r.verb ?? r.op ?? 'activate'} ${r.domain}${r.by ? ' (by ' + r.by + ')' : ''}${r.error ? ': ' + r.error : ''}`); break;
+      case 'dlg-domain': out.chat = this.note(r, `${r.verb ?? r.op ?? 'activate'} ${r.domain}${r.by ? ' (by ' + r.by + ')' : ''}${r.error ? ': ' + r.error : r.key ? ': reloaded (' + String(r.key).slice(0, 12) + ')' : ''}`); break;
     }
     return out;
   }

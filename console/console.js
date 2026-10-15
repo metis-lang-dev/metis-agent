@@ -142,7 +142,7 @@ function frame(f) {
     case 'catalog': catalog = { domains: f.domains ?? [] }; catalogLive = true; renderDomains(); renderTabs(); break;
     case 'ports': ports[f.domain] = f; if (tab === f.domain) renderWorldDock(); break;
     case 'domain_ack': if (f.error) note(`${f.verb} ${f.domain}: ${f.error}`); renderDomains(); break;
-    case 'reload_ack': note(f.error ? `reload ${f.domain}: ${f.error}` : `reload ${f.domain}: reloaded (${f.key ?? ''})`); renderDomains(); break;
+    case 'reload_ack': renderDomains(); break; // the journal's dlg-domain reload row says it (its key or its error) in the chat
     case 'world_ack': if (f.error) note(`world ${f.domain}: ${f.error}`); else if (tab === f.domain) renderWorldDock(); break;
     case 'narration': narration(f); break;
     case 'intent': case 'error': { const w = waiting.get(f.id); if (w) w(f); else if (f.ev === 'error') note(`error: ${f.error}`); break; }
