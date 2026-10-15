@@ -1,0 +1,17 @@
+# the plant's day, the person and the world (agent-loop step 1): two checks,
+# a watering, then the visitor's watering nobody models — the surprise
+domain: plant
+about: "the plant: checks, a watering, the visitor's jump EXPLAINED by its card (after the loop: domains/plant/plant_visitor.llp)"
+beats: 26
+say:
+  2: "how is the plant?"
+  9: "is it thirsty?"
+  10: "water the plant"
+expect:
+  - {dispatched: CHECK}
+  - {result: done, verb: WATER}
+  - {said: "moist"}
+  - {surprise: 1}
+  - {move: explain, args: {card: plant_visitor, move: visitor_waters}}
+  - {not: {move: escalate}}
+  - {sunk: explained}

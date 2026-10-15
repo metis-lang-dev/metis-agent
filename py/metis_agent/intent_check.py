@@ -81,14 +81,14 @@ def mapped(mapper, js):
     return None, got.error
 
 
-def check(name, rows, model=str(GGUF), root=CATALOG_ROOT, log=print):
+def check(name, rows, model=str(GGUF), root=CATALOG_ROOT, log=print, gpu_layers=99, threads=6):
     gen = generator(root)
     spec = gen.load_from(Path(root) / name)
     persona, gbnf = gen.prompt(spec) + gen.spoken(spec), gen.grammar(spec)
     dom = build(name, root=root)
     mapper, preds = Mapper(dom["CARD"]), declared(dom)
     from .llm import LLM
-    llm = LLM(model, n_ctx=4096, n_batch=512, n_threads=6, n_gpu_layers=99)
+    llm = LLM(model, n_ctx=4096, n_batch=512, n_threads=threads, n_gpu_layers=gpu_layers)
     llm.prime(persona)
     out = []
     for r in rows:
@@ -133,6 +133,8 @@ def main(argv=None):
     ap.add_argument("--no-model", action="store_true", help="intent.yaml's examples through the mapper only")
     ap.add_argument("--examples", action="store_true",
                     help="intent.yaml's examples as the corpus (a new domain before it has one)")
+    ap.add_argument("--gpu-layers", type=int, default=99, help="0: the model on the CPU (the GPU held elsewhere)")
+    ap.add_argument("--threads", type=int, default=6)
     a = ap.parse_args(argv)
     if a.no_model:
         recs = check_examples(a.domain, a.root)
@@ -145,7 +147,7 @@ def main(argv=None):
                     if not isinstance(e, dict)]
         else:
             rows = corpus(a.corpus or Path(a.root) / a.domain / "intent" / ("%s-corpus.tsv" % a.domain))
-        recs = check(a.domain, rows, a.model, a.root)
+        recs = check(a.domain, rows, a.model, a.root, gpu_layers=a.gpu_layers, threads=a.threads)
     if a.json:
         with open(a.json, "w") as f:
             for r in recs:
