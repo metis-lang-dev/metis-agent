@@ -142,7 +142,7 @@ func replAPI(catalog, loaded []string) []apiTool {
 }
 
 // APIDeclarations is the REPL API as the template declares tools
-// (tools/e9-tools.py declaration: the GGUF template's macros, ported).
+// (tools/gemma_tools.py declaration: the GGUF template's macros, ported).
 func APIDeclarations(catalog, loaded []string) string {
 	var b strings.Builder
 	for _, t := range replAPI(catalog, loaded) {

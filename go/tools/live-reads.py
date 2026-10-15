@@ -66,8 +66,8 @@ def main(path):
         for kind, text, forged, *lead in spoken:
             harness = lead[0] if lead else (text if kind == "template" else "")
             lines.append((w["t"][11:19], what, kind, text))
-            R["R5 leaks"].append((not sc.e9.leak(text), text))
-            claim = bool(sc.e9.CLAIM.search(text.replace(harness, "", 1) if harness else text))
+            R["R5 leaks"].append((not sc.vs.leak(text), text))
+            claim = bool(sc.vs.CLAIM.search(text.replace(harness, "", 1) if harness else text))
             R["R5 claims (not after its done)"].append((not (claim and what != "result:done"), "%s: %s" % (what, text)))
             R["R5 ids aloud"].append((not sc.IDS.search(text), text))
         if what == "person":

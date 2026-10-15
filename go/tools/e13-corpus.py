@@ -60,7 +60,7 @@ def _load(name):
     return m
 
 
-e9 = _load("e9-tools")
+gt = _load("gemma_tools")
 e10 = _load("e10-corpus")
 e11 = _load("e11-corpus")
 e11.STATE = True  # the state cues
@@ -193,7 +193,7 @@ def prompt():
     dog = ((GO / "../../metis-catalog/domains/dog/intent/dog-prompt.txt").read_text() + (GO / "../../metis-catalog/domains/dog/intent/dog-spoken.txt").read_text()
            + e10.IO_J + e10.io_examples("J-text"))
     dtext, _ = e10.decider()
-    decl = "".join(e9.declaration(t) for t in API)
+    decl = "".join(gt.declaration(t) for t in API)
     return (dog + dtext.replace("Close SURPRISE", "Close SURPRISE") + e10.domains_section("T-api")).rstrip("\n") \
         + LOOP_T + loop_examples() + decl
 
@@ -409,7 +409,7 @@ def main():
     p = prompt()
     (GO / PROMPT).write_text(p)
     if FINAL:  # the live -loop v3's system turn: the same, the REPL API's declarations left to the service (APIDeclarations)
-        (GO / "grammar/e13-prompt-base.txt").write_text(p[:len(p) - len("".join(e9.declaration(t) for t in API))])
+        (GO / "grammar/e13-prompt-base.txt").write_text(p[:len(p) - len("".join(gt.declaration(t) for t in API))])
     items, scen = [], []
 
     def add(group, iid, steps, rule, reps=1):

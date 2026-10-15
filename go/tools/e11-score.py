@@ -31,9 +31,9 @@ from collections import defaultdict
 from pathlib import Path
 
 GO = Path(__file__).resolve().parent.parent
-_spec = importlib.util.spec_from_file_location("e9score", GO / "tools/e9-score.py")
-e9 = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(e9)
+_spec = importlib.util.spec_from_file_location("voice_score", GO / "tools/voice_score.py")
+vs = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(vs)
 
 STOPW = {"the", "a", "an", "my", "me", "you", "in", "of", "is", "where", "more", "another", "some"}
 NUMW = {"five": "5", "three": "3"}
@@ -108,7 +108,7 @@ def said_wrong(line, rule):
     """Read 4 on one spoken line: E9's leak, an atom or an evidence entry
     aloud, a completion claim."""
     out = []
-    lk = e9.leak(line)
+    lk = vs.leak(line)
     if lk:
         out.append("leak (%s)" % lk)
     resp = rule.get("response") or {}
@@ -116,7 +116,7 @@ def said_wrong(line, rule):
     ev = [e for e in resp.get("evidence", []) if e.lower() in line.lower()]
     if atoms or ev:
         out.append("atom/evidence aloud: %s" % ", ".join(sorted(atoms) + ev))
-    if e9.CLAIM.search(line):
+    if vs.CLAIM.search(line):
         out.append("completion claim")
     return out
 

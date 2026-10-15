@@ -135,7 +135,7 @@ func (c Call) arg(k string) string {
 
 const q3 = `<|"|>` // the template's string quote
 
-// fmtArg is the template's format_argument (tools/e9-tools.py fmt_arg with
+// fmtArg is the template's format_argument (tools/gemma_tools.py fmt_arg with
 // escape_keys false): dict keys sorted and bare, strings in <|"|>.
 func fmtArg(v any) string {
 	switch x := v.(type) {

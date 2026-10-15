@@ -32,11 +32,13 @@ from collections import defaultdict
 from pathlib import Path
 
 GO = Path(__file__).resolve().parent.parent
-_spec = importlib.util.spec_from_file_location("e9score", GO / "tools/e9-score.py")
-e9 = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(e9)
+_spec = importlib.util.spec_from_file_location("voice_score", GO / "tools/voice_score.py")
+vs = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(vs)
 
-ARMS = ("J-text", "T-api")
+# the T-api arm went with the T bench (catalog-entry s-65dd0863); its runs
+# and the J-vs-T reading are MODEL-EXPERIMENTS.md's E10 history
+ARMS = ("J-text",)
 LABEL = re.compile(r"^\W*spoken response\s*:\s*", re.I)
 DONE = re.compile(r"\b(done|finished|completed?|made it|arrived|reached|found|succeeded|"
                   r"i'?m (now )?(at|in|here|there|standing|sitting|following|stopped|back|facing)|"
@@ -88,7 +90,7 @@ def speech_of(text):
 
 
 def leak(s):
-    return e9.leak(s)
+    return vs.leak(s)
 
 
 def load(paths, corpus):
@@ -109,16 +111,13 @@ def first(recs, label):
     return next((r for r in recs if r["label"] == label), None)
 
 
-def score_a(it, recs, tools):
+def score_a(it, recs):
     rule = it["rule"]
     call = first(recs, "call")
-    if it["arm"] == "J-text":
-        cls, j, err = e9.to_json({"arm": "J", "text": call["text"]})
-    else:
-        cls, j, err = e9.to_json({"arm": "T", "text": call["text"]})
+    cls, j, err = vs.to_json({"text": call["text"]})
     voice = first(recs, "voice")["text"]
     return {"class": cls == rule["want"], "args": j == rule["json"], "got": cls, "call": call["text"],
-            "voice": voice, "leak": leak(voice), "claim": bool(e9.CLAIM.search(voice))}
+            "voice": voice, "leak": leak(voice), "claim": bool(vs.CLAIM.search(voice))}
 
 
 def score_b(it, recs):
@@ -143,7 +142,7 @@ def score_b(it, recs):
         why.append("status not said (%s)" % res)
     # E9's CLAIM reads "found" in "no result was found": a sentence that says
     # the failure or the timeout is not a completion claim
-    if res != "done" and e9.CLAIM.search(said) and not (NEG.search(said) or EXPIRED.search(said)):
+    if res != "done" and vs.CLAIM.search(said) and not (NEG.search(said) or EXPIRED.search(said)):
         why.append("completion before done")
     inv = invented(said, rule["utt"] + " " + detail)
     if inv:
@@ -229,11 +228,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("jsonl", nargs="+")
     ap.add_argument("--corpus", default=str(GO / "grammar/e10-corpus.jsonl"))
-    ap.add_argument("--arms", default=",".join(ARMS), help="arms in the per-arm tables (E10b adds T-tmpl)")
+    ap.add_argument("--arms", default=",".join(ARMS), help="arms in the per-arm tables")
     a = ap.parse_args()
     ARMS = tuple(a.arms.split(","))
     items, gens = load(a.jsonl, a.corpus)
-    tools = e9.load_tools()
     res = defaultdict(list)  # (group, arm) -> [(item, rep, score)]
     ctx, first_ms = defaultdict(list), defaultdict(list)
     spoken_leaks = defaultdict(lambda: [0, 0])
@@ -243,7 +241,7 @@ def main():
             res[(it["group"] if it else "?", arm)].append((iid, rep, {"ok": False, "why": ["run error"]}))
             continue
         g = it["group"]
-        sc = {"A": lambda: score_a(it, recs, tools), "B": lambda: score_b(it, recs), "C": lambda: score_c(it, recs),
+        sc = {"A": lambda: score_a(it, recs), "B": lambda: score_b(it, recs), "C": lambda: score_c(it, recs),
               "D": lambda: score_d(it, recs), "E": lambda: score_e(it, recs), "F": lambda: score_f(it, recs)}[g]()
         res[(g, arm)].append((iid, rep, sc))
         for r in recs:
@@ -258,7 +256,7 @@ def main():
         rs = res.get((g, arm), [])
         return sum(1 for _, _, s in rs if s.get("ok")), len(rs)
 
-    print("# E10 — J-text vs T-api\n")
+    print("# E10 — J-text\n")
     print("## Read 1 — A, the parity bar (54 rows; 5 seeds of the spoken line)\n")
     print("| arm | class | args | spoken lines | leaks | completion claims | admissible |")
     print("|---|---|---|---|---|---|---|")
@@ -273,19 +271,10 @@ def main():
                                                              "yes" if adm[arm] else "**no**"))
 
     print("\n## Groups B–F (items passing every rule)\n")
-    print("| group | J-text | T-api | margin (T − J) | win needs | winner |")
-    print("|---|---|---|---|---|---|")
-    wins = {}
-    for g, need in (("B", 3), ("C", 3), ("D", 0), ("E", 1), ("F", 0)):
-        (jo, jn), (to, tn) = n_ok(g, "J-text"), n_ok(g, "T-api")
-        m = to - jo
-        if g in ("B", "C", "E"):
-            w = "T-api" if m >= need else "J-text" if -m >= need else "tie"
-            wins[g] = w
-        else:
-            w = "—"
-        unit = " seed" if g == "E" else ""
-        print("| %s | %d/%d | %d/%d | %+d | %s | %s |" % (g, jo, jn, to, tn, m, ("≥ %d%s" % (need, unit)) if need else "—", w))
+    print("| group | " + " | ".join(ARMS) + " |")
+    print("|---|" + "---|" * len(ARMS))
+    for g in "BCDEF":
+        print("| %s | %s |" % (g, " | ".join("%d/%d" % n_ok(g, arm) for arm in ARMS)))
 
     print("\n## Per group detail\n")
     for g in "BCDEF":
@@ -327,14 +316,6 @@ def main():
                 print("| %s | %s | %d | %d |" % (g, arm, mean(ctx[(g, arm)]), mean(first_ms.get((g, arm), []))))
     print("\nSpoken-line leaks over every spoken turn: " + ", ".join(
         "%s %d/%d" % (arm, *spoken_leaks[arm]) for arm in ARMS))
-
-    print("\n## Decision rule\n")
-    t_w = [g for g in ("B", "C", "E") if wins.get(g) == "T-api"]
-    t_l = [g for g in ("B", "C", "E") if wins.get(g) == "J-text"]
-    print("- read 1 (T-api admissible): %s; J-text admissible: %s" % (adm.get("T-api"), adm.get("J-text")))
-    print("- T-api wins %s; loses by the margin %s" % (", ".join(t_w) or "none", ", ".join(t_l) or "none"))
-    verdict = adm.get("T-api") and len(t_w) >= 2 and not t_l
-    print("- **%s**" % ("T-api becomes the executive's API" if verdict else "J-text stays; responses stay text"))
 
     print("\n## Misses (every item failing a rule)\n")
     for g in "ABCDEF":

@@ -28,9 +28,9 @@ from collections import defaultdict
 from pathlib import Path
 
 GO = Path(__file__).resolve().parent.parent
-_spec = importlib.util.spec_from_file_location("e9score", GO / "tools/e9-score.py")
-e9 = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(e9)
+_spec = importlib.util.spec_from_file_location("voice_score", GO / "tools/voice_score.py")
+vs = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(vs)
 
 WORLD = {"NAVIGATE", "LOCAL_ACTION", "FIND", "FOLLOW"}
 IDS = re.compile(r"\b(c\d+|q\d+)\b|#\d+")
@@ -237,9 +237,9 @@ def main(argv):
                 R["R2 person first in its beat"].append((ws[0] == "person", "%s r%d b%d %s" % (iid, rep, b, ws)))
     # R5: speech
     for tag, what, kind, text, harness in allspoken:
-        lk = e9.leak(text)
+        lk = vs.leak(text)
         R["R5 leaks"].append((not lk, "%s %s: %r (%s)" % (tag, what, text, lk)))
-        claim = bool(e9.CLAIM.search(text.replace(harness, "", 1) if harness else text))  # the harness's templates excluded
+        claim = bool(vs.CLAIM.search(text.replace(harness, "", 1) if harness else text))  # the harness's templates excluded
         after_done = what in ("result:done",)
         R["R5 claims (not after its done)"].append((not (claim and not after_done), "%s %s: %r" % (tag, what, text)))
         R["R5 ids aloud"].append((not IDS.search(text), "%s %s: %r" % (tag, what, text)))

@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """E10 corpus (docs/MODEL-EXPERIMENTS.md "E10", DESIGN.md "The executive's
-IO, refined"): the executive's IO round-trip as scripted dialogs, both arms
-rendered from one description so they differ only in the format.
+IO, refined"): the executive's IO round-trip as scripted dialogs.
 
   J-text  today's JSON intent (dog.gbnf); the runtime's calls as JSON
           ({"call":…}); responses and outcomes as text turns in the
           harness's convention (agent.taskCue's status report, then the
           "Spoken response:" cue as Narrate).
-  T-api   E9's declarations and grammar; every call a native call;
-          responses as <|tool_response> turns carrying the call's id: in
-          the call's own turn when synchronous (accepted, admitted,
-          refused), opening a later model turn when asynchronous (done,
-          refused, expired, progress — the template's tool_responses-on-an-
-          assistant-message rendering).
+
+The T-api arm (E9's dog-intent declarations and grammar, every call a
+native call) was removed with the T bench (catalog-entry s-65dd0863: the
+catalog carries J material only; MODEL-EXPERIMENTS.md keeps E10 as
+history). The T helpers E13's orchestrator corpus renders its REPL calls
+with stay: tcall, tresp, decider(), domains_section("T-api").
 
 Signals (⟪metis …⟫ fragments) are the same user turn in both arms, never a
 response. One system prompt per arm holds every seat, as the harness's one
@@ -38,7 +37,6 @@ and grammar/e10-corpus.jsonl (one item per arm; e10-score.py reads the
 item's "rule" fields)."""
 import importlib.util
 import json
-import re
 import sys
 from pathlib import Path
 
@@ -53,7 +51,7 @@ def _load(name):
     return m
 
 
-e9 = _load("e9-tools")
+gt = _load("gemma_tools")
 
 REF = GO.parent.parent / "fsttm-web/test/fixtures/harness-e2b.jsonl"
 TURN, END = "<|turn>", "<turn|>\n"
@@ -67,7 +65,7 @@ MODEL = TURN + "model\n"
 
 
 def T(v):
-    return e9.fmt_arg(v, False)
+    return gt.fmt_arg(v, False)
 
 
 def tresp(name, **kv):
@@ -183,32 +181,11 @@ first-person sentence what the report says happened, and nothing else.
 Runtime reports (⟪metis …⟫ lines) are not status reports of your commands.
 """
 
-IO_T = """
-## Outcomes of your calls
-The robot answers every call with a response that carries the call's id.
-"accepted" means the command was handed over, not done: never say it is
-done then. The outcome comes later as another response with the same id:
-done, refused (with the reason), expired, or progress. After a response,
-say in one short first-person sentence what it says happened, and nothing
-else. Runtime reports (⟪metis …⟫ lines) answer no call.
-"""
-
-
 def io_examples(arm):
     out = ["Examples:"]
     for n, (j, utt, ack, res, detail, said) in enumerate(OUTCOME_EX, 1):
-        if arm == "J-text":
-            out.append('"%s" → %s\nSpoken response: %s' % (utt, jcall(j), ack))
-            out.append("Later: %s\nSpoken response: %s" % (task_cue(j, res, detail), said))
-        else:
-            name = j["intent"]
-            args = {k: v for k, v in j.items() if k != "intent"}
-            cid = "c%d" % (90 + n)
-            out.append('"%s" → %s%s%s' % (utt, tcall(name, args), tresp(name, id=cid, status="accepted"), ack))
-            kv = {"id": cid, "status": res}
-            if detail:
-                kv["reason"] = detail
-            out.append("Later: %s%s" % (tresp(name, **kv), said))
+        out.append('"%s" → %s\nSpoken response: %s' % (utt, jcall(j), ack))
+        out.append("Later: %s\nSpoken response: %s" % (task_cue(j, res, detail), said))
     return "\n".join(out) + "\n"
 
 
@@ -236,11 +213,6 @@ def domains_section(arm):
             + cards.replace("\n", "\n- ") + "\n\nExamples:\n" + "\n".join(lines) + "\n")
 
 
-def activation_decls():
-    p = (E4 / "prompt-toolcall.txt").read_text()
-    return p[p.index("<|tool>"):].strip()
-
-
 def decider():
     s = (GO / "grammar/e10-decider.txt").read_text()
     i = s.index("<|tool>")
@@ -255,22 +227,9 @@ def decider_j(text):
 
 
 def prompts():
-    dtext, ddecl = decider()
-    j = ((GO / "../../metis-catalog/domains/dog/intent/dog-prompt.txt").read_text() + (GO / "../../metis-catalog/domains/dog/intent/dog-spoken.txt").read_text()
-         + IO_J + io_examples("J-text") + decider_j(dtext) + domains_section("J-text"))
-    tools = e9.load_tools()
-    rt, _ = e9.t_prompt(tools, True, rt=True)
-    i = rt.index("<|tool>")
-    ttext, tdecl = rt[:i], rt[i:]
-    k = [90]
-
-    def with_id(m):  # E9's round-trip examples, now with the call's id
-        k[0] += 10
-        return "response:%s{id:%sc%d%s,status:" % (m.group(1), Q, k[0], Q)
-    ttext = re.sub(r"response:([A-Za-z_]+)\{status:", with_id, ttext)
-    t = (ttext.rstrip() + "\n" + IO_T + io_examples("T-api") + dtext + domains_section("T-api")
-         + tdecl + ddecl + activation_decls())
-    return j, t
+    dtext, _ = decider()
+    return ((GO / "../../metis-catalog/domains/dog/intent/dog-prompt.txt").read_text() + (GO / "../../metis-catalog/domains/dog/intent/dog-spoken.txt").read_text()
+            + IO_J + io_examples("J-text") + decider_j(dtext) + domains_section("J-text"))
 
 
 def grammars():
@@ -288,10 +247,9 @@ def grammars():
 
 # ── the items ────────────────────────────────────────────────────────────────
 
-ARMS = ("J-text", "T-api")
-P = {"J-text": "grammar/e10-prompt-j.txt", "T-api": "grammar/e10-prompt-t.txt"}
-G = {"J-text": {"dog": "../../metis-catalog/domains/dog/intent/dog.gbnf", "decide": "grammar/e10-decide-j.gbnf", "activate": "grammar/e10-activate-j.gbnf"},
-     "T-api": {"dog": "../../metis-catalog/domains/dog/intent/bench/dog-tools.gbnf", "decide": "grammar/e10-decider.gbnf", "activate": "tools/e4-activate/toolcall.gbnf"}}
+ARMS = ("J-text",)          # the T-api arm went with the T bench (catalog-entry)
+P = {"J-text": "grammar/e10-prompt-j.txt"}
+G = {"J-text": {"dog": "../../metis-catalog/domains/dog/intent/dog.gbnf", "decide": "grammar/e10-decide-j.gbnf", "activate": "grammar/e10-activate-j.gbnf"},}
 CLOSE = {"op": "inject", "text": END}
 
 
@@ -316,35 +274,18 @@ def dog_turn(arm, utt, j, cid, gold=True):
     """The person's command, the call (gold or generated), the sync ack, the
     spoken line (sampled), the turn closed."""
     steps = [inject(user(utt) + MODEL)]
-    if arm == "J-text":
-        steps += [inject(jcall(j)) if gold else gen("call", G[arm]["dog"]), inject("\nSpoken response:")]
-    else:
-        if gold:
-            name, args = j["intent"], {k: v for k, v in j.items() if k != "intent"}
-            steps.append(inject(tcall(name, args) + tresp(name, id=cid, status="accepted")))
-        else:
-            steps += [gen("call", G[arm]["dog"]), inject(tresp("{call}", id=cid, status="accepted"))]
+    steps += [inject(jcall(j)) if gold else gen("call", G[arm]["dog"]), inject("\nSpoken response:")]
     return steps + [gen("ack" if gold else "voice", sampled=True, stop="\n"), CLOSE]
 
 
 def outcome_turn(arm, j, cid, result, detail, label="narr"):
-    if arm == "J-text":
-        return [inject(user(task_cue(j, result, detail)) + MODEL + "Spoken response:"),
-                gen(label, sampled=True, stop="\n"), CLOSE]
-    kv = {"id": cid, "status": result}
-    if detail:
-        kv["reason"] = detail
-    return [inject(MODEL + tresp(j["intent"], **kv)), gen(label, sampled=True, stop="\n"), CLOSE]
+    return [inject(user(task_cue(j, result, detail)) + MODEL + "Spoken response:"),
+            gen(label, sampled=True, stop="\n"), CLOSE]
 
 
 def runtime_response(arm, verb_text, name, cid, status, reason, notice=""):
-    """The runtime's answer to a decide/activate call. T: in the call's turn;
-    J: a text turn, the model's turn left open (it proposes or speaks)."""
-    if arm == "T-api":
-        kv = {"id": cid, "status": status, "reason": reason}
-        if notice:
-            kv["notice"] = notice
-        return tresp(name, **kv)
+    """The runtime's answer to a decide/activate call: a text turn, the
+    model's turn left open (it proposes or speaks)."""
     s = "[Runtime response — not something the person said.] Your call %swas %s: %s." % (
         verb_text + " " if verb_text else "", status, reason)
     if notice:
@@ -409,10 +350,9 @@ def main():
     sur2 = dict(sur, record=1, beat=62, observed=dict(sur["observed"], pot_space=0, pot_onion=3),
                 model=dict(sur["model"], pot_space=1, pot_onion=2))
 
-    j_prompt, t_prompt = prompts()
+    j_prompt = prompts()
     dec_j, act_j = grammars()
     (GO / P["J-text"]).write_text(j_prompt)
-    (GO / P["T-api"]).write_text(t_prompt)
     (GO / G["J-text"]["decide"]).write_text(dec_j)
     (GO / G["J-text"]["activate"]).write_text(act_j)
 
@@ -422,13 +362,12 @@ def main():
         items.append({"id": iid, "group": group, "arm": arm, "prompt": P[arm], "reps": reps,
                       "steps": steps, "rule": rule})
 
-    explain = {"J-text": ("explain(kitchen_shared, partner_load)", jcall({"call": "explain", "card": "kitchen_shared", "move": "partner_load"})),
-               "T-api": ("explain", tcall("explain", {"card": "kitchen_shared", "move": "partner_load"}))}
+    explain = {"J-text": ("explain(kitchen_shared, partner_load)", jcall({"call": "explain", "card": "kitchen_shared", "move": "partner_load"}))}
     ex_key = "explain:kitchen_shared:partner_load"
 
     def surprise_turn(arm, s, record, beat, settled):
         nxt = "Next reading: it matches the model again." if settled else "Next reading: the difference persists."
-        kind = "JSON call" if arm == "J-text" else "tool call"
+        kind = "JSON call"
         return user("Close SURPRISE #%d in %s with exactly one %s.\n%s\n%s" % (
             record, s["path"], kind, surprise_text(s, record, beat), nxt)) + MODEL
 
@@ -460,7 +399,7 @@ def main():
                         {"reason": reason, "refused_key": ex_key, "settled": settled, "record": rec})
         # D: E4's twelve changes, the call generated; four of them refused
         e4 = [ln.split("\t") for ln in (E4 / "corpus.tsv").read_text().splitlines() if ln and not ln.startswith("#")]
-        kind = "JSON call" if arm == "J-text" else "tool call"
+        kind = "JSON call"
         head = "[Context change — not something the person said; answer with exactly one %s: activate, deactivate or keep.] " % kind
         for n, (said, want, _src) in enumerate(e4, 1):
             add("D", "D%02d" % n, arm, [inject(user(head + said) + MODEL), gen("call", G[arm]["activate"]), CLOSE],
@@ -513,8 +452,8 @@ def main():
     by = {}
     for it in items:
         by[it["group"]] = by.get(it["group"], 0) + 1
-    print("e10 corpus: %s items per arm (%s); prompts J %d / T %d bytes"
-          % (len(items) // 2, ", ".join("%s %d" % (g, by[g] // 2) for g in sorted(by)), len(j_prompt), len(t_prompt)))
+    print("e10 corpus: %s items (%s); prompt %d bytes"
+          % (len(items), ", ".join("%s %d" % (g, by[g]) for g in sorted(by)), len(j_prompt)))
     return 0
 
 
