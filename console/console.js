@@ -228,7 +228,8 @@ function domState(name) {
 // line, what each domain has), each with its state here. One click opens a
 // domain: an active one shows its tab; an inactive one is activated.
 const HAS = ['agent', 'intent', 'host', 'notch', 'readme'];
-function canActivate(d) { return ws && catalogLive && !d.loaded && d.served !== false && !/pair/.test(d.state ?? ''); }
+// a domain no agent serves is installed by its activate (hot-install from its manifest): the backend says if it cannot
+function canActivate(d) { return ws && catalogLive && !d.loaded && d.kind !== 'partner' && !/pair/.test(d.state ?? ''); }
 function stateOf(d) {
   let text = d.state ?? '';
   if (!catalogLive) text = d.loaded ? domState(d.name).text : 'not loaded';
@@ -241,7 +242,7 @@ function openDomain(d) {
   if (d.loaded || /pair/.test(d.state ?? '')) { selectTab(d.partner_of || (/pair/.test(d.state ?? '') ? 'kitchen' : d.name)); return; }
   if (!canActivate(d)) {
     note(!catalogLive ? `${d.name}: activating needs the live service`
-      : d.served === false ? `${d.name}: no domain agent serves it in this configuration${d.has && !d.has.agent ? ' (it has no domain-agent module: open it in the loop console)' : ''}` : `${d.name}: cannot be activated`);
+      : d.kind === 'partner' ? `${d.name} is stepped with its pair: activate ${d.partner_of ?? 'its lead'}` : `${d.name}: cannot be activated`);
     return;
   }
   send({ ev: 'activate', domain: d.name });
@@ -270,7 +271,7 @@ function renderDomains() {
       acts.append(rl);
     }
     const row = el('div', { class: `dm${d.name === tab ? ' cur' : ''}`, tabindex: '0', role: 'button', 'data-dom': d.name,
-      title: d.loaded ? `open ${d.name}'s tab` : canActivate(d) ? `activate ${d.name}` : '' },
+      title: d.loaded ? `open ${d.name}'s tab` : canActivate(d) ? (d.served === false ? `activate ${d.name}: its agent is installed from the manifest` : `activate ${d.name}`) : '' },
       el('div', { class: 'hd' }, el('span', { class: 'nm' }, d.name), d.display && d.display !== d.name ? el('span', { class: 'empty' }, d.display) : null,
         el('span', { class: `st ${st.cls}`, title: st.text }, st.text.length > 46 ? st.text.slice(0, 44) + '…' : st.text || '—'), ...tags, acts),
       d.line ? el('div', { class: 'ln' }, d.line) : null,

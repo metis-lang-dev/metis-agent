@@ -393,3 +393,14 @@ def test_installing_an_intent_domain_joins_its_words(tmp_path, monkeypatch):
     assert [x.name for x in lv.intents] == ["dog", "pet"] and lv.gbnf.startswith("root ::= dog-root | pet-root\n")
     r = recs(lv, "dlg-restart")[-1]
     assert r["why"] == "install pet" and r["intents"] == ["dog", "pet"] and lv.o.cfg.intent_domains == ["dog", "pet"]
+
+
+def test_the_generic_agents_host_forwards_the_sensor_face():
+    """A data domain's AgentHost passes the catalog host's observe through
+    (the watch reads the env through it): without it a generic agent could
+    never be surprised (the plant's visitor; the architect's fix, e2e step 4)."""
+    from types import SimpleNamespace
+    from metis_agent.agent_host import AgentHost
+    seen = lambda counts: {"moist": 1}                                      # noqa: E731
+    assert AgentHost(SimpleNamespace(observe=seen), set()).observe is seen
+    assert not hasattr(AgentHost(SimpleNamespace(), set()), "observe")

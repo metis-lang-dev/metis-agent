@@ -1063,8 +1063,12 @@ def make_app(live, ui_dir, lib_dir=None):
         for sock in list(clients):
             await sock.close(code=1001, message=b"server shutdown")
 
+    async def revalidate(request, response):  # the page's files change under it (a git pull, an edit): revalidated every load
+        response.headers.setdefault("Cache-Control", "no-cache")
+
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
+    app.on_response_prepare.append(revalidate)
     app.router.add_get("/ws", ws_handler)
     try:
         from fsttm_web.aiohttp import mount

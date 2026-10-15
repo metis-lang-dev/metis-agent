@@ -27,6 +27,8 @@ class AgentHost:
         self.world_lines = []    # do-lines from the driver ({"world": [...]}), asserted on the next tick
         self.last_row = None
         self.beat_stage = getattr(inner, "beat_stage", None)
+        if hasattr(inner, "observe"):     # the sensor face (watch.py): a host that reads the env can be surprised
+            self.observe = inner.observe
 
     def replay(self):
         """The orchestrator's replay: the person and the world come from the
