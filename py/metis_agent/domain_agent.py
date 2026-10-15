@@ -162,6 +162,7 @@ class DomainAgent:
             raise ValueError("case: hosted | replay | live, not %r" % case)
         self.over = False
         self.log = []        # what the mapper did, per intent (the report's table)
+        self.held = []       # replies owed at the next beat (a surprise_open refusal)
         self.narrated = []   # (fragment, sentence) per narrated fragment
         self.consults = []   # every consult's full record (the report's transcripts)
         self.last_refusal = None   # the latest refusal not yet consulted: the consult's situation
@@ -208,6 +209,15 @@ class DomainAgent:
             return [reply(self.name, "error", id=iid, error="not this domain: %r" % msg.get("domain"))]
         if self.over:
             return [reply(self.name, "error", id=iid, error="the host's episode is over")]
+        if self.watch.open is not None:
+            # a surprise is open (the architect's ruling, e2e step 4): ONE
+            # templated refusal from the harness — no consult, no model call,
+            # no new escalation; the operator's close or an explain reopens
+            # orders. Taken now, refused at the next beat, as a program's
+            # refusal is: the orchestrator relays it as any refusal
+            self.held.append(self.surprise_open_refusal(iid, msg))
+            return [reply(self.name, "result", id=iid, status="accepted", ref={"beat": self.beat_no()},
+                          text="Accepted.")]
         m = self.mapper.map(msg)
         self.log.append({"id": iid, "verb": msg.get("verb"), "args": msg.get("args"),
                          **({"atom": m.atom, "act": m.act, "dropped": m.dropped} if isinstance(m, Mapped)
@@ -219,6 +229,18 @@ class DomainAgent:
         return [reply(self.name, "result", id=iid, status="accepted", ref={"beat": self.beat_no()},
                       text="Accepted.")]
 
+    def surprise_open_refusal(self, iid, msg):
+        k = self.watch.open
+        try:
+            diff = dict(self.repl.loop.records[k]["meta"].get("diff") or {})
+        except (IndexError, KeyError, TypeError):
+            diff = {}
+        dtext = ", ".join("%s %+d" % (a.replace("_", " "), n) for a, n in sorted(diff.items()))
+        text = "surprise #%s open%s: I take no new orders until it is closed" % (k, " (%s)" % dtext if dtext else "")
+        self.log.append({"id": iid, "verb": msg.get("verb"), "args": msg.get("args"), "refused": "surprise_open"})
+        return reply(self.name, "result", id=iid, status="refused", reason="surprise_open", blocker=None,
+                     ref={"seq": len(self.repl.fired), "beat": self.beat_no()}, text=text, voice="template")
+
     # a domain with no host runs its own day: at most this many watch steps
     # per beat, so a program that never quiesces (wgc's search fires ~100k
     # moves a second) cannot hold the orchestrator's thread
@@ -226,7 +248,8 @@ class DomainAgent:
 
     # ── the clock: one beat of the watch ──
     def beat(self):
-        w, out = self.watch, []
+        w, out = self.watch, self.held
+        self.held = []
         if self.over:
             return out
         b0 = w.beat
@@ -520,7 +543,7 @@ class DomainAgent:
     def step(self):
         """One watch step (a fired move, an entry into quiescence, or one
         env beat): the clock of an interleaved pair, as run_pair steps it."""
-        out = []
+        out, self.held = self.held, []
         if not self.over and not self.watch.done:
             for s in self.watch.step():
                 out += self.signal(s)

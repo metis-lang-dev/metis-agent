@@ -191,3 +191,40 @@ def test_no_sink_without_the_flag(tmp_path):
     ag = DomainAgent(dog)
     ag.sink_record(0, "open")                                            # sink None: nothing, no error
     assert ag.sink is None and not ag.sunk
+
+
+def test_orders_are_refused_while_a_surprise_is_open(tmp_path):
+    """The architect's ruling (e2e step 4, opus's Go live run of the plant):
+    a command while a surprise is open gets ONE templated refusal from the
+    harness — reason surprise_open, the record and its difference named, no
+    consult, no new escalation (the sink keeps one record: open, escalated)."""
+    import json
+    import os
+    import tempfile
+    from metis_agent.domain_agent import DomainAgent, records_path
+    from metis_agent.domains import kitchen, kitchen_shared
+    os.environ["METIS_PAIR_DIR"] = tempfile.mkdtemp()
+    try:
+        a, b = DomainAgent(kitchen), DomainAgent(kitchen_shared)
+        a.session, a.sink = "s1", records_path(kitchen, str(tmp_path), "s1")
+        while a.watch.open is None:
+            for ag in (a, b):
+                ag.handle({"clock": "step"})
+                if a.watch.open is not None:
+                    break
+        a.handle({"tool": "escalate", "id": "e1", "args": {"record": 0, "text": "someone else loaded the pot"}})
+        outs = []
+        for k in (1, 2):
+            took = a.handle({"verb": "COOK", "id": "c%d" % k, "args": {}})
+            assert took[0]["status"] == "accepted"                          # taken now, refused at the next beat
+            outs.append([r for r in a.handle({"clock": "step"}) if r.get("id") == "c%d" % k])
+        for out, k in zip(outs, (1, 2)):
+            r = out[0]
+            assert (r["kind"], r["status"], r["reason"], r["id"]) == ("result", "refused", "surprise_open", "c%d" % k)
+            assert r["text"].startswith("surprise #0 open (") and r["text"].endswith("I take no new orders until it is closed")
+            assert r.get("blocker") is None and len(out) == 1
+        lines = [json.loads(l) for l in a.sink.read_text().splitlines()]
+        assert [(l["record"], l["close"]["status"]) for l in lines] == [(0, "open"), (0, "escalated")]
+        assert len(a.repl.loop.records) == 1
+    finally:
+        del os.environ["METIS_PAIR_DIR"]

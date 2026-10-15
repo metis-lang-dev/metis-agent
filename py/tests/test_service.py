@@ -404,3 +404,28 @@ def test_the_generic_agents_host_forwards_the_sensor_face():
     seen = lambda counts: {"moist": 1}                                      # noqa: E731
     assert AgentHost(SimpleNamespace(observe=seen), set()).observe is seen
     assert not hasattr(AgentHost(SimpleNamespace(), set()), "observe")
+
+
+def test_a_surprise_open_refusal_is_relayed_never_escalated(tmp_path):
+    """The orchestrator relays the harness's surprise_open refusal as it is,
+    each time: the second identical refusal is no "again" — no escalate, no
+    consult."""
+    lv, _ = live(tmp_path)
+    dog = lv.agents.agents["dog"]
+    dog.watch.open = 0                                                      # a surprise open on the dog
+    picked, orig = [], lv.o.branch_of
+
+    def branch_of(r, c):                     # the branch each refusal takes (FakeLLM's lines can't tell)
+        b = orig(r, c)
+        if r.kind == "result" and r.status == "refused":
+            picked.append((b.name, b.pick))
+        return b
+    lv.o.branch_of = branch_of
+    lv.ol.intent = '{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}'
+    for _ in range(2):
+        lv.utterance("sit down", time.time())
+        lv.tick()
+    wakes = [r for r in recs(lv, "dlg-wake") if r.get("what") == "result:refused"]
+    assert len(wakes) == 2 and all("I take no new orders until it is closed" in (w.get("text") or "") for w in wakes)
+    assert picked == [("speak", ""), ("speak", "")]                          # never "again" → escalate
+    assert not [r for r in recs(lv, "dlg-wire") if r.get("what") == "tool"]   # no consult, no escalate

@@ -1551,6 +1551,12 @@ class Orch:
             b = Branch(domain=r.domain, refused=c, reply=r, record=c.arg("record"))
             if not b.record:
                 b.record = r.id
+            if r.reason == "surprise_open":
+                # the domain's surprise is open (e2e step 4 ruling): the harness's
+                # refusal is relayed as it is, every time — never "again", never
+                # an escalation or a consult; a close reopens orders
+                b.name = "speak"
+                return b
             k = (r.domain, c.verb(), r.reason)
             self.refusals[k] = self.refusals.get(k, 0) + 1
             if self.refusals[k] > 1:
