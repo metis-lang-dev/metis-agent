@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -24,8 +25,20 @@ func catalogDir(t *testing.T) string {
 	return d
 }
 
+// fixture is a testdata path, or the same path under $DAGENT_FIXTURES:
+// the parity gate (go/tools/dagent-parity.sh) points the checks at py's
+// streams regenerated fresh from the catalog's packages.
+func fixture(path string) string {
+	if d := os.Getenv("DAGENT_FIXTURES"); d != "" {
+		if rel, ok := strings.CutPrefix(path, "testdata/"); ok {
+			return filepath.Join(d, rel)
+		}
+	}
+	return path
+}
+
 func jsonl(t *testing.T, path string, each func(raw []byte)) {
-	f, err := os.Open(path)
+	f, err := os.Open(fixture(path))
 	if err != nil {
 		t.Fatal(err)
 	}

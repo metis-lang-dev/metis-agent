@@ -11,6 +11,7 @@ package dagent
 import (
 	"bytes"
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -61,11 +62,59 @@ func sameJSON(t *testing.T, what string, want json.RawMessage, got any) {
 	if a, ok := w.([]any); ok && len(a) == 0 && g == nil {
 		return
 	}
-	if !reflect.DeepEqual(w, g) {
+	if !sameValue(w, g, "") {
 		wb, _ := json.Marshal(w)
 		gb, _ := json.Marshal(g)
 		t.Fatalf("%s:\n want %s\n got  %s", what, wb, gb)
 	}
+}
+
+// LikelihoodTol is the parity rule for a likelihood (a surprise record's,
+// a surprise or rare signal's, a sink line's): equal within 1e-9 relative,
+// and zero exactly — an unmodeled reading is likelihood 0 on both stacks,
+// never a near-zero. Every other value compares exactly.
+const LikelihoodTol = 1e-9
+
+// sameValue is parsed-JSON equality with the likelihood rule.
+func sameValue(w, g any, key string) bool {
+	switch wv := w.(type) {
+	case map[string]any:
+		gv, ok := g.(map[string]any)
+		if !ok || len(gv) != len(wv) {
+			return false
+		}
+		for k, x := range wv {
+			y, ok := gv[k]
+			if !ok || !sameValue(x, y, k) {
+				return false
+			}
+		}
+		return true
+	case []any:
+		gv, ok := g.([]any)
+		if !ok || len(gv) != len(wv) {
+			return false
+		}
+		for i := range wv {
+			if !sameValue(wv[i], gv[i], key) {
+				return false
+			}
+		}
+		return true
+	case float64:
+		gv, ok := g.(float64)
+		if !ok {
+			return false
+		}
+		if key == "likelihood" {
+			if wv == 0 || gv == 0 {
+				return wv == gv
+			}
+			return math.Abs(wv-gv) <= LikelihoodTol*math.Max(math.Abs(wv), math.Abs(gv))
+		}
+		return wv == gv
+	}
+	return reflect.DeepEqual(w, g)
 }
 
 func TestTheWatchIsPys(t *testing.T) {
@@ -337,4 +386,21 @@ func handleNames(t *testing.T, d string) map[string]string {
 		}
 	})
 	return names
+}
+
+func TestTheLikelihoodRule(t *testing.T) {
+	for _, c := range []struct {
+		w, g float64
+		ok   bool
+	}{{0, 0, true}, {0, 1e-300, false}, {1e-300, 0, false}, {0.5, 0.5 * (1 + 5e-10), true},
+		{0.5, 0.5 * (1 + 2e-9), false}, {1e-12, 1e-12 * (1 + 1e-10), true}} {
+		w := map[string]any{"likelihood": c.w, "steps": 1.0}
+		g := map[string]any{"likelihood": c.g, "steps": 1.0}
+		if sameValue(w, g, "") != c.ok {
+			t.Fatalf("likelihood %v vs %v: want %v", c.w, c.g, c.ok)
+		}
+		if sameValue(map[string]any{"p": c.w}, map[string]any{"p": c.g}, "") != (c.w == c.g) {
+			t.Fatalf("a non-likelihood %v vs %v compares exactly", c.w, c.g)
+		}
+	}
 }
