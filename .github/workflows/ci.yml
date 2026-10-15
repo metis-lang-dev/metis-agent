@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # the pin: the archive checkout the harness is built and benched against
-  LLAMA_COMMIT: 8ad8aef447703e76cdcf74ed78dab16b92ec231a
+  # llama.cpp is the submodule third_party/llama.cpp: the pin IS its commit,
+  # the one py's llama_cpp_python vendors (third_party/check-pin.sh, py job)
   # the metis runtime (go/internal/rt): metis-lang (public) at the commit the
   # binding is built and tested against; build.sh builds libmetis_rt there
   METIS_LANG_COMMIT: dec78e9b1bdd2e6db006dbd02d0cc7ffe9b43fdf
@@ -38,7 +38,7 @@ jobs:
       - name: node console/test/console.mjs
         run: node console/test/console.mjs
 
-  # go/: cgo against a CPU-only llama.cpp at the pin (cached on the commit)
+  # go/: cgo against a CPU-only llama.cpp built in the submodule (cached on its commit)
   # and metis-lang's libmetis_rt at its pin (internal/rt: the goldens through
   # cgo, the K goldens through Go); vet, every cmd built, every package tested. Model-gated tests skip
   # without weights (go/models is not in git); the metispy-backed kernel test
@@ -53,6 +53,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: metis-agent
+          submodules: true          # third_party/llama.cpp, shallow at its pin
+      - name: The llama.cpp pin (the submodule's commit)
+        id: pin
+        run: echo "llama=$(git -C metis-agent rev-parse HEAD:third_party/llama.cpp)" >> "$GITHUB_OUTPUT"
       - name: Checkout metispy (private sibling; needs METIS_READ_TOKEN)
         if: env.HAVE_READ_TOKEN == 'true'
         uses: actions/checkout@v4
@@ -91,25 +95,23 @@ jobs:
         with:
           go-version-file: metis-agent/go/go.mod
           cache-dependency-path: metis-agent/go/go.sum
-      - name: Cache llama.cpp (CPU, the pinned commit)
+      - name: Cache llama.cpp's build (CPU, the submodule's commit)
         id: llama
         uses: actions/cache@v4
         with:
-          path: llama.cpp
-          key: llama-cpu-${{ runner.os }}-${{ env.LLAMA_COMMIT }}-${{ hashFiles('metis-agent/go/ci/llama-cpu.sh') }}
-      - name: Build llama.cpp (CPU)
+          path: metis-agent/third_party/llama.cpp/build
+          key: llama-cpu-${{ runner.os }}-${{ steps.pin.outputs.llama }}-${{ hashFiles('metis-agent/third_party/build-llama.sh', 'metis-agent/third_party/patches/**') }}
+      - name: Build llama.cpp (CPU, in the submodule)
         if: steps.llama.outputs.cache-hit != 'true'
-        run: metis-agent/go/ci/llama-cpu.sh "$GITHUB_WORKSPACE/llama.cpp" "$LLAMA_COMMIT"
+        run: JOBS=$(nproc) metis-agent/third_party/build-llama.sh cpu
       - name: go vet
         working-directory: metis-agent/go
         env:
-          LLAMA_DIR: ${{ github.workspace }}/llama.cpp
           METIS_LANG_DIR: ${{ github.workspace }}/metis-lang
         run: ./build.sh vet ./...
       - name: Build every cmd (metis-agent, llmbench, episodes, domemu)
         working-directory: metis-agent/go
         env:
-          LLAMA_DIR: ${{ github.workspace }}/llama.cpp
           METIS_LANG_DIR: ${{ github.workspace }}/metis-lang
         run: |
           ./build.sh
@@ -117,7 +119,6 @@ jobs:
       - name: go test ./...
         working-directory: metis-agent/go
         env:
-          LLAMA_DIR: ${{ github.workspace }}/llama.cpp
           METIS_LANG_DIR: ${{ github.workspace }}/metis-lang
         run: |
           rc=0
@@ -180,6 +181,9 @@ jobs:
           pip install -r metis-agent/py/requirements.txt
           pip install -e ./metispy
           pip install -e ./metis-catalog     # the domains' loader: metis_agent.domains reads the manifests
+      - name: One llama.cpp for both stacks (the submodule = llama_cpp_python's vendored commit)
+        if: env.HAVE_READ_TOKEN == 'true'
+        run: metis-agent/third_party/check-pin.sh python
       - name: pytest py/tests
         if: env.HAVE_READ_TOKEN == 'true'
         working-directory: metis-agent/py

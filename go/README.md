@@ -36,11 +36,22 @@ and links it as it links libllama (cgo flags, rpath).
 ./build.sh vet             # go vet ./... with the same cgo flags
 ```
 
-CI (`.github/workflows/ci.yml`) builds llama.cpp CPU-only at the pinned
-commit with `ci/llama-cpu.sh DIR` (cached on the commit), checks out
-metis-lang at its pinned commit (`METIS_LANG_COMMIT`, the runtime build
-cached on it), and runs vet, the build and the tests against both; `ci/llama-cpu.sh` + `LLAMA_DIR=DIR` is the
-same thing locally.
+**llama.cpp is the submodule `third_party/llama.cpp`**, pinned at the
+commit py's `llama_cpp_python` vendors (0.3.36 → 0c1e570): one llama.cpp
+for both stacks. `build.sh` builds it in place on first use
+(`third_party/build-llama.sh`, CUDA when nvcc is found, else CPU; JOBS=4)
+and applies `third_party/patches/*.patch` first — a local change is a
+patch, never a fork. `LLAMA_DIR` still overrides. A py release bump moves
+the submodule in the same commit (`git -C third_party/llama.cpp fetch
+--depth 1 origin <commit> && git -C third_party/llama.cpp checkout <commit>
+&& git add third_party/llama.cpp`); `third_party/check-pin.sh [python]`
+fails on drift.
+
+CI (`.github/workflows/ci.yml`) checks the submodule out, builds it
+CPU-only (cached on its commit), checks out metis-lang at its pinned
+commit (`METIS_LANG_COMMIT`, the runtime build cached on it), and runs
+vet, the build and the tests against both; the py job runs
+`third_party/check-pin.sh` against the installed binding.
 
 The model is the GGUF ollama holds for its tag (`~/.ollama/models/…`) or
 any GGUF; `llm.template: auto` takes the chat template from the GGUF,

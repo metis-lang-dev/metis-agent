@@ -1317,7 +1317,7 @@ func (l *LLM) Chat(systemPrompt, user string, s Sampling, onText func(string) bo
 	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
 	defer C.llama_sampler_free(chain)
 	if s.Repeat > 1 {
-		C.llama_sampler_chain_add(chain, C.llama_sampler_init_penalties(64, C.float(s.Repeat), 0, 0))
+		C.llama_sampler_chain_add(chain, C.llama_sampler_init_penalties(C.llama_vocab_n_tokens(l.vocab), 64, C.float(s.Repeat), 0, 0))
 	}
 	if s.TopK > 0 {
 		C.llama_sampler_chain_add(chain, C.llama_sampler_init_top_k(C.int32_t(s.TopK)))

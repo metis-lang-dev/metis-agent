@@ -64,7 +64,7 @@ JSONL=$OUT/records.jsonl
     echo "# models *$P2EX_MODELS*: prompt + $P2EX sha256=$(sha256sum "$OUT/prompt-p2ex.txt" | cut -c1-12)"
   fi
   [ -n "$P2TURN" ] && echo "# p2turn cue: $P2CUE"
-  echo "# llama.cpp: $(git -C "${LLAMA_DIR:-$HOME/archive/vox/llama.cpp}" log -1 --format='%h %ad' --date=short 2>/dev/null || echo '?')"
+  echo "# llama.cpp: $(git -C "${LLAMA_DIR:-$(cd "$(dirname "$0")/../.." && pwd)/third_party/llama.cpp}" log -1 --format='%h %ad' --date=short 2>/dev/null || echo '?')"
   nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader 2>/dev/null || true
 } | tee "$OUT/env.txt"
 

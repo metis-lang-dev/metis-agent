@@ -4,7 +4,7 @@
 # llama_cpp_python builds from source (CPU in CI: CMAKE_ARGS in ci.yml);
 # seat.py imports it at module level, so every test file needs it importable
 # even though no test loads weights.
-llama_cpp_python==0.3.36
+llama_cpp_python==0.3.36   # vendors llama.cpp 0c1e570 = the submodule third_party/llama.cpp (third_party/check-pin.sh)
 diskcache==5.6.3
 Jinja2==3.1.6
 MarkupSafe==3.0.4

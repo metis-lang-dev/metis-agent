@@ -26,7 +26,11 @@ py/.venv/bin/pip install -e ../metispy pytest
 ```
 
 `py/requirements.txt` pins what this venv has (CI installs it, with
-llama-cpp-python built CPU-only). metispy and metis-catalog are private
+llama-cpp-python built CPU-only). The llama.cpp that llama-cpp-python
+vendors is the one Go links: the submodule `third_party/llama.cpp` is at
+that commit, and `third_party/check-pin.sh py/.venv/bin/python` fails when
+they differ — a llama-cpp-python bump moves the submodule in the same
+commit (go/README.md). metispy and metis-catalog are private
 siblings: CI runs `py/tests` only with `METIS_READ_TOKEN`.
 
 ## Run (from metis-agent/)
