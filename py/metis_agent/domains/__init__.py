@@ -9,8 +9,9 @@ manifest, metis-catalog domains/<…>/domain.yaml (metis_catalog):
                               card, outcomes and alternatives of intent.yaml,
                               the host's world)
 
-NAME, DISPLAY, VOICE and CATALOG (the program) come from the manifest unless
-the module sets them. Each module is registered in sys.modules under
+NAME, DISPLAY and VOICE come from the manifest unless the module sets them;
+CATALOG (the served program) and PACKS from the manifest's Domain.serves()
+always. Each module is registered in sys.modules under
 metis_agent.domains.<name>, so a plugin spec naming it (the kernel attaches
 "metis_agent.domains.dog:make") and `from metis_agent.domains import dog`
 both find it.
@@ -64,12 +65,15 @@ class _Loader(importlib.abc.Loader):
         else:
             raise ImportError("domain %r has neither an agent module nor an intent.spec (%s)" % (self.name, d.dir))
         mod.MANIFEST = d
-        # the served program is the program plus every packs/*.llp (human-loop
-        # step 1): the packs extend THE manifest's program — a module serving
-        # another catalog (the kitchen's pair scene) has none of them
-        if "PACKS" not in mod.__dict__:
-            prog = Path(str(mod.__dict__.get("CATALOG") or "")).resolve()
-            mod.PACKS = d.packs() if d.program is not None and prog == d.program else []
+        # the served program from the manifest only (runtime-binding Q1, the
+        # architect's ruling): Domain.serves() — `serves: [files]`, else the
+        # program plus every packs/*.llp — the first is the program, the rest
+        # its packs, as the artifact emitter and the Go agent read it
+        served = d.serves()
+        if served:
+            mod.CATALOG, mod.PACKS = served[0], list(served[1:])
+        else:
+            mod.PACKS = []
         self.fresh = False
 
 

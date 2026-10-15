@@ -131,10 +131,12 @@ def mirror_atoms(text):
     return [l.split(None, 1)[1].strip() for l in text.splitlines() if l.startswith("#query ")]
 
 
-def scripts_of(repl):
-    """The runtime's `script` op, in-process: the cards offerable here."""
+def scripts_of(repl, packs=()):
+    """The runtime's `script` op, in-process: the cards offerable here, the
+    served card's clauses followed by its packs', each tagged "pack": <file>
+    (runtime-binding F3, the architect's ruling; the sidecar's script)."""
     from metis.loop.cards import script
-    return script(repl)
+    return script(repl, packs=packs)
 
 
 def other_cards(repl):
@@ -209,7 +211,7 @@ class DomainAgent:
         self.exo_events = getattr(module, "EXO_EVENTS", False)
         self.quiescence = getattr(module, "QUIESCENCE", "episode")
         self.narrator = None
-        self.script = scripts_of(self.repl)
+        self.script = scripts_of(self.repl, self.packs)
         if llm is not None:
             self.narrator = Narrator(llm, {self.name: self.script}, self.names, own_voice=self.own_voice)
         self.consult_seat = consult_seat
