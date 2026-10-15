@@ -10,7 +10,7 @@ manifest, metis-catalog domains/<…>/domain.yaml (metis_catalog):
                               the host's world)
 
 NAME, DISPLAY and VOICE come from the manifest unless the module sets them;
-CATALOG (the served program) and PACKS from the manifest's Domain.serves()
+CATALOG (the served program) and EXTENSIONS from the manifest's Domain.serves()
 always. Each module is registered in sys.modules under
 metis_agent.domains.<name>, so a plugin spec naming it (the kernel attaches
 "metis_agent.domains.dog:make") and `from metis_agent.domains import dog`
@@ -48,7 +48,7 @@ class _Loader(importlib.abc.Loader):
 
     def exec_module(self, mod):
         d = catalog().get(self.name)
-        mod.__dict__.pop("PACKS", None)           # a re-exec (reload) reads them again
+        mod.__dict__.pop("EXTENSIONS", None)           # a re-exec (reload) reads them again
         agent = d.agent
         mod.__dict__.update(NAME=d.name, DISPLAY=d.display, VOICE=d.manifest.get("voice", ""), CATALOG=d.program)
         if agent is not None:
@@ -67,13 +67,13 @@ class _Loader(importlib.abc.Loader):
         mod.MANIFEST = d
         # the served program from the manifest only (runtime-binding Q1, the
         # architect's ruling): Domain.serves() — `serves: [files]`, else the
-        # program plus every packs/*.llp — the first is the program, the rest
-        # its packs, as the artifact emitter and the Go agent read it
+        # program plus every extensions/*.llp — the first is the program, the rest
+        # its extensions, as the artifact emitter and the Go agent read it
         served = d.serves()
         if served:
-            mod.CATALOG, mod.PACKS = served[0], list(served[1:])
+            mod.CATALOG, mod.EXTENSIONS = served[0], list(served[1:])
         else:
-            mod.PACKS = []
+            mod.EXTENSIONS = []
         self.fresh = False
 
 

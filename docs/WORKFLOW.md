@@ -33,10 +33,10 @@ Pointers are to the code as of 2026-10-14 (metis-loop b413a13+, metispy
 
 A domain starts as prose: what there is, what can happen, what the person can
 ask. Today: the loop console's Claude chat (Agent SDK, `loop/gateway.py`,
-`loop/agent_service.py` tools `source_read`/`source_edit`/`pack_create`/
+`loop/agent_service.py` tools `source_read`/`source_edit`/`extension_create`/
 `recompile`) works on a **working copy in memory and IndexedDB**; nothing
 reaches the operator's disk (`gateway.py` "_init_work"); the skill
-(`skills/metis-loop/SKILL.md` step 6) commits packs to metis-catalog by hand.
+(`skills/metis-loop/SKILL.md` step 6) commits extensions to metis-catalog by hand.
 There is no "new domain" path.
 
 Missing:
@@ -44,14 +44,14 @@ Missing:
   `domain.yaml`, a skeleton `<name>.llp` (the header, `#init`, one commented
   rule with its `%%` line), `README.md` with the display line, and opens it.
 - **`save`**: the working copy written back to the domain's files in the
-  operator's checkout (program or pack); the console shows the diff first;
+  operator's checkout (program or extension); the console shows the diff first;
   git stays the user's (the skill's commit step), the console never commits.
 
 ### 2. Formalization (loop console)
 
 Prose → rules. Today: `formalize` drafts through the kernel's `llm` endpoint
 (`command:` backend — `claude -p` is configured there, CONSOLE-WS.md §105);
-`revise`/`gate` produce candidate packs; the Candidates dock approves or
+`revise`/`gate` produce candidate extensions; the Candidates dock approves or
 rejects (`loop_console.html` 525–538); the chat edits the source. The user's
 line stands: **gemma does not refine; formalization and revision are Claude's**
 (the chat, or `claude -p` behind the kernel).
@@ -123,7 +123,7 @@ Missing:
 - **File-backed records in the loop console**: the Records dock lists the
   domain's sinks and their records (newest first, escalated ones flagged);
   `record N` selects one; `mine` is pre-filled from `mined_text`; `revise`/
-  `gate` run as today; the accepted pack is **saved** (stage 1) into the
+  `gate` run as today; the accepted extension is **saved** (stage 1) into the
   domain. The operator path `watch operator=N` stays the agent's.
 
 ### 6. Updating and reloading the domain from the catalog
@@ -160,7 +160,7 @@ surprise.
 | A2 | 2 formalize | `formalize` / the chat writes the rules with `%%` lines; `run 10`, `why`; `save` | the program compiles, the hosted day runs; the diff shown, the file on disk changed |
 | A3 | 3 intents | `intents`: Claude drafts `intent.yaml` (WATER, CHECK, QUERY…); edit one example; the check maps a 6-row example corpus | `intent.yaml` saved; generated schema + examples; corpus 6/6 |
 | A4 | 4 run | agent console → catalog panel shows `plant` with its line; activate; type "water the plant", "how is the plant?" | the intents dispatched (journal), the outcome lines spoken with source labels; the plant's tab shows the fired rules |
-| A5 | 5 surprise | World tab: `+moisture(…)` jump nobody caused → surprise → consult → escalate; loop console Records dock lists the record; `record`, `mine`, `revise`, `gate`; approve the candidate ("a visitor waters it"); `save` | the record's `mined_text` carries the facts + the description; the candidate pack saved into `domains/plant/` |
+| A5 | 5 surprise | World tab: `+moisture(…)` jump nobody caused → surprise → consult → escalate; loop console Records dock lists the record; `record`, `mine`, `revise`, `gate`; approve the candidate ("a visitor waters it"); `save` | the record's `mined_text` carries the facts + the description; the candidate extension saved into `domains/plant/` |
 | A6 | 6 reload | agent console: `plant` marked STALE, the chat proposes; `reload`; repeat the jump | the mirror says reloaded; the same jump is now **explained** (the visitor's card), spoken as such, no escalation. The card's rule needs a trigger the program does not make itself — the host's report `+visitor` — else the kernel samples the visit into the model and watering becomes unreachable (found 2026-10-15) |
 | A7 | regression | the dog from the catalog in both consoles | dog corpus 54/54 through the generated grammar; integration replay reads unchanged |
 

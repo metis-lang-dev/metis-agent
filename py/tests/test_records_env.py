@@ -16,7 +16,7 @@ def test_the_sunk_env_is_the_catalog_hosts(tmp_path, monkeypatch):
     except Exception:
         pytest.skip("no plant in the catalog")
     from metis.kernel.record import env_data
-    _plant_without_packs(tmp_path, monkeypatch)
+    _plant_without_extensions(tmp_path, monkeypatch)
     proc = Process(["plant"], records=str(tmp_path), session="s1")
     agent = proc.build(1, "live")
     for _ in range(30):                              # the visitor waters the dry plant: the surprise
@@ -32,13 +32,13 @@ def test_the_sunk_env_is_the_catalog_hosts(tmp_path, monkeypatch):
     assert host.moist is True and line["close"]["status"] == "open"
 
 
-def _plant_without_packs(tmp_path, monkeypatch):
-    """The plant as authored, on a scratch copy without the operator's packs
-    (the served program is the program plus packs/*.llp: a visitor pack in
+def _plant_without_extensions(tmp_path, monkeypatch):
+    """The plant as authored, on a scratch copy without the operator's extensions
+    (the served program is the program plus extensions/*.llp: a visitor extension in
     the checkout models the very visit this test needs unmodeled)."""
     import shutil
     src = catalog().get("plant").dir
-    shutil.copytree(src, tmp_path / "cat/domains/plant", ignore=shutil.ignore_patterns("packs", "records", "__pycache__"))
+    shutil.copytree(src, tmp_path / "cat/domains/plant", ignore=shutil.ignore_patterns("extensions", "records", "__pycache__"))
     monkeypatch.setenv("METIS_CATALOG", str(tmp_path / "cat"))
 
 
@@ -53,7 +53,7 @@ def test_the_hosts_snapshot_is_json_and_restores_from_it(tmp_path, monkeypatch, 
         pytest.skip("no %s in the catalog" % name)
     from metis.kernel.record import env_json, env_text
     if name == "plant":
-        _plant_without_packs(tmp_path, monkeypatch)
+        _plant_without_extensions(tmp_path, monkeypatch)
     proc = Process([name], records=str(tmp_path), session="s1")
     agent = proc.build(1, "live")
     if order:

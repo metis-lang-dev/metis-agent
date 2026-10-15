@@ -42,7 +42,7 @@ os.environ.setdefault("METIS_CONFIG", "")
 from metis_agent.repl_tools import Kernel  # noqa: E402
 
 PLAN = "../metis-catalog/domains/planning/"
-WGC = PLAN + "wolf-goat-cabbage/wgc.llp"
+WGC = PLAN + "wgc/wgc.llp"
 BRIDGE = PLAN + "bridge-torch/bridge.llp"
 HANOI = PLAN + "tower_of_hanoi.llp"
 BLOCKS = PLAN + "blocks_world.llp"

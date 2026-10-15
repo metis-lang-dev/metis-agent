@@ -10,7 +10,7 @@ sys.path.insert(0, str(ROOT / "py"))
 from metis_agent import gemma4  # noqa: E402
 from metis_agent.repl_tools import WHITELIST, Kernel, scrub, tools  # noqa: E402
 
-WGC = ROOT.parent / "metis-catalog/domains/planning/wolf-goat-cabbage/wgc.llp"
+WGC = ROOT.parent / "metis-catalog/domains/planning/wgc/wgc.llp"
 
 
 def test_call_round_trip():

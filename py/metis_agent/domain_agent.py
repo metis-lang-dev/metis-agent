@@ -97,8 +97,8 @@ def rule_docs(path):
     return {r: w for r, (w, _) in rule_lines([Path(path)]).items()}
 
 
-def pack_text(src):
-    """A pack's approved text: its leading `%` comment block (the loop
+def extension_text(src):
+    """A extension's approved text: its leading `%` comment block (the loop
     console's `load` convention) — what its %% docs quote at the gate."""
     head = []
     for line in src.splitlines():
@@ -106,22 +106,22 @@ def pack_text(src):
             head.append(line.lstrip("%").strip())
         elif line.strip():
             break
-    return "\n".join(head) or "extension pack"
+    return "\n".join(head) or "extension"
 
 
-def apply_packs(repl, packs):
-    """The served program = the program plus its packs (human-loop step 1):
-    each pack gated against the program and accepted, in order — the loop's
-    own llp → gate → accept, as the loop console's copy + packs. The key
-    covers the union. A pack not admitted raises (a reload keeps the old)."""
-    for p in packs:
+def apply_extensions(repl, extensions):
+    """The served program = the program plus its extensions (human-loop step 1):
+    each extension gated against the program and accepted, in order — the loop's
+    own llp → gate → accept, as the loop console's copy + extensions. The key
+    covers the union. An extension not admitted raises (a reload keeps the old)."""
+    for p in extensions:
         src = Path(p).read_text()
-        repl.cmd_text(pack_text(src))
+        repl.cmd_text(extension_text(src))
         repl.cmd_llp(src)
         rep = repl.cmd_gate("")
         if not rep.get("ok"):
             found = rep.get("findings") or [rep.get("error", "rejected")]
-            raise ValueError("pack %s not admitted: %s" % (Path(p).name, "; ".join(map(str, found))[:600]))
+            raise ValueError("extension %s not admitted: %s" % (Path(p).name, "; ".join(map(str, found))[:600]))
         repl.cmd_accept("")
         repl.loop.text = ""
 
@@ -131,12 +131,12 @@ def mirror_atoms(text):
     return [l.split(None, 1)[1].strip() for l in text.splitlines() if l.startswith("#query ")]
 
 
-def scripts_of(repl, packs=()):
+def scripts_of(repl, extensions=()):
     """The runtime's `script` op, in-process: the cards offerable here, the
-    served card's clauses followed by its packs', each tagged "pack": <file>
+    served card's clauses followed by its extensions', each tagged "extension": <file>
     (runtime-binding F3, the architect's ruling; the sidecar's script)."""
     from metis.loop.cards import script
-    return script(repl, packs=packs)
+    return script(repl, extensions=extensions)
 
 
 def other_cards(repl):
@@ -158,8 +158,8 @@ class DomainAgent:
         self.name = module.NAME
         plugin = getattr(module, "PLUGIN", None)
         self.repl = Repl(str(module.CATALOG), seed=seed, plugin=plugin, host=bool(plugin))
-        self.packs = list(getattr(module, "PACKS", None) or [])
-        apply_packs(self.repl, self.packs)        # the served program: the program plus its packs
+        self.extensions = list(getattr(module, "EXTENSIONS", None) or [])
+        apply_extensions(self.repl, self.extensions)        # the served program: the program plus its extensions
         self.host = self.repl.plugin
         if plugin and self.host is None:
             raise RuntimeError("domain agent: host %s did not attach" % plugin)
@@ -173,7 +173,7 @@ class DomainAgent:
         handles = getattr(module, "HANDLE_NAMES", {})
         self.display_of = lambda v: handles.get(v, words(v))   # a binding's display name (the kitchen, tag 3)
         docs = rule_docs(module.CATALOG)
-        for p in self.packs:                      # the packs' rules speak their own %% lines
+        for p in self.extensions:                      # the extensions' rules speak their own %% lines
             docs.update(rule_docs(p))
         self.replier = Replier(self.name, docs, module.OUTCOMES, self.mapper.commands,
                                getattr(module, "alternatives", None), mirror_atoms(self.repl.text),
@@ -211,7 +211,7 @@ class DomainAgent:
         self.exo_events = getattr(module, "EXO_EVENTS", False)
         self.quiescence = getattr(module, "QUIESCENCE", "episode")
         self.narrator = None
-        self.script = scripts_of(self.repl, self.packs)
+        self.script = scripts_of(self.repl, self.extensions)
         if llm is not None:
             self.narrator = Narrator(llm, {self.name: self.script}, self.names, own_voice=self.own_voice)
         self.consult_seat = consult_seat

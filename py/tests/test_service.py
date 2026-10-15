@@ -42,6 +42,13 @@ class FakeLLM:
         self.n = mark
 
 
+
+def _rename_intent(d, old, new):
+    """A copied package's generated intent files at its own fixed names
+    (the package's name is its directory's; catalog-entry step 2)."""
+    for f in (d / "intent").glob(old + "*"):
+        f.rename(f.with_name(new + f.name[len(old):]))
+
 def live(tmp_path):
     cfg = S.load_config(ROOT / "py/config.live.yaml")
     cfg["v3"]["journal"] = str(tmp_path / "j.jsonl")
@@ -231,8 +238,9 @@ def test_a_hostless_manifest_domain_runs_its_own_day(tmp_path, monkeypatch):
     d = tmp_path / "domains/plant"
     shutil.copytree(catalog().get("dog").dir, d, ignore=shutil.ignore_patterns("records", "__pycache__", "*_host.py"))
     (d / "dog.llp").rename(d / "plant.llp")
+    _rename_intent(d, "dog", "plant")
     m = yaml.safe_load((d / "domain.yaml").read_text())
-    m.update(name="plant", program="plant.llp")
+    m.update(program="plant.llp")
     m.pop("host", None)
     (d / "domain.yaml").write_text(yaml.safe_dump(m))
     monkeypatch.setenv("METIS_CATALOG", str(tmp_path))
@@ -256,8 +264,9 @@ def test_a_domain_made_after_the_start_is_listed_and_installed(tmp_path, monkeyp
     d = cat / "domains/plant"
     shutil.copytree(cat / "domains/dog", d, ignore=shutil.ignore_patterns("*_host.py", "__pycache__"))
     (d / "dog.llp").rename(d / "plant.llp")
+    _rename_intent(d, "dog", "plant")
     m = yaml.safe_load((d / "domain.yaml").read_text())
-    m.update(name="plant", program="plant.llp", line="a plant: it drinks, it wilts")
+    m.update(program="plant.llp", line="a plant: it drinks, it wilts")
     m.pop("host", None)
     (d / "domain.yaml").write_text(yaml.safe_dump(m))
     lv.watch_once()
@@ -339,8 +348,9 @@ def _pet_catalog(tmp_path):
     shutil.copytree(cat / "domains/dog", d)
     (d / "dog.llp").rename(d / "pet.llp")
     (d / "dog_host.py").rename(d / "pet_host.py")
+    _rename_intent(d, "dog", "pet")
     m = yaml.safe_load((d / "domain.yaml").read_text())
-    m.update(name="pet", display="the pet", program="pet.llp", host="pet_host.py:make", line="a pet: it sits")
+    m.update(display="the pet", program="pet.llp", host="pet_host.py:make", line="a pet: it sits")
     (d / "domain.yaml").write_text(yaml.safe_dump(m))
     return cat
 

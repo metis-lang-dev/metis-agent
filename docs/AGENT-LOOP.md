@@ -5,7 +5,7 @@ Code session. It develops a domain in the metis REPL (design, formalize,
 intents), then **emulates the orchestrator**, the upper half, to exercise
 the **real domain agent**, the lower half: its program, host, mapper,
 replier, narrator and consult seat on the model. Its surprises come back as
-records. The loop revises them into a pack, and the next run shows the fix.
+records. The loop revises them into an extension, and the next run shows the fix.
 
 It runs in Python only, in a terminal, with no console. metis-agent/py is
 the development stack: the two halves sit on separate contexts of one
@@ -23,7 +23,7 @@ Paths below: `$CAT` is the metis-catalog checkout (or a scratch copy:
 | 1 | design + formalize | `cd $CAT/domains/<n> && metis --plugin <n>_host:make <n>.llp` — the skill's steps (metis-loop `skills/metis-loop`): `text`, `llp <<EOF`, `gate`, `run`, `why`, `save` | `domains/<n>/<n>.llp` with `%%` lines and `#init`; `<n>_host.py` when the world needs one; `domain.yaml` |
 | 2 | intents | `python3 tools/intents.py skeleton <n> > domains/<n>/intent.yaml` (the draft: a verb per `cmd_*` atom, its meaning from the `%%` line; `outcomes` inferred; `asks` candidates), edit it, `… gen <n>`, `… check <n>` | `intent.yaml` + `intent/<n>.gbnf`, `<n>-prompt.txt`, `<n>-spoken.txt`; `check` also refuses an ask that changes the state |
 | 3 | exercise | `py/.venv/bin/python -m metis_agent.orch_emu --scenario S.yaml [--records DIR] [--session ID] [--gpu-layers 0]` | `<out>/<session>/journal.jsonl` (person, intent, dispatch, reply, move, say), `transcript.md`, the reads (PASS/FAIL, exit 1 on a FAIL), and the records sink: `domains/<n>/records/<session>.jsonl` |
-| 4 | revise | `metis --plugin <n>_host:make <n>.llp`: `sink records/<session>.jsonl` · `record K` · `replay` · `mine %% <the unmodeled behaviour>` · `llp <<EOF <the pack> EOF` · `gate` · `accept` · `replay` (**fixed: true**) · `export DIR` | the pack (`DIR/pack1.llp`), applied to the domain: `domains/<n>/packs/<name>.llp` (`extends <n>`) — the served program is the program plus its packs (the architect's ruling, 2026-10-15; both backends); `text.md` |
+| 4 | revise | `metis --plugin <n>_host:make <n>.llp`: `sink records/<session>.jsonl` · `record K` · `replay` · `mine %% <the unmodeled behaviour>` · `llp <<EOF <the extension> EOF` · `gate` · `accept` · `replay` (**fixed: true**) · `export DIR` | the extension (`DIR/pack1.llp`, the REPL's export name), applied to the domain: `domains/<n>/extensions/<name>.llp` (`extends <n>`) — the served program is the program plus its extensions (the architect's ruling, 2026-10-15; both backends); `text.md` |
 | 5 | regression | step 3's scenario again (the same jump now explained); `python -m metis_agent.intent_check <n>` (the corpus, or `--examples`); the dog as the reference: `intent_check dog` 54/54 | the reads; the corpus score |
 
 ### The scenario (step 3)
@@ -103,7 +103,7 @@ replay                    → likelihood 1.0, explains true, [visitor_waters], f
 export DIR                → base.llp, pack1.llp, text.md
 ```
 
-`pack1.llp` is applied as `domains/plant/plant_visitor.llp`. A card is an
+`pack1.llp` (the REPL's export name) is applied as `domains/plant/plant_visitor.llp`. A card is an
 `.llp` beside the program that `extends` it. The domain agent offers its
 moves to `explain`.
 
@@ -121,14 +121,14 @@ every read passes.
 Regression on the CPU: `intent_check dog` 54/54, `intent_check plant
 --examples` 13/13.
 
-**Since the proof (the rulings of 2026-10-15 afternoon):** a pack goes to
-`packs/` and is merged into the served program (the key over the union), no
-longer a card beside it. A pack that explains an off-model change needs a
+**Since the proof (the rulings of 2026-10-15 afternoon):** an extension goes to
+`extensions/` and is merged into the served program (the key over the union), no
+longer a card beside it. An extension that explains an off-model change needs a
 trigger the world reports. The plant's host now emits `+visitor` with the
-visit (metis-catalog 389c11f), and the pack is `visitor_waters [dyn] : dry *
+visit (metis-catalog 389c11f), and the extension is `visitor_waters [dyn] : dry *
 visitor -o moist`. Without the trigger, the sampler fires the rule on its own
 and models the change away. The proof above used the earlier card shape.
-With the pack served, the visit still opens a surprise: the watch reads the
+With the extension served, the visit still opens a surprise: the watch reads the
 env before the rule fires. How the paused agent closes it is open with nina
 and the architect.
 

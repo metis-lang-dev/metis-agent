@@ -28,7 +28,7 @@ def test_the_plants_day(tmp_path, monkeypatch):
         catalog().get("plant")
     except Exception:
         pytest.skip("no plant in the catalog")
-    _plant_without_packs(tmp_path, monkeypatch)
+    _plant_without_extensions(tmp_path, monkeypatch)
     proc = Process(["plant"], records=str(tmp_path), session="t1")
     agent = proc.build(1, "live")
     journal = []
@@ -54,11 +54,11 @@ def test_the_plants_day(tmp_path, monkeypatch):
     assert json.loads(sink.read_text().splitlines()[0])["close"]["status"] == "open"
 
 
-def _plant_without_packs(tmp_path, monkeypatch):
-    """The plant as authored, on a scratch copy without the operator's packs
-    (the served program is the program plus packs/*.llp: a visitor pack in
+def _plant_without_extensions(tmp_path, monkeypatch):
+    """The plant as authored, on a scratch copy without the operator's extensions
+    (the served program is the program plus extensions/*.llp: a visitor extension in
     the checkout models the very visit this test needs unmodeled)."""
     import shutil
     src = catalog().get("plant").dir
-    shutil.copytree(src, tmp_path / "cat/domains/plant", ignore=shutil.ignore_patterns("packs", "records", "__pycache__"))
+    shutil.copytree(src, tmp_path / "cat/domains/plant", ignore=shutil.ignore_patterns("extensions", "records", "__pycache__"))
     monkeypatch.setenv("METIS_CATALOG", str(tmp_path / "cat"))

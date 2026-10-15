@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "py"))
 from metis_agent.loop import Specialist  # noqa: E402
 
-WGC = ROOT.parent / "metis-catalog/domains/planning/wolf-goat-cabbage/wgc.llp"
+WGC = ROOT.parent / "metis-catalog/domains/planning/wgc/wgc.llp"
 
 ITEMS = [
     {"kind": "trace", "setup": [],

@@ -1,7 +1,7 @@
 """Every test loads its domains from the catalog it runs on: the domain
 modules (metis_agent.domains.<name>, its <name>_host) are dropped after each
 test, so a test on a scratch copy (METIS_CATALOG) never gets a module an
-earlier test built from another checkout — its program, its packs."""
+earlier test built from another checkout — its program, its extensions."""
 import sys
 
 import pytest

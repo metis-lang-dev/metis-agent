@@ -135,7 +135,7 @@ def snapshot(d):
     if not d:
         return out
     d = Path(d)
-    for sub in (d, d / "intent", d / "packs"):
+    for sub in (d, d / "intent", d / "extensions"):
         try:
             entries = sorted(sub.iterdir())
         except OSError:
@@ -236,29 +236,30 @@ def catalog_lines(names):
 
 
 def intent_of(name, template="gemma4"):
-    """A domain's intent material from its manifest (Go IntentOf): its
-    intent.prompt + examples[template] text and its intent.grammar; None
-    when it has none."""
+    """A domain's intent material from its package (Go IntentOf): the
+    generated prompt + examples[template] text and grammar at their fixed
+    names in intent/ (metis_catalog's Domain.intent, derived from the
+    manifest's intent: {spec}); None when it has none."""
     from .domains import catalog
     try:
         d = catalog().get(name)
     except KeyError:
         return None
-    i = d.manifest.get("intent") or {}
+    i = d.intent
     if not i.get("grammar") or not i.get("prompt"):
         return None
-    prompt = d.path(i["prompt"]).read_text()
+    prompt = i["prompt"].read_text()
     ex = (i.get("examples") or {}).get(template)
     if ex:
-        prompt += d.path(ex).read_text()
+        prompt += ex.read_text()
     asks = []
     if i.get("spec"):                       # the verbs that ask (intent.yaml asks:)
         import yaml
         try:
-            asks = list((yaml.safe_load(d.path(i["spec"]).read_text()) or {}).get("asks") or [])
+            asks = list((yaml.safe_load(i["spec"].read_text()) or {}).get("asks") or [])
         except OSError:
             asks = []
-    return O.IntentDomain(name, d.manifest.get("display") or "the " + name, prompt, d.path(i["grammar"]).read_text(), asks)
+    return O.IntentDomain(name, d.manifest.get("display") or "the " + name, prompt, i["grammar"].read_text(), asks)
 
 
 def intents_of(names, template="gemma4"):
