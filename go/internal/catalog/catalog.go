@@ -36,8 +36,6 @@ type Manifest struct {
 		Prompt   string            `yaml:"prompt"`
 		Examples map[string]string `yaml:"examples"` // chat template → the pass-2 examples
 		Corpus   string            `yaml:"corpus"`
-		Tools    map[string]string `yaml:"tools"`
-		Bench    []string          `yaml:"bench"`
 	} `yaml:"intent"`
 	Clock struct {
 		Beats int `yaml:"beats"`

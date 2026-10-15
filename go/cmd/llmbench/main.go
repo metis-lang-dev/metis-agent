@@ -169,14 +169,6 @@ func main() {
 	capF := flag.String("cap", "", "cap check (consolidation step 1): the orchestrator's surprise narration on the hour's surprise shapes at these thought caps (e.g. 0,64,256); -e8-cards, -e8-reps, -pass2_seed")
 	e8K := flag.Int("e8-k", 12, "E8: the orchestrator's flat insertion, passed fragments per question (the harness's rack.k)")
 	eventsF := flag.String("events", "", "narrate corpus (intent<TAB>args JSON<TAB>result<TAB>detail): each task outcome through the harness's taskCue + Narrate + guard")
-	toolsF := flag.String("tools", "", "E9: the dog intents as native tool calls — arms J,J-free,T,T-rt,T-free,T-noex (T-think with -think) on -corpus; -tools-reps seeded pass-2 repeats from -pass2_seed")
-	toolsJPrompt := flag.String("tools-j-prompt", "../../metis-catalog/domains/dog/intent/dog-prompt.txt,../../metis-catalog/domains/dog/intent/dog-spoken.txt", "E9: arm J's prompt files, concatenated (the harness's prompt + prompt_extra)")
-	toolsTPrompt := flag.String("tools-prompt", "../../metis-catalog/domains/dog/intent/bench/dog-tools-prompt.txt", "E9: the T prompt (tools/e9-tools.py)")
-	toolsNoex := flag.String("tools-prompt-noex", "../../metis-catalog/domains/dog/intent/bench/dog-tools-prompt-noex.txt", "E9: the T prompt without the intent examples")
-	toolsRT := flag.String("tools-prompt-rt", "../../metis-catalog/domains/dog/intent/bench/dog-tools-prompt-rt.txt", "E9: the T-rt prompt (pass-2 examples as round-trips)")
-	toolsRTStatus := flag.String("tools-rt-status", "accepted", "E9: T-rt's result turn, {status:<this>}")
-	toolsGbnf := flag.String("tools-gbnf", "../../metis-catalog/domains/dog/intent/bench/dog-tools.gbnf", "E9: the call grammar (tools/e9-tools.py)")
-	toolsReps := flag.Int("tools-reps", 5, "E9: pass-2 repeats per row and mode")
 	e10F := flag.String("e10", "", "E10 corpus (tools/e10-corpus.py): the executive's IO round-trip, J-text vs T-api, over scripted dialogs; seeds from -pass2_seed")
 	e10Arms := flag.String("e10-arms", "", "E10: only these arms (J-text,T-api; empty = all)")
 	e10Groups := flag.String("e10-groups", "", "E10: only these groups (A–F; empty = all)")
@@ -311,13 +303,6 @@ func main() {
 	sum.Template, sum.EOT = l.Template(), l.EOT()
 	if *eventsF != "" {
 		runEvents(l, string(prompt), *eventsF, *tag, sum.VRAM, emit)
-		return
-	}
-	if *toolsF != "" {
-		if len(rows) == 0 {
-			fail(fmt.Errorf("-tools needs -corpus"))
-		}
-		runTools(l, rows, *toolsF, *toolsJPrompt, *gbnfF, *toolsTPrompt, *toolsNoex, *toolsRT, *toolsGbnf, *toolsRTStatus, *tag, *toolsReps, uint32(*seed), emit)
 		return
 	}
 	if *dialogF != "" {
