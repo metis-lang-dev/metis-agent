@@ -290,3 +290,100 @@ class Consultant:
                 except ValueError:
                     args = {"kind": "", "text": args["arg"]}
             self.seat.typed = args
+
+
+class TemplateConsult:
+    """The template consult (go-domain-agent s-a047870a step 3, the
+    architect's ruling; RUNTIME-PARITY row 26: on the device the consult is
+    the harness's template plus the cards' moves): every answer computed by
+    the harness, no model call (calls 0), the envelope as the seat's.
+
+      refusal   missing {atom, words} when the blocker flips in the host's
+                pairs and the host has its words; else unexplained — the
+                text is the refusal's own line either way
+      surprise  for each offered card in the cards' order, each move in its
+                order: the first whose witness over the record's fired path
+                reaches the reading explains it {card, move}; none:
+                unexplained. The harness branches on it (explains: explain
+                and adopt; unexplained: escalate); the template never
+                answers noise, so never a reset
+      question  answer: the mirror line for the atoms the question names,
+                the whole line when it names none — never an error
+    """
+
+    def __init__(self, agent):
+        self.agent = agent
+
+    def consult(self, iid, question, situation):
+        import time
+        from .reply import reply
+        ag = self.agent
+        t0 = time.perf_counter()
+        before = (ag.repl.stage, dict(ag.repl.counts), len(ag.repl.fired))
+        band, evidence, fixed = "", [], None
+        if situation == "refusal" and ag.last_refusal:
+            env, text, band, evidence, fixed = self.refusal()
+        elif situation == "surprise" and ag.watch.open is not None:
+            env, text, band, evidence = self.surprise()
+        else:
+            situation = "question"
+            env, text = {"answer_kind": "answer"}, self.question(question)
+        ag.consults.append({"situation": situation, "first_read": band, "fixed": fixed, "kinds": [env["answer_kind"]],
+                            "envelope": env, "text": text, "calls": [], "typed": None, "pinned": [], "clamped": False,
+                            "stop": "template", "tokens": 0,
+                            "live_unchanged": before == (ag.repl.stage, dict(ag.repl.counts), len(ag.repl.fired)),
+                            "ms": round((time.perf_counter() - t0) * 1e3)})
+        return [reply(ag.name, "consult", id=iid, calls=0, text=text, evidence=evidence or None,
+                      ref={"seq": len(ag.repl.fired), "beat": ag.beat_no()}, **env)]
+
+    def refusal(self):
+        ag = self.agent
+        lr = ag.last_refusal
+        band, evidence = ag.first_read(lr)
+        ag.last_refusal = None
+        b = lr.get("blocker")
+        w = ag.host_words(b, ag.handle_names) if (b and ag.flips(b) and ag.host_words) else None
+        if w:
+            fixed = {"kind": "missing", "atom": b, "words": w}
+            env = {"answer_kind": "missing", "resource": {"atom": b, "words": w}}
+        else:
+            fixed = {"kind": "unexplained", "atom": b}
+            env = {"answer_kind": "unexplained"}
+        return env, lr.get("said", ""), band, evidence, fixed
+
+    def surprise(self):
+        from metis.loop.cards import card_program, cards
+        from metis.loop.watch import _witness
+        from .domain_agent import offered_moves
+        ag = self.agent
+        rec = ag.repl.loop.records[ag.watch.open]
+        diff = dict(rec["meta"].get("diff") or {})
+        gap = ", ".join("%s %d (the model expected %d)" % (a, rec["observed"].get(a, 0), rec["observed"].get(a, 0) - d)
+                        for a, d in sorted(diff.items()))
+        evidence = ["%s %+d" % (a, d) for a, d in sorted(diff.items())]
+        band = ag.surprise_context()
+        by_name = {c["name"]: c for c in cards(ag.repl)}
+        since = list(rec["meta"].get("since") or [])
+        for name, moves in offered_moves(ag.repl).items():
+            _, prog = card_program(ag.repl, by_name[name], rec["init"], rec["meta"]["stage"])
+            for move in moves:
+                if _witness(prog, rec["init"], since, move, rec["observed"]) is not None:
+                    return ({"answer_kind": "explains", "cause": {"card": name, "move": move}},
+                            "the reading differs from the model: %s; %s explains it with %s" % (gap, name, move),
+                            band, evidence)
+        return ({"answer_kind": "unexplained"},
+                "the reading differs from the model: %s; no card explains it" % gap, band, evidence)
+
+    def question(self, question):
+        import re
+        from metis.loop.watch import mirror, mirror_line
+        ag = self.agent
+        row = mirror(ag.repl, ag.watch)[0]
+        q = " %s " % str(question or "").lower()
+        named = sorted(a for a in ag.repl.atoms
+                       if any(re.search(r"(?<![\w(])%s(?![\w)])" % re.escape(x.lower()), q)
+                              for x in {a, a.replace("_", " ")}))
+        if named:
+            row = dict(row, beliefs={a: p for a, p in row["beliefs"].items() if a in named},
+                       now={a: ag.repl.counts.get(a, 0) for a in named})
+        return mirror_line(row)

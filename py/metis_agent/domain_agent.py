@@ -433,14 +433,16 @@ class DomainAgent:
                     ", ".join(other_cards(self.repl)) or "none"))
 
     def consult(self, iid, args):
-        from .consult import Consultant
+        from .consult import Consultant, TemplateConsult
         q = str(args.get("question", "")).strip()
-        if not q:
-            return [reply(self.name, "error", id=iid, error="consult needs a question")]
         # the situation: an open surprise, else the latest refusal not yet
         # consulted, else the person's own question (args.situation overrides)
         situation = args.get("situation") or ("surprise" if self.watch.open is not None
                                               else "refusal" if self.last_refusal else "question")
+        if self.consult_seat == "template":    # --consult template: the harness answers, no model call
+            return TemplateConsult(self).consult(iid, q, situation)
+        if not q:
+            return [reply(self.name, "error", id=iid, error="consult needs a question")]
         if situation == "refusal" and self.consult_missing == "template":
             t = self.templated_missing(iid)
             if t:
@@ -957,8 +959,10 @@ def main():
     ap.add_argument("--narrate", nargs="?", const="*", default=None, metavar="DOMAINS",
                     help="the narrator writes text (gemma4, thinking off) — every domain, or the comma-separated "
                          "ones named (--narrate dog); the consultant shares its model")
-    ap.add_argument("--consult", default="", choices=["", "gemma4", "claude"],
-                    help="the consultant's seat (default: gemma4 when --narrate)")
+    ap.add_argument("--consult", default="", choices=["", "gemma4", "claude", "template"],
+                    help="the consultant's seat (default: gemma4 when --narrate); template: the harness "
+                         "answers every consult from the host's words, the cards' moves and the mirror, "
+                         "no model call (the device's consult, RUNTIME-PARITY row 26)")
     ap.add_argument("--model", default="", help="the GGUF (default: E2B Q4 under go/models)")
     ap.add_argument("--missing-seat", action="store_true", help="a computed missing goes to the seat too "
                     "(default: the harness answers it with no model call, DESIGN 98530fd)")
@@ -983,6 +987,8 @@ def main():
     if a.consult == "claude":
         from .claude_seat import ClaudeSeat
         seat = ClaudeSeat()
+    elif a.consult == "template":
+        seat = "template"
     proc = Process([d.strip() for d in a.domain.split(",") if d.strip()],
                    narrate=(None if not a.narrate else "*" if a.narrate == "*" else a.narrate),
                    llm=llm, seat=seat, missing_seat=a.missing_seat, trace=a.trace,

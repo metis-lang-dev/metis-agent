@@ -6,6 +6,10 @@
 {"id": "c2", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}
 {"clock": "beat"}
 {"clock": "beat"}
+{"tool": "consult", "args": {"question": "why did you not go?"}, "id": "k1"}
+{"tool": "consult", "args": {"question": "are you idle or sitting?"}, "id": "k2"}
+{"tool": "consult", "args": {"question": "how are you?"}, "id": "k3"}
+{"tool": "consult", "args": {}, "id": "k4"}
 {"tool": "state", "args": {}}
 {"tool": "events", "args": {}}
 {"id": "c3", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "STAND_UP"}}
@@ -43,6 +47,7 @@
 {"id": "c10", "domain": "dog", "verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "bottle"}}}
 {"clock": "beat"}
 {"clock": "beat"}
+{"tool": "consult", "args": {"question": "why not?"}, "id": "k5"}
 {"tool": "state", "args": {}}
 {"id": "c11", "domain": "dog", "verb": "QUERY", "args": {"target": {"type": "OBJECT", "description": "chair"}}}
 {"clock": "beat"}
@@ -52,6 +57,7 @@
 {"clock": "beat"}
 {"id": "c13", "domain": "dog", "verb": "UNKNOWN", "args": {}}
 {"clock": "beat"}
+{"tool": "consult", "args": {"question": "what happened?"}, "id": "k6"}
 {"id": "c14", "domain": "dog", "verb": "NO_SUCH_VERB", "args": {}}
 {"id": "c15", "domain": "dog", "verb": "go", "args": {"place": "door"}}
 {"clock": "beat"}

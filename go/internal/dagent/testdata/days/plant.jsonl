@@ -2,6 +2,7 @@
 {"clock": "beat"}
 {"id": "c1", "domain": "plant", "verb": "CHECK", "args": {}}
 {"clock": "beat"}
+{"tool": "consult", "args": {"question": "is the soil moist?"}, "id": "k1"}
 {"clock": "beat"}
 {"clock": "beat"}
 {"clock": "beat"}
@@ -55,6 +56,7 @@
 {"clock": "beat"}
 {"clock": "beat"}
 {"id": "c7", "domain": "plant", "verb": "CHECK", "args": {}}
+{"tool": "consult", "args": {"question": "what is wrong?"}, "id": "k2"}
 {"tool": "explain", "args": {"record": 0, "card": "nope", "move": "x"}, "id": "t1"}
 {"tool": "explain", "args": {"record": 0, "card": "plant+visitor", "move": "water"}, "id": "t2"}
 {"tool": "explain", "args": {"card": "plant+visitor"}, "id": "t3"}

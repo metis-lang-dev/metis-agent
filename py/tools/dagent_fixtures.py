@@ -291,7 +291,7 @@ def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None):
     import io
     import contextlib
     from metis_agent.domain_agent import Process, serve, ready
-    proc = Process([name])
+    proc = Process([name], seat="template")     # the device's consult: the harness's template
     with contextlib.redirect_stderr(io.StringIO()):
         agent = proc.build(1, case)
     if hostcalls is not None and hasattr(agent.host, "inner"):
