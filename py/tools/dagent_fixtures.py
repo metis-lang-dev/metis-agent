@@ -292,6 +292,17 @@ def records_json(repl):
     return json.loads(json.dumps(repl.loop.records, default=str))
 
 
+def unclock(out):
+    """A trace's consult and narration times are the clock's, not the
+    agent's: 0, so the fixtures regenerate byte-equal."""
+    for o in out:
+        if isinstance(o, dict) and o.get("kind") == "trace":
+            for c in (o.get("consults") or []) + (o.get("narrated") or []):
+                if c.get("ms") is not None:
+                    c["ms"] = 0
+    return out
+
+
 def run_pair_day(names, lines):
     """The kitchen pair's day through py's serve(): one process serving
     both cooks on one env (Domains, the pair's clock), the template seat."""
@@ -309,7 +320,29 @@ def run_pair_day(names, lines):
     return stream
 
 
-def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None, trace=False):
+class StubNarrator:
+    """A deterministic narrator for the narration's wiring (no model): by
+    the fragment's seq, the bound line itself (an own-voice fragment), or a
+    sentence each of the attribution check's rules refuses, or the
+    fragment's body — Go's test narrator says the same."""
+
+    def __init__(self, display):
+        self.display = display
+
+    def narrate(self, f):
+        k = f.seq % 5
+        if k == 0 and f.own_line:
+            return {"text": f.own_line}                         # holds
+        if k == 1:
+            return {"text": "%s does it." % self.display}      # the agent in the third person
+        if k == 2 and f.own_line:
+            return {"text": f.own_line.lower()}                 # the line's "I" lost
+        if k == 3 and ": " in f.own_line:
+            return {"text": f.own_line.partition(": ")[0] + "."}   # the reason dropped
+        return {"text": "narrated %s: %s" % (f.kind, f.body())}
+
+
+def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None, trace=False, narrate=False):
     """The day through py's serve(): (the output stream, the replier calls)."""
     import io
     import contextlib
@@ -364,6 +397,8 @@ def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None, trace=F
             return out
         agent.consult = consult
     agent.tracing = trace
+    if narrate:
+        agent.narrator = StubNarrator(agent.display)
     r = agent.replier
     calls = [{"call": "setup", "domain": r.domain, "docs": dict(r.docs), "outcomes": dict(r.outcomes),
               "commands": sorted(r.commands), "mirror": list(r.mirror), "blocking": sorted(r.blocking),
@@ -373,7 +408,7 @@ def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None, trace=F
     for msg in lines:
         with contextlib.redirect_stderr(io.StringIO()):
             agent, out = serve(agent, msg, proc.build, proc.reload, proc.add_line)
-        stream += [{"in": msg, "out": out}]
+        stream += [{"in": msg, "out": unclock(out)}]
     if watchcalls is not None:
         watchcalls.append(reads(agent.repl))
         watchcalls.append({"call": "records", "records": records_json(agent.repl),
@@ -484,6 +519,20 @@ def main():
                     k = o.get("kind") or ("ack" if "ack" in o else "clock")
                     kinds[k] = kinds.get(k, 0) + 1
             print(f"day {name}: {len(lines)} lines -> {dict(sorted(kinds.items()))}; replier calls {len(calls)}")
+    # the narration's wiring: the dog's and the plant's days narrated by the
+    # stub narrator, traced (the narrated fragments in the traces)
+    for name in ("dog", "plant"):
+        day = dest / "days" / f"{name}.jsonl"
+        if day.exists():
+            lines = [json.loads(x) for x in day.read_text().splitlines() if x.strip()]
+            stream, _ = run_day(name, lines, trace=True, narrate=True)
+            (dest / "days" / f"{name}.narrated.out.jsonl").write_text("".join(json.dumps(r) + "\n" for r in stream))
+            v = {}
+            for r in stream[1:]:
+                for o in r["out"]:
+                    if o.get("voice"):
+                        v[o["voice"]] = v.get(o["voice"], 0) + 1
+            print(f"day {name} narrated: voices {dict(sorted(v.items()))}")
     # --trace (the console's REPL log): the plant's day once more, traced
     day = dest / "days" / "plant.jsonl"
     if day.exists():

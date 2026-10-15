@@ -36,6 +36,7 @@ type Domain struct {
 	// the domain module's switches (py: EXO_EVENTS, QUIESCENCE, BEATS,
 	// OWN_DAY, PAIR) and what prices its weight ports (the ctx's PRICED)
 	ExoEvents  bool
+	FragCounts string // the fragment's counts: "left" (default) | "touched"
 	Quiescence string // "episode" (default) | "every"
 	Beats      int    // the watch's env beats; 0: no limit
 	OwnDay     bool   // a replay or live case keeps the host's own day
@@ -64,6 +65,9 @@ type Agent struct {
 	held     []Reply
 	lastRef  *Refusal
 	consults []map[string]any
+	Narrator Narrator // nil: no narrator (the replies speak the lines and the refs)
+	narrated []narratedPair
+	foreign  map[string]bool // own voice: the domain's distinctive words
 	reads    []map[string]any
 	worlds   [][]string
 	cursor   [3]int
@@ -270,6 +274,13 @@ func NewAgent(d Domain, seed uint64, caseName string) (*Agent, error) {
 			}
 			return words(v)
 		})
+	if d.Voice == "own" {
+		var lines []string
+		for _, l := range docs {
+			lines = append(lines, l)
+		}
+		a.foreign = distinctive(lines, 3)
+	}
 	a.Consult = &TemplateConsult{Sh: a.Sh, W: a.W, R: a.R, Tables: d.Tables, HandleNames: a.handles}
 	a.Sink = &Sink{Domain: d.Name, Key: p.Key}
 	return a, nil
@@ -454,13 +465,17 @@ func (a *Agent) Step() ([]Reply, error) {
 	return out, nil
 }
 
-// voiced marks a text's origin where none is set: without a narrator, the
-// fragment's ref in words.
-func voiced(rs []Reply) []Reply {
+// voiced marks a text's origin where none is set (py voiced): the
+// narrator's sentence, or the fragment's ref in words.
+func (a *Agent) voiced(rs []Reply) []Reply {
 	for i := range rs {
 		if t, _ := rs[i].Get("text").(string); t != "" {
 			if _, ok := rs[i].Vals["voice"]; !ok {
-				rs[i].Set("voice", "ref")
+				v := "ref"
+				if n := len(a.narrated); n > 0 && a.narrated[n-1].S.Text == t {
+					v = "narrator"
+				}
+				rs[i].Set("voice", v)
 			}
 		}
 	}
@@ -535,10 +550,52 @@ func (a *Agent) signal(s Signal) ([]Reply, error) {
 		k := sint(s, "fired")
 		row := a.Sh.Rows[k-1]
 		ev := evOfRow(row)
-		out := a.Replier.Fired(ev, k, beat, a.Sh.Counts, "")
+		var cons, prod, pers []string
+		for _, c := range row.Ev.Consume {
+			cons = append(cons, c.Atom)
+		}
+		for _, c := range row.Ev.Produce {
+			prod = append(prod, c.Atom)
+		}
+		for _, c := range row.Ev.Persist {
+			pers = append(pers, c.Atom)
+		}
+		// the fragment's counts: "left" (what the move produced and kept) or
+		// "touched" (consumed and produced)
+		atoms := map[string]bool{}
+		for _, x := range append(append([]string{}, prod...), pers...) {
+			atoms[x] = true
+		}
+		if a.D.FragCounts == "touched" {
+			atoms = map[string]bool{}
+			for _, x := range append(append([]string{}, cons...), prod...) {
+				atoms[x] = true
+			}
+		}
+		fc := map[string]int{}
+		for x := range atoms {
+			fc[x] = a.Sh.Counts.N[x]
+		}
+		line, objects := "", []string(nil)
+		if a.D.Voice == "own" {
+			line, objects = a.Replier.Line(ev.Name)
+		}
+		text := a.narrate(Fragment{Path: a.Name, Seq: k, Beat: beat, Kind: "event",
+			Ref: eventRef(ev.Name, cons, prod, pers, a.Replier.Commands), Counts: fc, OwnLine: line})
+		// the attribution check holds the sentence to the bound line
+		if text != "" && line != "" && !holdsLine(text, line, objects, a.D.Display, a.foreign) {
+			f := false
+			a.narrated[len(a.narrated)-1].S.held = &f
+			text = line
+		}
+		out := a.Replier.Fired(ev, k, beat, a.Sh.Counts, text)
 		for i := range out {
 			if t, _ := out[i].Get("text").(string); t != "" {
-				out[i].Set("voice", "line")
+				v := "line"
+				if text != "" && text != line {
+					v = "narrator"
+				}
+				out[i].Set("voice", v)
 			}
 		}
 		for _, r := range out {
@@ -560,7 +617,7 @@ func (a *Agent) signal(s Signal) ([]Reply, error) {
 				a.lastRef = lr
 			}
 		}
-		return voiced(out), nil
+		return a.voiced(out), nil
 	}
 	switch kind {
 	case "event":
@@ -570,21 +627,29 @@ func (a *Agent) signal(s Signal) ([]Reply, error) {
 		if s["kind"] == "exo" && !a.D.ExoEvents {
 			return nil, nil // the host's own input: not news
 		}
-		f := fragRef(s)
-		return voiced([]Reply{a.reply("event", F{"ref": a.ref(true, f), "counts": a.Replier.MirrorCounts(a.Sh.Counts),
-			"text": words(f)})}), nil
+		f := a.fragments(s, true)[0]
+		return a.voiced([]Reply{a.reply("event", F{"ref": a.ref(true, f.Ref), "counts": a.Replier.MirrorCounts(a.Sh.Counts),
+			"text": a.orRef(f)})}), nil
 	case "quiescence":
 		over, _ := s["episode_over"].(bool)
 		if over {
 			a.Over = true
-			return voiced([]Reply{a.reply("quiescence", F{"goal_pending": false, "over": true, "ref": a.ref(true, ""),
-				"text": "the day is over"})}), nil
-		}
-		if a.D.Quiescence != "every" {
+		} else if a.D.Quiescence != "every" {
 			return nil, nil
 		}
-		return voiced([]Reply{a.reply("quiescence", F{"goal_pending": false, "ref": a.ref(true, ""),
-			"text": words(fragRef(s))})}), nil
+		f := a.fragments(s, false)[0]
+		text := a.narrate(f)
+		if text == "" {
+			text = words(f.Ref)
+			if over {
+				text = "the day is over"
+			}
+		}
+		fs := F{"goal_pending": false, "ref": a.ref(true, ""), "text": text}
+		if over {
+			fs["over"] = true
+		}
+		return a.voiced([]Reply{a.reply("quiescence", fs)}), nil
 	case "surprise":
 		a.sinkRecord(sint(s, "record"), "open", nil)
 		var cards []string
@@ -594,8 +659,8 @@ func (a *Agent) signal(s Signal) ([]Reply, error) {
 		if cards == nil {
 			cards = []string{}
 		}
-		return voiced([]Reply{a.reply("surprise", F{"record": s["record"], "difference": s["diff"], "cards": cards,
-			"ref": a.ref(true, ""), "text": words(fragRef(s))})}), nil
+		return a.voiced([]Reply{a.reply("surprise", F{"record": s["record"], "difference": s["diff"], "cards": cards,
+			"ref": a.ref(true, ""), "text": a.orRef(a.fragments(s, false)[0])})}), nil
 	}
 	return nil, nil
 }
@@ -753,19 +818,20 @@ func (a *Agent) surpriseVerb(id any, verb string, args map[string]any) ([]Reply,
 			s["record"] = rec
 		}
 		status := sstr(s, "status")
-		f := F{"id": id, "status": status, "ref": a.ref(true, ""), "text": words(fragRef(s))}
+		frags := a.fragments(s, true)
+		f := F{"id": id, "status": status, "ref": a.ref(true, ""), "text": a.orRef(frags[0])}
 		if status == "refused" {
 			f["reason"] = sstr(s, "reason")
 		}
 		out = append(out, a.reply("result", f))
 		if strings.HasPrefix(status, "admitted") && verb == "explain" {
-			nref := fmt.Sprintf("notice: %v %v explained surprise %v; the reading is adopted", s["card"], s["move"], pyStr(s["record"]))
-			if nt, ok := s["notice"].(map[string]any); ok {
-				nref = fmt.Sprintf("notice: %v %v explained the reading %v orders running; the model lacks it, its revisers are told",
-					nt["card"], nt["move"], nt["orders"])
+			nf := Fragment{Path: a.Name, Seq: frags[0].Seq, Beat: frags[0].Beat, Kind: "notice",
+				Ref: fmt.Sprintf("notice: %v %v explained surprise %v; the reading is adopted", s["card"], s["move"], pyStr(s["record"]))}
+			if len(frags) > 1 {
+				nf = frags[1]
 			}
 			out = append(out, a.reply("notice", F{"record": s["record"], "card": s["card"], "move": s["move"],
-				"ref": a.ref(true, ""), "text": words(nref)}))
+				"ref": a.ref(true, ""), "text": a.orRef(nf)}))
 		}
 	}
 	a.W.Outbox = nil
@@ -783,7 +849,7 @@ func (a *Agent) surpriseVerb(id any, verb string, args map[string]any) ([]Reply,
 			a.sinkRecord(k, map[string]string{"explain": "explained", "reset": "reset", "escalate": "escalated"}[verb], extra)
 		}
 	}
-	return voiced(out), nil
+	return a.voiced(out), nil
 }
 
 func orEmpty(v any) any {
@@ -925,12 +991,12 @@ func kindOf(msg map[string]any) string {
 // rows, narrated fragments, consults, reads, world lines and sunk records):
 // one trace reply, or nil.
 func (a *Agent) Trace() *Reply {
-	f0, c0 := a.cursor[0], a.cursor[2]
-	rows, cons := a.Sh.Rows[f0:], a.consults[c0:]
-	a.cursor = [3]int{len(a.Sh.Rows), 0, len(a.consults)}
+	f0, n0, c0 := a.cursor[0], a.cursor[1], a.cursor[2]
+	rows, nar, cons := a.Sh.Rows[f0:], a.narrated[n0:], a.consults[c0:]
+	a.cursor = [3]int{len(a.Sh.Rows), len(a.narrated), len(a.consults)}
 	reads, worlds, sunk := a.reads, a.worlds, a.Sink.Sunk
 	a.reads, a.worlds, a.Sink.Sunk = nil, nil, nil
-	if len(rows) == 0 && len(cons) == 0 && len(reads) == 0 && len(worlds) == 0 && len(sunk) == 0 {
+	if len(rows) == 0 && len(nar) == 0 && len(cons) == 0 && len(reads) == 0 && len(worlds) == 0 && len(sunk) == 0 {
 		return nil
 	}
 	var fired []any
@@ -963,6 +1029,18 @@ func (a *Agent) Trace() *Reply {
 	}
 	if len(rows) > 40 {
 		f["more"] = len(rows) - 40
+	}
+	if len(nar) > 0 {
+		var ns []any
+		for _, p := range nar {
+			held := true
+			if p.S.held != nil {
+				held = *p.S.held
+			}
+			ns = append(ns, Ordered{}.With("kind", p.F.Kind).With("seq", p.F.Seq).With("sentence", p.S.Text).
+				With("line", p.F.OwnLine).With("held", held).With("ms", p.S.MS))
+		}
+		f["narrated"] = ns
 	}
 	if len(cons) > 0 {
 		var cs []any

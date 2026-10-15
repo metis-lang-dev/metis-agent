@@ -29,6 +29,7 @@ type HostEntry struct {
 	PluginSpec string // the host as the development stack attaches it
 	Display    string // the agent module's display name ("" = the manifest's)
 	ExoEvents  bool
+	FragCounts string
 	Quiescence string
 	Beats      int
 	OwnDay     bool
@@ -44,11 +45,11 @@ var Hosts = map[string]HostEntry{
 		PluginSpec: "metis_agent.domains.plant:make"},
 	"kitchen": {New: func(e *host.MemEnv) rt.Host { return host.NewCook("kitchen", e) },
 		PluginSpec: "metis.domains.kitchen.pair:make_pair_kitchen", Display: "the first cook",
-		ExoEvents: true, Quiescence: "every", Beats: host.DefaultPairScript().Beats * 4, OwnDay: true,
+		ExoEvents: true, FragCounts: "touched", Quiescence: "every", Beats: host.DefaultPairScript().Beats * 4, OwnDay: true,
 		Pair: []string{"kitchen", "kitchen_shared"}, PricedBy: "kitchen"},
 	"kitchen_shared": {New: func(e *host.MemEnv) rt.Host { return host.NewCook("kitchen_shared", e) },
 		PluginSpec: "metis.domains.kitchen.pair:make_pair_shared", Display: "the second cook",
-		ExoEvents: true, Quiescence: "every", Beats: host.DefaultPairScript().Beats * 4, OwnDay: true,
+		ExoEvents: true, FragCounts: "touched", Quiescence: "every", Beats: host.DefaultPairScript().Beats * 4, OwnDay: true,
 		Pair: []string{"kitchen", "kitchen_shared"}, PricedBy: "kitchen_shared"},
 }
 
@@ -124,7 +125,7 @@ func (p *Process) Domains(names []string) ([]Domain, error) {
 			return nil, err
 		}
 		d := Domain{Name: n, Display: m.Display, Voice: m.Voice, Bundle: bundle, Source: string(src),
-			Tables: h.Tables, PluginSpec: h.PluginSpec, Answers: h.Answers, ExoEvents: h.ExoEvents,
+			Tables: h.Tables, PluginSpec: h.PluginSpec, Answers: h.Answers, ExoEvents: h.ExoEvents, FragCounts: h.FragCounts,
 			Quiescence: h.Quiescence, Beats: h.Beats, OwnDay: h.OwnDay, Pair: h.Pair, PricedBy: h.PricedBy}
 		if h.Display != "" {
 			d.Display = h.Display

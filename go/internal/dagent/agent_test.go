@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/host"
@@ -32,6 +33,7 @@ func testDomain(t *testing.T, d string) Domain {
 		Source: string(src), Spec: spec, Generic: true, PluginSpec: "metis_agent.domains." + d + ":make"}
 	switch d {
 	case "dog":
+		dom.Voice = "own"
 		dom.NewHost = func() rt.Host { return host.NewDog() }
 		dom.Tables, dom.Answers = &host.DogTables, host.DogAnswerKinds()
 	case "plant":
@@ -45,13 +47,17 @@ func TestTheAgentStreamIsPys(t *testing.T) {
 	for _, tc := range []struct {
 		d, stream string
 		trace     bool
-	}{{"dog", "dog.out", false}, {"plant", "plant.out", false}, {"plant", "plant.trace.out", true}} {
+	}{{"dog", "dog.out", false}, {"plant", "plant.out", false}, {"plant", "plant.trace.out", true},
+		{"dog", "dog.narrated.out", true}, {"plant", "plant.narrated.out", true}} {
 		d := tc.d
 		a, err := NewAgent(testDomain(t, d), 1, "replay")
 		if err != nil {
 			t.Fatal(err)
 		}
 		a.Tracing = tc.trace // py's day runs have no records sink: a trace lists none
+		if strings.Contains(tc.stream, "narrated") {
+			a.Narrator = stubNarrator{a.D.Display}
+		}
 		n, lines := 0, 0
 		jsonl(t, "testdata/days/"+tc.stream+".jsonl", func(raw []byte) {
 			var row struct {
@@ -180,4 +186,25 @@ func unfile(v any) json.RawMessage {
 	}
 	out, _ := json.Marshal(x)
 	return out
+}
+
+// stubNarrator is dagent_fixtures' StubNarrator: by the fragment's seq,
+// the bound line itself, a sentence each of the attribution check's rules
+// refuses, or the fragment's body.
+type stubNarrator struct{ display string }
+
+func (n stubNarrator) Narrate(f Fragment) Narrated {
+	k := f.Seq % 5
+	head, _, cut := strings.Cut(f.OwnLine, ": ")
+	switch {
+	case k == 0 && f.OwnLine != "":
+		return Narrated{Text: f.OwnLine}
+	case k == 1:
+		return Narrated{Text: n.display + " does it."}
+	case k == 2 && f.OwnLine != "":
+		return Narrated{Text: strings.ToLower(f.OwnLine)}
+	case k == 3 && cut:
+		return Narrated{Text: head + "."}
+	}
+	return Narrated{Text: "narrated " + f.Kind + ": " + f.Body()}
 }
