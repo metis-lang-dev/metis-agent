@@ -18,7 +18,7 @@ pair runs metispy's run_pair (both cooks on one env, the second cook's
 help) into one trace, each call tagged "host": kitchen | kitchen_shared, in
 the order the cooks made them.
 
-    py/.venv/bin/python py/tools/host_traces.py [OUT_DIR]     # default go/internal/host/testdata
+    py/.venv/bin/python py/tools/host_traces.py [-o DIR]      # default go/internal/host/testdata
 """
 import io
 import json
@@ -153,7 +153,11 @@ def kitchen_pair():
 
 
 def main():
-    dest = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "go/internal/host/testdata"
+    import argparse
+    ap = argparse.ArgumentParser(description="the catalog hosts' recorded calls, for go/internal/host")
+    ap.add_argument("-o", "--out", type=Path, default=ROOT / "go/internal/host/testdata",
+                    help="the directory the traces go to (default: go/internal/host/testdata)")
+    dest = ap.parse_args().out
     dest.mkdir(parents=True, exist_ok=True)
     traces = {"plant": hosted_day("plant"), "dog": hosted_day("dog"),
               "kitchen_pair": kitchen_pair()}
