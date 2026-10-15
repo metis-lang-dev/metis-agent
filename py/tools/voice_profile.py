@@ -7,7 +7,8 @@ go/internal/llm TestVoiceProfile, the same JSON).
 The dialog is begun on --system (the live v3 turn: `metis_agent.service
 --print-turn`), then one user turn asking for a long answer is injected,
 and Gen (greedy, unconstrained, the dialog's own call) runs --reps times,
-rolled back after each. Two lengths: "short" (a one-line system) and
+each from the user turn decoded afresh (a rollback leaves the
+last generation's logits). Two lengths: "short" (a one-line system) and
 "long" (--system plus --filler exchanges, ~the live dialog's 5-7k tokens).
 ms_per_token = Gen's whole time / the tokens it sampled (the stop included),
 the same count Go's generate makes."""
@@ -35,15 +36,16 @@ def run(l, system, filler, reps, max_tokens):
     l.begin_dialog(system)
     if filler:
         l.inject(EXCHANGE * filler)
-    mark = l.inject(user_turn(ASK))
-    rows = []
+    base = l.n_past
+    rows, mark = [], base
     for _ in range(reps):
+        l.rollback(base)           # the user turn decoded again: its logits, not the last generation's
+        mark = l.inject(user_turn(ASK))
         g0 = l.n_generated
         text, _, first, whole = l.gen("", False, max_tokens, "")
         n = l.n_generated - g0
         rows.append({"tokens": n, "ms": whole * 1e3, "first_ms": first * 1e3,
                      "ms_per_token": whole * 1e3 / max(1, n), "text": text[:80]})
-        l.rollback(mark)
     per = [r["ms_per_token"] for r in rows]
     return {"n_past": mark, "reps": rows, "median_ms_per_token": statistics.median(per),
             "min_ms_per_token": min(per), "max_ms_per_token": max(per)}

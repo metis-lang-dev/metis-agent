@@ -11,8 +11,9 @@ import (
 // The voice-gen profile (llama-pin s-aeb12858 step 3), the Go half of
 // py/tools/voice_profile.py: the same dialog (the live v3 turn, filler
 // exchanges, one user turn asking for a long answer), greedy Gen --reps
-// times rolled back after each, per-token ms = Gen's whole time / the tokens
-// it sampled. Go's context takes llama.cpp's default flash attention (AUTO).
+// times, each from the user turn decoded afresh (a rollback leaves the last
+// generation's logits), per-token ms = Gen's whole time / the tokens it
+// sampled. Go's context takes llama.cpp's default flash attention (AUTO).
 // Off unless VOICE_PROFILE_OUT names the JSON file:
 //
 //	VOICE_PROFILE_OUT=go.json VOICE_PROFILE_SYSTEM=turn.txt ./build.sh test -run TestVoiceProfile -count=1 ./internal/llm
@@ -50,13 +51,21 @@ func TestVoiceProfile(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		mark, err := l.Inject("<|turn>user\n" + ask + "<turn|>\n<|turn>model\n")
+		basePast, err := l.Inject("")
 		if err != nil {
 			t.Fatal(err)
 		}
 		var rows []map[string]any
 		var per []float64
+		mark := basePast
 		for i := 0; i < reps; i++ {
+			// the user turn decoded again each time: a rollback leaves the last generation's logits
+			if err := l.Rollback(basePast); err != nil {
+				t.Fatal(err)
+			}
+			if mark, err = l.Inject("<|turn>user\n" + ask + "<turn|>\n<|turn>model\n"); err != nil {
+				t.Fatal(err)
+			}
 			_, g0 := l.TokenCounts()
 			text, _, first, whole, err := l.Gen("", false, maxTokens, "")
 			if err != nil {
@@ -72,9 +81,6 @@ func TestVoiceProfile(t *testing.T) {
 			}
 			rows = append(rows, map[string]any{"tokens": n, "ms": ms, "first_ms": float64(first.Microseconds()) / 1e3,
 				"ms_per_token": p, "text": text})
-			if err := l.Rollback(mark); err != nil {
-				t.Fatal(err)
-			}
 		}
 		s := append([]float64(nil), per...)
 		sort.Float64s(s)
