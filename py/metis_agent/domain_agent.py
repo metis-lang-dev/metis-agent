@@ -676,13 +676,20 @@ class DomainAgent:
 
 
 def records_path(module, where, session):
-    """Where a domain's records go: the manifest's `records` (default
-    records/) under its catalog directory — metis-catalog domains/<name>/
-    (DIR/<name>/ when --records DIR names another root)."""
+    """Where a domain's records go: "catalog" — its package's records
+    (metis_catalog Domain.records: the manifest's `records`, default
+    records/, under the package's own directory in the catalog the loader
+    reads, $METIS_CATALOG included; catalog-entry step 2); else DIR/<name>/
+    when --records DIR names another root."""
     from pathlib import Path
-    root = (Path(__file__).resolve().parents[3] / "metis-catalog" / "domains") if where == "catalog" else Path(where)
+    if where == "catalog":
+        d = getattr(module, "MANIFEST", None)
+        if d is None:
+            from .domains import catalog
+            d = catalog().get(module.NAME)
+        return d.records / ("%s.jsonl" % session)
     sub = getattr(module, "RECORDS", "records")
-    return root / module.NAME / sub / ("%s.jsonl" % session)
+    return Path(where) / module.NAME / sub / ("%s.jsonl" % session)
 
 
 def kind_of(msg):

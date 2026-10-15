@@ -77,3 +77,15 @@ def test_the_hosts_snapshot_is_json_and_restores_from_it(tmp_path, monkeypatch, 
         if hasattr(host.inner, "observe"):
             assert host.observe(dict(c)) == twin.observe(dict(c))
     assert env_text(twin.snapshot()) == env_text(host.snapshot())
+
+
+def test_the_catalog_sink_is_the_packages_records(tmp_path, monkeypatch):
+    """catalog-entry step 3's finding: records "catalog" go to the package's
+    own records (Domain.records) in the catalog the loader reads —
+    $METIS_CATALOG — never the sibling checkout's domains/<name>/."""
+    from metis_agent.domain_agent import records_path
+    from metis_agent import domains
+    _plant_without_extensions(tmp_path, monkeypatch)
+    m = domains.load("plant")
+    assert records_path(m, "catalog", "s1") == tmp_path / "cat/domains/plant/records/s1.jsonl"
+    assert records_path(m, str(tmp_path / "elsewhere"), "s1") == tmp_path / "elsewhere/plant/records/s1.jsonl"
