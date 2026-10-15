@@ -290,6 +290,8 @@ class DomainAgent:
                                                       if a.startswith("refused(")), "")}
             return out
         if kind == "event":
+            if s.get("kind") == "operator":   # the watch's operator=N resume closed the escalated record: its close sunk too
+                self.sink_record(s.get("record"), "operator")
             if s.get("kind") == "exo" and not self.exo_events:
                 return []                     # the host's own input (commands, retractions): not news
             f = from_signal(s, _Now(self.repl.counts))[0]

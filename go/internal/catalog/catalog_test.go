@@ -3,6 +3,7 @@ package catalog
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -46,11 +47,15 @@ func TestListIsTheLoaders(t *testing.T) {
 	if err != nil {
 		t.Skip(err) // the loader not importable here
 	}
-	names := map[string]bool{}
+	names := map[string]Entry{}
 	for _, e := range es {
-		names[e.Name] = true
+		names[e.Name] = e
 	}
-	if !names["dog"] || !names["kitchen"] || !names["wildfire"] {
+	if names["dog"].Name == "" || names["kitchen"].Name == "" || names["wildfire"].Name == "" {
 		t.Fatalf("list %v", names)
+	}
+	// a partner is its own row, with what it has and its lead, as py's
+	if p := names["kitchen_shared"]; p.Kind != "partner" || p.PartnerOf != "kitchen" || !strings.Contains(string(p.Has), `"agent": true`) {
+		t.Fatalf("partner row %+v (has %s)", p, p.Has)
 	}
 }

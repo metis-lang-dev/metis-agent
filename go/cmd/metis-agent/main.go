@@ -194,15 +194,8 @@ func main() {
 				if err != nil {
 					log.Printf("[catalog] the console's list: %v (the served domains only)", err)
 				}
-				in := map[string]bool{}
-				for _, e := range es {
-					in[e.Name] = true
-					v3.Listed = append(v3.Listed, agent.Listed{Name: e.Name, Kind: e.Kind, Display: e.Display, Line: e.Line, Has: e.Has})
-				}
-				for n, m := range manifests { // a partner the loader lists under its lead (kitchen_shared): its own row
-					if !in[n] && m.PartnerOf != "" {
-						v3.Listed = append(v3.Listed, agent.Listed{Name: n, Kind: "partner", Display: m.Display, Line: m.Line})
-					}
+				for _, e := range es { // a partner (kitchen_shared) its own row, as py's
+					v3.Listed = append(v3.Listed, agent.Listed{Name: e.Name, Kind: e.Kind, Display: e.Display, Line: e.Line, Has: e.Has, PartnerOf: e.PartnerOf})
 				}
 			}
 		}

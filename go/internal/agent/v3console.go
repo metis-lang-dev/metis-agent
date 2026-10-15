@@ -17,6 +17,7 @@ import (
 type Listed struct {
 	Name, Kind, Display, Line string
 	Has                       json.RawMessage
+	PartnerOf                 string // a partner's lead (kind partner)
 }
 
 // V3Frame is one frame for the page: {ev, …F}.
@@ -183,6 +184,9 @@ func (v *v3) catalog() []map[string]any {
 			e["line"], e["has"], e["kind"] = l.Line, l.Has, l.Kind
 			if l.Display != "" {
 				e["display"] = l.Display
+			}
+			if l.PartnerOf != "" {
+				e["partner_of"] = l.PartnerOf
 			}
 		}
 		if c := ld.changed[n]; c != "" {

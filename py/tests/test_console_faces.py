@@ -152,6 +152,40 @@ def test_records_sink_open_escalate_explain(tmp_path):
         del os.environ["METIS_PAIR_DIR"]
 
 
+def test_records_sink_the_operators_close(tmp_path):
+    """The watch's operator=N resume (an escalated record still open N beats
+    on: the human the escalation reached adopts the reading) closes the
+    record by "operator" with an event signal, not a tool result: its close
+    is sunk too (architect's follow-up on e2e step 1)."""
+    import json
+    import os
+    import tempfile
+    from metis_agent.domain_agent import DomainAgent, records_path
+    from metis_agent.domains import kitchen, kitchen_shared
+    os.environ["METIS_PAIR_DIR"] = tempfile.mkdtemp()
+    try:
+        a, b = DomainAgent(kitchen), DomainAgent(kitchen_shared)
+        a.session, a.sink = "s1", records_path(kitchen, str(tmp_path), "s1")
+        while a.watch.open is None:
+            for ag in (a, b):
+                ag.handle({"clock": "step"})
+                if a.watch.open is not None:
+                    break
+        a.handle({"tool": "escalate", "id": "e1", "args": {"record": 0, "text": "someone else loaded the pot"}})
+        a.watch.operator = 1                                             # watch operator=1
+        for _ in range(20):
+            if a.watch.open is None:
+                break
+            for ag in (a, b):
+                ag.handle({"clock": "step"})
+        assert a.watch.open is None and a.repl.loop.records[0]["resolution"]["by"] == "operator"
+        lines = [json.loads(l) for l in a.sink.read_text().splitlines()]
+        assert [(l["record"], l["close"]["status"]) for l in lines] == [(0, "open"), (0, "escalated"), (0, "operator")]
+        assert lines[2]["resolution"]["by"] == "operator"
+    finally:
+        del os.environ["METIS_PAIR_DIR"]
+
+
 def test_no_sink_without_the_flag(tmp_path):
     from metis_agent.domain_agent import DomainAgent
     ag = DomainAgent(dog)

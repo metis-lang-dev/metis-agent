@@ -108,19 +108,35 @@ type Entry struct {
 	Display string          `json:"display"`
 	Line    string          `json:"line"`
 	Has     json.RawMessage `json:"has"`
+
+	PartnerOf string `json:"partner_of,omitempty"`
 }
 
-// List is the consoles' list as the catalog's loader makes it (python is
-// an interpreter with metis_catalog importable, or the checkout beside it
-// on its path).
+// listPy is py's service.catalog_list: the loader's domains, then each
+// partner (listed under its lead in the index) as its own row, with what
+// it has by the loader's rule.
+const listPy = `import json, sys
+import metis_catalog as mc
+out = [{k: e.get(k) for k in ("name", "kind", "path", "display", "line", "has")}
+       for e in mc.index() if e["kind"] == "domain"]
+for d in mc.domains():
+    if d.partner_of:
+        out.append({"name": d.name, "kind": "partner", "path": str(d.dir), "display": d.display,
+                    "line": d.line, "has": d.has(), "partner_of": d.partner_of})
+json.dump(out, sys.stdout, default=str)
+`
+
+// List is the consoles' list as the catalog's loader makes it, a partner
+// as its own row (python is an interpreter with metis_catalog importable,
+// or the checkout beside it on its path).
 func List(python, root string) ([]Entry, error) {
 	if strings.Contains(python, "/") {
 		if abs, err := filepath.Abs(python); err == nil {
 			python = abs // the command runs in root
 		}
 	}
-	cmd := exec.Command(python, "-m", "metis_catalog", "list", "--domains", "--json")
-	cmd.Dir = root // the checkout: `-m metis_catalog` finds the package there when it is not installed
+	cmd := exec.Command(python, "-c", listPy)
+	cmd.Dir = root // the checkout: `import metis_catalog` finds the package there when it is not installed
 	b, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
