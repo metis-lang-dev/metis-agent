@@ -115,6 +115,8 @@ func (p *DomainProc) Do(req map[string]any) ([]map[string]any, error) {
 		kind = "ports"
 	case req["reload"] != nil:
 		kind = "reload"
+	case req["add"] != nil:
+		kind = "add"
 	}
 	t0 := time.Now()
 	if _, err := p.in.Write(append(b, '\n')); err != nil {

@@ -32,6 +32,10 @@ type DomainSpec struct {
 	// Watch: domain → its catalog directory, watched for changes on disk
 	// (e2e-workflow step 3: the panel marks it changed; reload takes it)
 	Watch map[string]string `yaml:"watch"`
+	// Into (v3.install only): the configured process a hot-installed
+	// domain joins ({"add"} on its line: its model and consult seat
+	// shared), instead of a process of its own from Argv
+	Into string `yaml:"into"`
 }
 
 // ClockSpec is one clock line per tick: a domain's beat, n env beats of a pair.

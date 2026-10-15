@@ -77,13 +77,14 @@ type Domains interface {
 
 // V3Config is the orchestrator's configuration.
 type V3Config struct {
-	Catalog []string          // the domains activate can attach
-	Loaded  []string          // the loaded domains
+	Catalog []string // the domains activate can attach
+	Loaded  []string // the loaded domains
 	// IntentDomains: the served domains with intent material, in the
 	// system turn's order; two or more: every J names its domain
 	// (e2e-workflow step 4), an alternative a domain offers is named for it
 	IntentDomains []string
-	Display map[string]string // a card's display name, for the explains line
+	Asks          map[string][]string // per intent domain, its verbs that ask (intent.yaml asks:)
+	Display       map[string]string   // a card's display name, for the explains line
 
 	// the E13 step 1 ruling (DESIGN v3 727ee7d); all off = E13 t3
 	AskCheck         bool // the ask's words in the cue and checked after generation, a miss re-asked (else a required literal)
@@ -250,7 +251,7 @@ func (o *Orch) Turn(person, gbnf string) (intent, voice string, err error) {
 			o.q, q = q, nil
 		}
 	}
-	if c.IsJ() && !talk && verb != "QUERY" && verb != "STOP" && verb != "CANCEL" && strings.HasSuffix(words, "?") {
+	if c.IsJ() && !talk && !o.isAsk(c) && verb != "STOP" && verb != "CANCEL" && strings.HasSuffix(words, "?") {
 		// question-form words moved as a world command: judged info or
 		// command (integration step 2 ruling: after the kitchen's lines,
 		// "what are you doing?" was dispatched as MOVE FORWARD)

@@ -608,7 +608,7 @@ def records_path(module, where, session):
 
 def kind_of(msg):
     """The ack's kind for a non-clock line."""
-    for k, name in (("reset", "reset"), ("reload", "reload"), ("verb", "intent"), ("tool", "tool"), ("world", "world"),
+    for k, name in (("reset", "reset"), ("reload", "reload"), ("add", "add"), ("verb", "intent"), ("tool", "tool"), ("world", "world"),
                     ("ports", "ports")):
         if k in msg:
             return name
@@ -692,14 +692,18 @@ class Domains:
         return out
 
 
-def serve(agent, msg, rebuild, reload=None):
+def serve(agent, msg, rebuild, reload=None, add=None):
     """One input line → the output lines: the agent's replies, then the ack
     (non-clock lines). A reset swaps the agent (rebuild(seed, case,
     pair_dir)) and answers ready; a reload swaps one domain (its pair with
     it) for one built from the files on disk (reload(agent, domain) →
-    (agent, replies)); it returns the agent that serves the next line."""
+    (agent, replies)); an add joins a domain not served at start (its pair
+    with it) built from its manifest (add(agent, domain) → (agent,
+    replies)); it returns the agent that serves the next line."""
     if "reload" in msg and reload is not None:
         agent, out = reload(agent, msg.get("domain"))
+    elif "add" in msg and add is not None:
+        agent, out = add(agent, msg.get("domain"))
     elif "reset" in msg:
         r = msg["reset"] or {}
         try:
@@ -712,7 +716,7 @@ def serve(agent, msg, rebuild, reload=None):
             out = agent.handle(msg)
         except Exception as e:     # the agent itself failed: an error reply, the process lives
             out = [reply(agent.name, "error", id=msg.get("id"), error="%s: %s" % (type(e).__name__, e))]
-    if "reset" not in msg and "reload" not in msg:   # --trace: what the line made each agent do, before its ack (or clock line)
+    if "reset" not in msg and "reload" not in msg and "add" not in msg:   # --trace: what the line made each agent do, before its ack (or clock line)
         ags = agent.agents.values() if isinstance(agent, Domains) else [agent]
         ts = [t for t in (a.trace() for a in ags if a.tracing) if t]
         if ts:
@@ -799,6 +803,30 @@ class Process:
         self.names += list(names)
         self.modules += mods
         return ags
+
+    def add_line(self, agent, d):
+        """{"add": {}, "domain": d} on the line (e2e-workflow step 4, WIRE.md;
+        the Go backend's hot-install into a process that holds the model):
+        d and its pair not served here built from their manifests on this
+        process's model and seat (add), joined to its Domains; one added
+        {key} per domain, or an error and nothing changed."""
+        from . import domains
+        ags = agent.agents if isinstance(agent, Domains) else {agent.name: agent}
+        try:
+            m = domains.catalog().get(d)
+        except Exception as e:  # noqa: BLE001 — no manifest: refused, nothing changed
+            return agent, [reply(agent.name, "error", error="add: no domain %r in the catalog (%s)" % (d, e))]
+        if d in ags:
+            return agent, [reply(d, "error", error="add: %s is served here already" % d)]
+        if m.partner_of:
+            return agent, [reply(d, "error", error="add: %s is stepped with its pair: add %s" % (d, m.partner_of))]
+        group = [d] + [p for p in (m.pair or ()) if p not in ags]
+        try:
+            new = self.add(group)
+        except Exception as e:  # noqa: BLE001 — the old set serves on
+            return agent, [reply(d, "error", error="add: %s: %s" % (type(e).__name__, e))]
+        agent = Domains(list(ags.values()) + new)
+        return agent, [reply(a.name, "added", key=a.repl.key) for a in new]
 
     def reload(self, agent, d):
         """reload(domain) (e2e-workflow step 3, WIRE.md): the domain's
@@ -890,7 +918,7 @@ def main():
                    narrate=(None if not a.narrate else "*" if a.narrate == "*" else a.narrate),
                    llm=llm, seat=seat, missing_seat=a.missing_seat, trace=a.trace,
                    records=a.records, session=a.session)
-    build, reload = proc.build, proc.reload
+    build, reload, add = proc.build, proc.reload, proc.add_line
     agent = build(a.seed, a.case)
     print(json.dumps(ready(agent)), flush=True)
     for line in sys.stdin:
@@ -901,7 +929,7 @@ def main():
         except ValueError as e:
             out = [reply(agent.name, "error", error="not JSON: %s" % e), {"ack": "error", "id": None}]
         else:
-            agent, out = serve(agent, msg, build, reload)
+            agent, out = serve(agent, msg, build, reload, add)
         for r in out:
             print(json.dumps(r), flush=True)
 

@@ -51,7 +51,7 @@ type V3Service struct {
 	// of a catalog domain no process serves starts one for it from its
 	// manifest — Install's argv with "{domains}" the domain and its pair
 	Root, Python, Template string
-	Install              *DomainSpec
+	Install                *DomainSpec
 }
 
 type v3 struct {
@@ -127,7 +127,7 @@ func (a *Agent) startV3(l *llm.LLM) error {
 		}
 	}
 	v := &v3{l: ol, prompt: b.String(), gbnf: gbnf, nctx: sc.NCtx, sc: sc,
-		cfg: V3Config{Catalog: sc.Catalog, Loaded: sc.Loaded, Display: sc.Display, IntentDomains: domainNames(sc.Intents),
+		cfg: V3Config{Catalog: sc.Catalog, Loaded: sc.Loaded, Display: sc.Display, IntentDomains: domainNames(sc.Intents), Asks: asksOf(sc.Intents),
 			AskCheck: ruled, AgainPick: ruled, EscalateTemplate: ruled, Mirror: true, Rollback: true}}
 	v.listed = sc.Listed
 	v.rec = &idEmitter{Emitter: a.out}

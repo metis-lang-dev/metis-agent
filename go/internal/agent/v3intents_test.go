@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/metis-lang-dev/metis-agent/go/internal/catalog"
 )
 
 const plantG = `intent ::= "\"WATER\"" | "\"CHECK\"" | "\"UNKNOWN\""
@@ -94,5 +96,41 @@ func TestTagJ(t *testing.T) {
 	}
 	if JDomain(Call{J: []byte(`{"intent":"STOP"}`)}) != "" {
 		t.Fatal("untagged has a domain")
+	}
+}
+
+// The info-or-command judge's exemption is data: a domain's asks
+// (intent.yaml); the dog's QUERY only without intent material.
+func TestAsks(t *testing.T) {
+	o := &Orch{}
+	if !o.isAsk(Call{J: []byte(`{"intent":"QUERY"}`)}) {
+		t.Fatal("no intent material: QUERY is the fixtures' ask")
+	}
+	o.cfg.IntentDomains, o.cfg.Asks = []string{"dog", "plant"}, asksOf([]IntentDomain{{Name: "dog", Asks: []string{"QUERY"}}, {Name: "plant", Asks: []string{"CHECK"}}})
+	for j, want := range map[string]bool{`{"intent":"QUERY"}`: true, `{"domain":"plant","intent":"CHECK"}`: true,
+		`{"domain":"plant","intent":"WATER"}`: false, `{"domain":"dog","intent":"CHECK"}`: false, `{"intent":"NAVIGATE"}`: false} {
+		if got := o.isAsk(Call{J: []byte(j)}); got != want {
+			t.Fatalf("%s: %v", j, got)
+		}
+	}
+	o.cfg.Asks = asksOf([]IntentDomain{{Name: "dog"}}) // a dog file without asks: QUERY is judged
+	if o.isAsk(Call{J: []byte(`{"intent":"QUERY"}`)}) {
+		t.Fatal("QUERY exempt without the file saying so")
+	}
+}
+
+// The dog's intent material from its manifest: its prompt and examples,
+// its grammar, its asks (QUERY, in its intent.yaml).
+func TestIntentOfTheDog(t *testing.T) {
+	ms, err := catalog.Scan("../../../../metis-catalog")
+	if err != nil || ms["dog"].Name == "" {
+		t.Skip("metis-catalog not beside metis-agent")
+	}
+	d, ok, err := IntentOf(ms["dog"], "gemma4")
+	if err != nil || !ok {
+		t.Fatal(ok, err)
+	}
+	if len(d.Asks) != 1 || d.Asks[0] != "QUERY" || !strings.HasPrefix(d.Prompt, "You are Nina") || !strings.Contains(d.Grammar, "root ::=") {
+		t.Fatalf("asks %v", d.Asks)
 	}
 }

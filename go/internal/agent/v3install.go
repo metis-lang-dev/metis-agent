@@ -5,10 +5,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/catalog"
+	"gopkg.in/yaml.v3"
 )
 
 // Hot-install (e2e-workflow s-143c3088 step 4, the architect's ruling):
@@ -47,6 +49,17 @@ func IntentOf(m catalog.Manifest, template string) (IntentDomain, bool, error) {
 		return d, false, fmt.Errorf("%s's intent: %w", m.Name, err)
 	}
 	d.Grammar = string(b)
+	if m.Intent.Spec != "" { // the verbs that ask (intent.yaml asks:)
+		var spec struct {
+			Asks []string `yaml:"asks"`
+		}
+		if b, err := os.ReadFile(m.Path(m.Intent.Spec)); err == nil {
+			if err := yaml.Unmarshal(b, &spec); err != nil {
+				return d, false, fmt.Errorf("%s's intent.yaml: %w", m.Name, err)
+			}
+			d.Asks = spec.Asks
+		}
+	}
 	return d, true, nil
 }
 
@@ -56,7 +69,7 @@ func (v *v3) install(dom string) error {
 	if sc.Root == "" {
 		return fmt.Errorf("no domain agent serves %s, and there is no catalog to install it from", dom)
 	}
-	if sc.Install == nil || len(sc.Install.Argv) == 0 {
+	if sc.Install == nil || (len(sc.Install.Argv) == 0 && sc.Install.Into == "") {
 		return fmt.Errorf("no domain agent serves %s, and the configuration has no v3.install to start one", dom)
 	}
 	ms, err := catalog.Scan(sc.Root)
@@ -88,27 +101,57 @@ func (v *v3) install(dom string) error {
 			spec.Watch[d] = dm.Dir
 		}
 	}
-	lf, _ := os.Create(fmt.Sprintf("%s-%s.log", journalStem(sc.Journal), spec.Name))
-	p, err := StartDomain(spec.Name, spec.Argv, spec.Dir, append([]string{"METIS_CONFIG="}, spec.Env...), lf)
-	if err != nil {
-		return fmt.Errorf("%s's domain agent: %w", dom, err)
-	}
-	p.OnTook = func(t Took) { ld.wire(spec.Name, t) }
-	ld.pmu.Lock()
-	ld.specs = append(ld.specs, spec)
-	ld.byName[spec.Name] = p
-	for _, d := range doms {
-		ld.procs[d] = p
-	}
-	ld.pmu.Unlock()
-	for d, dir := range spec.Watch {
-		base := snapshot(dir)
+	var p *DomainProc
+	if into := sc.Install.Into; into != "" { // joined to a running process: its model and its consult seat
+		p = ld.byName[into]
+		if p == nil {
+			return fmt.Errorf("v3.install.into names %q, which is no configured process", into)
+		}
+		rs, err := p.Do(map[string]any{"add": map[string]any{}, "domain": dom})
+		if err != nil {
+			return fmt.Errorf("%s: add: %w", dom, err)
+		}
+		added := 0
+		for _, r := range ld.sift(rs) {
+			switch r["kind"] {
+			case "error":
+				e, _ := r["error"].(string)
+				return fmt.Errorf("%s", e)
+			case "added":
+				added++
+			}
+		}
+		if added == 0 {
+			return fmt.Errorf("%s: the domain agent did not add it (no added reply)", dom)
+		}
 		ld.pmu.Lock()
-		ld.watch[d] = dir
+		for i := range ld.specs {
+			if ld.specs[i].Name == into {
+				s := ld.specs[i]
+				s.Domains = append(append([]string(nil), s.Domains...), doms...)
+				s.Clocks = append(append([]ClockSpec(nil), s.Clocks...), spec.Clocks...)
+				s.Quiet = append(append([]string(nil), s.Quiet...), spec.Quiet...)
+				ld.specs[i] = s
+			}
+		}
+		for _, d := range doms {
+			ld.procs[d] = p
+		}
 		ld.pmu.Unlock()
-		ld.jmu.Lock()
-		ld.base[d] = base
-		ld.jmu.Unlock()
+	} else {
+		lf, _ := os.Create(fmt.Sprintf("%s-%s.log", journalStem(sc.Journal), spec.Name))
+		var err error
+		if p, err = StartDomain(spec.Name, spec.Argv, spec.Dir, append([]string{"METIS_CONFIG="}, spec.Env...), lf); err != nil {
+			return fmt.Errorf("%s's domain agent: %w", dom, err)
+		}
+		p.OnTook = func(t Took) { ld.wire(spec.Name, t) }
+		ld.pmu.Lock()
+		ld.specs = append(ld.specs, spec)
+		ld.byName[spec.Name] = p
+		for _, d := range doms {
+			ld.procs[d] = p
+		}
+		ld.pmu.Unlock()
 	}
 	log.Printf("[v3] installed %s (%v) from its manifest: pid %d", dom, doms, p.Pid())
 	// the orchestrator's side: the card, the enum, the display names, the intents
@@ -152,9 +195,9 @@ func (v *v3) reprime(why string) error {
 		}
 		v.gbnf = g
 	}
-	v.cfg.IntentDomains = domainNames(sc.Intents)
+	v.cfg.IntentDomains, v.cfg.Asks = domainNames(sc.Intents), asksOf(sc.Intents)
 	if turn == v.prompt {
-		v.o.cfg.IntentDomains = v.cfg.IntentDomains
+		v.o.cfg.IntentDomains, v.o.cfg.Asks = v.cfg.IntentDomains, v.cfg.Asks
 		return nil
 	}
 	n, err := v.l.BeginDialog(turn)
@@ -175,7 +218,7 @@ func (v *v3) reprime(why string) error {
 func (o *Orch) restartDialog(n int, cfg V3Config) {
 	o.pend.Reset()
 	o.open, o.said, o.nPast = false, nil, n
-	o.cfg.Catalog, o.cfg.Loaded, o.cfg.Display, o.cfg.IntentDomains = cfg.Catalog, cfg.Loaded, cfg.Display, cfg.IntentDomains
+	o.cfg.Catalog, o.cfg.Loaded, o.cfg.Display, o.cfg.IntentDomains, o.cfg.Asks = cfg.Catalog, cfg.Loaded, cfg.Display, cfg.IntentDomains, cfg.Asks
 	o.api = replAPI(cfg.Catalog, cfg.Loaded)
 }
 
@@ -202,7 +245,7 @@ func (v *v3) reloadIntents(dom string) error {
 	if err != nil || !ok {
 		return fmt.Errorf("%s's intent material: %v", dom, err)
 	}
-	if it == v.sc.Intents[i] {
+	if reflect.DeepEqual(it, v.sc.Intents[i]) {
 		return nil
 	}
 	intents := append([]IntentDomain(nil), v.sc.Intents...)

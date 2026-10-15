@@ -72,10 +72,12 @@ v3:
           dir: ../py
           domains: [dog, kitchen, kitchen_shared]   # clocks (clock.beats), quiet partners (partner_of), the watched directories: their manifests
     # hot-install (e2e-workflow step 4): activate of a catalog domain no process
-    # above serves starts one for it (and its pair) from its manifest — its clock,
-    # its card in the system turn, its name in the enum, its intent material —
-    # and the dialog starts again on the rebuilt system turn; no narrator (the
-    # model stays one, in the process above)
+    # above serves builds its agent (and its pair's) from its manifest — its
+    # clock, its card in the system turn, its name in the enum, its intent
+    # material — and the dialog starts again on the rebuilt system turn. into:
+    # the process above takes it ({"add"} on its line), so it shares that
+    # process's model and consult seat (a surprise is consulted, escalated,
+    # sunk); without into, argv starts a process of its own ("{domains}": the
+    # domain and its pair), which has no model unless its argv loads one
     install:
-        argv: [.venv/bin/python, -m, metis_agent.domain_agent, --domain, "{domains}", --case, live, --trace, --records]
-        dir: ../py
+        into: agents

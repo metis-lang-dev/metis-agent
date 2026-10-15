@@ -24,6 +24,10 @@ type IntentDomain struct {
 	Display string // "the plant"
 	Prompt  string // its prompt, then its pass-2 examples for the template
 	Grammar string // its intent grammar (GBNF)
+	// Asks: its verbs that ask the domain something (intent.yaml asks:, the
+	// plant's CHECK): words in question form mapped to one are the domain's
+	// question, never judged talk (the dog's QUERY always is)
+	Asks []string
 }
 
 // IntentTurn is the system turn's intent part: the first domain's material
@@ -206,6 +210,35 @@ func prefixGrammar(g, p string) (string, error) {
 		out.WriteString("\n")
 	}
 	return out.String(), nil
+}
+
+func asksOf(ds []IntentDomain) map[string][]string {
+	if len(ds) == 0 {
+		return nil // no intent material: the fixtures' dog (isAsk)
+	}
+	out := map[string][]string{}
+	for _, d := range ds {
+		if len(d.Asks) > 0 {
+			out[d.Name] = d.Asks
+		}
+	}
+	return out
+}
+
+// isAsk: the J asks its domain something — a verb its domain lists under
+// asks (intent.yaml; the dog's QUERY is in its file). With no intent
+// material configured (llmbench's E13 fixtures: the dog's prompt files),
+// the dog's QUERY.
+func (o *Orch) isAsk(c Call) bool {
+	v := c.Verb()
+	if o.cfg.Asks == nil {
+		return v == "QUERY"
+	}
+	d := JDomain(c)
+	if d == "" && len(o.cfg.IntentDomains) > 0 {
+		d = o.cfg.IntentDomains[0]
+	}
+	return slicesContains(o.cfg.Asks[d], v)
 }
 
 func domainNames(ds []IntentDomain) []string {

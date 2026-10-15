@@ -21,7 +21,7 @@ there is no talk mode: every `say_text` is a person turn.
 | `say_text` | `id`, `text`, `mode?` (ignored) | a person turn of the orchestrator (`dlg-wake{what: person}`); answered by `intent` |
 | `world` | `domain`, `atoms: [str]` (also `mode` = domain, `text` = space-separated atoms, the first shape) | do-lines on the domain's world, applied on its next tick; answered by `world_ack`; then `ports` again after that tick |
 | `ports` | `domain` | the domain's world ports now (a tab opened) |
-| `activate` · `deactivate` | `domain`, `bindings?` | the intent interface's domain verbs from the page; answered by `domain_ack`, then `catalog` |
+| `activate` · `deactivate` | `domain`, `bindings?` | the intent interface's domain verbs from the page; answered by `domain_ack`, then `catalog`. Activate of a catalog domain no domain agent serves installs it from its manifest (e2e-workflow step 4, hot-install): its agent (and its pair's) built at run time, its clock, its card and its name in the activate enum, its intent material; the system turn rebuilt and the dialog begun again on it (`dlg-restart`), the mirror's line "installed" |
 | `reload` | `domain` | the domain rebuilt from the files on disk (e2e-workflow step 3): its program recompiled, its `intent.yaml` and host re-read, activated again with the same bindings; the kitchen pair reloads together (`kitchen`; `kitchen_shared` alone is refused); answered by `reload_ack`. A failed compile leaves the old domain running. The dialog keeps its past; the mirror's line says "reloaded" and the domain's tasks in flight are dropped (the new runtime does not know them); a regenerated intent grammar is the one the next turn is held to |
 | `heard` | `id` (a narration's), `text` | the page voiced it, this much (as FRAMEWORK §5) |
 | `cut` | `id`, `heard` | barge-in on turn `id` (no effect on the orchestrator's dialog in v1) |
@@ -56,11 +56,12 @@ Every record: `kind`, `seq` (1…, the session's order), `t` (RFC 3339),
 |---|---|
 | `dlg-start` | `why` (the clock started: `first viewer`) |
 | `dlg-wake` | person: `what: person`, `person` (the words), `wait_ms?` (from the words' arrival to the turn's start: queued behind a consult). A reply: `beat`, `rank` (the floor's), `domain`, `what` (`kind[:status]`: `result:refused`, `quiescence`, `surprise`, `notice`, `event` …), `cid`, `text`, `record?`, `voice?` (the text's origin: `narrator` · `line` · `ref`), `difference?` (a surprise's, the object as sent) |
-| `dlg-gen` | `label` (`move` · `voice` · `answer` · `rollback`), `branch` (`person` · `bound` · `none` · `answer` · `surprise` · `speak` · `""` for an outcome's voice …), `harness` (the harness wrote it, no model), `text`, `n_ctx`, `ms`, `try` |
-| `dlg-dispatch` | `cid`, `j` (the intent sent to the domain), `wait_ms?` (in a person turn: from the words' arrival to this dispatch, before the send) |
+| `dlg-gen` | `label` (`move` · `voice` · `answer` · `rollback`), `branch` (`person` · `bound` · `none` · `answer` · `surprise` · `speak` · `""` for an outcome's voice …), `harness` (the harness wrote it, no model), `text`, `n_ctx`, `ms`, `try`, `domain?` (a move that is a J: the domain whose intent material mapped the words) |
+| `dlg-dispatch` | `cid`, `j` (the intent sent to the domain), `domain` (where it went: the J's own `domain` with several intent domains, else the one), `wait_ms?` (in a person turn: from the words' arrival to this dispatch, before the send) |
+| `dlg-restart` | `why` (`install <d>` · `reload <d>`), `n_ctx` (the new system turn's tokens), `intents` (the intent domains, in the turn's order), `catalog` — the system turn rebuilt and the dialog begun again on it, the harness's state kept |
 | `dlg-say` | `what` (`voice` · `template` · `ask` · `turn`), `text`, `src: {by: model \| harness \| rollback, gen?, wake, domain?, what, branch?}` — `gen` the `dlg-gen` that carries the line, `wake` the `dlg-wake` it answers, `branch` `outcome` for `""`. `turn` is a person turn's own line (the reads take it from its `dlg-gen` and skip this record) |
 | `dlg-world` | `domain`, `lines`, `error?` |
-| `dlg-domain` | `verb` (`activate` · `deactivate` · `reload`), `domain`, `by` (`person` · `model`), `bindings?`, `key?` (reload), `error?` |
+| `dlg-domain` | `verb` (`activate` · `deactivate` · `reload`), `domain`, `by` (`person` · `model`), `bindings?`, `key?` (reload), `installed?` (activate: built from its manifest now), `error?` |
 | `dlg-wire` | `proc`, `what` (`intent` · `tool` · `world` · `ports`), `ms`, `replies` — one per request; `what: clock` is a summary every 40 beats: `n`, `ms` (mean), `max_ms` |
 | `dlg-trace` | the domain agent's `--trace` reply as sent (`domain`, `beat`, `fired`, `narrated`, `consults`, `reads`, `world`, `more?`): the domain tab's REPL log; never an inbound |
 
@@ -69,6 +70,7 @@ Every record: `kind`, `seq` (1…, the session's order), `t` (RFC 3339),
 `{"ports": {}, "domain": d}` → `{kind: ports, …}` then `{ack: ports}`;
 `{"world": [lines], "domain": d}` → (an `error` reply) then `{ack: world}`;
 `{"reload": {}, "domain": d}` → one `{kind: reloaded, domain, key}` per domain rebuilt (the pair: two), or `{kind: error, error}` (the old domain runs on), then `{ack: reload}` — the model, the tracing and the records sink kept, the live case's host live again;
+`{"add": {}, "domain": d}` → one `{kind: added, domain, key}` per domain built from its manifest (its pair with it) and joined to this process (its model, its consult seat, its tracing and records sink), or `{kind: error, error}` (served here already, a partner alone, no manifest: nothing changed), then `{ack: add}` — the Go backend's hot-install with `v3.install.into`;
 with `--trace`, a `{kind: trace, …}` reply before each line's ack or clock
 line. A backend whose domain agents run in its own process calls the same
 functions; the frames above are what the page sees either way.

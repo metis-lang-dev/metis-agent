@@ -136,6 +136,33 @@ After experience with both, a function may move from one side to the other
 (a domain's `stop` could become API; a domain's `activate` could become an
 intent of an always-on domain); the two sides keep their semantics.
 
+**Several intent domains: the J names its domain** (e2e-workflow s-143c3088
+step 4, the architect's ruling, 2026-10-15; opus's design, accepted). The
+orchestrator dispatches to a domain, and that domain's intent material maps
+the words: each served domain with an `intent:` in its manifest brings its
+prompt, its pass-2 examples and its generated grammar. With one intent
+domain the system turn opens with its prompt and the person turn's grammar
+is its own, byte for byte (the dog alone: the turn and the grammar of
+before; t3, the timelines and the corpus unchanged). With two or more, every
+J names its domain first — `{"domain":"plant","intent":"WATER"}` — under
+one grammar whose branches are the domains' own grammars (each domain's
+rules renamed under its prefix, its root's object opened by `"domain"`), so
+the pick and the intent are one generation; the system turn holds each
+further domain's prompt under its own heading and a "Several domains" block
+of tagged examples. The dispatch reads the domain off the J; an alternative
+a domain offers is tagged for it; the bound question's retry compares the
+refused J with its tag. **The switch counts the SERVED intent domains, not
+the active ones**: activate and deactivate never rebuild the turn, a J for a
+deactivated domain gets its "not active" reply; only a hot-install or a
+reload whose intent material changed rebuilds the system turn, and the
+dialog begins again on it with the harness's state kept. A domain may name
+the verbs that ask it something (`intent.yaml` `asks:`, the plant's
+`CHECK`): words in question form mapped to one are its question, never
+judged talk (the dog's `QUERY` always is). **Hot-install**: activate of a
+catalog domain no agent serves builds it from its manifest at run time
+(both backends; the Go backend joins it to the process that holds the model,
+`{"add"}` on its line, so its surprise is consulted on the same seat).
+
 **In: the generic reply.** One shape, domain-independent, from every domain
 agent, for every kind:
 
@@ -586,6 +613,31 @@ sampled draws; flash attention auto vs off changes nothing, 90/114 both), none
 changing a read. Aligning the builds is a separate infrastructure item, parked;
 when either pin moves, the traces and the reads are the regression, not the
 114 generations.
+
+### Two stacks, one behaviour (user, 2026-10-15): Python develops, Go deploys
+
+The user settled what the two backends are for, which also settles the
+orchestrator/domain-agent split between them:
+
+- **metis-agent/py is the development stack.** The orchestrator (upper half)
+  and the domain agent (lower half) run on *separate* LLM contexts on
+  purpose: the AI agent developing a domain from metis-loop-agent must be able
+  to exercise the lower half directly, with the upper half emulated
+  (`orch_emu`), and the human developer's loop console runs against the same
+  stack. Everything new lands here first.
+- **metis-agent/go is the deployment runtime** for an enhanced small LLM: the
+  compiled IR runtime (the cgo binding of the C++ kernel) plus one small
+  model, with the optimization that the upper and lower halves run **on the
+  same LLM with context and RAG swapping** (KV swap per context, examples by
+  retrieval — E12's one-model question, decided here as the Go deployment
+  shape, not as a question for the development stack). Logic parity with py
+  stays the bar for its behaviour (the traces, the reads); the one-model
+  optimization is measured against the same reads at the smaller footprint.
+- **Compiling an .llp script into the C++ IR runtime** is a separate process
+  that belongs to the project using the behaviour runtime, not to
+  metis-agent; metis-agent's Go side consumes the compiled IR.
+- **The AI agent's loop** (agent-loop subject) is built in Python land only.
+  The pi.dev framework is an experiment or a convenience, not needed now.
 
 ### One catalog, two consoles, one look (user, 2026-10-14 night)
 
