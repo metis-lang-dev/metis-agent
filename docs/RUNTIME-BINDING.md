@@ -31,7 +31,7 @@ way:
 | | llama.cpp | the metis runtime |
 |---|---|---|
 | the library | `libllama.so` (CMake, llama.cpp/) | **`libmetis_rt.so`** (CMake, metis-lang/runtime/): the header-only kernel plus one translation unit `metis_rt.cpp` that implements the C ABI |
-| the C API | `include/llama.h` | **`runtime/c/metis_rt.h`**: opaque handles, POD event structs, error strings — the same ABI a C or C++ device host links |
+| the C API | `include/llama.h` | **`runtime/c/metis_rt.h`**: opaque handles, POD event structs, error strings — the same ABI a C or C++ device host links. **The header states ownership and the error model** (the architect's note at step 3): every `metis_rt_*` handle is created by a `_load`/`_new` and freed by its `_free` (the caller owns it); strings and arrays inside an event are owned by the handle and valid until the next call on it; snapshots are caller buffers (a size query, then a fill); every fallible call returns a status, and `metis_rt_error(rt)` gives the last error's text, owned by the handle |
 | build.sh | `LLAMA_DIR`, `CGO_CFLAGS`, `CGO_LDFLAGS`, rpath | **`METIS_LANG_DIR`** (default: the sibling metis-lang), `-I$METIS_LANG_DIR/runtime/c`, `-L$METIS_LANG_DIR/runtime/build -lmetis_rt`, the same rpath |
 | the Go package | `go/internal/llm` | **`go/internal/rt`** |
 | CI | the Go job builds llama.cpp at a pinned commit, cached | the Go job checks out metis-lang at a pinned commit and runs `cmake --build runtime/build`, cached on the commit |
@@ -244,7 +244,9 @@ The journals of both modes are diffed in CI on the scripted days.
      `metis_rt` (an empty C ABI so far), the six tools, ctest with the
      goldens and the smokes on fixtures metispy generates;
    - `runtime/BUILD.bazel` from the archive;
-   - metis-lang CI builds it.
+   - metis-lang CI builds it;
+   - **`metis_rt_conformance` is the first ctest gate** (the goldens
+     through the C ABI, 46/46).
 
    Gate: `ci/check.sh` ALL GATES GREEN, ctest green.
 2. **The artifact.** metispy's emitter (`python -m metis.kernel.artifact
@@ -282,7 +284,10 @@ The journals of both modes are diffed in CI on the scripted days.
      verbs (explain = the witness over `Effect` + `Do` named for the move,
      checked against metispy's on the kitchen and the plant);
    - the sink with the JSON env, the ports reply, the pair scene;
-   - the narrator fed by `OnEvent`, the template consult.
+   - the narrator fed by `OnEvent`, the template consult;
+   - **reload = rebuild the artifact** through metispy's emitter from the
+     program plus its packs, then `Reload` (the architect's note at
+     step 3), so the human loop's `apply` reaches the device.
 4. **Parity without a model.** py's reply streams with the template seat on
    the scripted days, diffed against Go's.
 5. **The switch and parity on the model.** `v3.kernel: py | cgo`; the
