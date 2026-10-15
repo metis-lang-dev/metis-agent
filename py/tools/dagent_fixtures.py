@@ -289,6 +289,21 @@ def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None):
                            "waits": list(agent.host.waits), "commands": sorted(agent.host.commands)})
         agent.watch = RecordedWatch(w, watchcalls)
         agent.host = HostFace(agent.host, watchcalls)
+        # the records sink into a scratch file: every line recorded as it
+        # is written (the ts aside, what Go writes at the same moment)
+        import tempfile
+        agent.sink = Path(tempfile.mkdtemp(prefix="dagent-sink-")) / "records" / "fixture.jsonl"
+        agent.session = "fixture"
+        sink0 = agent.sink_record
+
+        def sink_record(k, status, **extra):
+            n0 = agent.sink.read_text().count("\n") if agent.sink.exists() else 0
+            sink0(k, status, **extra)
+            lines = agent.sink.read_text().splitlines() if agent.sink.exists() else []
+            watchcalls.append({"call": "sink", "k": k, "status": status, "extra": extra,
+                               "lines": [json.loads(x) for x in lines[n0:]],
+                               "sunk": agent.sunk[-1:] if len(lines) > n0 else []})
+        agent.sink_record = sink_record
     r = agent.replier
     calls = [{"call": "setup", "domain": r.domain, "docs": dict(r.docs), "outcomes": dict(r.outcomes),
               "commands": sorted(r.commands), "mirror": list(r.mirror), "blocking": sorted(r.blocking),

@@ -74,6 +74,7 @@ func TestTheWatchIsPys(t *testing.T) {
 		var sh *Shell
 		var w *Watch
 		var ah *AgentHost
+		var sink *Sink
 		n := map[string]int{}
 		jsonl(t, "testdata/watch_"+d+".jsonl", func(raw []byte) {
 			var c struct {
@@ -90,12 +91,16 @@ func TestTheWatchIsPys(t *testing.T) {
 				ID        string          `json:"id"`
 				Atom      string          `json:"atom"`
 				Payload   map[string]any  `json:"payload"`
-				Lines     []string        `json:"lines"`
 				Line      string          `json:"line"`
 				Out       json.RawMessage `json:"out"`
 				Outbox    json.RawMessage `json:"outbox"`
 				Records   json.RawMessage `json:"records"`
 				Fired     []string        `json:"fired"`
+				K         int             `json:"k"`
+				Status    string          `json:"status"`
+				Extra     map[string]any  `json:"extra"`
+				Lines     json.RawMessage `json:"lines"`
+				Sunk      []Sunk          `json:"sunk"`
 			}
 			dec := json.NewDecoder(bytes.NewReader(raw))
 			dec.UseNumber()
@@ -150,12 +155,18 @@ func TestTheWatchIsPys(t *testing.T) {
 				if w, err = NewWatch(sh, c.Canonical, cards); err != nil {
 					t.Fatal(err)
 				}
+				sink = &Sink{Path: filepath.Join(t.TempDir(), "records", "fixture.jsonl"), Session: "fixture",
+					Domain: d, Key: p.Key}
 			case "submit":
 				ah.Submit(c.ID, c.Atom, c.Payload)
 			case "retract":
 				ah.Retract(c.Atom)
 			case "world":
-				if err := ah.World(c.Lines); err != nil {
+				var lines []string
+				if err := json.Unmarshal(c.Lines, &lines); err != nil {
+					t.Fatal(err)
+				}
+				if err := ah.World(lines); err != nil {
 					t.Fatal(err)
 				}
 			case "step":
@@ -169,6 +180,40 @@ func TestTheWatchIsPys(t *testing.T) {
 				sameJSON(t, at+" "+c.Line, c.Out, got)
 				sameJSON(t, at+" "+c.Line+" outbox", c.Outbox, w.Outbox)
 				w.Outbox = nil
+			case "sink":
+				var extra []KV
+				for _, k := range []string{"card", "move"} {
+					if v, ok := c.Extra[k]; ok {
+						extra = append(extra, KV{K: k, V: v})
+					}
+				}
+				if err := sink.Record(sh.Records[c.K], c.K, c.Status, ah.Beat(), extra, true); err != nil {
+					t.Fatal(err)
+				}
+				b, err := os.ReadFile(sink.Path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				lines := strings.Split(strings.TrimRight(string(b), "\n"), "\n")
+				var got map[string]any
+				if err := json.Unmarshal([]byte(lines[len(lines)-1]), &got); err != nil {
+					t.Fatal(err)
+				}
+				var wl []map[string]any
+				if err := json.Unmarshal(c.Lines, &wl); err != nil {
+					t.Fatal(err)
+				}
+				want := wl[0]
+				for _, l := range []map[string]any{got, want} {
+					delete(l, "ts")
+					delete(l["close"].(map[string]any), "ts")
+				}
+				wb, _ := json.Marshal(want)
+				sameJSON(t, at+" line", wb, got)
+				g := sink.Sunk[len(sink.Sunk)-1]
+				if wnt := c.Sunk[0]; g.Record != wnt.Record || g.Status != wnt.Status || g.Beat != wnt.Beat || g.MinedText != wnt.MinedText {
+					t.Fatalf("%s sunk: want %+v got %+v", at, wnt, g)
+				}
 			case "records":
 				sameJSON(t, d+" records", c.Records, sh.Records)
 				if strings.Join(c.Fired, "|") != strings.Join(sh.Fired, "|") {
