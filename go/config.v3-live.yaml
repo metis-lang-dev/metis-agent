@@ -16,15 +16,16 @@ llm:
     n_gpu_layers: 99
     template: gemma4
     pass2: {temperature: 0.4, top_k: 40, max_tokens: 50}
-# the catalog (metis-catalog, CATALOG.md "domain.yaml"): the intent pass's
-# prompt, pass-2 examples (for the template above) and grammar from the dog's
-# manifest — generated from its intent.yaml, re-read after a reload; the
-# domains' display names, clocks, partners and watched directories from theirs;
-# the console's list by the catalog's loader (python -m metis_catalog list)
+# the catalog (metis-catalog, CATALOG.md "domain.yaml"): the intent material
+# of every served domain that has it (intent.prompt, examples for the template
+# above, grammar: generated from its intent.yaml, re-read after a reload) —
+# the system turn opens with it and the person turn's grammar is made of it
+# (e2e-workflow step 4: one intent domain, its own; several, every J names its
+# domain); the domains' display names, clocks, partners and watched
+# directories from their manifests; the console's list by the catalog's loader
 catalog:
     root: ../../metis-catalog
     python: ../py/.venv/bin/python
-    intent: dog
 talk:                            # say_text{mode: talk}: the free dialog (fsttm-web's long replies)
     prompt: grammar/talk-prompt.txt
     n_ctx: 4096
@@ -50,7 +51,7 @@ ws:
 # (nina ad9231b); the orchestrator owns time: each tick one dog beat and two
 # kitchen env beats; the journal is the session's record for the E13 reads.
 v3:
-    prompt: [grammar/e13-prompt-base.txt]
+    prompt: [grammar/v3-orchestrator.txt]   # the orchestrator's part: the intent part before it is the manifests'
     # WHICH installed domains the orchestrator is offered (the operator's
     # selection; the manifests are the source, the config selects): each must
     # have a manifest in catalog.root (else the service refuses to start), and
@@ -70,3 +71,11 @@ v3:
           # metis-catalog/domains/<n>/records/<session>.jsonl, session = the process's start time
           dir: ../py
           domains: [dog, kitchen, kitchen_shared]   # clocks (clock.beats), quiet partners (partner_of), the watched directories: their manifests
+    # hot-install (e2e-workflow step 4): activate of a catalog domain no process
+    # above serves starts one for it (and its pair) from its manifest — its clock,
+    # its card in the system turn, its name in the enum, its intent material —
+    # and the dialog starts again on the rebuilt system turn; no narrator (the
+    # model stays one, in the process above)
+    install:
+        argv: [.venv/bin/python, -m, metis_agent.domain_agent, --domain, "{domains}", --case, live, --trace, --records]
+        dir: ../py

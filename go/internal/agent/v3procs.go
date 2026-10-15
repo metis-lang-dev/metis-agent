@@ -68,24 +68,29 @@ func (d *procDomains) Intent(c Call) (Reply, bool) {
 	if verb == "" || verb == "CHITCHAT" || verb == "UNKNOWN" {
 		return Reply{}, false
 	}
-	p := d.procs[d.intents]
+	dom := d.intents // the one intent domain; with several, the J names it (e2e-workflow step 4)
+	if t, _ := j["domain"].(string); t != "" {
+		dom = t
+	}
+	p := d.procs[dom]
 	if p == nil {
 		return Reply{}, false
 	}
-	if d.off[d.intents] {
-		return notActive(d.intents), true
+	if d.off[dom] {
+		return notActive(dom), true
 	}
 	delete(j, "intent")
+	delete(j, "domain")
 	d.n++
 	cid := fmt.Sprintf("c%d", d.n)
-	rec := map[string]any{"kind": "dlg-dispatch", "cid": cid, "j": c.Text()}
+	rec := map[string]any{"kind": "dlg-dispatch", "cid": cid, "j": c.Text(), "domain": dom}
 	if !d.turnAt.IsZero() { // the dispatch-wait column (int-step3-table): the person's words to this dispatch, as py records it
 		rec["wait_ms"] = time.Since(d.turnAt).Milliseconds()
 	}
 	d.note(rec)
-	rs, err := p.Do(map[string]any{"id": cid, "domain": d.intents, "verb": verb, "args": j})
+	rs, err := p.Do(map[string]any{"id": cid, "domain": dom, "verb": verb, "args": j})
 	if err != nil {
-		log.Printf("[v3] %s intent: %v", d.intents, err)
+		log.Printf("[v3] %s intent: %v", dom, err)
 		return Reply{}, false
 	}
 	return d.split(d.sift(rs), cid, false)
@@ -165,6 +170,39 @@ type liveDomains struct {
 	changed map[string]string            // domain → a one-line summary of what changed on disk (under v3.mu)
 	// a world line went in: the domain's ports again after its next beat (under v3.mu)
 	portsDue map[string]bool
+	// pmu guards specs, procs, byName and watch against a hot-install
+	// (written under v3.mu and pmu; read under either)
+	pmu sync.RWMutex
+}
+
+// proc is the process serving domain d (nil: none).
+func (ld *liveDomains) proc(d string) *DomainProc {
+	ld.pmu.RLock()
+	defer ld.pmu.RUnlock()
+	return ld.procs[d]
+}
+
+// specsNow is the processes' specs and the process of each.
+func (ld *liveDomains) specsNow() ([]DomainSpec, []*DomainProc) {
+	ld.pmu.RLock()
+	defer ld.pmu.RUnlock()
+	specs := append([]DomainSpec(nil), ld.specs...)
+	ps := make([]*DomainProc, len(specs))
+	for i, s := range specs {
+		ps[i] = ld.byName[s.Name]
+	}
+	return specs, ps
+}
+
+// watchNow is the watched directories by domain.
+func (ld *liveDomains) watchNow() map[string]string {
+	ld.pmu.RLock()
+	defer ld.pmu.RUnlock()
+	w := make(map[string]string, len(ld.watch))
+	for d, dir := range ld.watch {
+		w[d] = dir
+	}
+	return w
 }
 
 func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journal string) error {
@@ -233,7 +271,7 @@ func (v *v3) runConsult(a *Agent, c Call) {
 	}
 	var rs []map[string]any
 	var err error
-	if p := ld.procs[dom]; p == nil {
+	if p := ld.proc(dom); p == nil {
 		err = fmt.Errorf("no domain agent serves %s", dom)
 	} else {
 		rs, err = p.ToolTo(dom, c.Name, args, "")
@@ -354,7 +392,8 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 		select {
 		case <-g:
 		case <-ctx.Done():
-			for _, p := range ld.byName {
+			_, ps := ld.specsNow()
+			for _, p := range ps {
 				_ = p.Close()
 			}
 			return
@@ -368,7 +407,8 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 	for {
 		select {
 		case <-ctx.Done():
-			for _, p := range ld.byName {
+			_, ps := ld.specsNow()
+			for _, p := range ps {
 				_ = p.Close()
 			}
 			return
@@ -382,8 +422,9 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 			off[d] = true
 		}
 		v.mu.Unlock()
-		for _, s := range ld.specs {
-			p := ld.byName[s.Name]
+		specs, ps := ld.specsNow() // a hot-installed domain's process joins on the next tick
+		for i, s := range specs {
+			p := ps[i]
 			clocks := s.Clocks
 			if len(clocks) == 0 {
 				clocks = []ClockSpec{{}}
@@ -490,7 +531,7 @@ func (a *Agent) V3World(domain string, lines []string) error {
 	if domain == "" {
 		domain = a.v3.live.pd.intents
 	}
-	p := a.v3.live.procs[domain]
+	p := a.v3.live.proc(domain)
 	if p == nil {
 		return fmt.Errorf("no domain %q", domain)
 	}

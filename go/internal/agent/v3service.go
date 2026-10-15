@@ -42,9 +42,20 @@ type V3Service struct {
 	// Start, when set, holds the clock until it closes (-wait-viewer: the
 	// first page joins, so the person hears the run from its first beat)
 	Start <-chan struct{}
+	// Intents: the served domains' intent material from their manifests
+	// (e2e-workflow step 4): the system turn opens with it and the person
+	// turn's grammar is made of it; nil: the prompt files and the agent's
+	// grammar stand (llmbench's fixtures, the E13 configs)
+	Intents []IntentDomain
+	// the catalog at run time (e2e-workflow step 4, hot-install): activate
+	// of a catalog domain no process serves starts one for it from its
+	// manifest — Install's argv with "{domains}" the domain and its pair
+	Root, Python, Template string
+	Install              *DomainSpec
 }
 
 type v3 struct {
+	sc     V3Service // the service's configuration: the system turn is rebuilt from it (hot-install, an intent reload)
 	mu     sync.Mutex
 	l      *llm.LLM
 	prompt string
@@ -83,7 +94,7 @@ func SystemTurn(sc V3Service) (string, error) {
 	for _, p := range sc.Prompt {
 		b.WriteString(p)
 	}
-	turn := b.String()
+	turn := IntentTurn(sc.Intents) + b.String()
 	if sc.Lines != nil {
 		var err error
 		if turn, err = InstalledCards(turn, sc.Catalog, sc.Lines); err != nil {
@@ -109,8 +120,14 @@ func (a *Agent) startV3(l *llm.LLM) error {
 		return err
 	}
 	ruled := sc.Ruled == nil || *sc.Ruled
-	v := &v3{l: ol, prompt: b.String(), gbnf: a.cfg.GBNF, nctx: sc.NCtx,
-		cfg: V3Config{Catalog: sc.Catalog, Loaded: sc.Loaded, Display: sc.Display,
+	gbnf := a.cfg.GBNF
+	if len(sc.Intents) > 0 {
+		if gbnf, err = IntentGrammar(sc.Intents); err != nil {
+			return err
+		}
+	}
+	v := &v3{l: ol, prompt: b.String(), gbnf: gbnf, nctx: sc.NCtx, sc: sc,
+		cfg: V3Config{Catalog: sc.Catalog, Loaded: sc.Loaded, Display: sc.Display, IntentDomains: domainNames(sc.Intents),
 			AskCheck: ruled, AgainPick: ruled, EscalateTemplate: ruled, Mirror: true, Rollback: true}}
 	v.listed = sc.Listed
 	v.rec = &idEmitter{Emitter: a.out}
@@ -133,8 +150,12 @@ func (a *Agent) startV3(l *llm.LLM) error {
 	}
 	v.cfg.OnGen = func(g GenInfo) {
 		if v.live != nil {
-			v.live.record(map[string]any{"kind": "dlg-gen", "label": g.Label, "try": g.Try, "branch": g.Branch,
-				"harness": g.Harness, "text": g.Text, "n_ctx": g.NCtx, "ms": g.All.Milliseconds()})
+			rec := map[string]any{"kind": "dlg-gen", "label": g.Label, "try": g.Try, "branch": g.Branch,
+				"harness": g.Harness, "text": g.Text, "n_ctx": g.NCtx, "ms": g.All.Milliseconds()}
+			if d := v.intentDomainOf(g); d != "" { // which domain's intent material mapped the words (e2e-workflow step 4)
+				rec["domain"] = d
+			}
+			v.live.record(rec)
 		}
 		log.Printf("[v3] %s/%s try %d (%d tok, %d ms) %s", g.Branch, g.Label, g.Try, g.NCtx, g.All.Milliseconds(), g.Text)
 	}

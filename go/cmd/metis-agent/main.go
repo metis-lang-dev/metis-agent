@@ -76,6 +76,10 @@ type config struct {
 		Domains []agent.DomainSpec `yaml:"domains"` // real domain agents as processes (integration step 2)
 		TickMs  int                `yaml:"tick_ms"`
 		Journal string             `yaml:"journal"`
+		// Install: how a catalog domain no process serves is started when
+		// it is activated (e2e-workflow step 4, hot-install): argv with
+		// "{domains}" the domain and its pair, dir, env
+		Install *agent.DomainSpec `yaml:"install"`
 	} `yaml:"v3"`
 	WS struct {
 		Addr  string `yaml:"addr"`
@@ -89,7 +93,7 @@ type config struct {
 	Catalog struct {
 		Root   string `yaml:"root"`
 		Python string `yaml:"python"` // an interpreter the loader runs on (python -m metis_catalog)
-		Intent string `yaml:"intent"` // the domain the intent pass maps for (dog)
+		Intent string `yaml:"intent"` // the domain the intent pass maps for (dog): -loop v2's; -loop v3 maps for every served domain with intent material
 	} `yaml:"catalog"`
 }
 
@@ -103,6 +107,7 @@ func main() {
 	noDomains := flag.Bool("no-domains", false, "attach no domain (the persona alone: the parity bar)")
 	loop := flag.String("loop", "v2", "v2: the dog's two-pass path; v3: the orchestrator agent (DESIGN v3; config v3:)")
 	printTurn := flag.Bool("print-turn", false, "-loop v3: print the orchestrator's system turn as built (the catalog's cards and declarations) and exit")
+	printGrammar := flag.Bool("print-grammar", false, "-loop v3: print the person turn's intent grammar as built (one intent domain's own, or several's union) and exit")
 	waitViewer := flag.Bool("wait-viewer", false, "attach the domains (v2), start the domain agents' clock (v3) when the first page connects (it hears the run from its start)")
 	flag.Parse()
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
@@ -116,11 +121,42 @@ func main() {
 		log.Fatal(err)
 	}
 	var manifests map[string]catalog.Manifest
+	var v3Intents []agent.IntentDomain
 	if cfg.Catalog.Root != "" {
 		if manifests, err = catalog.Scan(cfg.Catalog.Root); err != nil {
 			log.Fatalf("[catalog] %v", err)
 		}
-		if d := cfg.Catalog.Intent; d != "" {
+		d := cfg.Catalog.Intent
+		if d == "" && *loop == "v3" {
+			// the manifests are the source (e2e-workflow step 4): the served
+			// domains with intent material, in the processes' order; the
+			// first is the agent's own persona and grammar
+			for _, s := range cfg.V3.Domains {
+				doms := s.Domains
+				if len(doms) == 0 {
+					doms = []string{s.Name}
+				}
+				for _, n := range doms {
+					it, ok, err := agent.IntentOf(manifests[n], cfg.LLM.Template)
+					if err != nil {
+						log.Fatalf("[catalog] %v", err)
+					}
+					if ok {
+						v3Intents = append(v3Intents, it)
+						if d == "" {
+							d = n
+						}
+					}
+				}
+			}
+			log.Printf("[catalog] the intent domains: %v", func() (ns []string) {
+				for _, it := range v3Intents {
+					ns = append(ns, it.Name)
+				}
+				return
+			}())
+		}
+		if d != "" {
 			m, ok := manifests[d]
 			if !ok || m.Intent.Grammar == "" || m.Intent.Prompt == "" {
 				log.Fatalf("[catalog] no intent pass for %q in %s (domain.yaml intent: grammar, prompt)", d, cfg.Catalog.Root)
@@ -177,6 +213,8 @@ func main() {
 		}
 		v3.Catalog, v3.Loaded, v3.Display, v3.NCtx, v3.Ruled = cfg.V3.Catalog, cfg.V3.Loaded, cfg.V3.Display, cfg.V3.NCtx, cfg.V3.Ruled
 		v3.Domains, v3.TickMs, v3.Journal = cfg.V3.Domains, cfg.V3.TickMs, cfg.V3.Journal
+		v3.Intents, v3.Install, v3.Template = v3Intents, cfg.V3.Install, cfg.LLM.Template
+		v3.Root, v3.Python = cfg.Catalog.Root, cfg.Catalog.Python
 		if manifests != nil {
 			// the manifests are the source, the config selects: every selected
 			// domain is installed, and its card in the system turn is its line
@@ -201,6 +239,16 @@ func main() {
 		}
 	}
 
+	if *printGrammar {
+		g := gbnf
+		if len(v3.Intents) > 0 {
+			if g, err = agent.IntentGrammar(v3.Intents); err != nil {
+				log.Fatal(err)
+			}
+		}
+		fmt.Print(g)
+		return
+	}
 	if *printTurn {
 		turn, err := agent.SystemTurn(v3)
 		if err != nil {

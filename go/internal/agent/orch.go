@@ -79,6 +79,10 @@ type Domains interface {
 type V3Config struct {
 	Catalog []string          // the domains activate can attach
 	Loaded  []string          // the loaded domains
+	// IntentDomains: the served domains with intent material, in the
+	// system turn's order; two or more: every J names its domain
+	// (e2e-workflow step 4), an alternative a domain offers is named for it
+	IntentDomains []string
 	Display map[string]string // a card's display name, for the explains line
 
 	// the E13 step 1 ruling (DESIGN v3 727ee7d); all off = E13 t3
@@ -532,6 +536,9 @@ func (o *Orch) branchOf(r Reply, c Call) (branch, error) {
 				log.Printf("[v3] alternative %s: %v — the reason is spoken", raw, err)
 				b.name, b.alts = "speak", nil
 				return b, nil
+			}
+			if len(o.cfg.IntentDomains) > 1 { // several intent domains: the offer is the replying domain's
+				a = TagJ(a, r.Domain)
 			}
 			b.alts = append(b.alts, a)
 		}

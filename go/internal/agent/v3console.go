@@ -86,24 +86,30 @@ func (v *v3) domainVerb(verb, dom string, bindings any, by string) error {
 	if bindings != nil {
 		rec["bindings"] = bindings
 	}
-	err := v.setActive(verb == "activate", dom)
+	installed, err := v.setActive(verb == "activate", dom)
 	if err != nil {
 		rec["error"] = err.Error()
+	}
+	if installed {
+		rec["installed"] = true // started from its manifest (hot-install)
 	}
 	ld.record(rec)
 	return err
 }
 
-func (v *v3) setActive(on bool, dom string) error {
+func (v *v3) setActive(on bool, dom string) (installed bool, err error) {
 	ld := v.live
 	if _, ok := ld.procs[dom]; !ok {
-		if slicesContains(v.cfg.Catalog, dom) {
-			return fmt.Errorf("%s is in the catalog, but no domain agent serves it in this configuration", dom)
+		if !on {
+			return false, fmt.Errorf("no domain agent serves %s", dom)
 		}
-		return fmt.Errorf("no domain %q", dom)
+		if err := v.install(dom); err != nil { // hot-install from the manifest (e2e-workflow step 4)
+			return false, err
+		}
+		installed = true
 	}
 	if ld.quiet()[dom] {
-		return fmt.Errorf("%s is stepped with its pair, not on its own", dom)
+		return false, fmt.Errorf("%s is stepped with its pair, not on its own", dom)
 	}
 	var loaded []string
 	for _, d := range v.cfg.Loaded {
@@ -120,7 +126,11 @@ func (v *v3) setActive(on bool, dom string) error {
 	}
 	v.cfg.Loaded = loaded
 	v.o.cfg.Loaded = loaded
-	return nil
+	if installed {
+		v.o.m.last[dom] = "installed"
+		return true, v.reprime("install " + dom) // its card, its name in the enum, its intents: the system turn again
+	}
+	return false, nil
 }
 
 func (ld *liveDomains) quiet() map[string]bool {
@@ -231,7 +241,7 @@ func (m *mirror) state(d string) string {
 // ports asks the domain agent for its world ports (nina 86c6c98): pairs,
 // which side holds now, the reports, the handles.
 func (ld *liveDomains) ports(d string) (map[string]any, error) {
-	p := ld.procs[d]
+	p := ld.proc(d)
 	if p == nil {
 		return nil, fmt.Errorf("no domain agent serves %s", d)
 	}

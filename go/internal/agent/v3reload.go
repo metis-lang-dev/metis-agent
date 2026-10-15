@@ -97,19 +97,21 @@ func summary(base, now map[string]string) string {
 // runWatch polls the watched directories every 2 s.
 func (v *v3) runWatch(ctx context.Context) {
 	ld := v.live
-	if len(ld.watch) == 0 {
-		return
-	}
-	t := time.NewTicker(2 * time.Second)
+	t := time.NewTicker(2 * time.Second) // a hot-installed domain's directory joins the watch
 	defer t.Stop()
+	listed, n := "", 0
+	v.relist(&listed)
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-t.C:
 		}
+		if n++; n%5 == 0 { // every 10 s: a domain made after the start is listed
+			v.relist(&listed)
+		}
 		snaps := map[string]map[string]string{}
-		for d, dir := range ld.watch {
+		for d, dir := range ld.watchNow() {
 			snaps[d] = snapshot(dir) // the disk read outside the lock
 		}
 		v.mu.Lock() // the baseline a reload replaces is read under the reload's lock: no stale mark after it
@@ -193,8 +195,13 @@ func (a *Agent) V3Reload(domain, by string) (key string, err error) {
 		ld.jmu.Unlock()
 		ld.changed[domain] = ""
 	}
-	// a regenerated intent grammar is the one the next turn is held to
-	if g := a.cfg.GBNFPath; g != "" {
+	// its intent material re-read from its manifest: the system turn and
+	// the grammar the next turn is held to (e2e-workflow step 4)
+	if len(v.sc.Intents) > 0 {
+		if err := v.reloadIntents(domain); err != nil {
+			log.Printf("[v3] %s reloaded, its intent material not: %v", domain, err)
+		}
+	} else if g := a.cfg.GBNFPath; g != "" { // a regenerated intent grammar is the one the next turn is held to
 		if b, err := os.ReadFile(g); err == nil && string(b) != v.gbnf {
 			v.gbnf = string(b)
 			log.Printf("[v3] the intent grammar re-read after the reload (%s)", g)
