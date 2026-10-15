@@ -142,3 +142,27 @@ def test_summary_names_the_first_changed_line():
     assert S.summary({"a.llp": "x\ny"}, {"a.llp": "x"}) == "a.llp: − y"
     assert S.summary({"a.llp": "x"}, {}) == "a.llp: removed"
     assert S.summary({}, {}) == ""
+
+
+def test_the_system_turn_is_built_from_the_manifests():
+    """Go's 25ef76c in py: the config selects (v3.catalog), the manifests are
+    the source — the "## Domains" cards are the selected manifests' lines;
+    the prompt file's own lines rebuild it byte for byte; a selection with
+    no manifest refuses the start."""
+    from metis_agent import orchestrator as O
+    base = (ROOT / "go/grammar/e13-prompt-base.txt").read_text()
+    i = base.index("## Domains")
+    a = base.index("\nCards:\n", i) + len("\nCards:\n")
+    rows = [r[2:].split(": ", 1) for r in base[a:base.index("\n\n", a)].split("\n")]
+    assert O.installed_cards(base, [n for n, _ in rows], dict(rows)) == base
+    cfg = S.load_config(ROOT / "py/config.live.yaml")
+    turn = S.build_turn(cfg)
+    import metis_catalog
+    assert "Cards:\n- kitchen: %s\n\nExamples:" % metis_catalog.get("kitchen").line in turn
+    assert "- nav:" not in turn[turn.index("## Domains"):]
+    cfg["v3"]["catalog"] = ["kitchen", "nav"]
+    try:
+        S.build_turn(cfg)
+        assert False, "nav has no manifest: the start must be refused"
+    except ValueError as e:
+        assert "nav" in str(e)

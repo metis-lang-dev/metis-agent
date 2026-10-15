@@ -7,7 +7,11 @@ intent:                          # the person turn's intent pass (the dog's gram
 stop_words: [stop, halt, freeze, quiet]
 v3:
     prompt: [../go/grammar/e13-prompt-base.txt]
-    catalog: [kitchen, nav, xtraffic, sysadmin, social, votes]
+    # WHICH installed domains the orchestrator is offered (Go's config.v3-live.yaml,
+    # 25ef76c): each must have a manifest (else the service refuses to start); the
+    # system turn's "## Domains" cards and the activate/deactivate enum are built
+    # from those manifests' lines (--print-turn shows the turn)
+    catalog: [kitchen]
     loaded: [dog, kitchen]
     display: {kitchen_shared: second cook}
     n_ctx: 16384                 # integration step 4 ruling

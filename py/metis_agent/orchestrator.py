@@ -584,6 +584,38 @@ def repl_api(catalog, loaded):
     ]
 
 
+def installed_cards(turn, catalog, lines):
+    """The system turn's "## Domains" card list written from the catalog's
+    display lines (v3text.go InstalledCards; the manifests are the source,
+    the config selects): one "- name: line" per selected domain, in the
+    selection's order, replacing the list the prompt file carries."""
+    i = turn.find("## Domains")
+    if i < 0:
+        raise ValueError('the system turn has no "## Domains" section')
+    a = turn.find("\nCards:\n", i)
+    if a < 0:
+        raise ValueError('the "## Domains" section has no Cards: list')
+    a += len("\nCards:\n")
+    b = turn.find("\n\n", a)
+    if b < 0:
+        raise ValueError("the Domains card list does not end")
+    cards = []
+    for n in catalog:
+        if not lines.get(n):
+            raise ValueError("no display line for %r" % n)
+        cards.append("- %s: %s" % (n, lines[n]))
+    return turn[:a] + "\n".join(cards) + turn[b:]
+
+
+def system_turn(prompt, catalog, loaded, lines=None):
+    """The orchestrator's system turn (v3service.go SystemTurn): the prompt
+    files, their "## Domains" cards written from the catalog's lines (when
+    given), the REPL API's declarations over the catalog and the loaded."""
+    if lines is not None:
+        prompt = installed_cards(prompt, catalog, lines)
+    return prompt + api_declarations(catalog, loaded)
+
+
 def api_declarations(catalog, loaded):
     """The REPL API as the template declares tools (tools/e9-tools.py's macros)."""
     b = []

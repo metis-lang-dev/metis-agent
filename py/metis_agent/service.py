@@ -185,6 +185,31 @@ def catalog_list():
     return out
 
 
+def catalog_lines(names):
+    """The selected domains' display lines from their manifests (Go's
+    25ef76c: the manifests are the source, the config selects) — a domain
+    the config selects without a manifest and a line refuses the start."""
+    from .domains import catalog
+    mc = catalog()
+    lines = {}
+    for n in names:
+        try:
+            line = mc.get(n).line
+        except KeyError:
+            line = ""
+        if not line:
+            raise ValueError("v3.catalog selects %r, which has no manifest with a line in %s" % (n, mc.root()))
+        lines[n] = line
+    return lines
+
+
+def build_turn(cfg):
+    """The system turn as the service uses it (--print-turn prints it)."""
+    v3 = cfg["v3"]
+    prompt = "".join((ROOT / "py" / p).read_text() for p in v3["prompt"])
+    return O.system_turn(prompt, v3["catalog"], v3["loaded"], catalog_lines(v3["catalog"]))
+
+
 # ── the live loop (v3procs.go) ────────────────────────────────────────────────
 
 class Live:
@@ -221,8 +246,7 @@ class Live:
         self.gbnf = (ROOT / "py" / cfg["intent"]["grammar"]).read_text()
         self.gbnf_path = ROOT / "py" / cfg["intent"]["grammar"]
         self.stop_words = list(cfg.get("stop_words") or ["stop", "halt", "freeze", "quiet"])
-        prompt = "".join((ROOT / "py" / p).read_text() for p in v3["prompt"])
-        self.prompt = prompt + O.api_declarations(v3["catalog"], v3["loaded"])
+        self.prompt = build_turn(cfg)
         self.nctx = int(v3.get("n_ctx", 16384))
         self.ol = llm.sibling(self.nctx)
         self.catalog_names, self.loaded = list(v3["catalog"]), list(v3["loaded"])
@@ -830,9 +854,18 @@ def main():
     ap.add_argument("--ui-dir", default="")
     ap.add_argument("--lib-dir", default="")
     ap.add_argument("--no-wait-viewer", action="store_true", help="start the clock at once (else at the first page)")
+    ap.add_argument("--print-turn", action="store_true",
+                    help="print the orchestrator's system turn as built (the catalog's cards and declarations) and exit")
     a = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     cfg = load_config(a.config)
+    try:
+        turn = build_turn(cfg)
+    except ValueError as e:
+        raise SystemExit("[catalog] %s" % e)
+    if a.print_turn:
+        print(turn, end="")
+        return
     from aiohttp import web
 
     from .llm import LLM
