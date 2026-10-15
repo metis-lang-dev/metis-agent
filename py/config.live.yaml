@@ -28,5 +28,5 @@ domains:                         # in-process (no spawn), on the one loaded mode
     watch: {dog: ../../metis-catalog/domains/dog}
 ws:
     addr: 127.0.0.1:8395
-    ui: ../web
+    ui: ../console
     lib: ../../fsttm-web/lib

@@ -1,27 +1,39 @@
 #!/usr/bin/env bash
-# metis-agent — start the live console: the Go service (the orchestrator,
-# -loop v3) with the real domain agents (py/, spawned by the service on the
-# JSON-lines wire) and the page, then print the URL.
+# metis-agent — start the live console: the orchestrator with the real
+# domain agents and the page (console/), then print the URL. Two backends of
+# one console wire (docs/WIRE.md):
 #
-#   ./run.sh            build if needed, start in the background, print the URL
+#   BACKEND=py (default)  the standalone agent, py/ metis_agent.service: the
+#                         orchestrator, the domain agents and the page's
+#                         backend in one process on one model (config py/config.live.yaml)
+#   BACKEND=go            the Go service (-loop v3), the domain agents spawned
+#                         from py/ on the JSON-lines wire (config go/config.v3-live.yaml)
+#
+#   ./run.sh            start in the background (go: build if needed), print the URL
 #   ./run.sh stop       stop it (the domain agents end with it)
-#   ./run.sh status     running or not, the URL, the GPU
+#   ./run.sh status     running or not, which backend, the URL, the GPU
 #   ./run.sh log        follow the service's log
 #
-#   CONFIG=go/config.v3-live.yaml   UI_DIR=<page dir>   LIB_DIR=../fsttm-web/lib   ADDR=:8395
+#   BACKEND=py|go   CONFIG=<yaml>   UI_DIR=console   LIB_DIR=../fsttm-web/lib   ADDR=:8395
 #
-# The page: web/ (the console; UI_DIR=../fsttm-web/web for the plain page). Every typed or spoken line is a person turn of the orchestrator
-# (-loop v3 has no talk mode; the page's "replies" toggle does nothing).
-# The domains' clock starts when the first page connects. Each start keeps
-# the previous journal as go/results/live/session-<time>.jsonl.
+# The page: console/ (on fsttm-web's shell, lib/shell.css + shell.js, the
+# loop console's top bar, docks and colours; UI_DIR=../fsttm-web/web for the
+# plain page). Every typed or spoken line is a person turn of the
+# orchestrator. The domains' clock starts when the first page connects.
+# Each start keeps the previous journal (go: session-<time>.jsonl; py: its
+# session-py.jsonl rotated by the service).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 GO="$ROOT/go"
 RUN="$GO/results/live"
 PID="$RUN/service.pid"
 LOG="$RUN/service.log"
-CONFIG="${CONFIG:-$GO/config.v3-live.yaml}"
-case "$CONFIG" in /*) ;; *) CONFIG="$PWD/$CONFIG" ;; esac   # the service runs in go/: a relative path is the caller's
+BACKEND_F="$RUN/service.backend"
+BACKEND="${BACKEND:-py}"
+case "$BACKEND" in py) DEF_CONFIG="$ROOT/py/config.live.yaml" ;; go) DEF_CONFIG="$GO/config.v3-live.yaml" ;;
+  *) echo "BACKEND is py or go, not $BACKEND" >&2; exit 2 ;; esac
+CONFIG="${CONFIG:-$DEF_CONFIG}"
+case "$CONFIG" in /*) ;; *) CONFIG="$PWD/$CONFIG" ;; esac   # the service runs in go/ or py/: a relative path is the caller's
 ADDR="${ADDR:-:8395}"
 PORT="${ADDR##*:}"
 URL="http://localhost:$PORT/"
@@ -44,9 +56,9 @@ stop)
   else
     echo "not running"
   fi
-  rm -f "$PID"; exit 0 ;;
+  rm -f "$PID" "$BACKEND_F"; exit 0 ;;
 status)
-  if running; then echo "running (pid $(cat "$PID")) — $URL"; else echo "not running"; fi
+  if running; then echo "running (pid $(cat "$PID"), backend $(cat "$BACKEND_F" 2>/dev/null || echo '?')) — $URL"; else echo "not running"; fi
   gpu; exit 0 ;;
 log)
   exec tail -f "$LOG" ;;
@@ -54,34 +66,42 @@ start) ;;
 *) echo "usage: $0 [start|stop|status|log]" >&2; exit 2 ;;
 esac
 
-if running; then echo "already running (pid $(cat "$PID")) — $URL"; exit 0; fi
+if running; then echo "already running (pid $(cat "$PID"), backend $(cat "$BACKEND_F" 2>/dev/null || echo '?')) — $URL"; exit 0; fi
 
-# the console page (web/, agent-console step 2: source-labelled lines,
-# domain tabs, world ports) by default; UI_DIR=../fsttm-web/web for the plain page
-UI_DIR="${UI_DIR:-$ROOT/web}"
+# the console page (console/: source-labelled lines, the catalog, domain
+# tabs, world ports, the journal) by default; UI_DIR=../fsttm-web/web for the plain page
+UI_DIR="${UI_DIR:-$ROOT/console}"
 case "$UI_DIR" in /*) ;; *) UI_DIR="$ROOT/$UI_DIR" ;; esac
 [ -f "$UI_DIR/index.html" ] || { echo "no page at $UI_DIR (set UI_DIR)" >&2; exit 1; }
 # fsttm-web's library (lib/dialog.js …) at /lib/, beside whichever page
 LIB_DIR="${LIB_DIR:-$(cd "$ROOT/.." && pwd)/fsttm-web/lib}"
 [ -f "$LIB_DIR/dialog.js" ] || { echo "no fsttm-web lib at $LIB_DIR (set LIB_DIR)" >&2; exit 1; }
-[ -x "$ROOT/py/.venv/bin/python" ] || { echo "no py/.venv — the domain agents need it (cd py && python3 -m venv .venv && .venv/bin/pip install -e .)" >&2; exit 1; }
-
-# build if the binary is missing or older than a Go source
-BIN="$GO/bin/metis-agent"
-if [ ! -x "$BIN" ] || [ -n "$(find "$GO/cmd" "$GO/internal" -name '*.go' -newer "$BIN" -print -quit)" ]; then
-  echo "building go/bin/metis-agent …"
-  (cd "$GO" && nice ./build.sh metis-agent v3say) >/dev/null
-fi
+[ -f "$LIB_DIR/shell.css" ] || { echo "the fsttm-web lib at $LIB_DIR has no shell.css (the console's shell; update fsttm-web)" >&2; exit 1; }
+PY="$ROOT/py/.venv/bin/python"
+[ -x "$PY" ] || { echo "no py/.venv — the domain agents need it (cd py && python3 -m venv .venv && .venv/bin/pip install -e .)" >&2; exit 1; }
 
 mkdir -p "$RUN"
-J="$RUN/session.jsonl"
-if [ -s "$J" ]; then
-  mv "$J" "$RUN/session-$(date -r "$J" +%Y%m%d-%H%M%S).jsonl"
+if [ "$BACKEND" = go ]; then
+  # build if the binary is missing or older than a Go source
+  BIN="$GO/bin/metis-agent"
+  if [ ! -x "$BIN" ] || [ -n "$(find "$GO/cmd" "$GO/internal" -name '*.go' -newer "$BIN" -print -quit)" ]; then
+    echo "building go/bin/metis-agent …"
+    (cd "$GO" && nice ./build.sh metis-agent v3say) >/dev/null
+  fi
+  J="$RUN/session.jsonl"
+  if [ -s "$J" ]; then
+    mv "$J" "$RUN/session-$(date -r "$J" +%Y%m%d-%H%M%S).jsonl"
+  fi
+  cd "$GO"
+  nohup "$BIN" -config "$CONFIG" -loop v3 -no-domains -wait-viewer -addr "$ADDR" -ui-dir "$UI_DIR" -lib-dir "$LIB_DIR" >"$LOG" 2>&1 &
+else
+  "$PY" -c "import aiohttp, llama_cpp, metis_catalog" 2>/dev/null || {
+    echo "py/.venv lacks the service's packages: $ROOT/py/.venv/bin/pip install -r $ROOT/py/requirements.txt -e $ROOT/../metis-catalog" >&2; exit 1; }
+  cd "$ROOT/py"
+  nohup "$PY" -m metis_agent.service --config "$CONFIG" --addr "$ADDR" --ui-dir "$UI_DIR" --lib-dir "$LIB_DIR" >"$LOG" 2>&1 &
 fi
-
-cd "$GO"
-nohup "$BIN" -config "$CONFIG" -loop v3 -no-domains -wait-viewer -addr "$ADDR" -ui-dir "$UI_DIR" -lib-dir "$LIB_DIR" >"$LOG" 2>&1 &
 echo $! >"$PID"
+echo "$BACKEND" >"$BACKEND_F"
 
 # up when the console serves (the model and the domain agents load first)
 for _ in $(seq 1 240); do
@@ -91,11 +111,11 @@ for _ in $(seq 1 240); do
 done
 grep -q "serving http" "$LOG" || { echo "not serving after 120 s — see $LOG" >&2; exit 1; }
 
+if [ "$BACKEND" = go ]; then WHO="Go, -loop v3; the domain agents spawned from py/"; else WHO="py, metis_agent.service; the domain agents in-process, one model"; fi
 cat <<EOF
 metis-agent is up (pid $(cat "$PID")): open $URL
-  orchestrator: Go, -loop v3 ($CONFIG)
-  domain agents: dog, kitchen, kitchen_shared (py/, spawned by the service)
-  the clock starts when the page connects; journal go/results/live/session.jsonl
+  backend: $WHO ($CONFIG)
+  the clock starts when the page connects; journal go/results/live/session$( [ "$BACKEND" = py ] && echo -py).jsonl
   world lines: (cd go && ./bin/v3say -world "+arrived(kitchen)")
   ./run.sh stop · ./run.sh log · ./run.sh status
 EOF

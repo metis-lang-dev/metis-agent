@@ -116,7 +116,25 @@ def test_world_reload_and_the_watcher(tmp_path):
     assert err and "pair" in err                                           # the pair reloads as one, from the kitchen
     assert lv.domain_verb("deactivate", "kitchen", None, "person") is None and "kitchen" in lv.off
     assert {e["name"]: e for e in lv.catalog()}["kitchen"]["state"] == "inactive"
-    assert "not installed" in {e["name"]: e["state"] for e in lv.catalog()}["nav"]
+    cat = {e["name"]: e for e in lv.catalog()}
+    assert cat["wildfire"]["state"] == "not installed" and cat["wildfire"]["kind"] == "domain"
+    assert "nav" not in cat                                                # E13's fixture: no manifest, not listed
+
+
+def test_the_catalog_frame_lists_metis_catalogs_index(tmp_path):
+    """domain-catalog step 3: the CATALOG dock lists the loop console's rows
+    (metis_catalog.index()'s domains: line, has, kind; a partner as its own
+    row), each with its state here — as Go's catalog frame does."""
+    import metis_catalog
+    lv, _ = live(tmp_path)
+    cat = lv.catalog()
+    index = [e["name"] for e in metis_catalog.index() if e["kind"] == "domain"]
+    assert set(index) <= {e["name"] for e in cat}
+    by = {e["name"]: e for e in cat}
+    assert by["dog"]["loaded"] and by["dog"]["kind"] == "domain" and by["dog"]["has"]["intent"]
+    assert by["dog"]["line"] == metis_catalog.get("dog").line
+    assert by["kitchen_shared"]["kind"] == "partner" and by["kitchen_shared"]["partner_of"] == "kitchen"
+    assert by["wgc"]["served"] is False and by["wgc"]["has"]["agent"]
 
 
 def test_summary_names_the_first_changed_line():

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Metis Agent Console</title>
+<!-- the shell (top bar, docks, strip, splitter, colours): fsttm-web lib/, the loop console's own -->
+<link rel="stylesheet" href="lib/shell.css">
+<link rel="stylesheet" href="console.css">
+</head>
+<body>
+<header id="band" aria-label="context">
+  <div class="l">
+    <span class="brand">METIS AGENT</span>
+    <span><b>CONN</b><span class="v" id="conn">connecting…</span></span>
+    <span><b>ACTIVE</b><span class="v" id="b-active">—</span></span>
+    <span><b>DOMAIN</b><span class="v" id="b-tab">—</span></span>
+    <span><b>FLOOR</b><span class="v" id="floor" title="the page's floor (fsttm-web lib/dialog.js)">—</span></span>
+    <span id="sessbar">
+      <label class="tog" title="speak the agent's lines (speechSynthesis)"><input type="checkbox" id="voiceOn" checked> voice</label>
+      <button class="btn" id="micBtn" title="the recognizer: what you say is a person turn">mic</button>
+      <button class="btn" id="legendBtn" title="what the source labels mean">sources?</button>
+    </span>
+  </div>
+  <div class="l">
+    <span id="tokens"><b>LAST LINE</b><span id="b-last" class="empty">—</span></span>
+    <span><b>JOURNAL</b><span class="v" id="b-recs">0</span></span>
+  </div>
+</header>
+<div id="banner" role="status" hidden></div>
+
+<div id="replayBar" hidden>
+  <b>REPLAY</b> <span id="replayName"></span>
+  <select id="replayPick" title="a recorded journal"></select>
+  <button class="btn" id="replayStep" title="the next record">step</button>
+  <button class="btn" id="replayPlay">▶ play</button>
+  <label>speed <select id="replaySpeed"><option>1</option><option>4</option><option selected>10</option><option>50</option></select>×</label>
+  <span id="replayPos" class="empty"></span>
+</div>
+
+<div id="legend" hidden>
+  <div><span class="src s-person">you</span> your turn, typed or spoken: every utterance is a person turn of the orchestrator</div>
+  <div><span class="src s-model">model · branch</span> the orchestrator's model wrote the line on that branch (person, outcome, answer, again …)</div>
+  <div><span class="src s-relay">model · copies the dog's narrator</span> the model's line is the domain's own text word for word: its narrator's sentence, or its <code>%%</code> line when the narrator's did not hold</div>
+  <div><span class="src s-harness">harness · template</span> the harness's fixed words, no model (a bound "no", a surprise closed, an escalation)</div>
+  <div><span class="src s-cut">cut</span> you barged in: what was heard of the line, the rest unsaid</div>
+  <div class="empty">"derived": the journal had no <code>src</code> on the line (before agent-console step 1); the page read it off the records before the line. Click any label for the records it rests on.</div>
+</div>
+
+<main>
+  <section id="left" aria-label="journal">
+    <div id="journal" class="mono" aria-live="polite"></div>
+    <div id="lenses">journal:
+      <span id="kindFilter"></span>
+      <select id="domFilter"><option value="">every domain</option></select>
+      <input id="textFilter" placeholder="filter text" autocomplete="off">
+      <label class="tog"><input type="checkbox" id="showEvents"> clause events</label>
+    </div>
+  </section>
+  <div id="split" role="separator" aria-orientation="vertical" tabindex="0"></div>
+  <aside id="right" aria-label="tool panels">
+    <section class="dock" id="dock-chat" data-dock="chat" aria-label="the orchestrator">
+      <header><span class="tw">▾</span><span class="tt">ORCHESTRATOR · every line with its source</span><button class="x" title="hide (the strip brings it back)">✕</button></header>
+      <div class="dbody">
+        <div id="chat" aria-live="polite"></div>
+        <form id="say">
+          <input id="sayText" autocomplete="off" placeholder="say something — go to the door · what are you doing? · stop">
+          <button class="btn">send</button>
+        </form>
+      </div>
+    </section>
+    <section class="dock" id="dock-catalog" data-dock="catalog" aria-label="catalog">
+      <header><span class="tw">▾</span><span class="tt">CATALOG · installed &amp; active</span><button class="x" title="hide">✕</button></header>
+      <div class="dbody"><div id="domains" class="dlist"></div></div>
+    </section>
+    <section class="dock" id="dock-domain" data-dock="domain" aria-label="the domain">
+      <header><span class="tw">▾</span><span class="tt" id="domTitle">DOMAIN</span><button class="x" title="hide">✕</button></header>
+      <div class="dbody">
+        <nav id="tabs"></nav>
+        <nav id="subtabs">
+          <button class="chip" data-sub="stream" aria-pressed="true">stream</button>
+          <button class="chip" data-sub="repl" aria-pressed="false">REPL log</button>
+        </nav>
+        <div id="tabBody"></div>
+      </div>
+    </section>
+    <section class="dock" id="dock-world" data-dock="world" aria-label="world ports">
+      <header><span class="tw">▾</span><span class="tt" id="worldTitle">WORLD PORTS</span><button class="x" title="hide">✕</button></header>
+      <div class="dbody"><div id="worldBody"></div></div>
+    </section>
+  </aside>
+  <nav id="strip" aria-label="tool windows">
+    <button data-strip="chat" title="the orchestrator">Chat</button>
+    <button data-strip="catalog" title="the catalog: installed and active domains">Catalog</button>
+    <button data-strip="domain" title="the domain: its stream and REPL log">Domain</button>
+    <button data-strip="world" title="the domain's world ports">World</button>
+  </nav>
+</main>
+
+<script src="lib/shell.js"></script>
+<script type="importmap">
+{ "imports": { "fsttm-web/fsttm": "./lib/fsttm.js", "fsttm-web/attention": "./lib/attention.js",
+               "fsttm-web/dialog": "./lib/dialog.js", "fsttm-web/tts": "./lib/tts.js" } }
+</script>
+<script type="module" src="console.js"></script>
+</body>
+</html>

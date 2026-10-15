@@ -1,4 +1,4 @@
-// node web/test/console.mjs — the console's journal model on the real
+// node console/test/console.mjs — the console's journal model on the real
 // journals (fixtures/): every spoken line gets a source, and the sources
 // are the ones the records say.
 import { readFileSync } from 'fs';

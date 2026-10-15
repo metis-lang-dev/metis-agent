@@ -23,6 +23,18 @@ env:
   # environment secret is empty at the workflow level and in a job without it.
 
 jobs:
+  # console/: the page's journal model on the recorded journals (node, no deps)
+  console:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: node console/test/console.mjs
+        run: node console/test/console.mjs
+
   # go/: cgo against a CPU-only llama.cpp at the pin (cached on the commit);
   # vet, every cmd built, every package tested. Model-gated tests skip
   # without weights (go/models is not in git); the metispy-backed kernel test

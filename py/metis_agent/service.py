@@ -170,6 +170,21 @@ def summary(base, now):
     return "; ".join(parts)
 
 
+def catalog_list():
+    """The consoles' list, as Go's catalog.List reads it: metis_catalog's
+    index, its domains (the display line, what each has), plus each partner
+    (partner_of: listed by its pair's lead in the index) as kind partner."""
+    from .domains import catalog
+    mc = catalog()
+    out = [{k: e.get(k) for k in ("name", "kind", "display", "line", "has")}
+           for e in mc.index() if e["kind"] == "domain"]
+    for d in mc.domains():
+        if d.partner_of:
+            out.append({"name": d.name, "kind": "partner", "display": d.display, "line": d.line,
+                        "has": d.has(), "partner_of": d.partner_of})
+    return out
+
+
 # ── the live loop (v3procs.go) ────────────────────────────────────────────────
 
 class Live:
@@ -213,6 +228,11 @@ class Live:
         self.catalog_names, self.loaded = list(v3["catalog"]), list(v3["loaded"])
         self.display = dict(v3.get("display") or {})
         self.lines = dict(v3.get("lines") or {})
+        try:                                        # the catalog's list (the console's CATALOG dock)
+            self.listed = catalog_list()
+        except Exception as e:  # noqa: BLE001 — no loader: the system turn's catalog stands in
+            log.warning("[console] the catalog's list: %s", e)
+            self.listed = []
         self.intents_domain = next((n for n in self.loaded if n in self.names), "")
         self.off, self.pend, self.n = set(), [], 0
         self.watch = {d: str(ROOT / "py" / p) for d, p in (dcfg.get("watch") or {}).items()}
@@ -498,8 +518,12 @@ class Live:
         return err
 
     def catalog(self):
+        """Every domain the page can see (v3console.go catalog()): the loaded
+        ones, those served here, the catalog's list (else the system turn's
+        catalog); each with its state, and the list's line, has and kind."""
         names = []
-        for n in self.loaded + self.names + self.catalog_names:
+        listed = {e["name"]: e for e in self.listed}
+        for n in self.loaded + self.names + (list(listed) if listed else self.catalog_names):
             if n not in names:
                 names.append(n)
         out = []
@@ -510,6 +534,13 @@ class Live:
             e = {"name": n, "display": self.display.get(n, ""), "loaded": loaded, "served": served, "state": state}
             if self.lines.get(n):
                 e["line"] = self.lines[n]
+            if n in listed:
+                le = listed[n]
+                e.update(line=le.get("line") or "", has=le.get("has"), kind=le.get("kind"))
+                if le.get("display"):
+                    e["display"] = le["display"]
+                if le.get("partner_of"):
+                    e["partner_of"] = le["partner_of"]
             if self.changed.get(n):
                 e["changed"] = self.changed[n]
             out.append(e)
@@ -766,7 +797,12 @@ def make_app(live, ui_dir, lib_dir=None):
     async def on_startup(app):
         loop_box["loop"] = asyncio.get_running_loop()
 
+    async def on_shutdown(app):              # the pages' sockets closed, so a stop does not wait on them
+        for sock in list(clients):
+            await sock.close(code=1001, message=b"server shutdown")
+
     app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
     app.router.add_get("/ws", ws_handler)
     try:
         from fsttm_web.aiohttp import mount
@@ -806,13 +842,13 @@ def main():
     if a.no_wait_viewer:
         live.started.set()
     threading.Thread(target=live.run, daemon=True, name="agent").start()
-    ui = a.ui_dir or str(ROOT / "py" / cfg.get("ws", {}).get("ui", "../web"))
+    ui = a.ui_dir or str(ROOT / "py" / cfg.get("ws", {}).get("ui", "../console"))
     lib = a.lib_dir or str((ROOT / "py" / cfg.get("ws", {}).get("lib", "../../fsttm-web/lib")).resolve())
     host, _, port = (a.addr or cfg.get("ws", {}).get("addr", "127.0.0.1:8395")).rpartition(":")
     app = make_app(live, ui, lib)
     log.info("[console] serving http on %s:%s (ui=%s) — /ws", host or "0.0.0.0", port, ui)
     try:
-        web.run_app(app, host=host or "0.0.0.0", port=int(port), print=None)
+        web.run_app(app, host=host or "0.0.0.0", port=int(port), print=None, shutdown_timeout=5)
     finally:
         live.stop.set()
 

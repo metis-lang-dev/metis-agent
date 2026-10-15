@@ -2,15 +2,18 @@
 // orchestrator's chat with voice, every line labelled by its source; the
 // installed catalog; a tab per domain (its stream, its REPL log, its world
 // ports); the dlg-* journal live. The floor and the voice are fsttm-web's
-// library (lib/dialog.js), served at lib/ (run.sh LIB_DIR).
+// library (lib/dialog.js), served at lib/ (run.sh LIB_DIR); the shell — the
+// top bar, the docks and their strip, the colours — is fsttm-web's
+// lib/shell.css + shell.js, the loop console's own (domain-catalog step 3).
 //
 //   /                      live, on the service's /ws (run.sh)
 //   ?replay=fixtures/live-1710.jsonl[&id=D1-c][&speed=10][&voice]
 //                          a recorded journal, no service (the static mock)
 //
-// The wire (console-wire.md, agreed with opus): → hello{since} · say_text{id,text}
-// · world{domain,atoms} · activate{domain} · deactivate{domain} · heard{id,text} · cut{id,heard}
-// ← journal{rec} · catalog{domains} · ports{…} · world_ack{…} · narration{…,say} · intent{id,voice} · error
+// The wire (docs/WIRE.md): → hello{since} · say_text{id,text} · world{domain,atoms}
+// · activate{domain} · deactivate{domain} · reload{domain} · ports{domain} · heard{id,text} · cut{id,heard}
+// ← journal{rec} · catalog{domains} · ports{…} · world_ack{…} · domain_ack{…} · reload_ack{…}
+// · narration{…,say} · intent{id,voice} · error
 import { Journal, parseJournal, episodes, parseAtoms, wakeLabel } from './journal.js';
 import { FSTTM } from 'fsttm-web/fsttm';
 import { Attention } from 'fsttm-web/attention';
@@ -28,12 +31,13 @@ const el = (tag, attrs = {}, ...kids) => {
 };
 const q = new URLSearchParams(location.search);
 const REPLAYS = ['fixtures/live-1710.jsonl', 'fixtures/step1-smoke-1728.jsonl', 'fixtures/smoke.jsonl', 'fixtures/int-step2b.jsonl'];
-// the installed catalog when no service says it (config.v3-live.yaml v3.catalog/loaded/display)
+// the catalog when no service says it (a replay): the live config's two loaded domains
 const FALLBACK_CATALOG = {
   domains: [
-    { name: 'dog', display: 'the dog: walks, finds things, sits and stands (dog.llp)', loaded: true },
-    { name: 'kitchen', display: 'the kitchen: the first cook, its orders and soups (kitchen.llp)', loaded: true },
-    ...['nav', 'xtraffic', 'sysadmin', 'social', 'votes'].map(name => ({ name, display: '', loaded: false })),
+    { name: 'dog', kind: 'domain', display: 'the dog', line: 'a robot dog: walks to places, finds things, sits and stands', loaded: true, state: 'idle',
+      has: { program: true, host: true, notch: false, agent: true, intent: true, readme: true } },
+    { name: 'kitchen', kind: 'domain', display: 'the kitchen', line: 'the kitchen: the first cook, its orders and soups', loaded: true, state: 'idle',
+      has: { program: true, host: true, notch: true, agent: true, intent: false, readme: true } },
   ],
 };
 const DISPLAY = { kitchen_shared: 'second cook' };
@@ -44,6 +48,15 @@ let catalog = FALLBACK_CATALOG, catalogLive = false;
 const ports = {};             // domain → the ports reply
 let rendered = 0;             // J.chat rows on the page
 let tab = 'dog', sub = 'stream';
+
+// ── the shell: the docks and their strip, the splitter (fsttm-web lib/shell.js) ──
+const dockUI = MetisShell.docks({
+  names: ['chat', 'catalog', 'domain', 'world'], key: 'agentconsole.docks.v1',
+  defaults: { chat: { shown: true, open: true }, catalog: { shown: true, open: true },
+              domain: { shown: true, open: true }, world: { shown: true, open: false } },
+});
+dockUI.apply();
+MetisShell.splitter();
 const rowEl = new Map();      // chat seq → its element
 const jEl = new Map();        // journal seq → its element
 const turnLines = new Map();  // a turn id → its chat row (the line the intent frame voiced)
@@ -81,7 +94,7 @@ async function turn(id, text) {
 
 let speakingRow = null;
 function onDialog(kind, f = {}) {
-  if (kind === 'fsttm') $('floor').textContent = `floor ${f.dst}`;
+  if (kind === 'fsttm') $('floor').textContent = f.dst;
   if (kind === 'keyword_stop') send({ ev: 'say_text', id: `${sess}-stop${Date.now()}`, text: f.text, mode: 'intent' }); // the dog's stop is a person turn too
   if (kind === 'speak') markSpoken(f.sentences?.join(' '));
   if (kind === 'cut') markCut(f);
@@ -121,15 +134,16 @@ function connectLive() {
   ws.onmessage = e => { let f; try { f = JSON.parse(e.data); } catch { return; } frame(f); };
 }
 const lastSeq = () => J.recs.length ? J.recs[J.recs.length - 1].seq ?? 0 : 0;
-function setConn(text, cls) { $('conn').textContent = text; $('conn').className = `pill ${cls ?? ''}`; }
+function setConn(text, cls) { $('conn').textContent = text; $('conn').className = `v ${cls ?? ''}`; }
 
 function frame(f) {
   switch (f.ev) {
     case 'journal': if (f.rec && !(f.rec.seq != null && J.bySeq.has(f.rec.seq))) ingest(f.rec); break;
     case 'catalog': catalog = { domains: f.domains ?? [] }; catalogLive = true; renderDomains(); renderTabs(); break;
-    case 'ports': ports[f.domain] = f; if (tab === f.domain && sub === 'world') renderTab(); break;
+    case 'ports': ports[f.domain] = f; if (tab === f.domain) renderWorldDock(); break;
     case 'domain_ack': if (f.error) note(`${f.verb} ${f.domain}: ${f.error}`); renderDomains(); break;
-    case 'world_ack': if (f.error) note(`world ${f.domain}: ${f.error}`); else if (tab === f.domain && sub === 'world') renderTab(); break;
+    case 'reload_ack': note(f.error ? `reload ${f.domain}: ${f.error}` : `reload ${f.domain}: reloaded (${f.key ?? ''})`); renderDomains(); break;
+    case 'world_ack': if (f.error) note(`world ${f.domain}: ${f.error}`); else if (tab === f.domain) renderWorldDock(); break;
     case 'narration': narration(f); break;
     case 'intent': case 'error': { const w = waiting.get(f.id); if (w) w(f); else if (f.ev === 'error') note(`error: ${f.error}`); break; }
     case 'domains': break; // the pre-v3 attach list: the catalog frame replaces it
@@ -151,8 +165,10 @@ function ingest(rec) {
   if (rec.kind === 'dlg-wake' || rec.kind === 'dlg-trace' || rec.kind === 'dlg-world' || rec.kind === 'dlg-domain') {
     if (rec.domain) addDomFilter(rec.domain);
     renderDomains(); renderTabs();
-    if (!rec.domain || rec.domain === tab) renderTab();
+    if (!rec.domain || rec.domain === tab) { renderTab(); if (rec.kind === 'dlg-world') renderWorldDock(); }
   }
+  if (rec.kind === 'dlg-say') $('b-last').textContent = rec.text ?? '';
+  $('b-recs').textContent = J.recs.length;
 }
 
 function note(text) { J.chat.push({ who: 'note', text, t: new Date().toISOString() }); renderChat(); }
@@ -208,28 +224,66 @@ function domState(name) {
   if (d.task) return { text: `task ${d.task}`, cls: 'task' };
   return { text: d.state ?? 'idle', cls: '' };
 }
+// the catalog: metis_catalog's index (the loop console's rows: the display
+// line, what each domain has), each with its state here. One click opens a
+// domain: an active one shows its tab; an inactive one is activated.
+const HAS = ['agent', 'intent', 'host', 'notch', 'readme'];
+function canActivate(d) { return ws && catalogLive && !d.loaded && d.served !== false && !/pair/.test(d.state ?? ''); }
+function stateOf(d) {
+  let text = d.state ?? '';
+  if (!catalogLive) text = d.loaded ? domState(d.name).text : 'not loaded';
+  const diff = J.domains.get(d.name)?.surprise?.difference;
+  if (diff && /surprise/.test(text) && !/: /.test(text)) text += ': ' + diffText(diff);
+  const cls = /surprise/.test(text) ? 'surprise' : /task/.test(text) ? 'task' : d.loaded ? 'active' : '';
+  return { text: d.loaded && /^idle$/.test(text) ? 'active · idle' : text, cls };
+}
+function openDomain(d) {
+  if (d.loaded || /pair/.test(d.state ?? '')) { selectTab(d.partner_of || (/pair/.test(d.state ?? '') ? 'kitchen' : d.name)); return; }
+  if (!canActivate(d)) {
+    note(!catalogLive ? `${d.name}: activating needs the live service`
+      : d.served === false ? `${d.name}: no domain agent serves it in this configuration${d.has && !d.has.agent ? ' (it has no domain-agent module: open it in the loop console)' : ''}` : `${d.name}: cannot be activated`);
+    return;
+  }
+  send({ ev: 'activate', domain: d.name });
+  pendingTab = d.name;
+}
+let pendingTab = null;
 function renderDomains() {
   const box = $('domains');
   box.replaceChildren();
+  const active = [];
   for (const d of catalog.domains) {
-    // the service's own state line (the mirror's: idle · task c1 · surprise 0 · inactive …), the
-    // surprise's difference from the journal; without a service, the journal's alone
-    let st = d.loaded ? domState(d.name) : { text: 'not loaded', cls: 'off' };
-    if (catalogLive) {
-      const diff = J.domains.get(d.name)?.surprise?.difference;
-      const text = `${d.state ?? ''}${diff && /surprise/.test(d.state ?? '') ? ': ' + diffText(diff) : ''}`;
-      st = { text, cls: /surprise/.test(text) ? 'surprise' : /task/.test(text) ? 'task' : d.loaded ? '' : 'off' };
+    if (d.loaded) active.push(d.name);
+    const st = stateOf(d);
+    const tags = HAS.filter(k => d.has && k in d.has).map(k => el('span', { class: d.has[k] ? 'tag' : 'tag off', title: d.has[k] ? `it has ${k}` : `no ${k}` }, k));
+    const acts = el('span', { class: 'acts' });
+    if (d.loaded && !/pair/.test(d.state ?? '')) {
+      const off = el('button', { class: 'btn', title: 'deactivate(domain): detach it from the runtime tree' }, 'deactivate');
+      off.disabled = !ws || !catalogLive;
+      off.onclick = e => { e.stopPropagation(); send({ ev: 'deactivate', domain: d.name }); off.disabled = true; };
+      acts.append(off);
     }
-    const btn = el('button', { title: d.loaded ? 'deactivate(domain): detach it from the runtime tree' : 'activate(domain): attach it' }, d.loaded ? 'deactivate' : 'activate');
-    btn.disabled = !ws || !catalogLive || (d.served === false && !d.loaded) || /pair/.test(d.state ?? '');
-    if (!catalogLive) btn.title += ' — needs the live service';
-    else if (d.served === false) btn.title = 'no domain agent serves it in this configuration';
-    btn.onclick = () => { send({ ev: d.loaded ? 'deactivate' : 'activate', domain: d.name }); btn.disabled = true; };
-    box.append(el('div', { class: 'dom' },
-      el('div', { class: 'name' }, el('b', {}, d.name), d.display ? el('div', { class: 'disp' }, d.display) : null),
-      el('span', { class: `state ${st.cls}`, title: st.text }, st.text.length > 42 ? st.text.slice(0, 40) + '…' : st.text),
-      btn));
+    if (d.served !== false && (d.loaded || d.served) && !(d.partner_of || /pair/.test(d.state ?? ''))) {
+      const rl = el('button', { class: 'btn', title: d.changed ? `reload: the files changed — ${d.changed}` : 'reload(domain): the domain agent recompiles from its files' }, d.changed ? 'reload ●' : 'reload');
+      rl.disabled = !ws || !catalogLive;
+      rl.onclick = e => { e.stopPropagation(); send({ ev: 'reload', domain: d.name }); rl.disabled = true; };
+      acts.append(rl);
+    }
+    const row = el('div', { class: `dm${d.name === tab ? ' cur' : ''}`, tabindex: '0', role: 'button', 'data-dom': d.name,
+      title: d.loaded ? `open ${d.name}'s tab` : canActivate(d) ? `activate ${d.name}` : '' },
+      el('div', { class: 'hd' }, el('span', { class: 'nm' }, d.name), d.display && d.display !== d.name ? el('span', { class: 'empty' }, d.display) : null,
+        el('span', { class: `st ${st.cls}`, title: st.text }, st.text.length > 46 ? st.text.slice(0, 44) + '…' : st.text || '—'), ...tags, acts),
+      d.line ? el('div', { class: 'ln' }, d.line) : null,
+      d.changed ? el('div', { class: 'chg' }, `changed on disk: ${d.changed}`) : null);
+    row.onclick = () => openDomain(d);
+    row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDomain(d); } };
+    box.append(row);
   }
+  box.append(el('div', { class: 'foot empty' }, catalogLive
+    ? `${catalog.domains.length} domain(s) from metis_catalog — the program-only catalogs open in the loop console`
+    : 'the catalog comes from the live service (a replay shows the loaded domains)'));
+  $('b-active').textContent = active.join(', ') || '—';
+  if (pendingTab && active.includes(pendingTab)) { const t = pendingTab; pendingTab = null; selectTab(t); }
 }
 
 // ── per-domain tabs ──────────────────────────────────────────────────────
@@ -238,20 +292,28 @@ function tabNames() {
   for (const n of J.domains.keys()) if (!names.includes(n)) names.push(n);
   return names;
 }
+function selectTab(n) {
+  tab = n; renderTabs(); renderTab(); renderWorldDock(); renderDomains();
+  if (n !== 'kitchen_shared') send({ ev: 'ports', domain: n });
+  if (!dockUI.state.domain?.shown || !dockUI.state.domain?.open) dockUI.set('domain', { shown: true, open: true });
+}
 function renderTabs() {
   const box = $('tabs');
   const names = tabNames();
   if (!names.includes(tab) && names.length) tab = names[0];
   box.replaceChildren(...names.map(n => {
     const d = J.domains.get(n);
-    const b = el('button', { class: n === tab ? 'on' : '' }, DISPLAY[n] ? `${n} (${DISPLAY[n]})` : n, d?.surprise ? ' ⚠' : '');
-    b.onclick = () => { tab = n; renderTabs(); renderTab(); if (n !== 'kitchen_shared') send({ ev: 'ports', domain: n }); };
+    const b = el('button', { class: 'chip', 'aria-pressed': String(n === tab) }, DISPLAY[n] ? `${n} (${DISPLAY[n]})` : n, d?.surprise ? ' ⚠' : '');
+    b.onclick = () => selectTab(n);
     return b;
   }));
+  $('domTitle').textContent = `DOMAIN · ${tab}`;
+  $('worldTitle').textContent = `WORLD PORTS · ${tab}`;
+  $('b-tab').textContent = tab;
 }
 for (const b of document.querySelectorAll('#subtabs button')) b.onclick = () => {
   sub = b.dataset.sub;
-  for (const x of document.querySelectorAll('#subtabs button')) x.classList.toggle('on', x === b);
+  for (const x of document.querySelectorAll('#subtabs button')) x.setAttribute('aria-pressed', String(x === b));
   renderTab();
 };
 
@@ -272,12 +334,16 @@ function renderTab() {
     });
     box.replaceChildren(...(rows.length ? rows : [el('div', { class: 'empty' }, 'nothing from this domain yet')]),
       d.events ? el('div', { class: 'empty' }, `+ ${d.events} clause events (shown in the journal with "clause events")`) : '');
-  } else if (sub === 'repl') {
+  } else {
     const rows = d.trace.map(traceEl);
     box.replaceChildren(...(rows.length ? rows : [el('div', { class: 'empty' },
       'no REPL log yet: the domain agent sends a trace per line with --trace (py 86c6c98), journalled as dlg-trace')]));
-  } else renderWorld(box, d);
-  box.scrollTop = sub === 'world' ? 0 : box.scrollHeight;
+  }
+  const body = box.closest('.dbody');
+  if (body) body.scrollTop = body.scrollHeight;
+}
+function renderWorldDock() {
+  renderWorld($('worldBody'), J.domains.get(tab) ?? { stream: [], trace: [], world: [], events: 0 });
 }
 
 function traceEl(t) {
@@ -398,7 +464,10 @@ function renderJournalRow(r) {
   e.onclick = () => { const m = rowEl.get(r.seq); if (m) { for (const x of document.querySelectorAll('.msg.hl')) x.classList.remove('hl'); m.classList.add('hl'); m.scrollIntoView({ block: 'nearest' }); } };
   if (r.seq != null) jEl.set(r.seq, e);
   e._rec = r;
-  box.append(e);
+  // in seq order: a live frame can come before the hello's replay of older records
+  let after = box.lastElementChild;
+  while (r.seq != null && after && after._rec?.seq != null && after._rec.seq > r.seq) after = after.previousElementSibling;
+  if (after === box.lastElementChild) box.append(e); else if (after) after.after(e); else box.prepend(e);
   if (atEnd) box.scrollTop = box.scrollHeight;
 }
 function refilter() { for (const e of $('journal').children) e.hidden = !visible(e._rec); }
@@ -414,11 +483,11 @@ $('say').onsubmit = e => {
 };
 let rec = null;
 $('micBtn').onclick = () => {
-  if (rec) { rec.stop(); rec = null; $('micBtn').textContent = '🎤 mic off'; $('micBtn').classList.remove('on'); return; }
+  if (rec) { rec.stop(); rec = null; $('micBtn').textContent = 'mic'; $('micBtn').classList.remove('on'); return; }
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) { note('no SpeechRecognition in this browser'); return; }
   rec = attachRecognizer(new SR(), dialog);
-  $('micBtn').textContent = '🎤 mic on'; $('micBtn').classList.add('on');
+  $('micBtn').textContent = 'mic on'; $('micBtn').classList.add('on');
 };
 $('legendBtn').onclick = () => { $('legend').hidden = !$('legend').hidden; };
 
@@ -464,7 +533,7 @@ async function startReplay(path) {
   if (q.has('all')) { while (step()); } else play();
 }
 
-renderDomains(); renderTabs(); renderTab();
+renderDomains(); renderTabs(); renderTab(); renderWorldDock();
 if (replay) startReplay(replay);
 else connectLive();
 window.consoleJournal = J; // for CDP drivers
