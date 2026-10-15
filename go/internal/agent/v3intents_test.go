@@ -134,3 +134,42 @@ func TestIntentOfTheDog(t *testing.T) {
 		t.Fatalf("asks %v", d.Asks)
 	}
 }
+
+type recDomains struct{ sent []string }
+
+func (r *recDomains) Call(c Call) (Reply, bool) { return Reply{}, false }
+func (r *recDomains) Intent(c Call) (Reply, bool) {
+	r.sent = append(r.sent, c.Text())
+	d := JDomain(c)
+	if d == "" {
+		d = "dog"
+	}
+	return Reply{Domain: d, Kind: "result", ID: "s" + d, Status: "accepted"}, true
+}
+
+// The stop words (the architect's ruling, e2e step 4): to the domains whose
+// tasks are in flight, never by position; none in flight: nothing sent,
+// "Nothing is running."
+func TestStopGoesWhereTasksRun(t *testing.T) {
+	dom := &recDomains{}
+	o := NewOrch(V3Config{Loaded: []string{"dog", "kitchen", "plant"}, IntentDomains: []string{"dog", "plant"}, Mirror: true}, &fakeDialog{}, dom)
+	if _, voice, err := o.Stop("stop"); err != nil || voice != lineNothingRunning || len(dom.sent) != 0 {
+		t.Fatalf("idle: %q %v %v", voice, dom.sent, err)
+	}
+	o.m.see(Reply{Domain: "plant", Kind: "result", ID: "c2", Status: "accepted"}, Call{J: []byte(`{"domain":"plant","intent":"WATER"}`)})
+	if _, voice, _ := o.Stop("stop"); voice != ackTemplate["STOP"] || strings.Join(dom.sent, " ") != `{"domain":"plant","intent":"STOP"}` {
+		t.Fatalf("plant running: %q %v", voice, dom.sent)
+	}
+	dom.sent = nil
+	o.m.see(Reply{Domain: "dog", Kind: "result", ID: "c3", Status: "accepted"}, Call{J: []byte(`{"domain":"dog","intent":"FIND"}`)})
+	if o.Stop("halt"); strings.Join(dom.sent, " ") != `{"domain":"dog","intent":"STOP"} {"domain":"plant","intent":"STOP"}` {
+		t.Fatalf("both running: %v", dom.sent)
+	}
+	// one intent domain: its STOP untagged, as before
+	dom.sent = nil
+	o1 := NewOrch(V3Config{Loaded: []string{"dog"}, IntentDomains: []string{"dog"}, Mirror: true}, &fakeDialog{}, dom)
+	o1.m.see(Reply{Domain: "dog", Kind: "result", ID: "c1", Status: "accepted"}, Call{J: []byte(`{"intent":"FIND"}`)})
+	if o1.Stop("stop"); strings.Join(dom.sent, " ") != `{"intent":"STOP"}` {
+		t.Fatalf("one domain: %v", dom.sent)
+	}
+}

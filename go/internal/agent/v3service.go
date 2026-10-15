@@ -245,18 +245,12 @@ func (v *v3) utterance(a *Agent, text string, at time.Time) (Turn, error) {
 		v.live.record(w)
 	}
 	if keywordStop(text, a.cfg.StopWords) {
-		j := []byte(`{"intent":"STOP"}`)
-		c := Call{J: j}
-		var r Reply
-		if v.live != nil { // the dog is a domain agent process: its STOP goes on its wire
-			r, _ = v.live.pd.Intent(c)
-		} else {
-			r, _ = v3Domains{a: a, v: v}.Intent(c)
-		}
-		if err := v.o.Past(text, j, r.ID, ackTemplate["STOP"]); err != nil {
+		// to the domains whose tasks are in flight; none: "Nothing is running." (e2e step 4 ruling)
+		j, voice, err := v.o.Stop(text)
+		if err != nil {
 			return Turn{}, err
 		}
-		t := Turn{JSON: string(j), Voice: ackTemplate["STOP"]}
+		t := Turn{JSON: j, Voice: voice}
 		if v.live != nil {
 			t.Say = v.live.sayRec("turn", t.Voice)
 			v.handleDue(a, -1, nil)

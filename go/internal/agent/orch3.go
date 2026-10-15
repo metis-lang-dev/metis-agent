@@ -300,16 +300,56 @@ func (o *Orch) Activated(d string) { delete(o.qHeard, d) }
 // keyword: a stop word fires the intent without the model (the dog path's
 // keyword stop); the turn is kept as the dialog's past.
 func (o *Orch) keyword(person, j string) error {
-	c := Call{J: json.RawMessage(j)}
-	r, ok := o.dom.Intent(c)
-	if !ok {
-		return nil
+	_, voice, err := o.Stop(o.head() + person)
+	if voice == lineNothingRunning {
+		o.say("template", voice)
 	}
-	o.byID[r.ID] = c
-	o.quiet[r.ID] = true // its ack is the turn's line; its outcome the journal's
-	o.m.see(r, c)
+	return err
+}
+
+// lineNothingRunning: the stop words with no task in flight anywhere.
+const lineNothingRunning = "Nothing is running."
+
+// Stop is the stop words' STOP (the architect's ruling, e2e-workflow step
+// 4): sent to the domain whose task is in flight, to every one if several
+// (in the loaded order), never to a domain by position; with none in
+// flight nothing is sent and the line says so. A J to a domain other than
+// the one intent domain names it. The turn is kept as the dialog's past;
+// the acknowledgement or the nothing-running line is returned.
+func (o *Orch) Stop(person string) (j, voice string, err error) {
+	base := Call{J: json.RawMessage(`{"intent":"STOP"}`)}
 	o.q = nil
-	return o.Past(o.head()+person, c.J, r.ID, ackTemplate["STOP"])
+	var targets []string
+	for _, d := range o.cfg.Loaded {
+		if o.m.liveIn(d) {
+			targets = append(targets, d)
+		}
+	}
+	if len(targets) == 0 {
+		return base.Text(), lineNothingRunning, o.Past(person, base.J, "", lineNothingRunning)
+	}
+	id := ""
+	j = base.Text()
+	for _, d := range targets {
+		c := base
+		if len(o.cfg.IntentDomains) > 1 || len(o.cfg.IntentDomains) == 1 && d != o.cfg.IntentDomains[0] {
+			c = TagJ(base, d)
+		}
+		r, ok := o.dom.Intent(c)
+		if !ok {
+			continue
+		}
+		o.byID[r.ID] = c
+		o.quiet[r.ID] = true // its ack is the turn's line; its outcome the journal's
+		o.m.see(r, c)
+		if id == "" {
+			id, j = r.ID, c.Text()
+		}
+	}
+	if id == "" {
+		return j, "", nil
+	}
+	return j, ackTemplate["STOP"], o.Past(person, json.RawMessage(j), id, ackTemplate["STOP"])
 }
 
 // cancelFirst: the person agreed to drop the live task for the refused one
