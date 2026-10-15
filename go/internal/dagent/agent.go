@@ -728,6 +728,14 @@ func (a *Agent) surpriseVerb(id any, verb string, args map[string]any) ([]Reply,
 	if v, ok := args["record"]; ok {
 		rec = v
 	}
+	if rec == nil {
+		// nothing open and no record named (the architect's ruling): a
+		// final refusal under the domain's name; the watch is not asked
+		// and its outbox keeps nothing for the next verb's reply
+		a.W.Outbox = nil
+		return []Reply{a.reply("result", F{"id": id, "status": "refused", "reason": "no surprise is open",
+			"ref": a.ref(true, ""), "text": "no surprise is open", "voice": "template"})}, nil
+	}
 	var line string
 	switch verb {
 	case "explain":
@@ -743,12 +751,6 @@ func (a *Agent) surpriseVerb(id any, verb string, args map[string]any) ([]Reply,
 	for _, s := range a.W.Outbox {
 		if _, ok := s["record"]; !ok {
 			s["record"] = rec
-		}
-		if s["record"] == nil {
-			// py's from_signal formats the record with %d: no surprise
-			// open and none named raises there, before the outbox is
-			// cleared (a finding reported to the architect; kept as py's)
-			return nil, pyError{"TypeError", "%d format: a real number is required, not NoneType"}
 		}
 		status := sstr(s, "status")
 		f := F{"id": id, "status": status, "ref": a.ref(true, ""), "text": words(fragRef(s))}
@@ -918,12 +920,6 @@ func kindOf(msg map[string]any) string {
 	}
 	return "error"
 }
-
-// pyError is an exception py's serve() turns into an error reply
-// ("<Type>: <message>").
-type pyError struct{ typ, msg string }
-
-func (e pyError) Error() string { return e.typ + ": " + e.msg }
 
 // Trace is what the agent did since the last trace (py trace(): the fired
 // rows, narrated fragments, consults, reads, world lines and sunk records):

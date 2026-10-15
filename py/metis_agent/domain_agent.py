@@ -520,6 +520,14 @@ class DomainAgent:
 
     def surprise_verb(self, iid, verb, args):
         rec = args.get("record", self.watch.open)
+        if rec is None:
+            # nothing open and no record named (the architect's ruling): a
+            # final refusal under the domain's name — the watch is not asked,
+            # and nothing is left in its outbox for the next verb's reply
+            self.watch.outbox.clear()
+            return [reply(self.name, "result", id=iid, status="refused", reason="no surprise is open",
+                          ref={"seq": len(self.repl.fired), "beat": self.beat_no()}, text="no surprise is open",
+                          voice="template")]
         if verb == "explain":
             cm = self.card_names(args.get("card", ""), args.get("move", ""))
             line = "explain %s %s %s" % (rec, cm["card"], cm["move"])

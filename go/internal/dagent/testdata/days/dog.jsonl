@@ -10,6 +10,7 @@
 {"tool": "consult", "args": {"question": "are you idle or sitting?"}, "id": "k2"}
 {"tool": "consult", "args": {"question": "how are you?"}, "id": "k3"}
 {"tool": "consult", "args": {}, "id": "k4"}
+{"tool": "reset", "args": {}, "id": "n1"}
 {"tool": "state", "args": {}}
 {"tool": "events", "args": {}}
 {"id": "c3", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "STAND_UP"}}
