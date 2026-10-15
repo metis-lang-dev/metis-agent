@@ -267,3 +267,60 @@ def test_a_domain_made_after_the_start_is_listed_and_installed(tmp_path, monkeyp
     assert lv.domain_verb("activate", "plant", None, "person") is None
     assert {e["name"]: e for e in lv.catalog()}["plant"]["loaded"] and "- plant: a plant: it drinks, it wilts" in lv.prompt
     lv.tick()
+
+
+def test_every_served_domain_is_watched_with_its_reload_policy(tmp_path):
+    """human-loop step 1: the watched directories are the served domains'
+    manifests' (a partner reloads with its lead); each row carries its
+    reload policy — propose by default, the config's override over the
+    manifest's."""
+    import metis_catalog
+    cfg = S.load_config(ROOT / "py/config.live.yaml")
+    assert "watch" not in cfg["domains"]
+    lv, _ = live(tmp_path)
+    assert set(lv.watch) == {"dog", "kitchen"} and lv.watch["kitchen"] == str(metis_catalog.get("kitchen").dir)
+    rows = {e["name"]: e for e in lv.catalog()}
+    assert rows["dog"]["reload"] == rows["kitchen"]["reload"] == "propose" and "reload" not in rows["wildfire"]
+    assert S.reload_policy("dog", {"dog": "auto"}) == "auto" and S.reload_policy("kitchen", "auto") == "auto"
+    try:
+        S.reload_policy("dog", "sometimes")
+        assert False
+    except ValueError:
+        pass
+
+
+def test_auto_reloads_at_quiescence_and_a_failure_waits_for_the_next_change(tmp_path, monkeypatch):
+    """reload: auto — the changed dog reloads at the next tick it is quiet
+    with no task (dlg-domain reload by auto, the mirror says reloaded, the
+    mark cleared); a broken edit is tried once, refused, the old dog kept,
+    and not retried until the files change again."""
+    import shutil
+    from metis_agent.domains import catalog
+    cat = tmp_path / "cat"
+    for n in ("dog", "kitchen", "kitchen_shared"):
+        shutil.copytree(catalog().get(n).dir, cat / "domains" / n, ignore=shutil.ignore_patterns("records", "__pycache__"))
+    monkeypatch.setenv("METIS_CATALOG", str(cat))
+    cfg = S.load_config(ROOT / "py/config.live.yaml")
+    cfg["v3"]["journal"] = str(tmp_path / "j.jsonl")
+    cfg["domains"].update(narrate=None, consult=False, records=None, reload={"dog": "auto"})
+    lv = S.Live(cfg, FakeLLM())
+    assert lv.watch["dog"] == str(cat / "domains/dog")
+    llp = cat / "domains/dog/dog.llp"
+    good = llp.read_text()
+    llp.write_text(good.replace("%% I sit down.", "%% I sit down, nice and slow.", 1))
+    lv.watch_once()
+    assert lv.changed["dog"]
+    lv.tick()
+    r = [x for x in recs(lv, "dlg-domain") if x["verb"] == "reload"]
+    assert len(r) == 1 and r[0]["by"] == "auto" and "error" not in r[0]
+    assert not lv.changed["dog"] and lv.o.m.last["dog"] == "reloaded"
+    llp.write_text(good + "\n  wag [dyn] : cmd_wag * -o .\n")
+    lv.watch_once()
+    lv.tick()
+    lv.tick()
+    r = [x for x in recs(lv, "dlg-domain") if x["verb"] == "reload"]
+    assert len(r) == 2 and "ParseError" in r[1]["error"] and lv.changed["dog"]      # tried once, kept marked
+    assert any(x.get("kind") == "ports" for x in lv.serve_line({"ports": {}, "domain": "dog"}, "ports"))
+    llp.write_text(good.replace("%% I sit down.", "%% I sit down, nice and slow.", 1))
+    lv.watch_once()
+    assert not lv.changed["dog"]                                                     # back to what it runs

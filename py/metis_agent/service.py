@@ -135,7 +135,7 @@ def snapshot(d):
     if not d:
         return out
     d = Path(d)
-    for sub in (d, d / "intent"):
+    for sub in (d, d / "intent", d / "packs"):
         try:
             entries = sorted(sub.iterdir())
         except OSError:
@@ -183,6 +183,38 @@ def catalog_list():
             out.append({"name": d.name, "kind": "partner", "display": d.display, "line": d.line,
                         "has": d.has(), "partner_of": d.partner_of})
     return out
+
+
+RELOAD_POLICIES = ("propose", "auto")
+
+
+def manifest_dirs(names):
+    """{name: the manifest's directory} for the domains that have one."""
+    from .domains import catalog
+    out = {}
+    for n in names:
+        try:
+            out[n] = str(catalog().get(n).dir)
+        except Exception:  # noqa: BLE001 — no manifest: nothing to watch
+            pass
+    return out
+
+
+def reload_policy(name, override=None):
+    """propose (the default: the page proposes the reload, the band says
+    STALE) or auto (reloaded at the domain's next quiescence with no task):
+    the config's override, else the manifest's reload:, else propose."""
+    p = override.get(name) if isinstance(override, dict) else override
+    if not p:
+        from .domains import catalog
+        try:
+            p = catalog().get(name).manifest.get("reload")
+        except Exception:  # noqa: BLE001
+            p = None
+    p = p or "propose"
+    if p not in RELOAD_POLICIES:
+        raise ValueError("%s: reload is propose or auto, not %r" % (name, p))
+    return p
 
 
 def catalog_lines(names):
@@ -262,8 +294,16 @@ class Live:
             self.listed = []
         self.intents_domain = next((n for n in self.loaded if n in self.names), "")
         self.off, self.pend, self.n = set(), [], 0
-        self.watch = {d: str(ROOT / "py" / p) for d, p in (dcfg.get("watch") or {}).items()}
+        # every served domain's directory from its manifest (human-loop step 1;
+        # a partner reloads with its lead); domains.watch overrides a directory
+        self.watch = manifest_dirs(n for n in self.names if n not in self.quiet)
+        self.watch.update({d: str(ROOT / "py" / p) for d, p in (dcfg.get("watch") or {}).items()})
         self.base = {d: snapshot(p) for d, p in self.watch.items()}
+        # the reload policy per domain: the manifest's reload:, the config's
+        # domains.reload (one word for all, or {name: policy}) over it
+        self.reload_cfg = dcfg.get("reload")
+        self.policy = {n: reload_policy(n, self.reload_cfg) for n in self.names}
+        self.auto_failed = {}
         self.changed = {}
         self.ports_due = set()
         self.last_cat = ""
@@ -453,6 +493,7 @@ class Live:
                 if dom not in self.quiet and dom not in self.off:
                     due.append(r)
         self.handle_due(self.beat, due)
+        self.auto_reload()
         self.push_catalog()
         again, self.ports_due = self.ports_due, set()
         for d in again:
@@ -571,6 +612,8 @@ class Live:
         self.clocks.append({"domain": dom, "n": int(d.clock.get("beats", 1))})
         self.watch[dom] = str(d.dir)
         self.base[dom] = snapshot(self.watch[dom])
+        for n in group:
+            self.policy[n] = reload_policy(n, self.reload_cfg)
         if dom not in self.catalog_names:
             self.catalog_names.append(dom)
             self.ocfg.catalog.append(dom)
@@ -636,6 +679,8 @@ class Live:
                     e["partner_of"] = le["partner_of"]
             if self.changed.get(n):
                 e["changed"] = self.changed[n]
+            if served:
+                e["reload"] = self.policy.get(n, "propose")
             out.append(e)
         return out
 
@@ -720,6 +765,23 @@ class Live:
         self.journal.record(rec)
         self.push_catalog()
         return key, err
+
+    def auto_reload(self):
+        """reload: auto — a changed domain reloads at its next quiescence
+        with no task and no open surprise (the mirror says reloaded, as a
+        person's reload); a reload that failed waits for the next change."""
+        for d, ch in list(self.changed.items()):
+            if not ch or self.policy.get(d) != "auto" or self.auto_failed.get(d) == ch or d in self.off:
+                continue
+            ag = self.agents.agents.get(d) if hasattr(self.agents, "agents") else self.agents
+            if ag is None or self.o.m.tasks.get(d) or self.o.m.surprise.get(d):
+                continue
+            if not (ag.watch.quiet or ag.watch.observe_only or ag.over):
+                continue
+            _, err = self.reload(d, by="auto")
+            if err:
+                self.auto_failed[d] = ch
+                log.info("[v3] auto reload %s: %s", d, err)
 
     def relist(self):
         """The catalog's list again when its domains changed on disk (a

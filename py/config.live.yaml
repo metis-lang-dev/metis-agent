@@ -29,7 +29,11 @@ domains:                         # in-process (no spawn), on the one loaded mode
     records: catalog             # metis-catalog/domains/<name>/records/<session>.jsonl
     narrator_n_ctx: 8192
     seat_n_ctx: 8192             # the consult's own context: another domain's narration never waits on it
-    watch: {dog: ../../metis-catalog/domains/dog}
+    # every served domain's directory is watched (its manifest's; human-loop step 1):
+    # a change is marked on its catalog row; reload: propose (the default: the page
+    # proposes it, the band says STALE) | auto (at its next quiescence with no task),
+    # from each manifest's reload: key — overridden here by one word or {name: policy}
+    # reload: {dog: auto}
 ws:
     addr: 127.0.0.1:8395
     ui: ../console
