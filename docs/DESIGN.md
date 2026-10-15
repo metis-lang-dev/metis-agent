@@ -629,9 +629,13 @@ orchestrator/domain-agent split between them:
   the embedded solution: a small LLM with a text or voice interface on
   resource-constrained, offline devices (kitchen appliances, robot pets,
   cloud agents), the cost proportional to the intelligence required (the
-  user, 2026-10-15). It is the compiled IR runtime (the cgo binding of the C++
-  kernel — it existed at metis-agent's start, was lost to shortcuts, and is
-  redone properly: runtime-parity s-c39746ca, RUNTIME-PARITY.md) plus one
+  user, 2026-10-15). It is the compiled IR runtime linked into the agent (a C ABI and
+  cgo over metis-lang's header-only kernel — never written before: what
+  existed was archive/metis's MetisCtrl conformance actor over TIPC and the
+  Bazel `@metis//:kernel` library target, both left behind at the freeze
+  ba916e5 while metis-agent took the metispy JSON-lines shortcut 30884da;
+  the redo rehomes the library target, the goldens and the conformance seam
+  and adds the ABI: runtime-parity s-c39746ca, RUNTIME-PARITY.md) plus one
   small model, with the optimization that the upper and lower halves run
   **on the same LLM with context and RAG swapping** (KV swap per context, examples by
   retrieval — E12's one-model question, decided here as the Go deployment
