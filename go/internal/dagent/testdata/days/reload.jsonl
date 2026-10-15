@@ -1,0 +1,25 @@
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"edit": {"file": "plant.llp", "from": "my soil dries out.", "to": "my soil dries out in the sun."}}
+{"reload": {}, "domain": "plant", "id": "r1"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"reload": {}, "domain": "nowhere", "id": "r2"}
+{"add": {}, "domain": "plant", "id": "a0"}
+{"add": {}, "domain": "kitchen_shared", "id": "a1"}
+{"add": {}, "domain": "nowhere", "id": "a2"}
+{"add": {}, "domain": "dog", "id": "a3"}
+{"clock": "beat"}
+{"id": "c1", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"tool": "state", "args": {}, "domain": "plant", "id": "t1"}
+{"reload": {}, "domain": "dog", "id": "r3"}
+{"clock": "beat"}

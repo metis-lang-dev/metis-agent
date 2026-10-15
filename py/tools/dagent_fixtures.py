@@ -9,6 +9,9 @@ traffic, their outputs dumped as JSON lines for go/internal/dagent's tests.
       every act form (a refusal's alternatives: {verb: act, args: {type: v}})
       and the edge cases (an unknown verb, no args, an unknown handle).
 
+  days/reload.out.jsonl  reload and add on a scratch catalog (dog, plant,
+      kitchen_shared copied): the plant's %% line edited mid-day, reloaded
+      (the new key, the new line spoken), the dog added, the error forms
   days/kitchen.out.jsonl  the kitchen pair's day (both cooks, one env, the
       pair's clock): the second cook's load surprises the first, the
       template consult explains it, explain adopts it
@@ -390,7 +393,48 @@ def scrub_cases(dest):
     (dest / "scrub.jsonl").write_text("".join(json.dumps({"in": x, "out": scrub(x)}) + "\n" for x in ins))
 
 
+RELOAD_EDIT = {"file": "plant.llp", "from": "my soil dries out.", "to": "my soil dries out in the sun."}
+
+
+def reload_catalog(src, dst):
+    """The reload day's catalog: dog, plant and kitchen_shared's manifest
+    copied (the generated files, extensions and hosts with them)."""
+    import shutil
+    for d in ("dog", "plant", "kitchen_shared"):
+        shutil.copytree(Path(src) / "domains" / d, Path(dst) / "domains" / d,
+                        ignore=shutil.ignore_patterns("records", "build", "__pycache__"))
+
+
+def reload_day(lines, out):
+    """The plant's reload/add day through py's serve() on the catalog at
+    $METIS_CATALOG (a scratch copy): an {"edit"} line edits a package file
+    there and is not served (Go applies the same edit)."""
+    import io
+    import contextlib
+    import os
+    from metis_agent.domain_agent import Process, serve, ready
+    root = Path(os.environ["METIS_CATALOG"])
+    proc = Process(["plant"], seat="template")
+    with contextlib.redirect_stderr(io.StringIO()):
+        agent = proc.build(1, "replay")
+    stream = [ready(agent)]
+    for msg in lines:
+        if "edit" in msg:
+            e = msg["edit"]
+            f = root / "domains" / "plant" / e["file"]
+            f.write_text(f.read_text().replace(e["from"], e["to"]))
+            stream.append({"in": msg, "out": []})
+            continue
+        with contextlib.redirect_stderr(io.StringIO()):
+            agent, o = serve(agent, msg, proc.build, proc.reload, proc.add_line)
+        stream.append({"in": msg, "out": o})
+    Path(out).write_text("".join(json.dumps(r) + "\n" for r in stream))
+
+
 def main():
+    if len(sys.argv) == 4 and sys.argv[1] == "--reload-day":
+        lines = [json.loads(x) for x in Path(sys.argv[2]).read_text().splitlines() if x.strip()]
+        return reload_day(lines, sys.argv[3])
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("-o", "--out", type=Path, default=ROOT / "go/internal/dagent/testdata")
     dest = ap.parse_args().out
@@ -447,6 +491,20 @@ def main():
         stream, _ = run_day("plant", lines, trace=True)
         (dest / "days" / "plant.trace.out.jsonl").write_text("".join(json.dumps(r) + "\n" for r in stream))
         print(f"day plant traced: {sum(1 for r in stream[1:] for o in r['out'] if o.get('kind') == 'trace')} traces")
+    # reload and add (the bundle rebuilt from the files on disk): the plant's
+    # day on a scratch catalog, its %% line edited mid-day, then reloaded
+    day = dest / "days" / "reload.jsonl"
+    if day.exists():
+        import os
+        import subprocess
+        import tempfile
+        tmp = Path(tempfile.mkdtemp(prefix="dagent-reload-"))
+        reload_catalog(ROOT.parent / "metis-catalog", tmp)
+        out = dest / "days" / "reload.out.jsonl"
+        subprocess.run([sys.executable, __file__, "--reload-day", str(day), str(out)], check=True,
+                       env=dict(os.environ, METIS_CATALOG=str(tmp)), stderr=subprocess.DEVNULL)
+        n = sum(1 for _ in open(out)) - 1
+        print(f"day reload: {n} lines")
     day = dest / "days" / "kitchen.jsonl"
     if day.exists():
         lines = [json.loads(x) for x in day.read_text().splitlines() if x.strip()]

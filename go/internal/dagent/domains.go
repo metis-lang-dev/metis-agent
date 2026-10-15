@@ -205,19 +205,36 @@ func (d *Domains) pairBeat(group []string) ([]Reply, error) {
 	return out, nil
 }
 
+// Rebuilder is what serve()'s reset, reload and add ask of the process.
+type Rebuilder interface {
+	Build(seed uint64, caseName string) (Server, error)
+	Reload(s Server, domain string) (Server, []any)
+	Add(s Server, domain string) (Server, []any)
+}
+
 // Serve is py's serve(): the server's replies, then the ack (non-clock
 // lines); a failure of the agent itself is an error reply and the process
-// lives; a reset rebuilds the server (seed, case) and answers ready.
-func Serve(s Server, msg map[string]any, rebuild func(seed uint64, caseName string) (Server, error)) (Server, []any) {
+// lives; a reset rebuilds the server (seed, case) and answers ready; a
+// reload swaps one domain (its pair with it) for one built from the files
+// on disk; an add joins a domain not served at start.
+func Serve(s Server, msg map[string]any, proc Rebuilder) (Server, []any) {
 	var out []any
-	if hasKey(msg, "reset") {
+	dom, _ := msg["domain"].(string)
+	switch {
+	case hasKey(msg, "reload") && proc != nil:
+		s, out = proc.Reload(s, dom)
+	case hasKey(msg, "add") && proc != nil:
+		s, out = proc.Add(s, dom)
+	case hasKey(msg, "reset") && proc == nil:
+		out = []any{NewReply(s.ServerName(), "error", F{"id": msg["id"], "error": "reset: no process to rebuild from"})}
+	case hasKey(msg, "reset"):
 		r, _ := msg["reset"].(map[string]any)
 		seed := uint64(1)
 		if v, ok := r["seed"].(float64); ok {
 			seed = uint64(v)
 		}
 		cs, _ := r["case"].(string)
-		ns, err := rebuild(seed, cs)
+		ns, err := proc.Build(seed, cs)
 		if err != nil {
 			out = []any{NewReply(s.ServerName(), "error", F{"id": msg["id"], "error": "reset: " + err.Error()})}
 		} else {
@@ -225,7 +242,7 @@ func Serve(s Server, msg map[string]any, rebuild func(seed uint64, caseName stri
 			s = ns
 			out = []any{s.Ready()}
 		}
-	} else {
+	default:
 		rs, err := s.Handle(msg)
 		if err != nil {
 			rs = []any{NewReply(s.ServerName(), "error", F{"id": msg["id"], "error": err.Error()})}

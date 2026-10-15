@@ -1,0 +1,26 @@
+{"clock": "ready", "domain": "plant", "beat": 0}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 1, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 2, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 3, "over": false}]}
+{"in": {"edit": {"file": "plant.llp", "from": "my soil dries out.", "to": "my soil dries out in the sun."}}, "out": []}
+{"in": {"reload": {}, "domain": "plant", "id": "r1"}, "out": [{"domain": "plant", "kind": "reloaded", "key": "aa1aca319a942def6db1d28b8b2d21571fc237e01afc30682a8816511e08307a"}, {"ack": "reload", "id": "r1"}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 1, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 2, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 3, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 4, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 5, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "event", "ref": {"seq": 2, "beat": 6, "event": "dry_out"}, "text": "The sun has been on me for a while; my soil dries out in the sun.", "counts": {}, "voice": "line"}, {"clock": "beat", "beat": 6, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 7, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 8, "over": false}]}
+{"in": {"reload": {}, "domain": "nowhere", "id": "r2"}, "out": [{"domain": "plant", "kind": "error", "error": "reload: no domain 'nowhere' here"}, {"ack": "reload", "id": "r2"}]}
+{"in": {"add": {}, "domain": "plant", "id": "a0"}, "out": [{"domain": "plant", "kind": "error", "error": "add: plant is served here already"}, {"ack": "add", "id": "a0"}]}
+{"in": {"add": {}, "domain": "kitchen_shared", "id": "a1"}, "out": [{"domain": "kitchen_shared", "kind": "error", "error": "add: kitchen_shared is stepped with its pair: add kitchen"}, {"ack": "add", "id": "a1"}]}
+{"in": {"add": {}, "domain": "nowhere", "id": "a2"}, "out": [{"domain": "plant", "kind": "error", "error": "add: no domain 'nowhere' in the catalog (\"no domain 'nowhere' in /tmp/dagent-reload-ha7us4rc\")"}, {"ack": "add", "id": "a2"}]}
+{"in": {"add": {}, "domain": "dog", "id": "a3"}, "out": [{"domain": "dog", "kind": "added", "key": "f2927673f8e455d9f5bb83ce678f6a4adc533aa100cb29f40ccc082e1f82cb67"}, {"ack": "add", "id": "a3"}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 9, "over": false, "domains": {"plant": {"beat": 9, "over": false}, "dog": {"beat": 1, "over": false}}}]}
+{"in": {"id": "c1", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}, "out": [{"domain": "dog", "kind": "result", "ref": {"beat": 1}, "text": "Accepted.", "id": "c1", "status": "accepted"}, {"ack": "intent", "id": "c1"}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "dog", "kind": "result", "ref": {"seq": 2, "beat": 2, "event": "sit[P=standing]"}, "text": "I sit down.", "id": "c1", "status": "done", "voice": "line"}, {"clock": "beat", "beat": 10, "over": false, "domains": {"plant": {"beat": 10, "over": false}, "dog": {"beat": 2, "over": false}}}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 11, "over": false, "domains": {"plant": {"beat": 11, "over": false}, "dog": {"beat": 3, "over": false}}}]}
+{"in": {"tool": "state", "args": {}, "domain": "plant", "id": "t1"}, "out": [{"domain": "plant", "kind": "read", "ref": {"seq": 2, "beat": 11}, "tool": "state", "output": "stage main\n  dry  \u00b7"}, {"ack": "tool", "id": "t1"}]}
+{"in": {"reload": {}, "domain": "dog", "id": "r3"}, "out": [{"domain": "dog", "kind": "reloaded", "key": "f2927673f8e455d9f5bb83ce678f6a4adc533aa100cb29f40ccc082e1f82cb67"}, {"ack": "reload", "id": "r3"}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 12, "over": false, "domains": {"plant": {"beat": 12, "over": false}, "dog": {"beat": 1, "over": false}}}]}
