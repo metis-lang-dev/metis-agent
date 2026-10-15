@@ -99,41 +99,29 @@ def cue(state):
 
 # ── the REPL API, declared ───────────────────────────────────────────────────
 
-def _fn(name, desc, props=None, required=()):
-    f = {"name": name, "description": desc}
-    if props:
-        f["parameters"] = {"type": "OBJECT", "properties": props, "required": list(required)}
-    return f
+def _api():
+    """The REPL API from its one source, metispy's metis.lang.repl_api
+    (repl-tools s-0c6879a1): each verb as the template declares it, a
+    domain parameter's enum filled from its set (the loaded, the cards)."""
+    from metis.lang.repl_api import repl_api
+    out = []
+    for t in repl_api():
+        f = {"name": t["name"], "description": t["description"]}
+        p = t["parameters"]
+        if p:
+            props = {}
+            for k, v in p["properties"].items():
+                v = dict(v)
+                src = v.pop("enum_from", None)
+                if src:
+                    v["enum"] = {"loaded": LOADED, "catalog": CARDS}[src]
+                props[k] = v
+            f["parameters"] = {"type": "OBJECT", "properties": props, "required": list(p["required"])}
+        out.append(f)
+    return out
 
 
-def _s(desc, enum=None):
-    v = {"type": "STRING", "description": desc}
-    if enum:
-        v["enum"] = enum
-    return v
-
-
-DOM = _s("a loaded domain", LOADED)
-REC = _s("the id of the reply this closes: the refused call's id, or the surprise's record (#N)")
-API = [
-    _fn("activate", "attach a catalog domain to the runtime tree", {"domain": _s("the catalog domain (card)", CARDS),
-                                                                     "bindings": _s("the card's bindings, when any")}, ["domain"]),
-    _fn("deactivate", "detach a catalog domain from the runtime tree", {"domain": _s("the catalog domain (card)", CARDS)}, ["domain"]),
-    _fn("keep", "change nothing: the context change needs no domain attached or detached"),
-    _fn("state", "the domain's current state, as its agent reads it", {"domain": DOM}, ["domain"]),
-    _fn("ctx", "the domain's context band: catalog, stage, beat, what is enabled", {"domain": DOM}, ["domain"]),
-    _fn("events", "the domain's recent events", {"domain": DOM}, ["domain"]),
-    _fn("why", "why an atom holds or not, in the domain", {"domain": DOM, "atom": _s("the atom")}, ["domain", "atom"]),
-    _fn("findings", "what the domain's agent has found so far", {"domain": DOM}, ["domain"]),
-    _fn("consult", "ask the domain's agent a question; its reply has kind consult and an answer_kind",
-        {"domain": DOM, "question": _s("one question, usually why <the reason>?"),
-         "max_calls": {"type": "INTEGER", "description": "the agent's call budget, when you set one"}}, ["domain", "question"]),
-    _fn("reset", "the reading was noise: set it aside and resume on the model", {"domain": DOM, "record": REC}, ["domain", "record"]),
-    _fn("explain", "a sibling card's move explains it", {"domain": DOM, "record": REC, "card": _s("the sibling card"),
-                                                          "move": _s("the card's move")}, ["domain", "record", "card", "move"]),
-    _fn("escalate", "nothing explains it: describe it for the people who revise the model",
-        {"domain": DOM, "record": REC, "text": _s("one plain sentence: what was seen")}, ["domain", "record", "text"]),
-]
+API = _api()
 
 LOOP_T = """
 
