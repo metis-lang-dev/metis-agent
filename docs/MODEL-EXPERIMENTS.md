@@ -498,6 +498,15 @@ run.log; local).
 
 ## E9 — the dog intents as Gemma 4 native tools (user, 2026-10-13)
 
+> **Material removed (catalog-entry s-65dd0863, 2026-10-15).** E9 stays
+> here as history; its material is gone: the T bench (`dog-tools.json`,
+> `dog-tools.gbnf`, the three T prompts and the manifest keys
+> `intent.tools` / `intent.bench`) in metis-catalog 74c1829, and the Go
+> side — llmbench's `-tools*` flags and T arms (`cmd/llmbench/tools.go`),
+> `tools/e9-tools.py`, `tools/e9-score.py`, `internal/catalog`'s
+> Tools/Bench — in metis-agent 6fb341f. The ruling: the catalog carries J
+> material only; T is the REPL's interface and lives in metispy.
+
 **Question (user).** The intent path works by translating the utterance
 into our JSON under `dog.gbnf`, two passes with a KV rewind between them
 and a bare "Spoken response:" continuation. Gemma 4 is not trained for
