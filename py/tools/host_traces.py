@@ -105,12 +105,12 @@ def hosted_day(name):
     from metis.loop.watch import Watch
     sys.path.insert(0, str(CATALOG / "domains" / name))
     mod = __import__(f"{name}_host")
-    program, packs, _ = resolve(name)
+    program, extensions, _ = resolve(name)
     out = []
     r = Repl(str(program), seed=1, plugin=f"{CATALOG}/domains/{name}/{name}_host.py:make",
              host=True, stdout=io.StringIO())
-    if packs:
-        doc, _, _ = served_doc(program, packs)
+    if extensions:
+        doc, _, _ = served_doc(program, extensions)
         r._reserve(doc.catalog, doc.ports)
     r.plugin = Recorder(r.plugin, out)
     r._env_attach()
