@@ -1,0 +1,109 @@
+{"face": "snapshot", "out": [0, [], [], true, 0, 0], "text": "[0,[],[],true,0,0]"}
+{"face": "tick", "in": {"moist": 1}, "out": []}
+{"face": "snapshot", "out": [1, [], [], true, 0, 0], "text": "[1,[],[],true,0,0]"}
+{"face": "observe", "in": {"moist": 1}, "out": {"dry": 0, "moist": 1}}
+{"face": "tick", "in": {"moist": 1}, "out": ["+cmd_check"]}
+{"face": "snapshot", "out": [2, [], [], true, 0, 0], "text": "[2,[],[],true,0,0]"}
+{"args": [], "face": "on_event", "name": "check_moist"}
+{"face": "snapshot", "out": [2, [], [[2, "check_moist", []]], true, 0, 0], "text": "[2,[],[[2,\"check_moist\",[]]],true,0,0]"}
+{"face": "observe", "in": {"checked(moist)": 1, "moist": 1}, "out": {"dry": 0, "moist": 1}}
+{"face": "tick", "in": {"checked(moist)": 1, "moist": 1}, "out": ["-checked(moist) 1"]}
+{"face": "snapshot", "out": [3, [], [[2, "check_moist", []]], true, 0, 0], "text": "[3,[],[[2,\"check_moist\",[]]],true,0,0]"}
+{"face": "tick", "in": {"moist": 1}, "out": []}
+{"face": "snapshot", "out": [4, [], [[2, "check_moist", []]], true, 0, 0], "text": "[4,[],[[2,\"check_moist\",[]]],true,0,0]"}
+{"face": "observe", "in": {"moist": 1}, "out": {"dry": 0, "moist": 1}}
+{"face": "tick", "in": {"moist": 1}, "out": []}
+{"face": "snapshot", "out": [5, [], [[2, "check_moist", []]], true, 0, 0], "text": "[5,[],[[2,\"check_moist\",[]]],true,0,0]"}
+{"face": "observe", "in": {"moist": 1}, "out": {"dry": 0, "moist": 1}}
+{"face": "tick", "in": {"moist": 1}, "out": ["+sun"]}
+{"face": "snapshot", "out": [6, [], [[2, "check_moist", []]], true, 0, 0], "text": "[6,[],[[2,\"check_moist\",[]]],true,0,0]"}
+{"args": [], "face": "on_event", "name": "dry_out"}
+{"face": "snapshot", "out": [6, [], [[2, "check_moist", []], [6, "dry_out", []]], false, 0, 0], "text": "[6,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]]],false,0,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": []}
+{"face": "snapshot", "out": [7, [], [[2, "check_moist", []], [6, "dry_out", []]], false, 1, 0], "text": "[7,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]]],false,1,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": ["+cmd_check"]}
+{"face": "snapshot", "out": [8, [], [[2, "check_moist", []], [6, "dry_out", []]], false, 2, 0], "text": "[8,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]]],false,2,0]"}
+{"args": [], "face": "on_event", "name": "check_dry"}
+{"face": "snapshot", "out": [8, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []]], false, 2, 0], "text": "[8,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]]],false,2,0]"}
+{"face": "observe", "in": {"checked(dry)": 1, "dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"checked(dry)": 1, "dry": 1}, "out": ["-checked(dry) 1", "+cmd_water"]}
+{"face": "snapshot", "out": [9, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []]], false, 3, 0], "text": "[9,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]]],false,3,0]"}
+{"args": [], "face": "on_event", "name": "water"}
+{"face": "snapshot", "out": [9, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []]], true, 0, 0], "text": "[9,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]]],true,0,0]"}
+{"face": "observe", "in": {"done(water)": 1, "moist": 1}, "out": {"dry": 0, "moist": 1}}
+{"face": "tick", "in": {"done(water)": 1, "moist": 1}, "out": ["-done(water) 1"]}
+{"face": "snapshot", "out": [10, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []]], true, 0, 0], "text": "[10,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]]],true,0,0]"}
+{"face": "tick", "in": {"moist": 1}, "out": []}
+{"face": "snapshot", "out": [11, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []]], true, 0, 0], "text": "[11,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]]],true,0,0]"}
+{"face": "observe", "in": {"moist": 1}, "out": {"dry": 0, "moist": 1}}
+{"face": "tick", "in": {"moist": 1}, "out": ["+sun"]}
+{"face": "snapshot", "out": [12, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []]], true, 0, 0], "text": "[12,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]]],true,0,0]"}
+{"args": [], "face": "on_event", "name": "dry_out"}
+{"face": "snapshot", "out": [12, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []]], false, 0, 0], "text": "[12,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]]],false,0,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": []}
+{"face": "snapshot", "out": [13, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []]], false, 1, 0], "text": "[13,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]]],false,1,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": []}
+{"face": "snapshot", "out": [14, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []]], false, 2, 0], "text": "[14,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]]],false,2,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": []}
+{"face": "snapshot", "out": [15, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []]], false, 3, 0], "text": "[15,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]]],false,3,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": ["+cmd_check"]}
+{"face": "snapshot", "out": [16, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []]], false, 4, 0], "text": "[16,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]]],false,4,0]"}
+{"args": [], "face": "on_event", "name": "check_dry"}
+{"face": "snapshot", "out": [16, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []]], false, 4, 0], "text": "[16,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]]],false,4,0]"}
+{"face": "observe", "in": {"checked(dry)": 1, "dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"checked(dry)": 1, "dry": 1}, "out": ["-checked(dry) 1"]}
+{"face": "snapshot", "out": [17, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []]], false, 5, 0], "text": "[17,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]]],false,5,0]"}
+{"face": "tick", "in": {"dry": 1}, "out": []}
+{"face": "snapshot", "out": [18, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []]], false, 6, 0], "text": "[18,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]]],false,6,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": ["+visitor"]}
+{"face": "snapshot", "out": [19, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []]], false, 7, 0], "text": "[19,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]]],false,7,0]"}
+{"args": [], "face": "on_event", "name": "visitor_waters"}
+{"face": "snapshot", "out": [19, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []]], true, 0, 0], "text": "[19,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]]],true,0,0]"}
+{"face": "observe", "in": {"moist": 1}, "out": {"dry": 0, "moist": 1}}
+{"face": "tick", "in": {"moist": 1}, "out": []}
+{"face": "snapshot", "out": [20, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []]], true, 0, 0], "text": "[20,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]]],true,0,0]"}
+{"face": "observe", "in": {"moist": 1}, "out": {"dry": 0, "moist": 1}}
+{"face": "tick", "in": {"moist": 1}, "out": []}
+{"face": "snapshot", "out": [21, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []]], true, 0, 0], "text": "[21,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]]],true,0,0]"}
+{"face": "observe", "in": {"moist": 1}, "out": {"dry": 0, "moist": 1}}
+{"face": "tick", "in": {"moist": 1}, "out": []}
+{"face": "snapshot", "out": [22, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []]], true, 0, 0], "text": "[22,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]]],true,0,0]"}
+{"face": "observe", "in": {"moist": 1}, "out": {"dry": 0, "moist": 1}}
+{"face": "tick", "in": {"moist": 1}, "out": []}
+{"face": "snapshot", "out": [23, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []]], true, 0, 0], "text": "[23,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]]],true,0,0]"}
+{"face": "observe", "in": {"moist": 1}, "out": {"dry": 0, "moist": 1}}
+{"face": "tick", "in": {"moist": 1}, "out": ["+sun"]}
+{"face": "snapshot", "out": [24, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []]], true, 0, 0], "text": "[24,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]]],true,0,0]"}
+{"args": [], "face": "on_event", "name": "dry_out"}
+{"face": "snapshot", "out": [24, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []], [24, "dry_out", []]], false, 0, 0], "text": "[24,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]],[24,\"dry_out\",[]]],false,0,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": []}
+{"face": "snapshot", "out": [25, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []], [24, "dry_out", []]], false, 1, 0], "text": "[25,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]],[24,\"dry_out\",[]]],false,1,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": ["+cmd_check"]}
+{"face": "snapshot", "out": [26, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []], [24, "dry_out", []]], false, 2, 0], "text": "[26,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]],[24,\"dry_out\",[]]],false,2,0]"}
+{"args": [], "face": "on_event", "name": "check_dry"}
+{"face": "snapshot", "out": [26, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []], [24, "dry_out", []], [26, "check_dry", []]], false, 2, 0], "text": "[26,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]],[24,\"dry_out\",[]],[26,\"check_dry\",[]]],false,2,0]"}
+{"face": "observe", "in": {"checked(dry)": 1, "dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"checked(dry)": 1, "dry": 1}, "out": ["-checked(dry) 1"]}
+{"face": "snapshot", "out": [27, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []], [24, "dry_out", []], [26, "check_dry", []]], false, 3, 0], "text": "[27,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]],[24,\"dry_out\",[]],[26,\"check_dry\",[]]],false,3,0]"}
+{"face": "tick", "in": {"dry": 1}, "out": []}
+{"face": "snapshot", "out": [28, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []], [24, "dry_out", []], [26, "check_dry", []]], false, 4, 0], "text": "[28,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]],[24,\"dry_out\",[]],[26,\"check_dry\",[]]],false,4,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": []}
+{"face": "snapshot", "out": [29, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []], [24, "dry_out", []], [26, "check_dry", []]], false, 5, 0], "text": "[29,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]],[24,\"dry_out\",[]],[26,\"check_dry\",[]]],false,5,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": []}
+{"face": "snapshot", "out": [30, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []], [16, "check_dry", []], [19, "visitor_waters", []], [24, "dry_out", []], [26, "check_dry", []]], false, 6, 0], "text": "[30,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]],[16,\"check_dry\",[]],[19,\"visitor_waters\",[]],[24,\"dry_out\",[]],[26,\"check_dry\",[]]],false,6,0]"}
+{"face": "observe", "in": {"dry": 1}, "out": {"dry": 1, "moist": 0}}
+{"face": "tick", "in": {"dry": 1}, "out": null}
+{"face": "restore", "in": [15, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []]], false, 3, 0]}
+{"face": "snapshot", "out": [15, [], [[2, "check_moist", []], [6, "dry_out", []], [8, "check_dry", []], [9, "water", []], [12, "dry_out", []]], false, 3, 0], "text": "[15,[],[[2,\"check_moist\",[]],[6,\"dry_out\",[]],[8,\"check_dry\",[]],[9,\"water\",[]],[12,\"dry_out\",[]]],false,3,0]"}
+{"face": "tick", "in": {}, "out": ["+cmd_check"]}

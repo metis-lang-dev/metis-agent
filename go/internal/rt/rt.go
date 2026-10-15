@@ -110,7 +110,8 @@ type Event struct {
 	Produce      []Count
 	Persist      []Count
 	Ops          []string
-	P            float64 // its probability in its tier; 0 for exo
+	P            float64  // its probability in its tier; 0 for exo
+	Args         []string // the ground args, "go[P=tag3]" -> [tag3]: a host's OnEvent input
 }
 
 // Result of a Step.
@@ -128,11 +129,21 @@ type Candidate struct {
 	Weight float64
 }
 
-// WeightFunc prices one ground event of a weight port: its resolved args,
-// the counts now (View).
-type WeightFunc func(args []string, counts View) float64
+// Counts reads atom counts: the runtime's during a weight call (View), or a
+// plain map (MapCounts) — a weight port prices from it.
+type Counts interface{ Count(atom string) int }
 
-// View reads the counts during a WeightFunc call.
+// MapCounts is Counts over a map.
+type MapCounts map[string]int
+
+// Count is the atom's count (0 when absent).
+func (m MapCounts) Count(atom string) int { return m[atom] }
+
+// WeightFunc prices one ground event of a weight port: its resolved args,
+// the counts now.
+type WeightFunc func(args []string, counts Counts) float64
+
+// View reads the runtime's counts during a WeightFunc call.
 type View struct{ v *C.metis_rt_view }
 
 // Count is the atom's count now.
@@ -471,6 +482,11 @@ func goEvent(e *C.metis_rt_event) Event {
 	if e.n_ops > 0 {
 		for _, o := range unsafe.Slice(e.ops, e.n_ops) {
 			ev.Ops = append(ev.Ops, C.GoString(o))
+		}
+	}
+	if e.n_args > 0 {
+		for _, a := range unsafe.Slice(e.args, e.n_args) {
+			ev.Args = append(ev.Args, C.GoString(a))
 		}
 	}
 	return ev

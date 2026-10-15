@@ -15,6 +15,7 @@ of `docs/HARNESS.md` §2–§8 are history.)
 | `internal/agent` | the agent: intent turns, talk + the context cut, narration in forms, task outcomes, domains (`Domain`, `Register`/`Open`, the `process` plugin) |
 | `internal/console` | the wire (FRAMEWORK §5) and the static page |
 | `internal/llm` | the llama.cpp adapter: TwoPass, Decide, Speak, Chat, the tape (Append/Set/SpliceTape), siblings |
+| `internal/host` | the catalog domains' hosts in Go — the plant's, the dog's, the kitchen pair's cooks on their shared env (in-process or pair.py's JSON file): rt.Hosts replaying the py hosts' recorded calls byte for byte (`testdata/`, `py/tools/host_traces.py`), and the word tables the agent reads |
 | `internal/rt` | the metis runtime over cgo (metis-lang's libmetis_rt, `runtime/c/metis_rt.h`; docs/RUNTIME-BINDING.md): `Load(dir)` an artifact (ground.wire + sidecar.json), Seed/Step/Fire/Enabled/Do, Snapshot/Restore, Likelihood, BindWeight, OnEvent, Reload |
 | `internal/kernel` | the runtime client and host (triage, counts, the tape), cards |
 | `internal/narr` | the script RAG, fragments, the narrator, the form policy |

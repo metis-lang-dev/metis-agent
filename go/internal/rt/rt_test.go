@@ -10,6 +10,7 @@ package rt
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"math"
 	"os"
@@ -183,9 +184,9 @@ func readGolden(t *testing.T, path string) liveGolden {
 func (g liveGolden) bind(t *testing.T, r *Runtime) {
 	for _, b := range g.bindings {
 		b := b
-		fn := func([]string, View) float64 { return b.v }
+		fn := func([]string, Counts) float64 { return b.v }
 		if b.how == "if" {
-			fn = func(_ []string, v View) float64 {
+			fn = func(_ []string, v Counts) float64 {
 				if v.Count(b.atom) > 0 {
 					return b.yes
 				}
@@ -489,7 +490,7 @@ func TestTheHandle(t *testing.T) {
 	}
 	calls := 0
 	for _, port := range []string{"pa", "pb"} {
-		if err := r.BindWeight(port, func(args []string, v View) float64 { calls++; return 0.5 }); err != nil {
+		if err := r.BindWeight(port, func(args []string, v Counts) float64 { calls++; return 0.5 }); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -552,5 +553,64 @@ func TestTheHandle(t *testing.T) {
 	}
 	if err := p.Reload(link); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// a host whose TIME face gives "+ta 2", then quiet beats, then the end
+type scripted struct{ beat int }
+
+func (s *scripted) Tick(map[string]int) ([]string, bool) {
+	s.beat++
+	switch {
+	case s.beat == 1:
+		return []string{"+ta 2"}, false
+	case s.beat <= 3:
+		return nil, false
+	}
+	return nil, true
+}
+func (s *scripted) OnEvent(string, []string)              {}
+func (s *scripted) Observe(map[string]int) map[string]int { return nil }
+func (s *scripted) Snapshot() (json.RawMessage, error)    { return json.RawMessage("[]"), nil }
+func (s *scripted) Restore(json.RawMessage) error         { return nil }
+
+// Tick: the host's lines as one exo row; a quiet beat a row only with
+// quietRows; the end applies nothing. Args: a tagged event's ground args.
+func TestTickAndArgs(t *testing.T) {
+	fx := filepath.Join(langDir(t), "runtime/fixtures")
+	r := New()
+	defer r.Close()
+	if err := r.LoadWire(filepath.Join(fx, "live_cascade.wire"), nil, []string{"ua", "ub"}); err != nil {
+		t.Fatal(err)
+	}
+	h := &scripted{}
+	ev, row, end, err := r.Tick(h, false)
+	if err != nil || !row || end || ev.Name != "do +ta 2" || ev.Kind != "exo" {
+		t.Fatalf("first beat: %+v row %v end %v err %v", ev, row, end, err)
+	}
+	if _, row, end, err = r.Tick(h, false); err != nil || row || end {
+		t.Fatalf("a quiet beat without quiet rows: row %v end %v err %v", row, end, err)
+	}
+	if ev, row, _, err = r.Tick(h, true); err != nil || !row || ev.Name != "tick" {
+		t.Fatalf("a quiet beat with quiet rows: %+v row %v err %v", ev, row, err)
+	}
+	if _, row, end, err = r.Tick(h, true); err != nil || row || !end {
+		t.Fatalf("the end: row %v end %v err %v", row, end, err)
+	}
+
+	lt := New()
+	defer lt.Close()
+	if err := lt.LoadWire(filepath.Join(fx, "live_love_triangle.wire"), nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if err := lt.Seed(5); err != nil {
+		t.Fatal(err)
+	}
+	res, ev, err := lt.Step()
+	if err != nil || res != Fired || !strings.HasPrefix(ev.Name, "jealousy[") || len(ev.Args) != 3 {
+		t.Fatalf("a tagged event: %v %+v %v", res, ev, err)
+	}
+	if want := fmt.Sprintf("jealousy[A=%s,B=%s,C=%s]", ev.Args[0], ev.Args[1], ev.Args[2]); ev.Name != want {
+		t.Fatalf("args %v of %s", ev.Args, ev.Name)
 	}
 }
