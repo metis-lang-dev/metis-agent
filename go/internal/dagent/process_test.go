@@ -50,7 +50,7 @@ func venvPython(t *testing.T) string {
 	return py
 }
 
-var pyScratch = regexp.MustCompile(`/tmp/dagent-reload-[A-Za-z0-9_]+`)
+var pyScratch = regexp.MustCompile(`<catalog>`)
 
 func TestReloadAndAddArePys(t *testing.T) {
 	python := venvPython(t)

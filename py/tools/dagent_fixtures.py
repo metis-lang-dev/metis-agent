@@ -392,8 +392,10 @@ def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None, trace=F
         def consult(iid, args):        # the template consult at its moment: its input, the pending refusal, its replies
             lr = json.loads(json.dumps(agent.last_refusal))
             out = consult0(iid, args)
+            rec = json.loads(json.dumps(agent.consults[-1]))
+            rec["ms"] = 0                       # the clock's, not the agent's
             watchcalls.append({"call": "consult", "id": iid, "args": dict(args), "last_refusal": lr,
-                               "out": json.loads(json.dumps(out)), "record": json.loads(json.dumps(agent.consults[-1]))})
+                               "out": json.loads(json.dumps(out)), "record": rec})
             return out
         agent.consult = consult
     agent.tracing = trace
@@ -463,7 +465,8 @@ def reload_day(lines, out):
         with contextlib.redirect_stderr(io.StringIO()):
             agent, o = serve(agent, msg, proc.build, proc.reload, proc.add_line)
         stream.append({"in": msg, "out": o})
-    Path(out).write_text("".join(json.dumps(r) + "\n" for r in stream))
+    # the scratch catalog's path is the machine's: <catalog> in the fixture
+    Path(out).write_text("".join(json.dumps(r).replace(str(root), "<catalog>") + "\n" for r in stream))
 
 
 def main():
