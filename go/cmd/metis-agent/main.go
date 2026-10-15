@@ -17,7 +17,6 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -80,6 +79,10 @@ type config struct {
 		// it is activated (e2e-workflow step 4, hot-install): argv with
 		// "{domains}" the domain and its pair, dir, env
 		Install *agent.DomainSpec `yaml:"install"`
+		// Reload: the reload policy when a served domain's files change
+		// (human-loop step 2): one word for all, or {name: propose|auto},
+		// over each manifest's reload: (default propose)
+		Reload any `yaml:"reload"`
 	} `yaml:"v3"`
 	WS struct {
 		Addr  string `yaml:"addr"`
@@ -227,6 +230,16 @@ func main() {
 				v3.Lines[n] = m.Line
 			}
 			fromManifests(&v3, manifests)
+			v3.ReloadCfg, v3.Policy = cfg.V3.Reload, map[string]string{}
+			for _, s := range v3.Domains {
+				for _, d := range s.Domains {
+					p, err := agent.ReloadPolicy(d, manifests[d].Reload, cfg.V3.Reload)
+					if err != nil {
+						log.Fatalf("[catalog] %v", err)
+					}
+					v3.Policy[d] = p
+				}
+			}
 			if cfg.Catalog.Python != "" {
 				es, err := catalog.List(cfg.Catalog.Python, cfg.Catalog.Root)
 				if err != nil {
@@ -452,8 +465,8 @@ func fromManifests(v3 *agent.V3Service, ms map[string]catalog.Manifest) {
 			if !ok {
 				continue
 			}
-			if _, set := s.Watch[d]; !set && m.Program != "" && filepath.Dir(m.Path(m.Program)) == m.Dir {
-				s.Watch[d] = m.Dir // a domain whose program is its own directory's
+			if _, set := s.Watch[d]; !set && m.PartnerOf == "" {
+				s.Watch[d] = m.Dir // every served domain's manifest directory (human-loop step 2); a partner reloads with its lead
 			}
 			if !derive {
 				continue

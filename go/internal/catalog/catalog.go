@@ -45,6 +45,7 @@ type Manifest struct {
 	Pair      []string `yaml:"pair"`
 	PartnerOf string   `yaml:"partner_of"`
 	Records   string   `yaml:"records"`
+	Reload    string   `yaml:"reload"` // propose (default) | auto: the agent's reload policy when its files change (human-loop)
 
 	Dir string `yaml:"-"` // the manifest's directory
 }

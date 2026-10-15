@@ -81,3 +81,9 @@ v3:
     # domain and its pair), which has no model unless its argv loads one
     install:
         into: agents
+    # the reload policy when a served domain's files change on disk (human-loop
+    # step 2; every served domain's manifest directory is watched, packs/ too):
+    # propose (the default: the band says STALE, the chat proposes the reload)
+    # | auto (reloaded at the domain's next quiet tick with no task); one word
+    # for all, or {name: policy}, over each manifest's reload:
+    # reload: {dog: auto}

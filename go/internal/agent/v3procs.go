@@ -172,6 +172,9 @@ type liveDomains struct {
 	watch   map[string]string            // domain → its directory
 	base    map[string]map[string]string // domain → file → the content it was loaded with
 	changed map[string]string            // domain → a one-line summary of what changed on disk (under v3.mu)
+	// autoFailed: domain → the change an auto reload failed on: not tried
+	// again until the next change (under v3.mu)
+	autoFailed map[string]string
 	// a world line went in: the domain's ports again after its next beat (under v3.mu)
 	portsDue map[string]bool
 	// pmu guards specs, procs, byName and watch against a hot-install
@@ -212,7 +215,7 @@ func (ld *liveDomains) watchNow() map[string]string {
 func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journal string) error {
 	ld := &liveDomains{specs: specs, procs: map[string]*DomainProc{}, byName: map[string]*DomainProc{}, tick: tick,
 		portsDue: map[string]bool{}, watch: map[string]string{}, base: map[string]map[string]string{},
-		changed: map[string]string{}}
+		changed: map[string]string{}, autoFailed: map[string]string{}}
 	for _, s := range specs {
 		for d, dir := range s.Watch {
 			ld.watch[d] = dir
@@ -455,8 +458,15 @@ func (v *v3) runClock(ctx context.Context, a *Agent) {
 				}
 			}
 		}
+		heard := map[string]bool{} // the domains that said something this tick: not quiet
+		for _, r := range due {
+			if d, _ := r["domain"].(string); d != "" && r["kind"] != "quiescence" {
+				heard[d] = true
+			}
+		}
 		v.mu.Lock()
 		v.handleDue(a, beat, due)
+		v.autoReload(a, heard)
 		v.pushCatalog()
 		again := ld.portsDue
 		ld.portsDue = map[string]bool{}

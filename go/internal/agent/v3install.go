@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -96,10 +95,14 @@ func (v *v3) install(dom string) error {
 	for _, x := range sc.Install.Argv {
 		spec.Argv = append(spec.Argv, strings.ReplaceAll(x, "{domains}", strings.Join(doms, ",")))
 	}
-	for _, d := range doms {
-		if dm, ok := ms[d]; ok && dm.Program != "" && filepath.Dir(dm.Path(dm.Program)) == dm.Dir {
-			spec.Watch[d] = dm.Dir
+	spec.Watch[dom] = m.Dir // its manifest's directory (human-loop step 2); its pair reloads with it
+	policy := map[string]string{}
+	for _, d := range doms { // checked before anything starts
+		p, err := ReloadPolicy(d, ms[d].Reload, sc.ReloadCfg)
+		if err != nil {
+			return err
 		}
+		policy[d] = p
 	}
 	var p *DomainProc
 	if into := sc.Install.Into; into != "" { // joined to a running process: its model and its consult seat
@@ -153,7 +156,22 @@ func (v *v3) install(dom string) error {
 		}
 		ld.pmu.Unlock()
 	}
+	for d, dir := range spec.Watch { // its directory joins the watch: changed on disk, reload (human-loop step 2)
+		base := snapshot(dir)
+		ld.pmu.Lock()
+		ld.watch[d] = dir
+		ld.pmu.Unlock()
+		ld.jmu.Lock()
+		ld.base[d] = base
+		ld.jmu.Unlock()
+	}
 	log.Printf("[v3] installed %s (%v) from its manifest: pid %d", dom, doms, p.Pid())
+	if v.sc.Policy == nil {
+		v.sc.Policy = map[string]string{}
+	}
+	for d, pol := range policy {
+		v.sc.Policy[d] = pol
+	}
 	// the orchestrator's side: the card, the enum, the display names, the intents
 	if !slicesContains(v.sc.Catalog, dom) {
 		v.sc.Catalog = append(v.sc.Catalog, dom)

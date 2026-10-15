@@ -52,6 +52,12 @@ type V3Service struct {
 	// manifest — Install's argv with "{domains}" the domain and its pair
 	Root, Python, Template string
 	Install                *DomainSpec
+	// the reload policy per served domain (human-loop step 2): propose
+	// (the page proposes, the band says STALE) | auto (reloaded at the
+	// domain's next quiet tick with no task); ReloadCfg the config's
+	// override, for a hot-installed domain
+	Policy    map[string]string
+	ReloadCfg any
 }
 
 type v3 struct {

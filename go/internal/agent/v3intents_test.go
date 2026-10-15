@@ -186,3 +186,32 @@ func TestSurpriseOpenIsSpokenEveryTime(t *testing.T) {
 		}
 	}
 }
+
+// The reload policy (human-loop step 2): the config's word or map over the
+// manifest's, propose by default; anything else refused.
+func TestReloadPolicy(t *testing.T) {
+	for _, c := range []struct {
+		manifest string
+		override any
+		want     string
+	}{{"", nil, "propose"}, {"auto", nil, "auto"}, {"auto", "propose", "propose"},
+		{"", map[string]any{"dog": "auto"}, "auto"}, {"auto", map[string]any{"plant": "propose"}, "auto"}} {
+		if got, err := ReloadPolicy("dog", c.manifest, c.override); err != nil || got != c.want {
+			t.Fatalf("%v: %q %v", c, got, err)
+		}
+	}
+	if _, err := ReloadPolicy("dog", "sometimes", nil); err == nil {
+		t.Fatal("a policy that is neither taken")
+	}
+}
+
+// packs/ is watched with the directory (human-loop step 2).
+func TestSnapshotTakesPacks(t *testing.T) {
+	d := t.TempDir()
+	_ = os.MkdirAll(d+"/packs", 0o755)
+	_ = os.WriteFile(d+"/plant.llp", []byte("a"), 0o644)
+	_ = os.WriteFile(d+"/packs/visitor.llp", []byte("b"), 0o644)
+	if s := snapshot(d); s["plant.llp"] != "a" || s["packs/visitor.llp"] != "b" {
+		t.Fatalf("%v", s)
+	}
+}

@@ -202,6 +202,12 @@ func (v *v3) catalog() []map[string]any {
 		if c := ld.changed[n]; c != "" {
 			e["changed"] = c // on disk since it was loaded: reload takes it
 		}
+		if served {
+			e["reload"] = v.sc.Policy[n] // propose | auto (human-loop step 2): the page's STALE and its proposal
+			if e["reload"] == "" {
+				e["reload"] = "propose"
+			}
+		}
 		out = append(out, e)
 	}
 	return out

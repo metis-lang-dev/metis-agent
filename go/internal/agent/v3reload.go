@@ -30,10 +30,10 @@ func watched(name string) bool {
 		strings.HasSuffix(name, "-prompt.txt") || strings.HasSuffix(name, "-spoken.txt")
 }
 
-// snapshot is the directory's watched files (and intent/'s), by content.
+// snapshot is the directory's watched files (and intent/'s, packs/'s), by content.
 func snapshot(dir string) map[string]string {
 	out := map[string]string{}
-	for _, d := range []string{dir, filepath.Join(dir, "intent")} {
+	for _, d := range []string{dir, filepath.Join(dir, "intent"), filepath.Join(dir, "packs")} {
 		es, _ := os.ReadDir(d)
 		for _, e := range es {
 			if e.IsDir() || !watched(e.Name()) {
@@ -138,6 +138,50 @@ func (ld *liveDomains) baseOf(d string) map[string]string {
 	return ld.base[d]
 }
 
+// autoReload: under reload: auto (human-loop step 2) a changed domain
+// reloads at its next quiet tick — no task in the mirror, no open
+// surprise, nothing it said this tick, not deactivated — journalled
+// dlg-domain reload by auto, the mirror says reloaded; a reload that failed
+// waits for the next change (v.mu held).
+func (v *v3) autoReload(a *Agent, heard map[string]bool) {
+	ld := v.live
+	for d, ch := range ld.changed {
+		if ch == "" || v.sc.Policy[d] != "auto" || ld.autoFailed[d] == ch || ld.pd.off[d] || heard[d] ||
+			len(v.o.m.tasks[d]) > 0 || v.o.m.surprise[d] != "" {
+			continue
+		}
+		if _, err := v.reload(a, d, "auto"); err != nil {
+			ld.autoFailed[d] = ch
+			log.Printf("[v3] auto reload %s: %v (waits for the next change)", d, err)
+		}
+	}
+}
+
+// ReloadPolicy is a domain's reload policy (human-loop step 2): the
+// config's override (one word for all, or {name: policy}), else its
+// manifest's reload:, else propose.
+func ReloadPolicy(name, manifest string, override any) (string, error) {
+	p := ""
+	switch o := override.(type) {
+	case string:
+		p = o
+	case map[string]any:
+		p, _ = o[name].(string)
+	case map[string]string:
+		p = o[name]
+	}
+	if p == "" {
+		p = manifest
+	}
+	if p == "" {
+		p = "propose"
+	}
+	if p != "propose" && p != "auto" {
+		return "", fmt.Errorf("%s: reload is propose or auto, not %q", name, p)
+	}
+	return p, nil
+}
+
 // V3Reload is reload(domain) from the page (by: person) or the model.
 func (a *Agent) V3Reload(domain, by string) (key string, err error) {
 	v := a.v3
@@ -146,6 +190,11 @@ func (a *Agent) V3Reload(domain, by string) (key string, err error) {
 	}
 	v.mu.Lock()
 	defer v.mu.Unlock()
+	return v.reload(a, domain, by)
+}
+
+// reload is reload(domain) under v.mu: by person, model or auto.
+func (v *v3) reload(a *Agent, domain, by string) (key string, err error) {
 	ld := v.live
 	rec := map[string]any{"kind": "dlg-domain", "verb": "reload", "domain": domain, "by": by}
 	defer func() {
