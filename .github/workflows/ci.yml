@@ -18,7 +18,7 @@ env:
   LLAMA_COMMIT: 8ad8aef447703e76cdcf74ed78dab16b92ec231a
   # the metis runtime (go/internal/rt): metis-lang (public) at the commit the
   # binding is built and tested against; build.sh builds libmetis_rt there
-  METIS_LANG_COMMIT: 20096ed13dee269285a55d0de15ee29c6f21e5c1
+  METIS_LANG_COMMIT: dec78e9b1bdd2e6db006dbd02d0cc7ffe9b43fdf
   # metispy and metis-catalog are PRIVATE siblings: read with METIS_READ_TOKEN
   # (Contents: read on both), as metispy's own ci.yml reads metis-catalog.
   # The secret is an ENVIRONMENT secret (environment METIS_READ_TOKEN), so each
