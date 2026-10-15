@@ -6,7 +6,9 @@ Binding an outcome to the intent it answers, from the runtime alone:
 
 - the event that consumed a command atom answers that command's intent:
   an outcome token of the command's own act (done(go) for cmd_go) is its
-  result;
+  result; failing one, any outcome that rule produced which no running
+  task's act claims (checked(moist) for cmd_check: the architect's ruling,
+  e2e-workflow step 4 — no done(check) boilerplate in programs);
 - `progress(ACT)` opens a task: later outcomes of ACT that no command
   carries (arrive's done(go), stop_follow's cancelled(follow)) answer the
   task's intent and close it;
@@ -75,6 +77,10 @@ class Replier:
                     del self.pending[a]
                 break
         out = []
+        # the command answered by an outcome of its own act; else by the
+        # first outcome of its rule that no running task's act claims
+        answered = cmd is None or any(atom_args(a)[1] == cmd[1] and atom_args(a)[0] in self.outcomes
+                                      for a in ev.produce)
         for a in sorted(ev.produce):
             pred, act = atom_args(a)
             status = self.outcomes.get(pred)
@@ -84,6 +90,8 @@ class Replier:
                 iid = cmd[0]
             elif act in self.tasks:
                 iid = self.tasks[act]
+            elif not answered:
+                iid, answered = cmd[0], True
             else:
                 continue
             if status == "progress":
