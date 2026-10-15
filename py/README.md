@@ -8,7 +8,7 @@ calls. Shares no code with `go/` (the executive); imports metispy's
 | file | what |
 |---|---|
 | `metis_agent/llm.py` | the Python LLM runtime over llama-cpp-python's low-level API: prime the system prefix, generate under a grammar, rewind to the prefix; the Go adapter's two-pass turn for the parity check |
-| `metis_agent/gemma4.py` | Gemma 4 declarations, calls, responses and the call grammar (go/tools/e9-tools.py's renderer, ported) |
+| `metis_agent/gemma4.py` | Gemma 4 declarations, calls, responses and the call grammar (go/tools/gemma_tools.py's renderer, ported) |
 | `metis_agent/repl_tools.py` | the §3 whitelist, one declaration per verb from the REPL's own help, the in-process kernel (`Repl.capture`), the scrub and cap |
 | `metis_agent/seat.py` | the gemma4 seat: `turn(system, tools, question, cont) → Call \| Text` |
 | `metis_agent/loop.py` | the loop on a bare context (iteration 1) |

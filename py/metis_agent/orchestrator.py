@@ -805,7 +805,7 @@ def system_turn(prompt, catalog, loaded, lines=None):
 
 
 def api_declarations(catalog, loaded):
-    """The REPL API as the template declares tools (tools/e9-tools.py's macros)."""
+    """The REPL API as the template declares tools (go/tools/gemma_tools.py's macros)."""
     b = []
     for name, desc, params, required in repl_api(catalog, loaded):
         b.append("<|tool>declaration:" + name + "{description:" + Q3 + desc + Q3)

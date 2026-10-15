@@ -1,6 +1,6 @@
 """Gemma 4 native tool calls: the declarations and the call grammar.
 
-Ported from go/tools/e9-tools.py (E4/E9), which ports the GGUF chat
+Ported from go/tools/gemma_tools.py (E4/E9; was e9-tools.py), which ports the GGUF chat
 template's macros (format_function_declaration, format_argument,
 format_tool_response_block). Copied, not imported: go/ and py/ share no
 code (SPECIALIST.md §2).
@@ -110,7 +110,7 @@ def parse_call(text):
 
 
 class Gbnf:
-    """The call grammar over the declarations (e9-tools.py's Gbnf, the
+    """The call grammar over the declarations (E9's e9-tools.py Gbnf, the
     parts the REPL tools use: string / enum / number parameters)."""
 
     def __init__(self):
