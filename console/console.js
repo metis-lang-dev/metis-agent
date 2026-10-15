@@ -310,7 +310,8 @@ function renderDomains() {
       el('div', { class: 'hd' }, el('span', { class: 'nm' }, d.name), d.display && d.display !== d.name ? el('span', { class: 'empty' }, d.display) : null,
         el('span', { class: `st ${st.cls}`, title: st.text }, st.text.length > 46 ? st.text.slice(0, 44) + '…' : st.text || '—'), ...tags, acts),
       d.line ? el('div', { class: 'ln' }, d.line) : null,
-      d.changed ? el('div', { class: 'chg' }, `changed on disk: ${d.changed}`) : null);
+      d.changed ? el('div', { class: 'chg', title: 'the domain runs an older program than the catalog has: reload takes the new one' },
+        `STALE · changed on disk: ${d.changed}`) : null);
     row.onclick = () => openDomain(d);
     row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDomain(d); } };
     box.append(row);
