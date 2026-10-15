@@ -90,12 +90,11 @@ LATER = ("activate", "deactivate")
 
 def rule_docs(path):
     """rule → its %% comment in words (tag lines such as `target: kitchen`
-    dropped, as the script op does)."""
-    from metis.lang import parser
-    from metis.lang.ast import Stage
-    from metis.loop.cards import _words
-    cat = parser.parse_file(str(path))
-    return {r.name: _words(r.doc)[0] for d in cat.decls if isinstance(d, Stage) for r in d.rules}
+    dropped, as the script op does), over the file with its includes spliced
+    (the kitchen's rules live in the included kitchen.llp): the artifact's
+    sidecar lines, metis.kernel.artifact.rule_lines."""
+    from metis.kernel.artifact import rule_lines
+    return {r: w for r, (w, _) in rule_lines([Path(path)]).items()}
 
 
 def pack_text(src):

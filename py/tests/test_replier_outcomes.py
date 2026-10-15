@@ -41,3 +41,15 @@ def test_an_outcome_of_a_running_task_stays_the_tasks():
     r.submitted("c2", "cmd_stop", "stop")
     got = {x["id"]: x["status"] for x in r.fired(Ev, 5, 3, {})}
     assert got == {"c1": "cancelled", "c2": "done"}
+
+
+def test_the_replier_speaks_the_included_rules_lines():
+    """runtime-binding step 2's F2 (opus): the kitchen's rules live in the
+    included kitchen.llp; their %% lines reach the replier, as they reach the
+    artifact's sidecar (metis.kernel.artifact.rule_lines)."""
+    import importlib
+    from metis_agent.domain_agent import rule_docs
+    kitchen = importlib.import_module("metis_agent.domains.kitchen")
+    docs = rule_docs(kitchen.CATALOG)
+    assert {"fetch_onion", "load", "cook", "plate", "serve"} <= set(docs)
+    assert all(docs[r] for r in ("load", "cook", "serve"))
