@@ -7,11 +7,13 @@ import (
 	"strings"
 )
 
-// due is a do-line the world owes at a beat (py: (beat, line)).
-type due struct {
+// Due is a do-line the world owes at a beat (py: (beat, line)).
+type Due struct {
 	Beat int
 	Line string
 }
+
+type due = Due
 
 // act is one actuation (py: (beat, name, args)).
 type act struct {
@@ -113,3 +115,20 @@ func nonNil[T any](s []T) []T {
 	}
 	return s
 }
+
+// Day is a host with a hosted day the domain agent's AgentHost drives
+// (py: the inner host's beat, due, script and last, which AgentHost reads
+// and rewrites).
+type Day interface {
+	Beat() int
+	Due() []Due
+	SetDue([]Due)
+	// Replay turns the hosted day's script off and its end off: the driver
+	// brings the person (intents) and the world (world lines).
+	Replay()
+}
+
+func (d *day) Beat() int      { return d.beat }
+func (d *day) Due() []Due     { return append([]Due(nil), d.due...) }
+func (d *day) SetDue(x []Due) { d.due = append([]Due(nil), x...) }
+func (d *day) Replay()        { d.Script, d.Last = map[int][]string{}, -1 }

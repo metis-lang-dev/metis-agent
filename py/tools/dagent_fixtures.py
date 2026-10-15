@@ -15,6 +15,9 @@ traffic, their outputs dumped as JSON lines for go/internal/dagent's tests.
       step 4 diffs Go's against
   replier_<domain>.jsonl  every Replier call of that day, inputs and outputs
       (submitted · fired · untaken)
+  agenthost_<domain>[_live|_hosted].jsonl  every AgentHost call (the faces,
+      submit/retract/world, each snapshot's canonical text) of that day in
+      the replay and the live case, and of 40 beats of the host's own day
 
     py/.venv/bin/python py/tools/dagent_fixtures.py [-o DIR]   # default go/internal/dagent/testdata
 """
@@ -129,14 +132,78 @@ class RecordedReplier:
         return out, gone
 
 
-def run_day(name, lines):
+class RecordedAgentHost:
+    """The agent's AgentHost with every call recorded (the faces, and the
+    agent's submit/retract/world); on_event carries the fired row's consume
+    (it picks the command whose payload rides with the event)."""
+
+    def __init__(self, inner, out):
+        self.__dict__["_h"], self.__dict__["_out"] = inner, out
+        if callable(getattr(inner, "observe", None)):
+            self.__dict__["observe"] = self._observe
+
+    def __getattr__(self, k):
+        if k == "observe":
+            raise AttributeError(k)
+        return getattr(self._h, k)
+
+    def __setattr__(self, k, v):
+        setattr(self._h, k, v)
+
+    def tick(self, counts):
+        out = self._h.tick(dict(counts))
+        self._out.append({"call": "tick", "in": dict(counts), "out": None if out is None else list(out)})
+        return out
+
+    def on_event(self, name, args):
+        row = self._h.last_row() if self._h.last_row else None
+        self._out.append({"call": "on_event", "name": name, "args": list(args),
+                          "consume": list(row[2].consume) if row else []})
+        return self._h.on_event(name, args)
+
+    def _observe(self, counts):
+        out = self._h.observe(dict(counts))
+        self._out.append({"call": "observe", "in": dict(counts), "out": dict(out)})
+        return out
+
+    def snapshot(self):
+        from metis.kernel.record import env_text
+        out = self._h.snapshot()
+        self._out.append({"call": "snapshot", "text": env_text(out)})
+        return out
+
+    def restore(self, snap):
+        self._out.append({"call": "restore", "in": snap})
+        return self._h.restore(snap)
+
+    def submit(self, iid, atom, payload=None):
+        self._out.append({"call": "submit", "id": iid, "atom": atom, "payload": dict(payload or {})})
+        return self._h.submit(iid, atom, payload)
+
+    def retract(self, atom):
+        self._out.append({"call": "retract", "atom": atom})
+        return self._h.retract(atom)
+
+    def world(self, lines):
+        self._out.append({"call": "world", "lines": list(lines)})
+        return self._h.world(lines)
+
+
+def run_day(name, lines, case="replay", hostcalls=None):
     """The day through py's serve(): (the output stream, the replier calls)."""
     import io
     import contextlib
     from metis_agent.domain_agent import Process, serve, ready
     proc = Process([name])
     with contextlib.redirect_stderr(io.StringIO()):
-        agent = proc.build(1, "replay")
+        agent = proc.build(1, case)
+    if hostcalls is not None and hasattr(agent.host, "inner"):
+        h = agent.host
+        hostcalls.append({"call": "setup", "case": case, "enders": list(h.ENDERS), "reports": dict(h.reports),
+                          "waits": list(h.waits), "commands": sorted(h.commands)})
+        rec = RecordedAgentHost(h, hostcalls)
+        agent.host = rec
+        agent.repl.plugin = rec
     r = agent.replier
     calls = [{"call": "setup", "domain": r.domain, "docs": dict(r.docs), "outcomes": dict(r.outcomes),
               "commands": sorted(r.commands), "mirror": list(r.mirror), "blocking": sorted(r.blocking),
@@ -176,7 +243,16 @@ def main():
         day = dest / "days" / f"{name}.jsonl"
         if day.exists():
             lines = [json.loads(x) for x in day.read_text().splitlines() if x.strip()]
-            stream, calls = run_day(name, lines)
+            hostcalls = []
+            stream, calls = run_day(name, lines, hostcalls=hostcalls)
+            (dest / f"agenthost_{name}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in hostcalls))
+            live = []
+            run_day(name, lines, case="live", hostcalls=live)
+            (dest / f"agenthost_{name}_live.jsonl").write_text("".join(json.dumps(r) + "\n" for r in live))
+            hosted = []      # the host's own day: its script's commands dropped, its end
+            run_day(name, [{"clock": "beat"}] * 40, case="hosted", hostcalls=hosted)
+            (dest / f"agenthost_{name}_hosted.jsonl").write_text("".join(json.dumps(r) + "\n" for r in hosted))
+            print(f"agenthost {name}: {len(hostcalls)} calls (replay), {len(live)} (live), {len(hosted)} (hosted)")
             (dest / "days" / f"{name}.out.jsonl").write_text(
                 "".join(json.dumps(r) + "\n" for r in stream))
             (dest / f"replier_{name}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in calls))

@@ -29,6 +29,7 @@
 {"clock": "beat"}
 {"id": "c7", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}
 {"clock": "beat"}
+{"world": ["+arrived(kitchen)"], "id": "w1b"}
 {"clock": "beat"}
 {"clock": "beat"}
 {"id": "c8", "domain": "dog", "verb": "FOLLOW", "args": {"target": {"type": "PERSON", "description": "the person"}}}
@@ -68,5 +69,12 @@
 {"clock": "beat"}
 {"tool": "events", "args": {}}
 {"ports": {}, "id": "p1"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c18", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "TAG", "description": "tag"}, "tag_id": 3}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c19", "domain": "dog", "verb": "STOP", "args": {}}
+{"clock": "beat"}
 {"clock": "beat"}
 {"clock": "beat"}
