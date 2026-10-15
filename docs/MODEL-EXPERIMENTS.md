@@ -715,6 +715,16 @@ the dispatcher. The user decides whether E9b runs.
 
 ## E10 — the executive's IO round-trip: JSON intent vs tool call as the API (user, 2026-10-13)
 
+> **T-api arm removed (catalog-entry s-65dd0863, 2026-10-15).** E10 and
+> E10b stay here as history; their T side is gone with the T bench: the
+> T-api rows of `grammar/e10-corpus.jsonl`, the T-api and T-tmpl rows of
+> `grammar/e10b-corpus.jsonl`, `grammar/e10-prompt-t*.txt` and
+> `tools/e10b-template.py`, in metis-agent acb497e. The J-text arm still
+> runs (`tools/e10-corpus.py`, `e10-score.py`, `e10b-table.py`, J only).
+> The question the T arm asked — rendering the API side as tool calls —
+> now belongs to metispy's REPL tool declarations: the orchestrator talks T
+> to the REPL and J to a domain.
+
 **Question (user).** E9 compared the two formats as classifiers and they
 tied. The preference for the tool call is as an **API**: typed calls down,
 responses the model was trained to consume up, sync and async on the same
