@@ -554,34 +554,25 @@ def words(ident):
     return ident.replace("_", " ")
 
 
-# the REPL API, declared
+# the REPL API, declared — from metispy, where the REPL lives (repl-tools
+# s-0c6879a1 step 2): metis.lang.repl_api is the one source; nothing here
+# restates a verb, a description or a parameter
 
 def repl_api(catalog, loaded):
-    dom = {"name": "domain", "type": "STRING", "desc": "a loaded domain", "enum": list(loaded)}
-    card = {"name": "domain", "type": "STRING", "desc": "the catalog domain (card)", "enum": list(catalog)}
-    rec = {"name": "record", "type": "STRING",
-           "desc": "the id of the reply this closes: the refused call's id, or the surprise's record (#N)", "enum": []}
-
-    def p(name, typ, desc):
-        return {"name": name, "type": typ, "desc": desc, "enum": []}
-    return [
-        ("activate", "attach a catalog domain to the runtime tree", [card, p("bindings", "STRING", "the card's bindings, when any")], ["domain"]),
-        ("deactivate", "detach a catalog domain from the runtime tree", [card], ["domain"]),
-        ("keep", "change nothing: the context change needs no domain attached or detached", [], []),
-        ("state", "the domain's current state, as its agent reads it", [dom], ["domain"]),
-        ("ctx", "the domain's context band: catalog, stage, beat, what is enabled", [dom], ["domain"]),
-        ("events", "the domain's recent events", [dom], ["domain"]),
-        ("why", "why an atom holds or not, in the domain", [dom, p("atom", "STRING", "the atom")], ["domain", "atom"]),
-        ("findings", "what the domain's agent has found so far", [dom], ["domain"]),
-        ("consult", "ask the domain's agent a question; its reply has kind consult and an answer_kind",
-         [dom, p("question", "STRING", "one question, usually why <the reason>?"),
-          p("max_calls", "INTEGER", "the agent's call budget, when you set one")], ["domain", "question"]),
-        ("reset", "the reading was noise: set it aside and resume on the model", [dom, rec], ["domain", "record"]),
-        ("explain", "a sibling card's move explains it", [dom, rec, p("card", "STRING", "the sibling card"),
-                                                          p("move", "STRING", "the card's move")], ["domain", "record", "card", "move"]),
-        ("escalate", "nothing explains it: describe it for the people who revise the model",
-         [dom, rec, p("text", "STRING", "one plain sentence: what was seen")], ["domain", "record", "text"]),
-    ]
+    """The REPL API's verbs from the installed metispy, as the renderer and
+    alt_call take them: (name, description, [{name, type, desc, enum}],
+    required); a parameter's enum_from fills its enum — "loaded" from the
+    domains served, "catalog" from the domains activate can attach."""
+    from metis.lang.repl_api import repl_api as published
+    fill = {"loaded": list(loaded), "catalog": list(catalog)}
+    out = []
+    for v in published():
+        ps = v.get("parameters") or {}
+        params = [{"name": k, "type": p["type"], "desc": p.get("description", ""),
+                   "enum": list(fill[p["enum_from"]]) if p.get("enum_from") else list(p.get("enum") or [])}
+                  for k, p in (ps.get("properties") or {}).items()]
+        out.append((v["name"], v["description"], params, list(ps.get("required") or [])))
+    return out
 
 
 # ── several intent domains (Go v3intents.go; e2e-workflow step 4) ─────────────

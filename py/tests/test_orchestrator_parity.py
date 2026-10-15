@@ -102,3 +102,19 @@ def test_reloaded_drops_the_tasks_and_says_so():
     line = o.m.render(LOADED)
     assert "dog: last report: reloaded." in line and "in flight" not in line and "surprise" not in line
     assert o.quiescence_spoken(O.Reply({"domain": "dog", "kind": "quiescence", "text": "quiet"}))  # first again
+
+
+def test_the_repl_api_is_metispys(monkeypatch):
+    """repl-tools step 2: the REPL API's declarations are rendered from the
+    installed metispy's metis.lang.repl_api, never from a copy here — a
+    change there is a change in the orchestrator's turn."""
+    import metis.lang.repl_api as published
+    from metis_agent import orchestrator as O
+    before = O.api_declarations(["dog"], ["dog"])
+    assert "why an atom holds or not, in the domain" in before
+    api = published.repl_api()
+    next(v for v in api if v["name"] == "why")["description"] = "why, said differently"
+    monkeypatch.setattr(published, "repl_api", lambda: api)
+    after = O.api_declarations(["dog"], ["dog"])
+    assert "why, said differently" in after and "why an atom holds or not" not in after
+    assert [v[0] for v in O.repl_api(["dog"], ["dog"])] == [v["name"] for v in api]
