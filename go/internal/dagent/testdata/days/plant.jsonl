@@ -1,0 +1,53 @@
+{"ports": {}, "id": "p0"}
+{"clock": "beat"}
+{"id": "c1", "domain": "plant", "verb": "CHECK", "args": {}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c2", "domain": "plant", "verb": "CHECK", "args": {}}
+{"clock": "beat"}
+{"id": "c3", "domain": "plant", "verb": "WATER", "args": {}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"tool": "state", "args": {}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c4", "domain": "plant", "verb": "CHECK", "args": {}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"tool": "events", "args": {}}
+{"id": "c5", "domain": "plant", "verb": "WATER", "args": {}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c6", "domain": "plant", "verb": "CHECK", "args": {}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"tool": "ctx", "args": {}}
+{"clock": "beat"}
+{"clock": "beat"}

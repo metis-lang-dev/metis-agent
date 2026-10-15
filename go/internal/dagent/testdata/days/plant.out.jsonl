@@ -1,0 +1,54 @@
+{"clock": "ready", "domain": "plant", "beat": 0}
+{"in": {"ports": {}, "id": "p0"}, "out": [{"domain": "plant", "kind": "ports", "ref": {"seq": 0, "beat": 0}, "world": true, "pairs": [["dry", "moist"]], "reports": {"lost": null, "timeout": null}, "handles": {}, "held": ["moist"]}, {"ack": "ports", "id": "p0"}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 1, "over": false}]}
+{"in": {"id": "c1", "domain": "plant", "verb": "CHECK", "args": {}}, "out": [{"domain": "plant", "kind": "result", "ref": {"beat": 1}, "text": "Accepted.", "id": "c1", "status": "accepted"}, {"ack": "intent", "id": "c1"}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "result", "ref": {"seq": 2, "beat": 2, "event": "check_moist"}, "text": "When you check on me while I am moist, I tell you I am moist.", "id": "c1", "status": "done", "voice": "line"}, {"clock": "beat", "beat": 2, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 3, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 4, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 5, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "event", "ref": {"seq": 5, "beat": 6, "event": "dry_out"}, "text": "The sun has been on me for a while; my soil dries out.", "counts": {}, "voice": "line"}, {"clock": "beat", "beat": 6, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 7, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 8, "over": false}]}
+{"in": {"id": "c2", "domain": "plant", "verb": "CHECK", "args": {}}, "out": [{"domain": "plant", "kind": "result", "ref": {"beat": 8}, "text": "Accepted.", "id": "c2", "status": "accepted"}, {"ack": "intent", "id": "c2"}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "result", "ref": {"seq": 7, "beat": 9, "event": "check_dry"}, "text": "When you check on me while I am dry, I tell you I am dry.", "id": "c2", "status": "done", "voice": "line"}, {"clock": "beat", "beat": 9, "over": false}]}
+{"in": {"id": "c3", "domain": "plant", "verb": "WATER", "args": {}}, "out": [{"domain": "plant", "kind": "result", "ref": {"beat": 9}, "text": "Accepted.", "id": "c3", "status": "accepted"}, {"ack": "intent", "id": "c3"}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "result", "ref": {"seq": 9, "beat": 10, "event": "water"}, "text": "When I am dry and you water me, my soil is moist again.", "id": "c3", "status": "done", "voice": "line"}, {"clock": "beat", "beat": 10, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 11, "over": false}]}
+{"in": {"tool": "state", "args": {}}, "out": [{"domain": "plant", "kind": "read", "ref": {"seq": 10, "beat": 11}, "tool": "state", "output": "stage main\n  moist  \u00b7"}, {"ack": "tool", "id": null}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "event", "ref": {"seq": 12, "beat": 12, "event": "dry_out"}, "text": "The sun has been on me for a while; my soil dries out.", "counts": {}, "voice": "line"}, {"clock": "beat", "beat": 12, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 13, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 14, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 15, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 16, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 17, "over": false}]}
+{"in": {"id": "c4", "domain": "plant", "verb": "CHECK", "args": {}}, "out": [{"domain": "plant", "kind": "result", "ref": {"beat": 17}, "text": "Accepted.", "id": "c4", "status": "accepted"}, {"ack": "intent", "id": "c4"}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "result", "ref": {"seq": 14, "beat": 18, "event": "check_dry"}, "text": "When you check on me while I am dry, I tell you I am dry.", "id": "c4", "status": "done", "voice": "line"}, {"clock": "beat", "beat": 18, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "event", "ref": {"seq": 16, "beat": 19, "event": "visitor_waters"}, "text": "A visitor has watered me; my soil is moist again.", "counts": {}, "voice": "line"}, {"clock": "beat", "beat": 19, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 20, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 21, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 22, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 23, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "event", "ref": {"seq": 18, "beat": 24, "event": "dry_out"}, "text": "The sun has been on me for a while; my soil dries out.", "counts": {}, "voice": "line"}, {"clock": "beat", "beat": 24, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 25, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 26, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 27, "over": false}]}
+{"in": {"tool": "events", "args": {}}, "out": [{"domain": "plant", "kind": "read", "ref": {"seq": 18, "beat": 27}, "tool": "events", "output": "quiescent (stage main) \u2014 the env ticks on step/run (plugin metis_agent.domains.plant:make); quiet, not dead"}, {"ack": "tool", "id": null}]}
+{"in": {"id": "c5", "domain": "plant", "verb": "WATER", "args": {}}, "out": [{"domain": "plant", "kind": "result", "ref": {"beat": 27}, "text": "Accepted.", "id": "c5", "status": "accepted"}, {"ack": "intent", "id": "c5"}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "result", "ref": {"seq": 20, "beat": 28, "event": "water"}, "text": "When I am dry and you water me, my soil is moist again.", "id": "c5", "status": "done", "voice": "line"}, {"clock": "beat", "beat": 28, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 29, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "event", "ref": {"seq": 23, "beat": 30, "event": "dry_out"}, "text": "The sun has been on me for a while; my soil dries out.", "counts": {}, "voice": "line"}, {"clock": "beat", "beat": 30, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 31, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 32, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 33, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 34, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 35, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 36, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "event", "ref": {"seq": 25, "beat": 37, "event": "visitor_waters"}, "text": "A visitor has watered me; my soil is moist again.", "counts": {}, "voice": "line"}, {"clock": "beat", "beat": 37, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 38, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 39, "over": false}]}
+{"in": {"id": "c6", "domain": "plant", "verb": "CHECK", "args": {}}, "out": [{"domain": "plant", "kind": "result", "ref": {"beat": 39}, "text": "Accepted.", "id": "c6", "status": "accepted"}, {"ack": "intent", "id": "c6"}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "result", "ref": {"seq": 27, "beat": 40, "event": "check_moist"}, "text": "When you check on me while I am moist, I tell you I am moist.", "id": "c6", "status": "done", "voice": "line"}, {"clock": "beat", "beat": 40, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 41, "over": false}]}
+{"in": {"tool": "ctx", "args": {}}, "out": [{"domain": "plant", "kind": "read", "ref": {"seq": 28, "beat": 41}, "tool": "ctx", "output": "CATALOG plant+visitor  KEY aa1aca319a94  STAGE main  BEAT 16  EPISODE 0  QUIESCENT  28 fired \u00b7 last do -checked(moist)\nTOKENS  moist \u25cf\nENABLED 0 event(s) \u00b7 0 of 5 rule(s) fireable\n\u2500\u2500 tokens\n  moist  \u00b7\n\u2500\u2500 rules\nrules  of stage main  (* enabled now \u00d7N \u00b7 \u25c2 the present rests on #k \u00b7 \u00b7 fired, no longer matters \u00b7 ? waiting on \u2190 maker \u00b7 \u2013 spent: no X and nothing here makes it)\n    21    %% The sun has been on me for a while; my soil dries out.\n  \u25c2 22    dry_out [dyn] : moist * sun -o dry.   \u25c2 #5 #12 #18 #23  \u2013 no sun\n    23    %% When I am dry and you water me, my soil is moist again.\n  \u25c2 24    water [dyn] : dry * cmd_water -o moist * done(water).   \u25c2 #9 #20  \u2013 no cmd_water\n    25    %% When you check on me while I am moist, I tell you I am moist.\n  \u25c2 26    check_moist [dyn] : cmd_check * $moist -o checked(moist).   \u25c2 #2  \u00b7 #27  \u2013 no cmd_check\n    27    %% When you check on me while I am dry, I tell you I am dry.\n  \u25c2 28    check_dry [dyn] : cmd_check * $dry -o checked(dry).   \u25c2 #7 #14  \u2013 no cmd_check\n  \u25c2  ?  visitor_waters   \u25c2 #16 #25  \u2013 no visitor\nrests on  (rules of other stages the present depends on)\n  \u25c2 main: do +cmd_check #1 #6 #13 \u00b7 do +sun #4 #11 #17 #22 \u00b7 do -checked(dry) +cmd_water #8 \u00b7 do -done(water) #10 \u00b7 do -checked(dry) +visitor #15 \u00b7 do +cmd_water #19 \u00b7 do +visitor #24\n  \u00b7 4 more fired event(s) in other stages no longer matter\n\u2500\u2500 trace\n   0 |  0  #init\n   1 |  1  do +cmd_check                0<1\n     |  4  do +sun                      0<4\n   2 |  2  check_moist                  1<2(cmd_check)\n   3 |  3  do -checked(moist)           2<3(checked(moist))\n     |  5  dry_out                      2<5 4<5(sun)\n     |  6  do +cmd_check                2<6\n   4 |  7  check_dry                    5<7 6<7(cmd_check)\n     | 11  do +sun                      5<11\n   5 |  8  do -checked(dry) +cmd_water  7<8(checked(dry))\n     | 13  do +cmd_check                7<13\n   6 |  9  water                        8<9(cmd_water)\n   7 | 10  do -done(water)              9<10(done(wate\n\u2026 [950 more characters cut]"}, {"ack": "tool", "id": null}]}
+{"in": {"clock": "beat"}, "out": [{"domain": "plant", "kind": "event", "ref": {"seq": 30, "beat": 42, "event": "dry_out"}, "text": "The sun has been on me for a while; my soil dries out.", "counts": {}, "voice": "line"}, {"clock": "beat", "beat": 42, "over": false}]}
+{"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 43, "over": false}]}

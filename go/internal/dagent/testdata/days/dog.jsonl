@@ -1,0 +1,72 @@
+{"ports": {}, "id": "p0"}
+{"clock": "beat"}
+{"id": "c1", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c2", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"tool": "state", "args": {}}
+{"tool": "events", "args": {}}
+{"id": "c3", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "STAND_UP"}}
+{"clock": "beat"}
+{"id": "c4", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "TAG", "description": "tag"}, "tag_id": 3}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c5", "domain": "dog", "verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "keys"}}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"tool": "ctx", "args": {}}
+{"id": "c6", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "MOVE", "direction": "BACKWARD", "distance_m": 0.5}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"world": ["-closed(kitchen)", "+open(kitchen)"], "id": "w1"}
+{"clock": "beat"}
+{"id": "c7", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "REGION", "description": "kitchen"}}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c8", "domain": "dog", "verb": "FOLLOW", "args": {"target": {"type": "PERSON", "description": "the person"}}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c9", "domain": "dog", "verb": "STOP", "args": {}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"world": ["-battery_ok", "+battery_low"], "id": "w2"}
+{"clock": "beat"}
+{"id": "c10", "domain": "dog", "verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "bottle"}}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"tool": "state", "args": {}}
+{"id": "c11", "domain": "dog", "verb": "QUERY", "args": {"target": {"type": "OBJECT", "description": "chair"}}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c12", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "TURN", "direction": "LEFT"}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c13", "domain": "dog", "verb": "UNKNOWN", "args": {}}
+{"clock": "beat"}
+{"id": "c14", "domain": "dog", "verb": "NO_SUCH_VERB", "args": {}}
+{"id": "c15", "domain": "dog", "verb": "go", "args": {"place": "door"}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"world": ["-battery_low", "+battery_ok"], "id": "w3"}
+{"id": "c16", "domain": "dog", "verb": "FIND", "args": {"target": {"type": "OBJECT", "description": "fire extinguisher"}}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c17", "domain": "dog", "verb": "CANCEL", "args": {}}
+{"clock": "beat"}
+{"clock": "beat"}
+{"tool": "events", "args": {}}
+{"ports": {}, "id": "p1"}
+{"clock": "beat"}
+{"clock": "beat"}
