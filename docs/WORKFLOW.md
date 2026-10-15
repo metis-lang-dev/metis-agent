@@ -161,7 +161,7 @@ surprise.
 | A3 | 3 intents | `intents`: Claude drafts `intent.yaml` (WATER, CHECK, QUERY…); edit one example; the check maps a 6-row example corpus | `intent.yaml` saved; generated schema + examples; corpus 6/6 |
 | A4 | 4 run | agent console → catalog panel shows `plant` with its line; activate; type "water the plant", "how is the plant?" | the intents dispatched (journal), the outcome lines spoken with source labels; the plant's tab shows the fired rules |
 | A5 | 5 surprise | World tab: `+moisture(…)` jump nobody caused → surprise → consult → escalate; loop console Records dock lists the record; `record`, `mine`, `revise`, `gate`; approve the candidate ("a visitor waters it"); `save` | the record's `mined_text` carries the facts + the description; the candidate pack saved into `domains/plant/` |
-| A6 | 6 reload | agent console: `plant` marked changed; `reload`; repeat the jump | the mirror says reloaded; the same jump is now **explained** (the visitor's card), spoken as such, no escalation |
+| A6 | 6 reload | agent console: `plant` marked STALE, the chat proposes; `reload`; repeat the jump | the mirror says reloaded; the same jump is now **explained** (the visitor's card), spoken as such, no escalation. The card's rule needs a trigger the program does not make itself — the host's report `+visitor` — else the kernel samples the visit into the model and watering becomes unreachable (found 2026-10-15) |
 | A7 | regression | the dog from the catalog in both consoles | dog corpus 54/54 through the generated grammar; integration replay reads unchanged |
 
 The scenario is the bar for the subject below; the user's own run of it,
