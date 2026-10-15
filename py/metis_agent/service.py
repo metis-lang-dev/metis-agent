@@ -247,6 +247,7 @@ class Live:
         self.gbnf_path = ROOT / "py" / cfg["intent"]["grammar"]
         self.stop_words = list(cfg.get("stop_words") or ["stop", "halt", "freeze", "quiet"])
         self.prompt = build_turn(cfg)
+        self.prompt_files = list(v3["prompt"])
         self.nctx = int(v3.get("n_ctx", 16384))
         self.ol = llm.sibling(self.nctx)
         self.catalog_names, self.loaded = list(v3["catalog"]), list(v3["loaded"])
@@ -254,6 +255,8 @@ class Live:
         self.lines = dict(v3.get("lines") or {})
         try:                                        # the catalog's list (the console's CATALOG dock)
             self.listed = catalog_list()
+            from .domains import catalog
+            self.catalog_seen = ",".join(sorted(d.name for d in catalog().domains()))   # relist's baseline
         except Exception as e:  # noqa: BLE001 — no loader: the system turn's catalog stands in
             log.warning("[console] the catalog's list: %s", e)
             self.listed = []
@@ -299,6 +302,20 @@ class Live:
         n = self.ol.begin_dialog(self.prompt)
         self.o = O.Orch(self.ocfg, self.ol, self)
         self.o.n_past = n
+
+    def reprime(self, why):
+        """The system turn built again (the catalog, the active domains) and
+        the dialog started over on it, the harness's state kept (Go's
+        v3install.go reprime); journalled as dlg-restart."""
+        prompt = "".join((ROOT / "py" / p).read_text() for p in self.prompt_files)
+        turn = O.system_turn(prompt, self.ocfg.catalog, self.ocfg.loaded, catalog_lines(self.ocfg.catalog))
+        if turn == self.prompt:
+            return
+        n = self.ol.begin_dialog(turn)
+        self.prompt = turn
+        self.o.restart_dialog(n, self.ocfg)
+        self.journal.record({"kind": "dlg-restart", "why": why, "n_ctx": n, "catalog": list(self.ocfg.catalog)})
+        log.info("[v3] the dialog starts over on the system turn rebuilt (%s): %d tok", why, n)
 
     def room(self):
         if self.o.tokens() < self.nctx - 1536:
@@ -519,14 +536,62 @@ class Live:
 
     # the console's verbs (v3console.go, v3reload.go, the world)
 
+    def install(self, dom):
+        """Hot-install (e2e-workflow step 4, the architect's ruling; Go's
+        v3install.go): a manifest domain no agent serves gets one at runtime
+        — its agent built from the manifest (its pair with it), its clock,
+        lock and watched directory, its card and its name in the activate
+        enum. The caller reprimes the dialog. Returns an error or None."""
+        from .domains import catalog
+        try:
+            d = catalog().get(dom)
+        except KeyError:
+            return "no domain %r in the catalog" % dom
+        if d.partner_of:
+            return "%s is stepped with its pair: activate %s" % (dom, d.partner_of)
+        group = [dom] + [p for p in d.pair if p not in self.names]
+        if not d.line:
+            return "%s's manifest has no line (the orchestrator's card)" % dom
+        try:
+            new = self.proc.add(group)
+        except Exception as e:  # noqa: BLE001 — nothing changed: the old set serves on
+            return "install %s: %s: %s" % (dom, type(e).__name__, e)
+        from .domain_agent import Domains
+        old = list(self.agents.agents.values()) if isinstance(self.agents, Domains) else [self.agents]
+        self.agents = Domains(old + new)
+        lock = threading.Lock()
+        for n in group:
+            self.names.append(n)
+            self.locks[n] = lock
+            if n != dom:
+                self.quiet.add(n)
+        if len(group) > 1:
+            for n in group:
+                self.pairs[n] = tuple(group)
+        self.clocks.append({"domain": dom, "n": int(d.clock.get("beats", 1))})
+        self.watch[dom] = str(d.dir)
+        self.base[dom] = snapshot(self.watch[dom])
+        if dom not in self.catalog_names:
+            self.catalog_names.append(dom)
+            self.ocfg.catalog.append(dom)
+        self.display.setdefault(dom, d.display)
+        self.ocfg.display.setdefault(dom, d.display)
+        log.info("[v3] installed %s (%s) from its manifest", dom, ", ".join(group))
+        return None
+
     def domain_verb(self, verb, dom, bindings, by):
         rec = {"kind": "dlg-domain", "verb": verb, "domain": dom, "by": by}
         if bindings is not None:
             rec["bindings"] = bindings
         err = None
-        if dom not in self.names:
-            err = ("%s is in the catalog, but no domain agent serves it in this configuration" % dom
-                   if dom in self.catalog_names else "no domain %r" % dom)
+        installed = False
+        if verb == "activate" and dom not in self.names:      # hot-install from the manifest
+            err = self.install(dom)
+            installed = err is None
+        if err is not None:
+            pass
+        elif dom not in self.names:
+            err = "no domain agent serves %s" % dom
         elif dom in self.quiet:
             err = "%s is stepped with its pair, not on its own" % dom
         else:
@@ -535,6 +600,10 @@ class Live:
             self.ocfg.loaded = self.loaded
             if verb == "activate":
                 self.o.activated(dom)
+            if installed:
+                rec["installed"] = True
+                self.o.m.last[dom] = "installed"
+                self.reprime("install " + dom)      # its card, its name in the enum: the system turn again
         if err:
             rec["error"] = err
         self.journal.record(rec)
@@ -652,8 +721,29 @@ class Live:
         self.push_catalog()
         return key, err
 
+    def relist(self):
+        """The catalog's list again when its domains changed on disk (a
+        domain made after the start: its row in the console's list, and
+        activate installs it; Go's relist)."""
+        from .domains import catalog
+        try:
+            names = ",".join(sorted(d.name for d in catalog().domains()))
+        except Exception as e:  # noqa: BLE001 — a manifest mid-write: the next poll
+            log.info("[catalog] the catalog's domains: %s", e)
+            return False
+        last, self.catalog_seen = getattr(self, "catalog_seen", None), names
+        if last is None or last == names:
+            return False
+        try:
+            self.listed = catalog_list()
+        except Exception as e:  # noqa: BLE001
+            log.info("[catalog] the console's list again: %s", e)
+            return False
+        log.info("[catalog] the catalog's domains changed on disk: %s", names)
+        return True
+
     def watch_once(self):
-        moved = False
+        moved = self.relist()
         for d, p in self.watch.items():
             s = summary(self.base.get(d, {}), snapshot(p))
             if self.changed.get(d, "") != s:

@@ -154,7 +154,9 @@ class DomainAgent:
                 self.host.live()          # the replay, on a person's time (dog.py AgentHost.live)
             elif hasattr(self.host, "replay"):
                 self.host.replay()
-            elif not getattr(module, "OWN_DAY", False):
+            elif not getattr(module, "OWN_DAY", False) and not isinstance(self.host, _NoHost):
+                # a host with no replay keeps its own day; with no host at all the
+                # program runs its own day (the architect's ruling, e2e step 4)
                 raise ValueError("domain %s has no replay case (its host keeps its own day)" % self.name)
         elif case not in (None, "hosted"):
             raise ValueError("case: hosted | replay | live, not %r" % case)
@@ -217,16 +219,25 @@ class DomainAgent:
         return [reply(self.name, "result", id=iid, status="accepted", ref={"beat": self.beat_no()},
                       text="Accepted.")]
 
+    # a domain with no host runs its own day: at most this many watch steps
+    # per beat, so a program that never quiesces (wgc's search fires ~100k
+    # moves a second) cannot hold the orchestrator's thread
+    OWN_DAY_STEPS = 200
+
     # ── the clock: one beat of the watch ──
     def beat(self):
         w, out = self.watch, []
         if self.over:
             return out
         b0 = w.beat
+        cap, n = (self.OWN_DAY_STEPS if isinstance(self.host, _NoHost) else None), 0
         while not w.done:
             would_tick = w.observe_only or (w.quiet and not self.repl._candidates())
             if w.beat > b0 and would_tick:
                 break
+            if cap is not None and n >= cap:
+                break
+            n += 1
             for s in w.step():
                 out += self.signal(s)
         if w.done:
@@ -772,6 +783,22 @@ class Process:
             ag.session = self.state.setdefault("session", self.session_id or time.strftime("%Y%m%d-%H%M%S"))
             ag.sink = records_path(m, self.records, ag.session)
         return ag
+
+    def add(self, names):
+        """Hot-install (e2e-workflow step 4, the architect's ruling): agents
+        for domains not served at start, built from their manifests on the
+        model, seed and case of this process — a pair on its own fresh pair
+        env. Returns the new agents (the caller joins them to its Domains)."""
+        import tempfile
+        from . import domains
+        mods = [domains.load(n) for n in names]
+        if any(getattr(m, "PAIR", None) for m in mods):
+            self.state["pair_dir"] = tempfile.mkdtemp(prefix="pair-")
+            os.environ["METIS_PAIR_DIR"] = self.state["pair_dir"]
+        ags = [self.make(m, self.state.get("seed", 1), self.state.get("case")) for m in mods]
+        self.names += list(names)
+        self.modules += mods
+        return ags
 
     def reload(self, agent, d):
         """reload(domain) (e2e-workflow step 3, WIRE.md): the domain's

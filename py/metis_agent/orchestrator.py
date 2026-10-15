@@ -1708,6 +1708,15 @@ class Orch:
     def activated(self, d):
         self.q_heard.pop(d, None)
 
+    def restart_dialog(self, n, cfg):
+        """The dialog begun again at a new system turn of n tokens (Go's
+        restartDialog: a hot-install's card and enum): the harness's state
+        stands — the mirror, the journal by id, the question."""
+        self.pend = []
+        self.open, self.said, self.n_past = False, None, n
+        self.cfg.catalog, self.cfg.loaded, self.cfg.display = list(cfg.catalog), list(cfg.loaded), dict(cfg.display)
+        self.api = repl_api(cfg.catalog, cfg.loaded)
+
     def reloaded(self, d):
         """reload(domain) took (e2e-workflow step 3, Go v3reload.go): the new
         runtime does not know the old tasks; the mirror says reloaded, the

@@ -190,3 +190,80 @@ def test_a_failed_reload_leaves_the_old_domain_running(tmp_path, monkeypatch):
     llp.write_text(good + "\n#init floor_dry 2\n")                         # a program change (the key ignores a %% text edit)
     ag, out = serve(ag, {"reload": {}, "domain": "dog"}, p.build, p.reload)
     assert any(r.get("kind") == "reloaded" for r in out) and ag.repl.key != old_key
+
+
+def test_activate_installs_a_manifest_domain_at_runtime(tmp_path):
+    """Hot-install (e2e-workflow step 4, the architect's ruling): `activate`
+    on a manifest domain no agent serves builds its agent from the manifest
+    — wgc: an agent module, no host, so it runs its own day — its clock
+    ticks, its card and enum entry join the system turn, the dialog starts
+    over with the mirror kept (its line "installed"), the row goes active.
+    A name with no manifest, and a partner on its own, are refused."""
+    import metis_catalog
+    lv, frames = live(tmp_path)
+    lv.o.m.last["dog"] = "sat down"
+    assert "wgc" not in lv.names and "- wgc:" not in lv.prompt
+    assert lv.domain_verb("activate", "wgc", None, "person") is None
+    assert "wgc" in lv.names and "wgc" in lv.loaded and "wgc" in lv.agents.agents
+    assert "- wgc: %s" % metis_catalog.get("wgc").line in lv.prompt and '<|"|>wgc<|"|>' in lv.prompt   # the card and the enum
+    assert lv.o.m.last == {"dog": "sat down", "wgc": "installed"}                           # the mirror kept
+    rs = recs(lv, "dlg-restart")
+    assert len(rs) == 1 and rs[0]["why"] == "install wgc" and "wgc" in rs[0]["catalog"]
+    rec = recs(lv, "dlg-domain")[-1]
+    assert (rec["verb"], rec["domain"], rec.get("installed")) == ("activate", "wgc", True) and "error" not in rec
+    row = {e["name"]: e for e in lv.catalog()}["wgc"]
+    assert row["loaded"] and row["served"] and row["state"] != "not installed"
+    fired = len(lv.agents.agents["wgc"].repl.fired)
+    for _ in range(3):
+        lv.tick()
+    assert 0 < len(lv.agents.agents["wgc"].repl.fired) - fired <= 3 * 200                  # its own day, bounded per beat
+    assert "no domain 'nav' in the catalog" in lv.domain_verb("activate", "nav", None, "person")
+    assert lv.domain_verb("deactivate", "wgc", None, "person") is None and "wgc" in lv.off
+
+
+def test_a_hostless_manifest_domain_runs_its_own_day(tmp_path, monkeypatch):
+    """The ruling: a manifest with no host and no agent module (a plant from
+    `new` + intents) runs its own day in the live case, never refused."""
+    import shutil
+    import yaml
+    from metis_agent.domain_agent import Process
+    from metis_agent.domains import catalog
+    d = tmp_path / "domains/plant"
+    shutil.copytree(catalog().get("dog").dir, d, ignore=shutil.ignore_patterns("records", "__pycache__", "*_host.py"))
+    (d / "dog.llp").rename(d / "plant.llp")
+    m = yaml.safe_load((d / "domain.yaml").read_text())
+    m.update(name="plant", program="plant.llp")
+    m.pop("host", None)
+    (d / "domain.yaml").write_text(yaml.safe_dump(m))
+    monkeypatch.setenv("METIS_CATALOG", str(tmp_path))
+    ag = Process(["plant"]).build(1, "live")
+    assert ag.name == "plant" and ag.case == "live"
+
+
+def test_a_domain_made_after_the_start_is_listed_and_installed(tmp_path, monkeypatch):
+    """The plant's path (A4): a manifest written after the service started
+    shows in the console's list at the next poll (relist), and one activate
+    installs it — host-less, its own day."""
+    import shutil
+    import yaml
+    from metis_agent.domains import catalog
+    cat = tmp_path / "cat"
+    for n in ("dog", "kitchen", "kitchen_shared"):
+        shutil.copytree(catalog().get(n).dir, cat / "domains" / n, ignore=shutil.ignore_patterns("records", "__pycache__"))
+    monkeypatch.setenv("METIS_CATALOG", str(cat))
+    lv, frames = live(tmp_path)
+    assert "plant" not in {e["name"] for e in lv.catalog()}
+    d = cat / "domains/plant"
+    shutil.copytree(cat / "domains/dog", d, ignore=shutil.ignore_patterns("*_host.py", "__pycache__"))
+    (d / "dog.llp").rename(d / "plant.llp")
+    m = yaml.safe_load((d / "domain.yaml").read_text())
+    m.update(name="plant", program="plant.llp", line="a plant: it drinks, it wilts")
+    m.pop("host", None)
+    (d / "domain.yaml").write_text(yaml.safe_dump(m))
+    lv.watch_once()
+    row = {e["name"]: e for e in lv.catalog()}["plant"]
+    assert row["state"] == "not installed" and row["kind"] == "domain"
+    assert any(ev == "catalog" and "plant" in {e["name"] for e in f["domains"]} for ev, f in frames)
+    assert lv.domain_verb("activate", "plant", None, "person") is None
+    assert {e["name"]: e for e in lv.catalog()}["plant"]["loaded"] and "- plant: a plant: it drinks, it wilts" in lv.prompt
+    lv.tick()
