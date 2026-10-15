@@ -209,6 +209,13 @@ class RecordedWatch:
     def step(self):
         out = self._w.step()
         self._out.append({"call": "step", "out": json.loads(json.dumps(out))})
+        self.__dict__["_n"] = self.__dict__.get("_n", 0) + 1
+        if self._n % 10 == 1:
+            self._out.append(reads(self._w.shell))
+        elif self._w.shell._candidates():   # mid-cascade: the tier listed
+            sh = self._w.shell
+            self._out.append({"call": "reads", "out": [{"cmd": c, "arg": x, "text": sh.capture(c, x)}
+                                                       for c, x in (("events", ""), ("ctx", "tokens"))]})
         return out
 
     def intent(self, line):
@@ -256,6 +263,23 @@ def canonical_body(repl):
     from metis.kernel.nets import canonical_bytes
     text = canonical_bytes(repl.prog).decode()
     return text[:text.index("init-stage ")]
+
+
+def reads(repl):
+    """The T reads as metispy's REPL prints them (capture, unscrubbed):
+    state, events, ctx (whole, one section, a bad one), why (bare, every event k
+    of a few, every present atom, a spent one, a never-made one, bad
+    input) and findings, at this point of the day."""
+    args = {"state": [""], "events": [""], "ctx": ["", "tokens", "nope"],
+            "findings": ["", "1", "x"]}
+    n = len(repl.fired)
+    whys = ["", "0", str(n), str(max(1, n // 2)), str(n + 1), "nope_never_made"]
+    whys += sorted(a for a, c in repl.counts.items() if c > 0)
+    spent = sorted({a for _, _, ev in repl.fired_rows for a in ev.produce} - set(repl.counts))
+    whys += spent[:2]
+    args["why"] = whys
+    return {"call": "reads", "out": [{"cmd": c, "arg": a, "text": repl.capture(c, a)}
+                                     for c, al in args.items() for a in al]}
 
 
 def records_json(repl):
@@ -315,10 +339,22 @@ def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None):
             agent, out = serve(agent, msg, proc.build, proc.reload, proc.add_line)
         stream += [{"in": msg, "out": out}]
     if watchcalls is not None:
+        watchcalls.append(reads(agent.repl))
         watchcalls.append({"call": "records", "records": records_json(agent.repl),
                            "fired": list(agent.repl.fired), "counts": dict(agent.repl.counts),
                            "stage": agent.repl.stage})
     return stream, calls
+
+
+def scrub_cases(dest):
+    """py's scrub (repl_tools: no file paths, no template markup, the
+    2000-character cap) on inputs that reach each branch."""
+    from metis_agent.repl_tools import scrub
+    from metis_agent.gemma4 import Q
+    ins = ["plain text", "/home/u/repo/x.llp and /etc/passwd", "a/b/c relative", "x./a/b", "w/a/b",
+           "(/tmp/claude/x/y.json)", "say " + Q + "hi" + Q + " <|tool|>", "/only", "//a//b", "/a.b/c@d+e-f/g",
+           "é/a/b /ü/v", "x" * 1999, "y" * 2000, "z" * 2001, "/p/q " + "w" * 2500, "line\n/a/b\n" * 300]
+    (dest / "scrub.jsonl").write_text("".join(json.dumps({"in": x, "out": scrub(x)}) + "\n" for x in ins))
 
 
 def main():
@@ -331,6 +367,7 @@ def main():
     from metis_agent.mapper import Mapped, Mapper
     from metis_agent.domains import catalog
     js = gathered_js()
+    scrub_cases(dest)
     for name in DOMAINS:
         d = catalog().get(name)
         spec = yaml.safe_load((d.dir / "intent.yaml").read_text())

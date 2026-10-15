@@ -75,6 +75,8 @@ func TestTheWatchIsPys(t *testing.T) {
 		var w *Watch
 		var ah *AgentHost
 		var sink *Sink
+		var reads *Reads
+		nreads := 0
 		n := map[string]int{}
 		jsonl(t, "testdata/watch_"+d+".jsonl", func(raw []byte) {
 			var c struct {
@@ -162,6 +164,12 @@ func TestTheWatchIsPys(t *testing.T) {
 				if w, err = NewWatch(sh, body, cards); err != nil {
 					t.Fatal(err)
 				}
+				prog := map[string]string{"dog": "dog.llp", "plant": "plant.llp"}[d]
+				src, err := os.ReadFile(filepath.Join(catalogDir(t), "domains", d, prog))
+				if err != nil {
+					t.Fatal(err)
+				}
+				reads = NewReads(sh, string(src))
 				sink = &Sink{Path: filepath.Join(t.TempDir(), "records", "fixture.jsonl"), Session: "fixture",
 					Domain: d, Key: p.Key}
 			case "submit":
@@ -221,6 +229,21 @@ func TestTheWatchIsPys(t *testing.T) {
 				if wnt := c.Sunk[0]; g.Record != wnt.Record || g.Status != wnt.Status || g.Beat != wnt.Beat || g.MinedText != wnt.MinedText {
 					t.Fatalf("%s sunk: want %+v got %+v", at, wnt, g)
 				}
+			case "reads":
+				var rs []struct{ Cmd, Arg, Text string }
+				if err := json.Unmarshal(c.Out, &rs); err != nil {
+					t.Fatal(err)
+				}
+				for _, x := range rs {
+					got, ok, err := reads.Read(x.Cmd, x.Arg)
+					if err != nil || !ok {
+						t.Fatalf("%s %s %q: %v %v", at, x.Cmd, x.Arg, ok, err)
+					}
+					if got != x.Text {
+						t.Fatalf("%s: %s %q (after %d fired):\n%s", at, x.Cmd, x.Arg, len(sh.Fired), firstDiff(x.Text, got))
+					}
+					nreads++
+				}
 			case "records":
 				sameJSON(t, d+" records", c.Records, sh.Records)
 				if strings.Join(c.Fired, "|") != strings.Join(sh.Fired, "|") {
@@ -234,6 +257,24 @@ func TestTheWatchIsPys(t *testing.T) {
 				t.Fatalf("%s: unknown call", at)
 			}
 		})
-		t.Logf("%s: %v, %d records, %d fired", d, n, len(sh.Records), len(sh.Fired))
+		t.Logf("%s: %v, %d records, %d fired, %d reads equal", d, n, len(sh.Records), len(sh.Fired), nreads)
 	}
+}
+
+// firstDiff shows where two texts part: the line, want then got.
+func firstDiff(want, got string) string {
+	w, g := strings.Split(want, "\n"), strings.Split(got, "\n")
+	for i := 0; i < len(w) || i < len(g); i++ {
+		var a, b string
+		if i < len(w) {
+			a = w[i]
+		}
+		if i < len(g) {
+			b = g[i]
+		}
+		if a != b || i >= len(w) || i >= len(g) {
+			return "line " + strconv.Itoa(i+1) + ":\n want " + strconv.Quote(a) + "\n got  " + strconv.Quote(b)
+		}
+	}
+	return "(equal?)"
 }

@@ -38,6 +38,10 @@ type Shell struct {
 	Stage      string
 	Records    []*Record
 	quietStage string
+	// the causality graph's base (py Repl._base): the start — the agent
+	// makes no edit no fired event explains
+	BaseStage  string
+	BaseCounts map[string]int
 }
 
 // NewShell attaches a host to a loaded bundle; counts is the start in py's
@@ -49,6 +53,7 @@ func NewShell(p *rt.Program, plugin rt.Host, spec string, counts Counts) (*Shell
 		return nil, err
 	}
 	s.Stage = st
+	s.BaseStage, s.BaseCounts = st, counts.copy().Map()
 	return s, s.check()
 }
 
