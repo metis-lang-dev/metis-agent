@@ -166,3 +166,27 @@ def test_the_system_turn_is_built_from_the_manifests():
         assert False, "nav has no manifest: the start must be refused"
     except ValueError as e:
         assert "nav" in str(e)
+
+
+def test_a_failed_reload_leaves_the_old_domain_running(tmp_path, monkeypatch):
+    """e2e-workflow step 3: reload(domain) recompiles from the files on
+    disk; a program that does not compile is an error reply and the old
+    domain agent keeps running (its beat goes on); fixed, the reload takes."""
+    import shutil
+    from metis_agent.domain_agent import Process, serve
+    from metis_agent.domains import catalog
+    shutil.copytree(catalog().get("dog").dir, tmp_path / "domains/dog", ignore=shutil.ignore_patterns("records", "__pycache__"))
+    monkeypatch.setenv("METIS_CATALOG", str(tmp_path))
+    p = Process(["dog"])
+    ag = p.build(1, "live")
+    old_key = ag.repl.key
+    llp = tmp_path / "domains/dog/dog.llp"
+    good = llp.read_text()
+    llp.write_text(good + "\nthis is not a rule [\n")
+    ag2, out = serve(ag, {"reload": {}, "domain": "dog"}, p.build, p.reload)
+    assert ag2 is ag and any(r.get("kind") == "error" for r in out)           # the old one kept
+    ag, out = serve(ag, {"ports": {}, "domain": "dog"}, p.build, p.reload)
+    assert ag.repl.key == old_key and any(r.get("kind") == "ports" for r in out)   # …and still answering
+    llp.write_text(good + "\n#init floor_dry 2\n")                         # a program change (the key ignores a %% text edit)
+    ag, out = serve(ag, {"reload": {}, "domain": "dog"}, p.build, p.reload)
+    assert any(r.get("kind") == "reloaded" for r in out) and ag.repl.key != old_key
