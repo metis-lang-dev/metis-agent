@@ -139,7 +139,7 @@ function setConn(text, cls) { $('conn').textContent = text; $('conn').className 
 function frame(f) {
   switch (f.ev) {
     case 'journal': if (f.rec && !(f.rec.seq != null && J.bySeq.has(f.rec.seq))) ingest(f.rec); break;
-    case 'catalog': catalog = { domains: f.domains ?? [] }; catalogLive = true; renderDomains(); renderTabs(); break;
+    case 'catalog': catalog = { domains: f.domains ?? [] }; catalogLive = true; renderDomains(); renderTabs(); staleNews(); break;
     case 'ports': ports[f.domain] = f; if (tab === f.domain) renderWorldDock(); break;
     case 'domain_ack': if (f.error) note(`${f.verb} ${f.domain}: ${f.error}`); renderDomains(); break;
     case 'reload_ack': renderDomains(); break; // the journal's dlg-domain reload row says it (its key or its error) in the chat
@@ -171,7 +171,36 @@ function ingest(rec) {
   $('b-recs').textContent = J.recs.length;
 }
 
-function note(text) { J.chat.push({ who: 'note', text, t: new Date().toISOString() }); renderChat(); }
+function note(text, act) { J.chat.push({ who: 'note', text, act, t: new Date().toISOString() }); renderChat(); }
+
+// human-loop step 1: a served domain whose files changed on disk is STALE in
+// the band; under reload: propose (the default) the chat proposes the reload,
+// one click; under auto the backend reloads it at its next quiet beat (the
+// journal's reload row says so)
+const proposed = new Map();   // domain → the changed line it was proposed for (and its button's row)
+function staleNews() {
+  const stale = catalog.domains.filter(d => d.changed && (d.loaded || d.served));
+  $('b-stale').textContent = stale.map(d => d.name).join(', ') || '—';
+  $('b-stale').classList.toggle('on', stale.length > 0);
+  if (!catalogLive) return;
+  for (const d of catalog.domains) {
+    const was = proposed.get(d.name);
+    if (!d.changed) {      // reloaded (or edited back): its proposal is spent
+      if (was?.row?.actBtn) was.row.actBtn.disabled = true;
+      proposed.delete(d.name);
+      continue;
+    }
+    if (was?.changed === d.changed || !(d.loaded || d.served)) continue;
+    if (was?.row?.actBtn) was.row.actBtn.disabled = true;
+    if (d.reload === 'auto') {
+      note(`${d.name} changed on disk: ${d.changed} — it reloads by itself at its next quiet beat (reload: auto)`);
+      proposed.set(d.name, { changed: d.changed });
+    } else {
+      note(`${d.name} changed on disk: ${d.changed} — reload?`, { label: `reload ${d.name}`, fn: () => send({ ev: 'reload', domain: d.name }) });
+      proposed.set(d.name, { changed: d.changed, row: J.chat[J.chat.length - 1] });
+    }
+  }
+}
 
 // ── chat ─────────────────────────────────────────────────────────────────
 const hhmmss = t => t ? new Date(t).toLocaleTimeString([], { hour12: false }) : '';
@@ -192,6 +221,12 @@ function renderChat() {
       meta.append(el('span', { class: 'src s-person' }, 'you'));
     }
     if (r.kind) meta.append(el('span', { class: 'tag' }, r.kind));
+    if (r.act) {     // a one-click proposal (the reload a changed domain asks for)
+      const b = el('button', { class: 'btn act' }, r.act.label);
+      b.onclick = () => { b.disabled = true; r.act.fn(); };
+      r.actBtn = b;
+      meta.append(b);
+    }
     if (meta.childNodes.length) body.append(meta);
     const m = el('div', { class: `msg ${r.who}` }, el('span', { class: 't' }, hhmmss(r.t)), body);
     r.el = m;

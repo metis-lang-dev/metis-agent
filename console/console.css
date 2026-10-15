@@ -14,6 +14,8 @@ code,.mono{font-family:var(--mono)}
 #micBtn.on{color:var(--bg);background:var(--red);border-color:transparent}
 #conn.ok{color:var(--green)}#conn.bad{color:var(--red)}
 #b-last{color:var(--fg)}
+#b-stale.on{color:var(--yellow)}
+.msg .act{margin-left:6px}
 
 #replayBar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#2a2111;color:var(--yellow);padding:3px 12px;border-bottom:1px solid var(--line);flex:none}
 #replayBar b{font-weight:normal;letter-spacing:.04em}
