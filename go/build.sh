@@ -42,6 +42,18 @@ if [ "${1:-}" = "test" ] || [ "${1:-}" = "vet" ]; then
 fi
 # GOFLAGS=-tags=mtmd links libmtmd for the E3 audio path (internal/llm/audio.go);
 # the default build (the harness) does not.
-if [ $# -gt 0 ]; then targets=(); for t in "$@"; do targets+=("./cmd/$t"); done; else targets=(./cmd/...); fi
+if [ $# -gt 0 ]; then
+  targets=()
+  for arg in "$@"; do
+    t="${arg%/}"; t="${t#./}"; t="${t#cmd/}"; t="${t#./cmd/}"   # a path to a command names it too
+    if [ ! -d "cmd/$t" ]; then
+      echo "build.sh: no command '$arg' — ./build.sh [cmd...] takes command names ($(cd cmd && ls -d */ | tr -d / | tr '\n' ' ')), or: test|vet [pkgs...]" >&2
+      exit 2
+    fi
+    targets+=("./cmd/$t")
+  done
+else
+  targets=(./cmd/...)
+fi
 go build -o bin/ "${targets[@]}"
 echo "built → go/bin/ (rpath-embedded; no LD_LIBRARY_PATH needed)"

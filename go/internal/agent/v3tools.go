@@ -9,7 +9,9 @@ package agent
 // is a startup error.
 
 import (
+	"bytes"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -46,13 +48,26 @@ func replAPIFrom(tools []repltools.Tool, catalogDoms, loaded []string) []apiTool
 func BundleDir(m catalog.Manifest) string { return filepath.Join(m.Dir, "build", m.Name+".metis") }
 
 // ServedTools reads the REPL API from the served packages' bundles, in
-// activation order; a package whose bundle is missing is emitted first
-// when python (metispy's interpreter) is given — a py-served package has
-// its bundle too, as reload re-emits it anyway.
+// activation order. With python (metispy's interpreter) given, each
+// bundle is first held to metispy's REPL API now (python -m
+// metis.lang.repl --tools-json): a missing or different tools.json — a
+// bundle built before a metispy update — is emitted again, so Go never
+// speaks older declarations than py; a py-served package has its bundle
+// too, as reload re-emits it anyway. Without python the check is skipped
+// (logged) and the bundles are read as they are.
 func ServedTools(root, python string, names []string) ([]repltools.Tool, error) {
 	ms, err := catalog.Scan(root)
 	if err != nil {
 		return nil, err
+	}
+	var now []byte
+	if python != "" {
+		cmd := exec.Command(python, "-m", "metis.lang.repl", "--tools-json")
+		if now, err = cmd.Output(); err != nil {
+			return nil, fmt.Errorf("metispy's REPL API (%s -m metis.lang.repl --tools-json): %v", python, err)
+		}
+	} else {
+		log.Printf("[catalog] the REPL API's freshness check skipped (no catalog.python): the bundles are read as they are")
 	}
 	var bundles []repltools.NamedDir
 	seen := map[string]bool{}
@@ -63,11 +78,18 @@ func ServedTools(root, python string, names []string) ([]repltools.Tool, error) 
 		}
 		seen[n] = true
 		dir := BundleDir(m)
-		if _, err := os.Stat(filepath.Join(dir, "tools.json")); err != nil && python != "" {
-			cmd := exec.Command(python, "-m", "metis.kernel.artifact", n)
-			cmd.Env = append(os.Environ(), "METIS_CATALOG="+root)
-			if b, err := cmd.CombinedOutput(); err != nil {
-				return nil, fmt.Errorf("emit %s's bundle: %v: %s", n, err, strings.TrimSpace(string(b)))
+		if now != nil {
+			have, _ := os.ReadFile(filepath.Join(dir, "tools.json"))
+			if !bytes.Equal(have, now) {
+				cmd := exec.Command(python, "-m", "metis.kernel.artifact", n)
+				cmd.Env = append(os.Environ(), "METIS_CATALOG="+root)
+				if b, err := cmd.CombinedOutput(); err != nil {
+					return nil, fmt.Errorf("emit %s's bundle: %v: %s", n, err, strings.TrimSpace(string(b)))
+				}
+				if have, _ = os.ReadFile(filepath.Join(dir, "tools.json")); !bytes.Equal(have, now) {
+					return nil, fmt.Errorf("%s's bundle, emitted again, still differs from metispy's REPL API", n)
+				}
+				log.Printf("[catalog] %s's bundle emitted (its REPL API was missing or older than metispy's)", n)
 			}
 		}
 		bundles = append(bundles, repltools.NamedDir{Name: n, Dir: dir})

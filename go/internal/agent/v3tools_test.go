@@ -4,6 +4,9 @@ package agent
 // byte as the hand-built table did (the -loop v3 system turn unchanged).
 
 import (
+	"fmt"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -40,4 +43,52 @@ func testTools(t testing.TB) []repltools.Tool {
 		t.Skipf("no metispy golden bundle with tools.json: %v", err)
 	}
 	return tools
+}
+
+// A bundle whose REPL API is older than metispy's is emitted again at
+// startup when python is given (nina's finding: every served bundle stale
+// alike passes the cross-bundle check); without python it is read as is.
+func TestServedToolsHoldsTheBundlesToMetispy(t *testing.T) {
+	python, _ := filepath.Abs("../../../py/.venv/bin/python")
+	if err := exec.Command(python, "-c", "import metis.kernel.artifact").Run(); err != nil {
+		t.Skip("no metispy in the py venv")
+	}
+	cat, _ := filepath.Abs("../../../../metis-catalog")
+	root := t.TempDir()
+	if err := exec.Command("cp", "-r", filepath.Join(cat, "domains", "plant"), filepath.Join(root, "domains", "plant")).Run(); err != nil {
+		if err := os.MkdirAll(filepath.Join(root, "domains"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := exec.Command("cp", "-r", filepath.Join(cat, "domains", "plant"), filepath.Join(root, "domains", "plant")).Run(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	os.RemoveAll(filepath.Join(root, "domains", "plant", "build"))
+	tools, err := ServedTools(root, python, []string{"plant"}) // missing: emitted
+	if err != nil || len(tools) != 12 {
+		t.Fatalf("a missing bundle: %d tools, %v", len(tools), err)
+	}
+	// a bundle an emitter before a metispy update wrote: its own version
+	// directory, the link pointing at it
+	build := filepath.Join(root, "domains", "plant", "build")
+	real, _ := filepath.EvalSymlinks(filepath.Join(build, "plant.metis"))
+	old := filepath.Join(build, "plant.metis.v-0ld0ld0ld0ld")
+	if err := exec.Command("cp", "-r", real, old).Run(); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(old, "tools.json"))
+	stale := strings.Replace(string(b), "the domain's recent events", "the domain's OLD events", 1)
+	if err := os.WriteFile(filepath.Join(old, "tools.json"), []byte(stale), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	os.Remove(filepath.Join(build, "plant.metis"))
+	if err := os.Symlink(filepath.Base(old), filepath.Join(build, "plant.metis")); err != nil {
+		t.Fatal(err)
+	}
+	if tools, err = ServedTools(root, "", []string{"plant"}); err != nil || !strings.Contains(fmt.Sprint(tools), "OLD") {
+		t.Fatalf("without python the bundle is read as it is: %v", err)
+	}
+	if tools, err = ServedTools(root, python, []string{"plant"}); err != nil || strings.Contains(fmt.Sprint(tools), "OLD") {
+		t.Fatalf("an older REPL API is emitted again: %v %v", err, strings.Contains(fmt.Sprint(tools), "OLD"))
+	}
 }
