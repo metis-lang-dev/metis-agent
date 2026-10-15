@@ -76,6 +76,7 @@ func TestTheWatchIsPys(t *testing.T) {
 		var ah *AgentHost
 		var sink *Sink
 		var reads *Reads
+		var tc *TemplateConsult
 		nreads := 0
 		n := map[string]int{}
 		jsonl(t, "testdata/watch_"+d+".jsonl", func(raw []byte) {
@@ -103,6 +104,13 @@ func TestTheWatchIsPys(t *testing.T) {
 				Extra     map[string]any  `json:"extra"`
 				Lines     json.RawMessage `json:"lines"`
 				Sunk      []Sunk          `json:"sunk"`
+				Args      map[string]any  `json:"args"`
+				LastRef   *Refusal        `json:"last_refusal"`
+				Record    struct {
+					FirstRead string         `json:"first_read"`
+					Fixed     map[string]any `json:"fixed"`
+					Situation string         `json:"situation"`
+				} `json:"record"`
 			}
 			dec := json.NewDecoder(bytes.NewReader(raw))
 			dec.UseNumber()
@@ -170,6 +178,8 @@ func TestTheWatchIsPys(t *testing.T) {
 					t.Fatal(err)
 				}
 				reads = NewReads(sh, string(src))
+				tables := map[string]*host.Tables{"dog": &host.DogTables, "plant": &host.PlantTables}[d]
+				tc = &TemplateConsult{Sh: sh, W: w, R: reads, Tables: tables, HandleNames: handleNames(t, d)}
 				sink = &Sink{Path: filepath.Join(t.TempDir(), "records", "fixture.jsonl"), Session: "fixture",
 					Domain: d, Key: p.Key}
 			case "submit":
@@ -244,6 +254,41 @@ func TestTheWatchIsPys(t *testing.T) {
 					}
 					nreads++
 				}
+			case "consult":
+				situation, _ := c.Args["situation"].(string)
+				if situation == "" {
+					switch {
+					case w.Open >= 0:
+						situation = "surprise"
+					case c.LastRef != nil:
+						situation = "refusal"
+					default:
+						situation = "question"
+					}
+				}
+				q, _ := c.Args["question"].(string)
+				got, err := tc.Consult(strings.TrimSpace(q), situation, c.LastRef)
+				if err != nil {
+					t.Fatal(err)
+				}
+				f := F{"id": c.ID, "calls": 0, "text": got.Text,
+					"ref": map[string]any{"seq": len(sh.Fired), "beat": ah.Beat()}}
+				if len(got.Evidence) > 0 {
+					f["evidence"] = got.Evidence
+				}
+				for k, v := range got.Env {
+					f[k] = v
+				}
+				var want []json.RawMessage
+				if err := json.Unmarshal(c.Out, &want); err != nil {
+					t.Fatal(err)
+				}
+				sameJSON(t, at+" reply", want[0], NewReply(d, "consult", f))
+				if got.FirstRead != c.Record.FirstRead || got.Situation != c.Record.Situation {
+					t.Fatalf("%s first read / situation:\n want %q %s\n got  %q %s", at, c.Record.FirstRead, c.Record.Situation, got.FirstRead, got.Situation)
+				}
+				fb, _ := json.Marshal(c.Record.Fixed)
+				sameJSON(t, at+" fixed", fb, got.Fixed)
 			case "records":
 				sameJSON(t, d+" records", c.Records, sh.Records)
 				if strings.Join(c.Fired, "|") != strings.Join(sh.Fired, "|") {
@@ -277,4 +322,19 @@ func firstDiff(want, got string) string {
 		}
 	}
 	return "(equal?)"
+}
+
+// handleNames are the domain's HANDLE_NAMES (the replier fixture's setup).
+func handleNames(t *testing.T, d string) map[string]string {
+	var names map[string]string
+	jsonl(t, "testdata/replier_"+d+".jsonl", func(raw []byte) {
+		var c struct {
+			Call        string            `json:"call"`
+			HandleNames map[string]string `json:"handle_names"`
+		}
+		if json.Unmarshal(raw, &c) == nil && c.Call == "setup" && names == nil {
+			names = c.HandleNames
+		}
+	})
+	return names
 }

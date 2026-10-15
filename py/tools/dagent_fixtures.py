@@ -331,6 +331,15 @@ def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None):
             watchcalls.append({"call": "sink", "k": k, "status": status, "extra": extra,
                                "lines": new, "sunk": sunk})
         agent.sink_record = sink_record
+        consult0 = agent.consult
+
+        def consult(iid, args):        # the template consult at its moment: its input, the pending refusal, its replies
+            lr = json.loads(json.dumps(agent.last_refusal))
+            out = consult0(iid, args)
+            watchcalls.append({"call": "consult", "id": iid, "args": dict(args), "last_refusal": lr,
+                               "out": json.loads(json.dumps(out)), "record": json.loads(json.dumps(agent.consults[-1]))})
+            return out
+        agent.consult = consult
     r = agent.replier
     calls = [{"call": "setup", "domain": r.domain, "docs": dict(r.docs), "outcomes": dict(r.outcomes),
               "commands": sorted(r.commands), "mirror": list(r.mirror), "blocking": sorted(r.blocking),
