@@ -625,10 +625,15 @@ orchestrator/domain-agent split between them:
   to exercise the lower half directly, with the upper half emulated
   (`orch_emu`), and the human developer's loop console runs against the same
   stack. Everything new lands here first.
-- **metis-agent/go is the deployment runtime** for an enhanced small LLM: the
-  compiled IR runtime (the cgo binding of the C++ kernel) plus one small
-  model, with the optimization that the upper and lower halves run **on the
-  same LLM with context and RAG swapping** (KV swap per context, examples by
+- **metis-agent/go is the deployment runtime** for an enhanced small LLM —
+  the embedded solution: a small LLM with a text or voice interface on
+  resource-constrained, offline devices (kitchen appliances, robot pets,
+  cloud agents), the cost proportional to the intelligence required (the
+  user, 2026-10-15). It is the compiled IR runtime (the cgo binding of the C++
+  kernel — it existed at metis-agent's start, was lost to shortcuts, and is
+  redone properly: runtime-parity s-c39746ca, RUNTIME-PARITY.md) plus one
+  small model, with the optimization that the upper and lower halves run
+  **on the same LLM with context and RAG swapping** (KV swap per context, examples by
   retrieval — E12's one-model question, decided here as the Go deployment
   shape, not as a question for the development stack). Logic parity with py
   stays the bar for its behaviour (the traces, the reads); the one-model

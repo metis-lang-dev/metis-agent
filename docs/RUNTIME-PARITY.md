@@ -15,6 +15,67 @@ Sources: metis-agent/py (`domain_agent.py`, `agent_host.py`, `consult.py`,
 metis-lang/runtime (`include/metis/*.hpp`, `tools/`), `src/` (metisc);
 metis-agent/go (`internal/kernel`, `internal/agent`, `build.sh`).
 
+## Step 2 — the ruling (architect with the user, 2026-10-15)
+
+**The scope of agent/go** (the user): an embedded solution that runs a small
+LLM with a text or voice interface on resource-constrained and offline
+devices — kitchen appliances, intelligent robot pets, cloud agents — with the
+cost proportional to the intelligence required. agent/py is the development
+stack; agent/go runs the domain models those developments produce.
+
+**Corrections to "where things stand"** (the user):
+- a cgo binding of the C++ IR runtime EXISTED when metis-agent started and
+  was lost to shortcuts; it is redone properly, not designed from zero;
+- the runtime has no live stepping core, but it does make progress from the
+  ports' input (the Evaluator tick path), it has the surprise record, and a
+  trace callback that can be redirected to a narrator — rows 10, 15, 16, 17
+  are re-cut against that;
+- product artifacts from metispy only is the cover for now: the compile
+  stays metispy's, the runtime loads the artifact (C rows stand);
+- the record's env as a Python pickle is a shortcut: ONE neutral env format
+  (JSON: the host's snapshot as data) for py and go, both write and read it.
+
+**The constructive cut: RUN vs DESIGN.** Every row is one of:
+- **RUN** — needed to run a domain model on the device: the Go harness gets
+  it (as an adaptation of agent/py's logic) and the runtime grows what the
+  harness cannot do itself;
+- **DESIGN** — part of the design workflow: it stays on the development
+  stack (metispy, the loop console, agent/py) and the device does without.
+
+| RUN (device) | DESIGN (development stack only) |
+|---|---|
+| load the artifact; the key, the `%%` lines, the cards and the merged packs as the artifact's sidecars (C) | compile, gate/accept, formalize, mine, revise (metispy, the loop) |
+| step one thing on the live state with the normative sampler; enabled events; do-lines as deltas; stages and the host tick (K core) | `why`, `findings`, the structural cone |
+| the host faces as a Go/C PortPlugin (tick, on_event, observe, snapshot, restore) — the hosts out of Python, or a C ABI so a device host is C++ | `recover` / `replay` of records (the loop's "fixed: true") |
+| the surprise test from the checkpoint; the surprise record; the open-surprise gate; `explain(card, move)` (fire a card's move on the live state); `reset`; `escalate` with mined text; the operator resume | the counterfactual consult tools: `necessity`, `sufficiency`, `graph`, `narrate`, `whatif` (on the device the consult is the harness's template + the cards' moves) |
+| the records sink with the neutral env; snapshot/restore (the checkpoint, the consult fork) | the dialog/parity traces, the timelines, the benches |
+| the orchestrator's T reads (`state`, `events`, `ctx`), the mirror counts (`#query`), notch overlay, port pricing | the loop console, `intents` drafting, `apply` |
+| reload / add (hot-swap of an artifact; the old runs on failure), reset, the ports reply, the pair scene (two runtimes, one env) | the web page's download/copy |
+| the generic domain agent's logic in Go: mapper, replier, narrator (trace callback → the narrator), AgentHost queues, the consult harness — from `intent.yaml` and the manifest as on py | — |
+
+**What the C++ runtime must grow (K), in order:** (1) a stepping API on a
+live state with the normative splitmix64 sampler, seeded, returning the
+fired event with its c/o/p — the core; (2) enabled-events and do-line deltas
+on the live state; (3) snapshot/restore of the runtime state (counts, stage,
+rng, fired length); (4) projection from a given state over N steps for the
+surprise test (if not already what the surprise record uses — verify); (5)
+fire a card's move on the live state (explain). The rest of RUN is binding
+(B: the cgo binding redone properly, with the artifact loader and the
+sidecars) and harness (H: the generic domain agent and the hosts in Go, the
+JSON env).
+
+**The parity bar for agent/go** stays DESIGN "What parity means": the same
+`dlg-*` journal, the reads of the timelines and the integration replay
+holding with py's counts; the one-model optimization (KV swap per context,
+the `%%`/cards RAG by key) is measured against the same reads at the device's
+footprint.
+
+**Next (step 3, to be opened as build subjects after the user's gate):**
+`runtime-binding` (opus: the cgo binding + K 1–5 in metis-lang's runtime with
+its OCaml-authoritative semantics checked) and `go-domain-agent` (opus, nina
+reviews parity: the H rows, the JSON env on both stacks, a device host
+contract). Not before the re-cut matrix below carries the RUN/DESIGN column.
+
 ## Where things stand (read this first)
 
 1. **There is no binding of the C++ IR runtime today.**
