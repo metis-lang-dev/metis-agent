@@ -1,0 +1,124 @@
+{"ports": {}, "domain": "kitchen", "id": "p0"}
+{"clock": "step", "domain": "kitchen"}
+{"tool": "events", "args": {}, "domain": "kitchen", "id": "e0"}
+{"clock": "step", "domain": "kitchen"}
+{"tool": "events", "args": {}, "domain": "kitchen", "id": "e1"}
+{"tool": "ctx", "args": {"arg": "tokens"}, "domain": "kitchen", "id": "e2"}
+{"clock": "step", "domain": "kitchen_shared"}
+{"tool": "events", "args": {}, "domain": "kitchen_shared", "id": "e3"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"tool": "state", "args": {}, "domain": "kitchen", "id": "r1-0"}
+{"tool": "events", "args": {}, "domain": "kitchen", "id": "r1-1"}
+{"tool": "ctx", "args": {}, "domain": "kitchen", "id": "r1-2"}
+{"tool": "why", "args": {}, "domain": "kitchen", "id": "r1-3"}
+{"tool": "why", "args": {"atom": "pot_onion"}, "domain": "kitchen", "id": "r1-4"}
+{"tool": "findings", "args": {}, "domain": "kitchen", "id": "r1-5"}
+{"tool": "state", "args": {}, "domain": "kitchen_shared", "id": "s1-0"}
+{"tool": "events", "args": {}, "domain": "kitchen_shared", "id": "s1-1"}
+{"tool": "ctx", "args": {}, "domain": "kitchen_shared", "id": "s1-2"}
+{"tool": "why", "args": {}, "domain": "kitchen_shared", "id": "s1-3"}
+{"tool": "why", "args": {"atom": "pot_onion"}, "domain": "kitchen_shared", "id": "s1-4"}
+{"tool": "findings", "args": {}, "domain": "kitchen_shared", "id": "s1-5"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"tool": "state", "args": {}, "domain": "kitchen", "id": "r2-0"}
+{"tool": "events", "args": {}, "domain": "kitchen", "id": "r2-1"}
+{"tool": "ctx", "args": {}, "domain": "kitchen", "id": "r2-2"}
+{"tool": "why", "args": {}, "domain": "kitchen", "id": "r2-3"}
+{"tool": "why", "args": {"atom": "pot_onion"}, "domain": "kitchen", "id": "r2-4"}
+{"tool": "findings", "args": {}, "domain": "kitchen", "id": "r2-5"}
+{"tool": "consult", "args": {"question": "what happened?"}, "domain": "kitchen", "id": "k1"}
+{"verb": "LOAD", "args": {}, "domain": "kitchen", "id": "c1"}
+{"tool": "explain", "args": {"card": "kitchen shared", "move": "partner load"}, "domain": "kitchen", "id": "x1"}
+{"tool": "explain", "args": {"card": "kitchen_shared", "move": "partner_load"}, "domain": "kitchen", "id": "x2"}
+{"tool": "state", "args": {}, "domain": "kitchen", "id": "r3-0"}
+{"tool": "events", "args": {}, "domain": "kitchen", "id": "r3-1"}
+{"tool": "ctx", "args": {}, "domain": "kitchen", "id": "r3-2"}
+{"tool": "why", "args": {}, "domain": "kitchen", "id": "r3-3"}
+{"tool": "why", "args": {"atom": "pot_onion"}, "domain": "kitchen", "id": "r3-4"}
+{"tool": "findings", "args": {}, "domain": "kitchen", "id": "r3-5"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"tool": "consult", "args": {"question": "how many served?"}, "domain": "kitchen", "id": "k2"}
+{"world": ["+pot_space"], "domain": "kitchen", "id": "w1"}
+{"clock": "beat", "domain": "nowhere"}
+{"tool": "state", "args": {}, "id": "bad"}
+{"clock": "beat"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}
+{"tool": "state", "args": {}, "domain": "kitchen", "id": "r4-0"}
+{"tool": "events", "args": {}, "domain": "kitchen", "id": "r4-1"}
+{"tool": "ctx", "args": {}, "domain": "kitchen", "id": "r4-2"}
+{"tool": "why", "args": {}, "domain": "kitchen", "id": "r4-3"}
+{"tool": "why", "args": {"atom": "pot_onion"}, "domain": "kitchen", "id": "r4-4"}
+{"tool": "findings", "args": {}, "domain": "kitchen", "id": "r4-5"}
+{"tool": "state", "args": {}, "domain": "kitchen_shared", "id": "s4-0"}
+{"tool": "events", "args": {}, "domain": "kitchen_shared", "id": "s4-1"}
+{"tool": "ctx", "args": {}, "domain": "kitchen_shared", "id": "s4-2"}
+{"tool": "why", "args": {}, "domain": "kitchen_shared", "id": "s4-3"}
+{"tool": "why", "args": {"atom": "pot_onion"}, "domain": "kitchen_shared", "id": "s4-4"}
+{"tool": "findings", "args": {}, "domain": "kitchen_shared", "id": "s4-5"}
+{"clock": "beat", "domain": "kitchen"}
+{"clock": "beat", "domain": "kitchen"}

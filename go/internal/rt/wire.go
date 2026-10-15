@@ -38,6 +38,7 @@ func (e WireEvent) Kind() string {
 
 // Wire is a parsed ground.wire.
 type Wire struct {
+	Ports              map[string][]string // the B manifest: kind (in|out|guard|weight) -> names
 	NStages, InitStage int
 	Events             []WireEvent
 	Init               []Count
@@ -85,6 +86,11 @@ func ReadWire(path string) (*Wire, error) {
 				return nil, bad(err)
 			}
 		case "B":
+			kind, name, _ := strings.Cut(rest, " ")
+			if w.Ports == nil {
+				w.Ports = map[string][]string{}
+			}
+			w.Ports[kind] = append(w.Ports[kind], strings.TrimSpace(name))
 		default:
 			return nil, bad(fmt.Errorf("unknown record %q", tag))
 		}

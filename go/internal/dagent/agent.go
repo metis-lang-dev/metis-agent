@@ -25,13 +25,22 @@ type Domain struct {
 	Name, Display, Voice string
 	Bundle               string // the bundle directory (ground.wire + sidecar.json)
 	Source               string // the served program's source text (the rule spans)
-	Spec                 *Spec  // intent.yaml
-	NewHost              func() Inner
+	Spec                 *Spec  // intent.yaml (nil: a domain with no intents, the kitchen's cooks)
+	Generic              bool   // the generic agent: the host wrapped as the AgentHost (intent.spec)
+	NewHost              func() rt.Host
 	Tables               *host.Tables
 	PluginSpec           string              // the host as the development stack attaches it (records, reads)
 	Answers              map[string][]string // act -> the report kinds the host answers it with
 	Waits                []string            // the waits the world ends by itself (default timeout, lost)
 	RecordsDir           string              // the records sink's directory ("" = off)
+	// the domain module's switches (py: EXO_EVENTS, QUIESCENCE, BEATS,
+	// OWN_DAY, PAIR) and what prices its weight ports (the ctx's PRICED)
+	ExoEvents  bool
+	Quiescence string // "episode" (default) | "every"
+	Beats      int    // the watch's env beats; 0: no limit
+	OwnDay     bool   // a replay or live case keeps the host's own day
+	Pair       []string
+	PricedBy   string
 }
 
 // Agent is py's DomainAgent.
@@ -122,6 +131,9 @@ func NewAgent(d Domain, seed uint64, caseName string) (*Agent, error) {
 		p.Close()
 		return nil, err
 	}
+	if d.Spec == nil {
+		d.Spec = &Spec{Outcomes: map[string]string{}}
+	}
 	a := &Agent{D: d, Name: d.Name, P: p, Case: caseName}
 	cmds := map[string]bool{}
 	for _, r := range d.Spec.Card.Rows {
@@ -132,7 +144,18 @@ func NewAgent(d Domain, seed uint64, caseName string) (*Agent, error) {
 		waits = []string{"timeout", "lost"}
 	}
 	var plugin rt.Host
-	if d.NewHost != nil {
+	if d.NewHost != nil && !d.Generic {
+		plugin = d.NewHost()
+		if caseName == "replay" || caseName == "live" {
+			if !d.OwnDay {
+				p.Close()
+				return nil, fmt.Errorf("domain %s has no replay case (its host keeps its own day)", d.Name)
+			}
+		} else if caseName != "" && caseName != "hosted" {
+			p.Close()
+			return nil, fmt.Errorf("case: hosted | replay | live, not %s", pyRepr(caseName))
+		}
+	} else if d.NewHost != nil {
 		var plus []string
 		for _, w := range waits {
 			plus = append(plus, "+"+w)
@@ -143,7 +166,12 @@ func NewAgent(d Domain, seed uint64, caseName string) (*Agent, error) {
 			s, _ := v.(string)
 			reps[k] = s
 		}
-		a.Host = NewAgentHost(d.NewHost(), cmds, d.Spec.Enders, reps, plus)
+		inner, ok := d.NewHost().(Inner)
+		if !ok {
+			p.Close()
+			return nil, fmt.Errorf("domain %s: the generic agent needs a host with a hosted day", d.Name)
+		}
+		a.Host = NewAgentHost(inner, cmds, d.Spec.Enders, reps, plus)
 		if a.Host.Enders == nil {
 			a.Host.Enders = []string{}
 		}
@@ -158,6 +186,20 @@ func NewAgent(d Domain, seed uint64, caseName string) (*Agent, error) {
 			return nil, fmt.Errorf("case: hosted | replay | live, not %s", pyRepr(caseName))
 		}
 		plugin = a.Host
+	}
+	if wh, ok := plugin.(rt.Weighted); ok { // the host prices the wire's weight ports
+		ws := wh.Weights()
+		for _, port := range p.Wire.Ports["weight"] {
+			fn, ok := ws[port]
+			if !ok {
+				p.Close()
+				return nil, fmt.Errorf("domain %s: the host has no weight %s", d.Name, port)
+			}
+			if err := p.BindWeight(port, fn); err != nil {
+				p.Close()
+				return nil, err
+			}
+		}
 	}
 	start, err := initOrder(d.Bundle)
 	if err != nil {
@@ -196,7 +238,16 @@ func NewAgent(d Domain, seed uint64, caseName string) (*Agent, error) {
 		p.Close()
 		return nil, err
 	}
+	if d.Beats > 0 {
+		a.W.Beats = d.Beats
+	}
 	a.R = NewReads(a.Sh, d.Source)
+	if len(p.Wire.Ports["weight"]) > 0 && plugin != nil {
+		a.R.PricedBy = d.PricedBy
+		if a.R.PricedBy == "" {
+			a.R.PricedBy = d.PluginSpec
+		}
+	}
 	a.Mapper = NewMapper(d.Spec.Card)
 	a.handles = cardHandleNames(d.Spec.Card)
 	docs := map[string]string{}
@@ -516,7 +567,7 @@ func (a *Agent) signal(s Signal) ([]Reply, error) {
 		if s["kind"] == "operator" {
 			a.sinkRecord(sint(s, "record"), "operator", nil)
 		}
-		if s["kind"] == "exo" {
+		if s["kind"] == "exo" && !a.D.ExoEvents {
 			return nil, nil // the host's own input: not news
 		}
 		f := fragRef(s)
@@ -524,12 +575,16 @@ func (a *Agent) signal(s Signal) ([]Reply, error) {
 			"text": words(f)})}), nil
 	case "quiescence":
 		over, _ := s["episode_over"].(bool)
-		if !over {
+		if over {
+			a.Over = true
+			return voiced([]Reply{a.reply("quiescence", F{"goal_pending": false, "over": true, "ref": a.ref(true, ""),
+				"text": "the day is over"})}), nil
+		}
+		if a.D.Quiescence != "every" {
 			return nil, nil
 		}
-		a.Over = true
-		return voiced([]Reply{a.reply("quiescence", F{"goal_pending": false, "over": true, "ref": a.ref(true, ""),
-			"text": "the day is over"})}), nil
+		return voiced([]Reply{a.reply("quiescence", F{"goal_pending": false, "ref": a.ref(true, ""),
+			"text": words(fragRef(s))})}), nil
 	case "surprise":
 		a.sinkRecord(sint(s, "record"), "open", nil)
 		var cards []string
@@ -688,6 +743,12 @@ func (a *Agent) surpriseVerb(id any, verb string, args map[string]any) ([]Reply,
 	for _, s := range a.W.Outbox {
 		if _, ok := s["record"]; !ok {
 			s["record"] = rec
+		}
+		if s["record"] == nil {
+			// py's from_signal formats the record with %d: no surprise
+			// open and none named raises there, before the outbox is
+			// cleared (a finding reported to the architect; kept as py's)
+			return nil, pyError{"TypeError", "%d format: a real number is required, not NoneType"}
 		}
 		status := sstr(s, "status")
 		f := F{"id": id, "status": status, "ref": a.ref(true, ""), "text": words(fragRef(s))}
@@ -858,37 +919,8 @@ func kindOf(msg map[string]any) string {
 	return "error"
 }
 
-// Serve is py's serve(agent, msg, …) for one agent: the replies, then the
-// ack (non-clock lines). A reset rebuilds the agent (seed, case) and
-// answers ready; reload and add are the process's (not here yet).
-func Serve(a *Agent, msg map[string]any) (*Agent, []any) {
-	var out []any
-	switch {
-	case hasKey(msg, "reset"):
-		r, _ := msg["reset"].(map[string]any)
-		seed := uint64(1)
-		if v, ok := r["seed"].(float64); ok {
-			seed = uint64(v)
-		}
-		cs, _ := r["case"].(string)
-		na, err := NewAgent(a.D, seed, cs)
-		if err != nil {
-			out = []any{a.errorReply(msg["id"], "reset: "+err.Error())}
-		} else {
-			na.Sink.Path, na.Sink.Session, na.Tracing = a.Sink.Path, a.Sink.Session, a.Tracing
-			a.Close()
-			a = na
-			out = []any{a.Ready()}
-		}
-	default:
-		rs, err := a.Handle(msg)
-		if err != nil {
-			rs = []any{a.errorReply(msg["id"], err.Error())}
-		}
-		out = rs
-	}
-	if !hasKey(msg, "clock") {
-		out = append(out, Ordered{}.With("ack", kindOf(msg)).With("id", msg["id"]))
-	}
-	return a, out
-}
+// pyError is an exception py's serve() turns into an error reply
+// ("<Type>: <message>").
+type pyError struct{ typ, msg string }
+
+func (e pyError) Error() string { return e.typ + ": " + e.msg }

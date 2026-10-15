@@ -36,6 +36,9 @@ type Reads struct {
 	// stack) and their full texts.
 	Findings     []string
 	FindingsFull []string
+	// PricedBy names what prices the weight ports (py _pricing: the
+	// plugin's name, else its spec); "" without a pricer
+	PricedBy string
 }
 
 var ruleHead = regexp.MustCompile(`^\s*(?:qui\s+)?([\p{L}\p{N}_-]+)\s*\[`)
@@ -612,6 +615,9 @@ func (r *Reads) Ctx(arg string) (string, error) {
 	}
 	out := []string{head, "TOKENS  " + dt,
 		fmt.Sprintf("ENABLED %d event(s) · %d of %d rule(s) fireable", len(cs), nRules, len(rel.stage))}
+	if r.PricedBy != "" {
+		out = append(out, "PRICED  priced by "+r.PricedBy+"; overlays: none")
+	}
 	want := ctxSections
 	if a != "" {
 		want = []string{a}

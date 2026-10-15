@@ -9,6 +9,9 @@ traffic, their outputs dumped as JSON lines for go/internal/dagent's tests.
       every act form (a refusal's alternatives: {verb: act, args: {type: v}})
       and the edge cases (an unknown verb, no args, an unknown handle).
 
+  days/kitchen.out.jsonl  the kitchen pair's day (both cooks, one env, the
+      pair's clock): the second cook's load surprises the first, the
+      template consult explains it, explain adopts it
   days/<domain>.out.jsonl  the scripted day (days/<domain>.jsonl: intents,
       clock beats, tools, world and ports lines) through py's own serve() on a
       `replay`-case process, every output line in order — the reply stream
@@ -286,6 +289,23 @@ def records_json(repl):
     return json.loads(json.dumps(repl.loop.records, default=str))
 
 
+def run_pair_day(names, lines):
+    """The kitchen pair's day through py's serve(): one process serving
+    both cooks on one env (Domains, the pair's clock), the template seat."""
+    import io
+    import contextlib
+    from metis_agent.domain_agent import Process, serve, ready
+    proc = Process(list(names), seat="template")
+    with contextlib.redirect_stderr(io.StringIO()):
+        agent = proc.build(1, "replay")
+    stream = [ready(agent)]
+    for msg in lines:
+        with contextlib.redirect_stderr(io.StringIO()):
+            agent, out = serve(agent, msg, proc.build, proc.reload, proc.add_line)
+        stream += [{"in": msg, "out": out}]
+    return stream
+
+
 def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None):
     """The day through py's serve(): (the output stream, the replier calls)."""
     import io
@@ -419,6 +439,17 @@ def main():
                     k = o.get("kind") or ("ack" if "ack" in o else "clock")
                     kinds[k] = kinds.get(k, 0) + 1
             print(f"day {name}: {len(lines)} lines -> {dict(sorted(kinds.items()))}; replier calls {len(calls)}")
+    day = dest / "days" / "kitchen.jsonl"
+    if day.exists():
+        lines = [json.loads(x) for x in day.read_text().splitlines() if x.strip()]
+        stream = run_pair_day(("kitchen", "kitchen_shared"), lines)
+        (dest / "days" / "kitchen.out.jsonl").write_text("".join(json.dumps(r) + "\n" for r in stream))
+        kinds = {}
+        for r in stream[1:]:
+            for o in r["out"]:
+                k = o.get("kind") or ("ack" if "ack" in o else "clock")
+                kinds[k] = kinds.get(k, 0) + 1
+        print(f"day kitchen pair: {len(lines)} lines -> {dict(sorted(kinds.items()))}")
 
 
 if __name__ == "__main__":
