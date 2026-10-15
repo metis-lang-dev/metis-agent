@@ -16,6 +16,9 @@ concurrency:
 env:
   # the pin: the archive checkout the harness is built and benched against
   LLAMA_COMMIT: 8ad8aef447703e76cdcf74ed78dab16b92ec231a
+  # the metis runtime (go/internal/rt): metis-lang (public) at the commit the
+  # binding is built and tested against; build.sh builds libmetis_rt there
+  METIS_LANG_COMMIT: 20096ed13dee269285a55d0de15ee29c6f21e5c1
   # metispy and metis-catalog are PRIVATE siblings: read with METIS_READ_TOKEN
   # (Contents: read on both), as metispy's own ci.yml reads metis-catalog.
   # The secret is an ENVIRONMENT secret (environment METIS_READ_TOKEN), so each
@@ -35,8 +38,9 @@ jobs:
       - name: node console/test/console.mjs
         run: node console/test/console.mjs
 
-  # go/: cgo against a CPU-only llama.cpp at the pin (cached on the commit);
-  # vet, every cmd built, every package tested. Model-gated tests skip
+  # go/: cgo against a CPU-only llama.cpp at the pin (cached on the commit)
+  # and metis-lang's libmetis_rt at its pin (internal/rt: the goldens through
+  # cgo, the K goldens through Go); vet, every cmd built, every package tested. Model-gated tests skip
   # without weights (go/models is not in git); the metispy-backed kernel test
   # runs when the token lets metispy be checked out, else skips.
   go:
@@ -72,6 +76,17 @@ jobs:
         run: |
           pip install -e ./metispy
           echo "METISPY=$GITHUB_WORKSPACE/metispy" >> "$GITHUB_ENV"
+      - name: Checkout metis-lang at the pin (public; the runtime internal/rt binds)
+        uses: actions/checkout@v4
+        with:
+          repository: metis-lang-dev/metis-lang
+          ref: ${{ env.METIS_LANG_COMMIT }}
+          path: metis-lang
+      - name: Cache libmetis_rt (the pinned commit)
+        uses: actions/cache@v4
+        with:
+          path: metis-lang/runtime/build
+          key: metis-rt-${{ runner.os }}-${{ env.METIS_LANG_COMMIT }}
       - uses: actions/setup-go@v5
         with:
           go-version-file: metis-agent/go/go.mod
@@ -89,11 +104,13 @@ jobs:
         working-directory: metis-agent/go
         env:
           LLAMA_DIR: ${{ github.workspace }}/llama.cpp
+          METIS_LANG_DIR: ${{ github.workspace }}/metis-lang
         run: ./build.sh vet ./...
       - name: Build every cmd (metis-agent, llmbench, episodes, domemu)
         working-directory: metis-agent/go
         env:
           LLAMA_DIR: ${{ github.workspace }}/llama.cpp
+          METIS_LANG_DIR: ${{ github.workspace }}/metis-lang
         run: |
           ./build.sh
           for c in metis-agent llmbench episodes domemu; do test -x "bin/$c" || { echo "::error::cmd $c not built"; exit 1; }; done
@@ -101,6 +118,7 @@ jobs:
         working-directory: metis-agent/go
         env:
           LLAMA_DIR: ${{ github.workspace }}/llama.cpp
+          METIS_LANG_DIR: ${{ github.workspace }}/metis-lang
         run: |
           rc=0
           ./build.sh test -count=1 -v ./... > go-test.log 2>&1 || rc=$?

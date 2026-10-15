@@ -15,6 +15,7 @@ of `docs/HARNESS.md` §2–§8 are history.)
 | `internal/agent` | the agent: intent turns, talk + the context cut, narration in forms, task outcomes, domains (`Domain`, `Register`/`Open`, the `process` plugin) |
 | `internal/console` | the wire (FRAMEWORK §5) and the static page |
 | `internal/llm` | the llama.cpp adapter: TwoPass, Decide, Speak, Chat, the tape (Append/Set/SpliceTape), siblings |
+| `internal/rt` | the metis runtime over cgo (metis-lang's libmetis_rt, `runtime/c/metis_rt.h`; docs/RUNTIME-BINDING.md): `Load(dir)` an artifact (ground.wire + sidecar.json), Seed/Step/Fire/Enabled/Do, Snapshot/Restore, Likelihood, BindWeight, OnEvent, Reload |
 | `internal/kernel` | the runtime client and host (triage, counts, the tape), cards |
 | `internal/narr` | the script RAG, fragments, the narrator, the form policy |
 | `internal/rack` | per-domain tapes, flat insertion |
@@ -24,8 +25,10 @@ of `docs/HARNESS.md` §2–§8 are history.)
 
 ## Build
 
-Go ≥ 1.24 and a built llama.cpp checkout (CMake, `-DGGML_CUDA=ON` for the
-GPU).
+Go ≥ 1.24, a built llama.cpp checkout (CMake, `-DGGML_CUDA=ON` for the
+GPU), and a metis-lang checkout (`METIS_LANG_DIR`, default the sibling):
+`build.sh` builds its `runtime/build/libmetis_rt.so` with CMake when needed
+and links it as it links libllama (cgo flags, rpath).
 
 ```bash
 ./build.sh                 # bin/metis-agent bin/llmbench bin/episodes bin/domemu
@@ -34,8 +37,9 @@ GPU).
 ```
 
 CI (`.github/workflows/ci.yml`) builds llama.cpp CPU-only at the pinned
-commit with `ci/llama-cpu.sh DIR` (cached on the commit) and runs vet, the
-build and the tests against it; `ci/llama-cpu.sh` + `LLAMA_DIR=DIR` is the
+commit with `ci/llama-cpu.sh DIR` (cached on the commit), checks out
+metis-lang at its pinned commit (`METIS_LANG_COMMIT`, the runtime build
+cached on it), and runs vet, the build and the tests against both; `ci/llama-cpu.sh` + `LLAMA_DIR=DIR` is the
 same thing locally.
 
 The model is the GGUF ollama holds for its tag (`~/.ollama/models/…`) or
