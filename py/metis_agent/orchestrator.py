@@ -1944,21 +1944,25 @@ class Orch:
 
     def keyword(self, person, j):
         self.q = None
-        _, voice = self.stop(self.head() + person)
+        _, voice = self.stop(person, head=True)
         if voice == LINE_NOTHING_RUNNING:
             self.say("template", voice)
 
-    def stop(self, person):
+    def stop(self, person, head=False):
         """The stop words' STOP (the architect's ruling, e2e step 4; Go
         Orch.Stop 2db8296): sent to the domain whose task is in flight, to
         every one if several (in the loaded order), never to a domain by
         position; with none in flight nothing is sent and the line says so.
         A J to a domain other than the one intent domain names it. The turn
-        is kept as the dialog's past. Returns (the J, the line)."""
+        is kept as the dialog's past — head: the mirror before the person's
+        words, as it stands after the STOP went out (the keyword path's; Go
+        4a359f6). Returns (the J, the line)."""
+        def said():
+            return self.head() + person if head else person
         base = Call(j='{"intent":"STOP"}')
         targets = [d for d in self.cfg.loaded if self.m.live_in(d)]
         if not targets:
-            self.past(person, base.j, "", LINE_NOTHING_RUNNING)
+            self.past(said(), base.j, "", LINE_NOTHING_RUNNING)
             return base.text(), LINE_NOTHING_RUNNING
         ids = self.cfg.intent_domains
         iid, j = "", base.text()
@@ -1976,7 +1980,7 @@ class Orch:
                 iid, j = r.id, c.text()
         if not iid:
             return j, ""
-        self.past(person, j, iid, ACK_TEMPLATE["STOP"])
+        self.past(said(), j, iid, ACK_TEMPLATE["STOP"])
         return j, ACK_TEMPLATE["STOP"]
 
     def cancel_first(self, q):
