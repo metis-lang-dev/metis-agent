@@ -30,10 +30,10 @@ func watched(name string) bool {
 		strings.HasSuffix(name, "-prompt.txt") || strings.HasSuffix(name, "-spoken.txt")
 }
 
-// snapshot is the directory's watched files (and intent/'s, packs/'s), by content.
+// snapshot is the directory's watched files (and intent/'s, extensions/'s), by content.
 func snapshot(dir string) map[string]string {
 	out := map[string]string{}
-	for _, d := range []string{dir, filepath.Join(dir, "intent"), filepath.Join(dir, "packs")} {
+	for _, d := range []string{dir, filepath.Join(dir, "intent"), filepath.Join(dir, "extensions")} {
 		es, _ := os.ReadDir(d)
 		for _, e := range es {
 			if e.IsDir() || !watched(e.Name()) {

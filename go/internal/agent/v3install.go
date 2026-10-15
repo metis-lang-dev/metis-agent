@@ -273,8 +273,8 @@ func (v *v3) reloadIntents(dom string) error {
 	return v.reprime("reload " + dom)
 }
 
-// catalogNames is the catalog's domains with a manifest, sorted, each with
-// its packs/*.llp (a pack added or removed changes the list's has.packs).
+// catalogNames is the catalog's domain packages, sorted, each with its
+// extensions (one added or removed changes the list's has.extensions).
 func catalogNames(root string) []string {
 	ms, err := catalog.Scan(root)
 	if err != nil {
@@ -282,20 +282,19 @@ func catalogNames(root string) []string {
 	}
 	var out []string
 	for n, m := range ms {
-		packs, _ := filepath.Glob(filepath.Join(m.Dir, "packs", "*.llp"))
-		for i, p := range packs {
-			packs[i] = filepath.Base(p)
+		exts := m.Extensions()
+		for i, p := range exts {
+			exts[i] = filepath.Base(p)
 		}
-		sort.Strings(packs)
-		out = append(out, n+"["+strings.Join(packs, " ")+"]")
+		out = append(out, n+"["+strings.Join(exts, " ")+"]")
 	}
 	sort.Strings(out)
 	return out
 }
 
 // relist runs the catalog's loader again when the catalog's domains or
-// their packs changed on disk (a domain made after the start: its row in
-// the console's list, activate installs it; a pack: has.packs); v.mu not held.
+// their extensions changed on disk (a domain made after the start: its row in
+// the console's list, activate installs it; an extension: has.extensions); v.mu not held.
 func (v *v3) relist(last *string) {
 	sc := v.sc
 	if sc.Root == "" || sc.Python == "" {

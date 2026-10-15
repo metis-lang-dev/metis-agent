@@ -1,9 +1,12 @@
-// Package catalog reads metis-catalog's domain manifests (domain-catalog
-// s-2a2bc758 step 2; metis-catalog CATALOG.md "domain.yaml"): the Go
-// backend's share of them — name, display, line, voice, the intent pass's
-// generated files, the clock, the pair — natively, and the console's list
-// through the catalog's own loader (`python -m metis_catalog list --json`),
-// so both backends list the same domains by the same rules.
+// Package catalog reads metis-catalog's domain packages (domain-catalog
+// s-2a2bc758 step 2, catalog-entry s-65dd0863 step 2; metis-catalog
+// CATALOG.md "domain.yaml"): the Go backend's share of each package's
+// manifest — display, line, voice, the intent spec and the generated files
+// at their fixed names, the extensions, the clock, the pair — natively and
+// by the loader's rules (the name is the directory's; an unknown key is
+// refused), and the console's list through the catalog's own loader
+// (`python -m metis_catalog list --json`), so both backends list the same
+// domains by the same rules.
 package catalog
 
 import (
@@ -19,10 +22,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Manifest is one domain.yaml (the keys the Go backend reads; the rest
-// are the py backend's and the consoles').
+// Manifest is one domain package's domain.yaml (the keys the Go backend
+// reads; the rest are the py backend's and the consoles').
 type Manifest struct {
-	Name    string `yaml:"name"`
+	Name    string `yaml:"-"` // the package's directory name
 	Display string `yaml:"display"`
 	Line    string `yaml:"line"`
 	Voice   string `yaml:"voice"`
@@ -31,13 +34,18 @@ type Manifest struct {
 	Host    string `yaml:"host"`
 	Agent   string `yaml:"agent"`
 	Intent  struct {
-		Spec     string            `yaml:"spec"`
-		Grammar  string            `yaml:"grammar"`
-		Prompt   string            `yaml:"prompt"`
-		Examples map[string]string `yaml:"examples"` // chat template → the pass-2 examples
-		Corpus   string            `yaml:"corpus"`
+		Spec string `yaml:"spec"`
+		// the generated files at their fixed names in intent/, set when
+		// present (relative to the package): <n>.gbnf, <n>-prompt.txt,
+		// {gemma4: <n>-spoken.txt}, <n>-corpus.tsv
+		Grammar  string            `yaml:"-"`
+		Prompt   string            `yaml:"-"`
+		Examples map[string]string `yaml:"-"` // chat template → the pass-2 examples
+		Corpus   string            `yaml:"-"`
 	} `yaml:"intent"`
-	Clock struct {
+	ExtensionList []string `yaml:"extensions"` // absent: extensions/*.llp in name order
+	Serves        []string `yaml:"serves"`
+	Clock         struct {
 		Beats int `yaml:"beats"`
 	} `yaml:"clock"`
 	Pair      []string `yaml:"pair"`
@@ -62,39 +70,152 @@ func (m Manifest) DisplayName() string {
 	return strings.TrimPrefix(strings.TrimPrefix(m.Display, "the "), "The ")
 }
 
-// Scan reads every domain.yaml under root/domains (and root/demo), by name.
+// Extensions are the package's extensions, in order: the manifest's
+// `extensions: [files]`, else extensions/*.llp beside it in name order —
+// each `extends` the program (py Domain.extensions()). Absolute paths.
+func (m Manifest) Extensions() []string {
+	if len(m.ExtensionList) > 0 {
+		out := make([]string, len(m.ExtensionList))
+		for i, x := range m.ExtensionList {
+			out[i] = m.Path(x)
+		}
+		return out
+	}
+	out, _ := filepath.Glob(filepath.Join(m.Dir, "extensions", "*.llp"))
+	sort.Strings(out)
+	return out
+}
+
+// Keys are the manifest's keys (metis_catalog KEYS); any other is refused.
+var Keys = []string{"program", "extensions", "serves", "host", "intent", "clock", "reload", "records",
+	"display", "line", "voice", "agent", "pair", "partner_of", "notch"}
+
+// CheckManifest reads one domain.yaml by the loader's rules (py
+// check_manifest): a mapping of the known keys only, intent {spec} only,
+// extensions/serves/pair lists, reload propose or auto. The name is the
+// package directory's; the generated intent files are found at their
+// fixed names.
+func CheckManifest(p string) (Manifest, error) {
+	var m Manifest
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return m, err
+	}
+	var raw map[string]any
+	if err := yaml.Unmarshal(b, &raw); err != nil {
+		return m, fmt.Errorf("%s: %w", p, err)
+	}
+	var bad []string
+	for k := range raw {
+		if !contains(Keys, k) {
+			bad = append(bad, k)
+		}
+	}
+	if bad != nil {
+		sort.Strings(bad)
+		return m, fmt.Errorf("%s: unknown key%s %s (the package's keys: %s)", p, plural(bad),
+			strings.Join(bad, ", "), strings.Join(Keys, ", "))
+	}
+	if i, ok := raw["intent"]; ok && i != nil {
+		im, ok := i.(map[string]any)
+		if !ok || im["spec"] == nil || im["spec"] == "" {
+			return m, fmt.Errorf("%s: intent is {spec: intent.yaml}", p)
+		}
+		var bad []string
+		for k := range im {
+			if k != "spec" {
+				bad = append(bad, k)
+			}
+		}
+		if bad != nil {
+			sort.Strings(bad)
+			return m, fmt.Errorf("%s: unknown intent key%s %s (intent is {spec}; the generated files sit at fixed names in intent/)",
+				p, plural(bad), strings.Join(bad, ", "))
+		}
+	}
+	for _, k := range []string{"extensions", "serves", "pair"} {
+		if v, ok := raw[k]; ok {
+			if _, list := v.([]any); !list {
+				return m, fmt.Errorf("%s: %s is a list", p, k)
+			}
+		}
+	}
+	if r, ok := raw["reload"]; ok && r != nil && r != "propose" && r != "auto" {
+		return m, fmt.Errorf("%s: reload is propose or auto", p)
+	}
+	if err := yaml.Unmarshal(b, &m); err != nil {
+		return m, fmt.Errorf("%s: %w", p, err)
+	}
+	m.Dir = filepath.Dir(p)
+	m.Name = filepath.Base(m.Dir)
+	if m.Intent.Spec != "" {
+		for _, f := range []struct {
+			dst  *string
+			name string
+		}{{&m.Intent.Grammar, m.Name + ".gbnf"}, {&m.Intent.Prompt, m.Name + "-prompt.txt"},
+			{&m.Intent.Corpus, m.Name + "-corpus.tsv"}} {
+			if isFile(filepath.Join(m.Dir, "intent", f.name)) {
+				*f.dst = filepath.Join("intent", f.name)
+			}
+		}
+		if sp := filepath.Join("intent", m.Name+"-spoken.txt"); isFile(filepath.Join(m.Dir, sp)) {
+			m.Intent.Examples = map[string]string{"gemma4": sp}
+		}
+	}
+	return m, nil
+}
+
+func isFile(p string) bool {
+	st, err := os.Stat(p)
+	return err == nil && st.Mode().IsRegular()
+}
+
+func plural(xs []string) string {
+	if len(xs) > 1 {
+		return "s"
+	}
+	return ""
+}
+
+func contains(xs []string, s string) bool {
+	for _, x := range xs {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
+// Scan reads every domain package under root/domains (a domain.yaml in its
+// directory), by name — the directory's; a name twice is an error.
 func Scan(root string) (map[string]Manifest, error) {
 	out := map[string]Manifest{}
-	for _, top := range []string{"domains", "demo"} {
-		base := filepath.Join(root, top)
-		if _, err := os.Stat(base); err != nil {
-			continue
-		}
-		err := filepath.WalkDir(base, func(p string, d fs.DirEntry, err error) error {
-			if err != nil || d.IsDir() || d.Name() != "domain.yaml" {
-				return err
-			}
-			b, err := os.ReadFile(p)
-			if err != nil {
-				return err
-			}
-			var m Manifest
-			if err := yaml.Unmarshal(b, &m); err != nil {
-				return fmt.Errorf("%s: %w", p, err)
-			}
-			if m.Name == "" {
-				return fmt.Errorf("%s: no name", p)
-			}
-			if prev, dup := out[m.Name]; dup {
-				return fmt.Errorf("domain %q in two manifests: %s and %s", m.Name, prev.Dir, filepath.Dir(p))
-			}
-			m.Dir = filepath.Dir(p)
-			out[m.Name] = m
-			return nil
-		})
+	base := filepath.Join(root, "domains")
+	if _, err := os.Stat(base); err != nil {
+		return out, nil
+	}
+	err := filepath.WalkDir(base, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil, err
+			return err
 		}
+		if d.IsDir() && (d.Name() == ".git" || d.Name() == "__pycache__") {
+			return filepath.SkipDir
+		}
+		if d.IsDir() || d.Name() != "domain.yaml" {
+			return nil
+		}
+		m, err := CheckManifest(p)
+		if err != nil {
+			return err
+		}
+		if prev, dup := out[m.Name]; dup {
+			return fmt.Errorf("domain %q twice: %s and %s", m.Name, prev.Dir, m.Dir)
+		}
+		out[m.Name] = m
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	return out, nil
 }

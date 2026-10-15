@@ -10,8 +10,9 @@ import (
 // Several intent domains (e2e-workflow s-143c3088 step 4, the architect's
 // ruling; DESIGN v3's J interface): the orchestrator dispatches to a
 // domain, and THAT domain's intent material maps the words. Each domain's
-// material is its manifest's (intent.prompt, intent.examples[template],
-// intent.grammar: generated from its intent.yaml). With one intent domain
+// material is its package's (intent/<n>-prompt.txt, the template's
+// examples <n>-spoken.txt, the grammar <n>.gbnf: generated from its
+// intent.yaml, found at those fixed names). With one intent domain
 // the system turn and the person turn's grammar are that domain's, byte for
 // byte as before; with two or more, every J names its domain first —
 // {"domain":"plant","intent":"WATER"} — under one grammar whose branches

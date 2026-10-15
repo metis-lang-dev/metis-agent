@@ -17,8 +17,9 @@ llm:
     template: gemma4
     pass2: {temperature: 0.4, top_k: 40, max_tokens: 50}
 # the catalog (metis-catalog, CATALOG.md "domain.yaml"): the intent material
-# of every served domain that has it (intent.prompt, examples for the template
-# above, grammar: generated from its intent.yaml, re-read after a reload) —
+# of every served domain that has it (intent/<n>-prompt.txt, the examples for
+# the template above, the grammar <n>.gbnf: generated from its intent.yaml at
+# those fixed names, re-read after a reload) —
 # the system turn opens with it and the person turn's grammar is made of it
 # (e2e-workflow step 4: one intent domain, its own; several, every J names its
 # domain); the domains' display names, clocks, partners and watched
@@ -82,7 +83,7 @@ v3:
     install:
         into: agents
     # the reload policy when a served domain's files change on disk (human-loop
-    # step 2; every served domain's manifest directory is watched, packs/ too):
+    # step 2; every served domain's package directory is watched, extensions/ too):
     # propose (the default: the band says STALE, the chat proposes the reload)
     # | auto (reloaded at the domain's next quiet tick with no task); one word
     # for all, or {name: policy}, over each manifest's reload:

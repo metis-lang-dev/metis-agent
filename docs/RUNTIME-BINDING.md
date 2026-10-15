@@ -48,15 +48,15 @@ way:
   It is **the binding's first test**: the committed goldens through cgo
   must give the same IR PARITY 46/46 that `ci/check.sh` gives natively.
 
-## 2. The artifact: one directory, one loader, one Program
+## 2. The bundle: one directory, one loader, one Program
 
 metispy compiles (the cover, per the ruling). A new metispy emitter writes,
-per domain, **the served program after its packs are merged** (the
-`apply_packs` union, so the key is the union's):
+per domain, **the served program with its extensions merged** (the
+`apply_extensions` union, so the key is the union's):
 
 ```
 domains/<n>/build/<n>.metis/
-  ground.wire       N/E/I/S/B — the existing product ground wire (kernel/wire.py emit_artifact): events c/o/p, stages, init, steps, the B port manifest
+  ground.wire       N/E/I/S/B — the existing product ground wire (kernel/wire.py emit_artifact; Go reads it as data too, rt.ReadWire: the event table and the canonical body): events c/o/p, stages, init, steps, the B port manifest
   sidecar.json      what the RUN rows need beyond the wire (below)
   program.ir        the product IR (kernel/ir.py) — OPTIONAL: marginals and the planner (IrEvaluator); no RUN row needs it
 ```
@@ -66,7 +66,7 @@ domains/<n>/build/<n>.metis/
 ```json
 {"format": "metis-sidecar/1",
  "key": "<program key of the union>",              // row 2: records, replies, the KV prefix cache
- "packs": ["visitor.llp"],                         // row 3: what was merged, in order
+ "extensions": ["visitor.llp"],                    // row 3: what was merged, in order
  "stages": ["main", "…"],                          // the wire's stage indices by name
  "events": [{"i": 0, "name": "dry_out", "kind": "clause", "line": "The sun has been on me for a while; my soil dries out."}],
                                                    // row 4: each event's %% line (the rule's doc, _words applied)
@@ -111,7 +111,7 @@ Every K item is a method on it. The references:
 | **K4** projection from a given state | `ForwardProjection(prog, State from, steps, policy)` (a constructor beside the init one) · `metis_rt_likelihood(rt, from_snapshot, steps, observed)` | P(observed \| the program, from the checkpoint state, over the steps since): what `surprise_record` computes (`kernel/record.py:39-71`), so the watch's surprise test and the record's likelihood. **From `init` it is the existing projection exactly** | the identity, `from = init` equals today's projection (IR PARITY unchanged). **New golden:** metispy's likelihoods on the recorded surprises, the plant's visitor (moist +1, dry −1) and the kitchen's `partner_load`, from their records' `init` and `steps` |
 | (B) weights | `metis_rt_bind_weight(rt, port, fn, user)` | the existing `Registry` weight binding (`registry.hpp:181`), a C function pointer. Go binds through one `//export` trampoline. A device host in C++ binds its `std::function` directly | metispy's `PortPricer` on the kitchen pair (`w_partner`): the priced tier equals |
 | (B) the event observer | `metis_rt_on_event(rt, fn, user)` | called after every fired or applied row with the Event: **the trace callback, with the event as its payload**, beside the slice `Observer` (`kernel.hpp:116`), which is unchanged | the K1 golden, observed rather than polled |
-| (B) reload | `metis_rt_reload(rt, dir)` | the hot swap with degrade-to-last-good (`Evaluator::reload`'s contract, `evaluator.hpp:68-97`): a new artifact or an error, the old one serving on. The state is not carried (agent/py does not carry it either, `Process.reload`) | the old one answers after a failed reload; the key moves |
+| (B) reload | `metis_rt_reload(rt, dir)` | the hot swap with degrade-to-last-good (`Evaluator::reload`'s contract, `evaluator.hpp:68-97`): a new bundle or an error, the old one serving on. The state is not carried (agent/py does not carry it either, `Process.reload`) | the old one answers after a failed reload; the key moves |
 
 **Explain needs no K (the step-2 list's K5 drops out).** Reading metispy's
 `explain` closely, it has two parts, both harness work over K1/K2:
@@ -213,7 +213,7 @@ template plus the cards' moves). On the dog, the plant and the kitchen pair:
 - `py`: today's py domain agent processes. It stays the default and the
   reference;
 - `cgo`: the Go domain agent in-process over `go/internal/rt`, on the
-  artifacts built from the same catalog.
+  bundles built from the same catalog.
 
 The journals of both modes are diffed in CI on the scripted days.
 
@@ -228,7 +228,7 @@ The journals of both modes are diffed in CI on the scripted days.
   - the new K1–K4 goldens.
 
   `ci/check.sh` is unchanged and must stay ALL GATES GREEN.
-- **metispy CI**: the emitter's golden (the three domains' artifact
+- **metispy CI**: the emitter's golden (the three domains' bundle
   directories re-emitted, diffed clean) and the K-golden generators.
 - **metis-agent CI** (the Go job, as llama.cpp is pinned):
   - check out metis-lang at a pinned commit;
@@ -254,9 +254,9 @@ The journals of both modes are diffed in CI on the scripted days.
      side that owns the generator, the goldens' contract.
 
    Gate: `ci/check.sh` ALL GATES GREEN, ctest green.
-2. **The artifact.** metispy's emitter (`python -m metis.kernel.artifact
-   <name> -o <dir>`: ground.wire + sidecar.json + program.ir, the packs
-   merged), its golden on the dog, the plant and the kitchen pair, and
+2. **The bundle.** metispy's emitter (`python -m metis.kernel.artifact
+   <name> -o <dir>`: ground.wire + sidecar.json + program.ir, the
+   extensions merged), its golden on the dog, the plant and the kitchen pair, and
    `domains/<n>/build/` git-ignored in metis-catalog.
 3. **K1 + K2.**
    - `metis::Live` with the normative sampler moved into `sampler.hpp`,
@@ -290,8 +290,8 @@ The journals of both modes are diffed in CI on the scripted days.
      checked against metispy's on the kitchen and the plant);
    - the sink with the JSON env, the ports reply, the pair scene;
    - the narrator fed by `OnEvent`, the template consult;
-   - **reload = rebuild the artifact** through metispy's emitter from the
-     program plus its packs, then `Reload` (the architect's note at
+   - **reload = rebuild the bundle** through metispy's emitter from the
+     program plus its extensions, then `Reload` (the architect's note at
      step 3), so the human loop's `apply` reaches the device.
 4. **Parity without a model.** py's reply streams with the template seat on
    the scripted days, diffed against Go's.

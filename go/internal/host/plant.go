@@ -7,7 +7,7 @@ import (
 
 // The plant (metis-catalog domains/plant/plant_host.py): the sun dries the
 // soil every SunEvery beats while it is moist; VisitorAfter dry beats on a
-// visitor waters it — reported as +visitor a beat before (the pack's
+// visitor waters it — reported as +visitor a beat before (the extension's
 // trigger), off-model otherwise: the surprise.
 const (
 	PlantSunEvery     = 6

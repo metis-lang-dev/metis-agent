@@ -26,18 +26,18 @@ type SidecarEvent struct {
 
 // Sidecar is what the harness needs beyond the wire (docs/RUNTIME-BINDING.md §2).
 type Sidecar struct {
-	Format  string          `json:"format"`
-	Catalog string          `json:"catalog"`
-	Key     string          `json:"key"`
-	Packs   []string        `json:"packs"`
-	Init    map[string]int  `json:"init"`
-	Steps   int             `json:"steps"`
-	Stages  []string        `json:"stages"`
-	Events  []SidecarEvent  `json:"events"`
-	Cards   json.RawMessage `json:"cards"`
-	Queries []string        `json:"queries"`
-	Script  json.RawMessage `json:"script"`
-	IR      *string         `json:"ir"`
+	Format     string          `json:"format"`
+	Catalog    string          `json:"catalog"`
+	Key        string          `json:"key"`
+	Extensions []string        `json:"extensions"`
+	Init       map[string]int  `json:"init"`
+	Steps      int             `json:"steps"`
+	Stages     []string        `json:"stages"`
+	Events     []SidecarEvent  `json:"events"`
+	Cards      json.RawMessage `json:"cards"`
+	Queries    []string        `json:"queries"`
+	Script     json.RawMessage `json:"script"`
+	IR         *string         `json:"ir"`
 }
 
 // Program is a loaded artifact: the live handle on its ground.wire and

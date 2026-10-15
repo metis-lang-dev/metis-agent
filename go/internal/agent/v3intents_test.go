@@ -205,13 +205,13 @@ func TestReloadPolicy(t *testing.T) {
 	}
 }
 
-// packs/ is watched with the directory (human-loop step 2).
-func TestSnapshotTakesPacks(t *testing.T) {
+// extensions/ is watched with the directory (human-loop step 2).
+func TestSnapshotTakesExtensions(t *testing.T) {
 	d := t.TempDir()
-	_ = os.MkdirAll(d+"/packs", 0o755)
+	_ = os.MkdirAll(d+"/extensions", 0o755)
 	_ = os.WriteFile(d+"/plant.llp", []byte("a"), 0o644)
-	_ = os.WriteFile(d+"/packs/visitor.llp", []byte("b"), 0o644)
-	if s := snapshot(d); s["plant.llp"] != "a" || s["packs/visitor.llp"] != "b" {
+	_ = os.WriteFile(d+"/extensions/visitor.llp", []byte("b"), 0o644)
+	if s := snapshot(d); s["plant.llp"] != "a" || s["extensions/visitor.llp"] != "b" {
 		t.Fatalf("%v", s)
 	}
 }

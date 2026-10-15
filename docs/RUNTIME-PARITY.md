@@ -44,7 +44,7 @@ stack; agent/go runs the domain models those developments produce.
 
 | RUN (device) | DESIGN (development stack only) |
 |---|---|
-| load the artifact; the key, the `%%` lines, the cards and the merged packs as the artifact's sidecars (C) | compile, gate/accept, formalize, mine, revise (metispy, the loop) |
+| load the bundle; the key, the `%%` lines, the cards and the merged extensions in the bundle's sidecar (C) | compile, gate/accept, formalize, mine, revise (metispy, the loop) |
 | step one thing on the live state with the normative sampler; enabled events; do-lines as deltas; stages and the host tick (K core) | the cone's design uses (the loop's mining, the console's graph) |
 | the host faces as a Go/C PortPlugin (tick, on_event, observe, snapshot, restore) — the hosts out of Python, or a C ABI so a device host is C++ | `recover` / `replay` of records (the loop's "fixed: true") |
 | the surprise test from the checkpoint; the surprise record; the open-surprise gate; `explain(card, move)` (fire a card's move on the live state); `reset`; `escalate` with mined text; the operator resume | the counterfactual consult tools: `necessity`, `sufficiency`, `graph`, `narrate`, `whatif` (on the device the consult is the harness's template + the cards' moves; they come into RUN with the one-model shape, go-domain-agent step 6) |
@@ -226,7 +226,7 @@ snapshot as JSON data, written and read by py and Go alike; the pickle goes.
 |---|---|---|---|---|---|---|
 | 1 | load the program (`Repl(CATALOG…)`: parse, compile, ground) | **RUN**: load the artifact · DESIGN: the compile | `load_program` (loader.hpp:40), `load_ir_artifact` (ir.hpp:604) | load present | C + B | |
 | 2 | the program key (`repl.key`) | **RUN** | missing | missing | C + B | the KV prefix cache keys on it |
-| 3 | packs merged (`apply_packs`: gate, accept) | **RUN**: the merged artifact · DESIGN: gate/accept | missing in the runtime | right so | C | admitted at build |
+| 3 | extensions merged (`apply_extensions`: gate, accept) | **RUN**: the merged bundle · DESIGN: gate/accept | missing in the runtime | right so | C | admitted at build |
 | 4 | each rule's `%%` line (`rule_docs`) | **RUN** | missing in both wires | missing | C (+ K: accept a doc record, or H: a sidecar) | the narrator, the replier's text and reason |
 | 5 | the script of cards (`cards.script`) | **RUN** | missing | missing | C + H | the narrator's prompt / RAG |
 | 6 | cards and their moves (`cards`, `card_program`) | **RUN** | missing | missing | C + K5 | `explain` fires a card's move |
