@@ -76,6 +76,38 @@ its OCaml-authoritative semantics checked) and `go-domain-agent` (opus, nina
 reviews parity: the H rows, the JSON env on both stacks, a device host
 contract). Not before the re-cut matrix below carries the RUN/DESIGN column.
 
+## Step 2.1 — the existing gates, verified before any runtime change (opus, 2026-10-15)
+
+The user's precondition was that, before any C++ IR functionality changes,
+CI and the py ↔ C++ IR parity have not degraded. Each gate is listed with
+its command and result. **All green**: nothing has degraded, and the
+runtime work may start.
+
+| gate | command (where) | result |
+|---|---|---|
+| metis-lang, all gates at HEAD 8d60203 (local) | `make -C src metisc && sh ci/check.sh` (metis-lang/) | **ALL GATES GREEN**: corpus roundtrip, symbolic parity, canonical keys, **IR PARITY 46/46 (12 cases)**, **SAMPLE PARITY 43/43 (5 cases)**, embedded directives, Horn facts, constants, structured diagnostics |
+| metis-lang CI at HEAD | GitHub `ci` run 38576985519 on 8d60203; `formal (Lean)` 38245649519 | success · success |
+| metispy CI at HEAD 245715b | GitHub `ci` 38706708943 (fast suite) · `parity (metisc)` 38706708942 | success: 391 passed, 6 skipped · success: 4 passed |
+| metispy parity tests against the references, run for real | `pytest -rs tests/test_oracle_parity.py tests/test_ocaml_parity.py tests/test_cpp_parity.py tests/test_sample_parity.py tests/test_ground_parity.py tests/test_refsample.py tests/test_ir_debug.py` (metispy/, the agent's venv) | **20 passed, 0 skipped**. The wayplan ll2pg oracle (`tests/oracle.py`) is found at the `repo/perotheia/chariot_ws/packages/wayplan/py` layout, so `test_oracle_parity` runs |
+| the C++ runtime tools on current artifacts | inside `test_cpp_parity.py` (5) and `test_sample_parity.py` (3): each tool compiled with g++ -std=c++17 and run on artifacts metispy generates now (`gen_ir_artifact`, `gen_fw_artifact`, the goldens) | **all pass**: `metis_run` (both corpora, run_goldens), `fw_smoke` (loader, blackboard, observer), `budget_smoke` (max_states), `evaluator_smoke`, `ir_eval_smoke` (the likelihood-0 surprise op), `sample_run` (the normative sampler, the goldens current) |
+| metispy heavy parity gates (`-m slow`: golden corpus, differential) — **the ones that skipped silently** | `pytest -rs -m slow --ignore=tests/kitchen -k "not sumo"` | with the agent's venv: 15 passed, **9 skipped (pyRDDLGym / rddlrepository not installed)**. In a venv with `pyRDDLGym rddlrepository`: **24 passed, 0 skipped** (5 min) |
+| metispy's CI recipe, full fast suite (the scoped flake rerun, CI.md D2) | `pytest -q -m "not slow" --ignore=tests/kitchen -k "not sumo" --reruns 2 --only-rerun OSError` (venv with `pytest-rerunfailures pgmpy`) | **398 passed, 0 skipped** (twice). Without the rerun, 2 failed, both the known bus FIFO `ENXIO` flake; in one of four runs it outlasted 2 reruns |
+
+**What was skipping, and where it still does:**
+- **GitHub CI never runs the 24 `slow` gates.** `ci.yml` deselects them,
+  and `parity.yml` runs 4 tests. The RDDL differential gates also need
+  pyRDDLGym, which is not a declared test dependency.
+- **CI's fast suite skips 6.** These are most likely the wayplan oracle,
+  which isn't on the runner, plus pgmpy; the log does not print `-rs`.
+- **The bus FIFO flake** is quarantined as designed, but it can exceed 2
+  reruns.
+- **Recommended, before the runtime changes land:**
+  - a nightly `slow` job with `pyRDDLGym rddlrepository` declared in
+    `[test]`;
+  - `-rs` in CI so skips are named;
+  - the wayplan oracle either vendored as a fixture or named as a
+    host-only gate.
+
 ## Step 2 — the re-cut (opus): the corrections checked against the record
 
 The ruling's four corrections were checked against every repo's history:
