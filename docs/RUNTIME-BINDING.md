@@ -247,6 +247,11 @@ The journals of both modes are diffed in CI on the scripted days.
    - metis-lang CI builds it;
    - **`metis_rt_conformance` is the first ctest gate** (the goldens
      through the C ABI, 46/46).
+   - **the smokes' fw/IR fixtures are committed** into metis-lang, each
+     with a header line naming the metispy commit and its generator
+     file's hash (the architect's ruling), so ctest runs without Python.
+     metispy's CI regenerates them and diffs clean: drift is caught on the
+     side that owns the generator, the goldens' contract.
 
    Gate: `ci/check.sh` ALL GATES GREEN, ctest green.
 2. **The artifact.** metispy's emitter (`python -m metis.kernel.artifact
