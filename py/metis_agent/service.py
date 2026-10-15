@@ -624,11 +624,9 @@ class Live:
         self.turn_at = at if at is not None else time.time()
         try:
             if O.keyword_stop(text, self.stop_words):
-                j = '{"intent":"STOP"}'
-                r, _ = self.intent(O.Call(j=j))
-                self.o.past(text, j, r.id, O.ACK_TEMPLATE["STOP"])
-                voice = O.ACK_TEMPLATE["STOP"]
-                say = self.journal.say_rec("turn", voice)
+                # to the domains whose tasks are in flight; none: "Nothing is running." (e2e step 4 ruling)
+                j, voice = self.o.stop(text)
+                say = self.journal.say_rec("turn", voice) if voice else 0
                 self.handle_due(-1, [])
                 self.push_catalog()
                 return j, voice, say

@@ -446,3 +446,42 @@ def test_a_domains_asking_verbs_are_never_judged_talk(tmp_path):
     o0 = O.Orch(O.V3Config(), FakeLLM(), None)
     assert o0.is_ask(J('{"intent":"QUERY"}')) and not o0.is_ask(J('{"intent":"CHECK"}'))
     assert O.asks_of([]) is None
+
+
+def test_stop_goes_where_tasks_run():
+    """The stop words (the architect's ruling; Go's TestStopGoesWhereTasksRun,
+    2db8296): STOP to the domains whose tasks are in flight, never by
+    position; none in flight: nothing sent, "Nothing is running."; one
+    intent domain: its STOP untagged, as before."""
+    from metis_agent import orchestrator as O
+
+    class Rec:
+        def __init__(self):
+            self.sent = []
+
+        def intent(self, c):
+            self.sent.append(c.text())
+            d = O.j_domain(c) or "dog"
+            return O.Reply({"domain": d, "kind": "result", "id": "s" + d, "status": "accepted"}), True
+    dom = Rec()
+    o = O.Orch(O.V3Config(loaded=["dog", "kitchen", "plant"], intent_domains=["dog", "plant"], mirror=True), FakeLLM(), dom)
+    assert o.stop("stop") == ('{"intent":"STOP"}', "Nothing is running.") and dom.sent == []
+    o.m.see(O.Reply({"domain": "plant", "kind": "result", "id": "c2", "status": "accepted"}), O.Call(j='{"domain":"plant","intent":"WATER"}'))
+    _, voice = o.stop("stop")
+    assert voice == O.ACK_TEMPLATE["STOP"] and dom.sent == ['{"domain":"plant","intent":"STOP"}']
+    dom.sent = []
+    o.m.see(O.Reply({"domain": "dog", "kind": "result", "id": "c3", "status": "accepted"}), O.Call(j='{"domain":"dog","intent":"FIND"}'))
+    o.stop("halt")
+    assert dom.sent == ['{"domain":"dog","intent":"STOP"}', '{"domain":"plant","intent":"STOP"}']
+    dom.sent = []
+    o1 = O.Orch(O.V3Config(loaded=["dog"], intent_domains=["dog"], mirror=True), FakeLLM(), dom)
+    o1.m.see(O.Reply({"domain": "dog", "kind": "result", "id": "c1", "status": "accepted"}), O.Call(j='{"intent":"FIND"}'))
+    o1.stop("stop")
+    assert dom.sent == ['{"intent":"STOP"}']
+
+
+def test_the_stop_words_with_nothing_running_send_nothing(tmp_path):
+    lv, _ = live(tmp_path)
+    n = len(recs(lv, "dlg-dispatch"))
+    j, voice, _ = lv.utterance("stop", time.time())
+    assert voice == "Nothing is running." and len(recs(lv, "dlg-dispatch")) == n

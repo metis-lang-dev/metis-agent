@@ -769,6 +769,9 @@ def asks_of(ds):
     return {d.name: list(d.asks) for d in ds if d.asks}
 
 
+LINE_NOTHING_RUNNING = "Nothing is running."     # the stop words with no task in flight anywhere
+
+
 def installed_cards(turn, catalog, lines):
     """The system turn's "## Domains" card list written from the catalog's
     display lines (v3text.go InstalledCards; the manifests are the source,
@@ -1940,15 +1943,41 @@ class Orch:
         self.activated(d)
 
     def keyword(self, person, j):
-        c = Call(j=j)
-        r, ok = self.dom.intent(c)
-        if not ok:
-            return
-        self.by_id[r.id] = c
-        self.quiet[r.id] = True
-        self.m.see(r, c)
         self.q = None
-        self.past(self.head() + person, c.j, r.id, ACK_TEMPLATE["STOP"])
+        _, voice = self.stop(self.head() + person)
+        if voice == LINE_NOTHING_RUNNING:
+            self.say("template", voice)
+
+    def stop(self, person):
+        """The stop words' STOP (the architect's ruling, e2e step 4; Go
+        Orch.Stop 2db8296): sent to the domain whose task is in flight, to
+        every one if several (in the loaded order), never to a domain by
+        position; with none in flight nothing is sent and the line says so.
+        A J to a domain other than the one intent domain names it. The turn
+        is kept as the dialog's past. Returns (the J, the line)."""
+        base = Call(j='{"intent":"STOP"}')
+        targets = [d for d in self.cfg.loaded if self.m.live_in(d)]
+        if not targets:
+            self.past(person, base.j, "", LINE_NOTHING_RUNNING)
+            return base.text(), LINE_NOTHING_RUNNING
+        ids = self.cfg.intent_domains
+        iid, j = "", base.text()
+        for d in targets:
+            c = base
+            if len(ids) > 1 or (len(ids) == 1 and d != ids[0]):
+                c = tag_call(base, d)
+            r, ok = self.dom.intent(c)
+            if not ok:
+                continue
+            self.by_id[r.id] = c
+            self.quiet[r.id] = True             # its ack is the turn's line; its outcome the journal's
+            self.m.see(r, c)
+            if not iid:
+                iid, j = r.id, c.text()
+        if not iid:
+            return j, ""
+        self.past(person, j, iid, ACK_TEMPLATE["STOP"])
+        return j, ACK_TEMPLATE["STOP"]
 
     def cancel_first(self, q):
         c = Call(j='{"intent":"' + q.alt + '"}')
