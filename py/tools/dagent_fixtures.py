@@ -324,9 +324,12 @@ def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None):
             n0 = agent.sink.read_text().count("\n") if agent.sink.exists() else 0
             sink0(k, status, **extra)
             lines = agent.sink.read_text().splitlines() if agent.sink.exists() else []
+            new = [json.loads(x) for x in lines[n0:]]
+            for x in new:                  # the clock and the scratch path aside: regenerates byte-equal
+                x["ts"] = x["close"]["ts"] = "TS"
+            sunk = [dict(x, file="records/fixture.jsonl") for x in agent.sunk[-1:]] if new else []
             watchcalls.append({"call": "sink", "k": k, "status": status, "extra": extra,
-                               "lines": [json.loads(x) for x in lines[n0:]],
-                               "sunk": agent.sunk[-1:] if len(lines) > n0 else []})
+                               "lines": new, "sunk": sunk})
         agent.sink_record = sink_record
     r = agent.replier
     calls = [{"call": "setup", "domain": r.domain, "docs": dict(r.docs), "outcomes": dict(r.outcomes),
