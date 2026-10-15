@@ -561,18 +561,15 @@ class DomainAgent:
         except (TypeError, ValueError, IndexError):
             return
         env = rec.get("env")
-        if isinstance(env, dict) and "blob" in env and hasattr(self.host, "inner"):
+        if isinstance(env, dict) and "data" in env and hasattr(self.host, "inner"):
             # the generic agent's AgentHost wraps the catalog's host: the
             # sunk record carries the catalog host's own snapshot, the one
             # the loop's REPL restores (`metis --plugin <host> <name>.llp`,
-            # record N, replay), not the wrapper's (inner, queues) pair
-            from metis.kernel.record import env_record, env_unblob
-            try:
-                snap = env_unblob(env)
-                if isinstance(snap, tuple) and len(snap) == 2:
-                    rec["env"] = env_record(snap[0])
-            except Exception as e:  # noqa: BLE001 — the record as it is; the replay says MISMATCH
-                print("[records] env of record %s: %s" % (k, e), file=sys.stderr)
+            # record N, replay), not the wrapper's {host, queues}
+            from metis.kernel.record import env_record
+            data = env["data"]
+            if isinstance(data, dict) and "host" in data:
+                rec["env"] = env_record(data["host"])
         now = time.strftime("%Y-%m-%dT%H:%M:%S%z")
         line = {**rec, "record": k, "domain": self.name, "session": self.session, "ts": now,
                 "catalog_hash": self.repl.key,

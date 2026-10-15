@@ -129,9 +129,15 @@ class AgentHost:
             self.inner.due = tuple(due)
 
     def snapshot(self):
-        return (self.inner.snapshot(), copy.deepcopy((self.queue, self.inflight, self.acted, self.world_lines,
-                                                      getattr(self, "live_waits", set()))))
+        """The neutral JSON env (metis.kernel.record): the catalog host's own
+        snapshot under "host", the queues beside it (the waits as sorted pairs)."""
+        return {"host": self.inner.snapshot(),
+                **copy.deepcopy({"queue": self.queue, "inflight": self.inflight, "acted": self.acted,
+                                 "world_lines": self.world_lines}),
+                "live_waits": sorted([b, d] for b, d in getattr(self, "live_waits", set()))}
 
     def restore(self, snap):
-        self.inner.restore(snap[0])
-        self.queue, self.inflight, self.acted, self.world_lines, self.live_waits = copy.deepcopy(snap[1])
+        self.inner.restore(snap["host"])
+        self.queue, self.inflight, self.acted, self.world_lines = copy.deepcopy(
+            [snap["queue"], snap["inflight"], snap["acted"], snap["world_lines"]])
+        self.live_waits = {(b, d) for b, d in snap["live_waits"]}
