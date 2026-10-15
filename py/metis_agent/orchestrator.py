@@ -593,10 +593,11 @@ def repl_api(catalog, loaded):
 # the domains' grammars, so the pick and the intent are one generation.
 
 class IntentDomain:
-    __slots__ = ("name", "display", "prompt", "grammar")
+    __slots__ = ("name", "display", "prompt", "grammar", "asks")
 
-    def __init__(self, name, display, prompt, grammar):
+    def __init__(self, name, display, prompt, grammar, asks=()):
         self.name, self.display, self.prompt, self.grammar = name, display, prompt, grammar
+        self.asks = list(asks or ())     # its verbs that ask the domain something (intent.yaml asks:)
 
     def __eq__(self, o):
         return isinstance(o, IntentDomain) and all(getattr(self, k) == getattr(o, k) for k in self.__slots__)
@@ -758,6 +759,14 @@ def intent_grammar(ds):
         alts.append(p + "root")
         rules.append(g if g.endswith("\n") else g + "\n")
     return "root ::= " + " | ".join(alts) + "\n" + "".join(rules)
+
+
+def asks_of(ds):
+    """Per intent domain its asking verbs (Go asksOf); None with no intent
+    material (the E13 fixtures: the dog's QUERY)."""
+    if not ds:
+        return None
+    return {d.name: list(d.asks) for d in ds if d.asks}
 
 
 def installed_cards(turn, catalog, lines):
@@ -1031,11 +1040,15 @@ def unspeakable_line(t):
 class V3Config:
     def __init__(self, catalog=(), loaded=(), display=None, ask_check=False, again_pick=False,
                  escalate_template=False, mirror=False, rollback=False, sample_moves=False,
-                 on_gen=None, on_say=None, defer=None, intent_domains=()):
+                 on_gen=None, on_say=None, defer=None, intent_domains=(), asks=None):
         self.catalog, self.loaded, self.display = list(catalog), list(loaded), dict(display or {})
         # the served domains with intent material; two or more: every J names
         # its domain, an alternative a domain offers is named for it
         self.intent_domains = list(intent_domains)
+        # per intent domain its verbs that ask (intent.yaml asks:): words in
+        # question form mapped to one are the domain's question, never talk;
+        # None: no intent material (the dog's QUERY)
+        self.asks = None if asks is None else dict(asks)
         self.ask_check, self.again_pick, self.escalate_template = ask_check, again_pick, escalate_template
         self.mirror, self.rollback, self.sample_moves = mirror, rollback, sample_moves
         self.on_gen, self.on_say, self.defer = on_gen, on_say, defer
@@ -1382,7 +1395,7 @@ class Orch:
             clock, talk = clock_line(verb), True
             if q is not None:
                 self.q, q = q, None
-        if c.is_j() and not talk and verb not in ("QUERY", "STOP", "CANCEL") and wds.endswith("?"):
+        if c.is_j() and not talk and not self.is_ask(c) and verb not in ("STOP", "CANCEL") and wds.endswith("?"):
             self.w("\n" + cue_info(c) + "\n")
             cls, _ = self.gen_capture("answer", GRAMMAR_INFO, b)
             if '"info"' in cls:
@@ -1895,6 +1908,17 @@ class Orch:
     def activated(self, d):
         self.q_heard.pop(d, None)
 
+    def is_ask(self, c):
+        """The J asks its domain something (Go isAsk): a verb its domain lists
+        under asks:; with no intent material configured, the dog's QUERY."""
+        v = c.verb()
+        if self.cfg.asks is None:
+            return v == "QUERY"
+        d = j_domain(c)
+        if not d and self.cfg.intent_domains:
+            d = self.cfg.intent_domains[0]
+        return v in self.cfg.asks.get(d, [])
+
     def restart_dialog(self, n, cfg):
         """The dialog begun again at a new system turn of n tokens (Go's
         restartDialog: a hot-install's card and enum): the harness's state
@@ -1903,6 +1927,7 @@ class Orch:
         self.open, self.said, self.n_past = False, None, n
         self.cfg.catalog, self.cfg.loaded, self.cfg.display = list(cfg.catalog), list(cfg.loaded), dict(cfg.display)
         self.cfg.intent_domains = list(cfg.intent_domains)
+        self.cfg.asks = None if cfg.asks is None else dict(cfg.asks)
         self.api = repl_api(cfg.catalog, cfg.loaded)
 
     def reloaded(self, d):

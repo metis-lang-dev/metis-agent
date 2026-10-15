@@ -429,3 +429,20 @@ def test_a_surprise_open_refusal_is_relayed_never_escalated(tmp_path):
     assert len(wakes) == 2 and all("I take no new orders until it is closed" in (w.get("text") or "") for w in wakes)
     assert picked == [("speak", ""), ("speak", "")]                          # never "again" → escalate
     assert not [r for r in recs(lv, "dlg-wire") if r.get("what") == "tool"]   # no consult, no escalate
+
+
+def test_a_domains_asking_verbs_are_never_judged_talk(tmp_path):
+    """asks: (the architect's ruling b, Go's isAsk): the verbs an intent.yaml
+    lists under asks: are the domain's questions — "how is the plant?" →
+    CHECK is dispatched, never judged info/talk. Per domain (the J's, or the
+    first intent domain untagged); with no intent material, the dog's QUERY."""
+    from metis_agent import orchestrator as O
+    cfg = S.load_config(ROOT / "py/config.live.yaml")
+    assert [x.asks for x in S.intents_of(cfg["domains"]["names"])] == [["QUERY"]]   # the dog's file says so
+    o = O.Orch(O.V3Config(intent_domains=["dog", "plant"], asks={"dog": ["QUERY"], "plant": ["CHECK"]}), FakeLLM(), None)
+    J = lambda t: O.Call(j=t)                                                        # noqa: E731
+    assert o.is_ask(J('{"domain":"plant","intent":"CHECK"}')) and o.is_ask(J('{"intent":"QUERY"}'))
+    assert not o.is_ask(J('{"domain":"plant","intent":"QUERY"}')) and not o.is_ask(J('{"domain":"dog","intent":"CHECK"}'))
+    o0 = O.Orch(O.V3Config(), FakeLLM(), None)
+    assert o0.is_ask(J('{"intent":"QUERY"}')) and not o0.is_ask(J('{"intent":"CHECK"}'))
+    assert O.asks_of([]) is None

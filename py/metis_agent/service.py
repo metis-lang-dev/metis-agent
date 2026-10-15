@@ -251,7 +251,14 @@ def intent_of(name, template="gemma4"):
     ex = (i.get("examples") or {}).get(template)
     if ex:
         prompt += d.path(ex).read_text()
-    return O.IntentDomain(name, d.manifest.get("display") or "the " + name, prompt, d.path(i["grammar"]).read_text())
+    asks = []
+    if i.get("spec"):                       # the verbs that ask (intent.yaml asks:)
+        import yaml
+        try:
+            asks = list((yaml.safe_load(d.path(i["spec"]).read_text()) or {}).get("asks") or [])
+        except OSError:
+            asks = []
+    return O.IntentDomain(name, d.manifest.get("display") or "the " + name, prompt, d.path(i["grammar"]).read_text(), asks)
 
 
 def intents_of(names, template="gemma4"):
@@ -354,7 +361,7 @@ class Live:
         self.ocfg = O.V3Config(self.catalog_names, self.loaded, self.display, ask_check=True, again_pick=True,
                                escalate_template=True, mirror=True, rollback=True,
                                on_gen=self.on_gen, on_say=self.on_say, defer=self.defer,
-                               intent_domains=[x.name for x in self.intents])
+                               intent_domains=[x.name for x in self.intents], asks=O.asks_of(self.intents))
         self.restart()
         self.jobs = queue.Queue()
         self.started = threading.Event()
@@ -414,11 +421,11 @@ class Live:
         if self.intents:
             self.gbnf = O.intent_grammar(self.intents)
         names = [x.name for x in self.intents]
-        self.ocfg.intent_domains = names
+        self.ocfg.intent_domains, self.ocfg.asks = names, O.asks_of(self.intents)
         if self.intents:
             self.intents_domain = names[0]
         if turn == self.prompt:
-            self.o.cfg.intent_domains = names
+            self.o.cfg.intent_domains, self.o.cfg.asks = names, self.ocfg.asks
             return
         n = self.ol.begin_dialog(turn)
         self.prompt = turn
