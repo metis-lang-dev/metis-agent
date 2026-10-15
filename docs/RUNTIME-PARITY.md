@@ -45,11 +45,11 @@ stack; agent/go runs the domain models those developments produce.
 | RUN (device) | DESIGN (development stack only) |
 |---|---|
 | load the artifact; the key, the `%%` lines, the cards and the merged packs as the artifact's sidecars (C) | compile, gate/accept, formalize, mine, revise (metispy, the loop) |
-| step one thing on the live state with the normative sampler; enabled events; do-lines as deltas; stages and the host tick (K core) | `why`, `findings`, the structural cone |
+| step one thing on the live state with the normative sampler; enabled events; do-lines as deltas; stages and the host tick (K core) | the cone's design uses (the loop's mining, the console's graph) |
 | the host faces as a Go/C PortPlugin (tick, on_event, observe, snapshot, restore) — the hosts out of Python, or a C ABI so a device host is C++ | `recover` / `replay` of records (the loop's "fixed: true") |
-| the surprise test from the checkpoint; the surprise record; the open-surprise gate; `explain(card, move)` (fire a card's move on the live state); `reset`; `escalate` with mined text; the operator resume | the counterfactual consult tools: `necessity`, `sufficiency`, `graph`, `narrate`, `whatif` (on the device the consult is the harness's template + the cards' moves) |
+| the surprise test from the checkpoint; the surprise record; the open-surprise gate; `explain(card, move)` (fire a card's move on the live state); `reset`; `escalate` with mined text; the operator resume | the counterfactual consult tools: `necessity`, `sufficiency`, `graph`, `narrate`, `whatif` (on the device the consult is the harness's template + the cards' moves; they come into RUN with the one-model shape, go-domain-agent step 6) |
 | the records sink with the neutral env; snapshot/restore (the checkpoint, the consult fork) | the dialog/parity traces, the timelines, the benches |
-| the orchestrator's T reads (`state`, `events`, `ctx`), the mirror counts (`#query`), notch overlay, port pricing | the loop console, `intents` drafting, `apply` |
+| the orchestrator's T reads (`state`, `events`, `ctx`, `why(atom)`, `findings`), the mirror counts (`#query`), notch overlay, port pricing | the loop console, `intents` drafting, `apply` |
 | reload / add (hot-swap of an artifact; the old runs on failure), reset, the ports reply, the pair scene (two runtimes, one env) | the web page's download/copy |
 | the generic domain agent's logic in Go: mapper, replier, narrator (trace callback → the narrator), AgentHost queues, the consult harness — from `intent.yaml` and the manifest as on py | — |
 
@@ -256,16 +256,16 @@ snapshot as JSON data, written and read by py and Go alike; the pickle goes.
 | 20 | `reset` · `escalate` (mined_text) · the operator resume | **RUN** | n/a | — | H | |
 | 21 | the records sink (metispy's JSONL) | **RUN** | n/a | — | H | the device's records are replayed on the development stack |
 | 22 | the record's `env` | **RUN** **Δ** | n/a | the pickle is a shortcut | H on both stacks: **one neutral JSON env** (the host's snapshot as data), py first | the ruling's (d) |
-| 23 | `recover` / replay | DESIGN | missing | — | — | the loop's "fixed: true" |
+| 23 | `recover` / replay | DESIGN | missing | — | — | the loop's "fixed: true": the revision loop's replay against a candidate extension |
 
 ### D. Reads and the consult
 
 | # | capability (agent/py) | RUN/DESIGN | C++ today | gap | cost | note |
 |---|---|---|---|---|---|---|
 | 24 | `state` · `events` · `ctx` (the orchestrator's T reads) | **RUN** | counts, events | partial | H over B | |
-| 25 | `why(atom)` · `findings` | DESIGN | missing | — | — | **Δ** the device's refusal path takes its blocker from the replier (row 15); py's harness also reads `why(refused(ACT))` for the consult's evidence, which the device's template consult does without |
-| 26 | the consult in a fork (`fork`, `back`) | DESIGN (the model consult) · **RUN**: the snapshot it rests on (row 28) | missing | — | — | **Δ** on the device the consult is the harness's template plus the cards' moves (the ruling) |
-| 27 | the consult's tools (`run` `step` `do` `undo` `necessity` `sufficiency` `graph` `narrate` `whatif`) | DESIGN | `do()` clamps only | — | — | **Δ** `run`/`step`/`do`/`undo` too: the template consult makes none |
+| 25 | `why(atom)` · `findings` | **RUN** | missing | missing | H over K1 | the domain agent serves them as REPL reads beside row 24 (py's `READS` = state, ctx, events, why, findings) and the Go orchestrator declares and calls them (v3text.go): a domain agent that cannot answer `why` leaves the orchestrator's consult without evidence. `why` is the structural cone over the fired path, from K1's c/o/p per event: the explain witness (row 19) read the other way. Byte-equal to metispy's REPL text, as the other reads (go-domain-agent step 3, module 8; the architect's correction, 2026-10-15) |
+| 26 | the consult in a fork (`fork`, `back`) | DESIGN (the model consult) until step 6 · **RUN**: the snapshot it rests on (row 28) | missing | — | K3 | **Δ** on the device the consult is the harness's template plus the cards' moves (the ruling); the fork comes into RUN with the one-model shape (step 6, row 27) |
+| 27 | the consult's tools (`run` `step` `do` `undo` `necessity` `sufficiency` `graph` `narrate` `whatif`) | DESIGN until step 6 | `do()` clamps only | — | K1 + K3 + K4 | **Δ** `run`/`step`/`do`/`undo` too: the template consult makes none. They are the model consult's tools and come into RUN with the one-model shape (go-domain-agent step 6), composed from K1 + K3 + K4: `fork`/`undo` = snapshot/restore, `whatif` = the projection, `necessity`/`sufficiency` = fork + do + run |
 | 28 | snapshot/restore of the runtime state | **RUN** | none (no snapshot anywhere in `include/` or `tools/`) | missing | **K3** + H (the host's own, row 14) | **Δ** needed on the device for the watch's checkpoint and the explain witness, not only for a consult fork |
 
 ### E. Lifecycle and the scene
@@ -334,7 +334,8 @@ consult's answers cannot hold on the device as they are: the integration
 replay's consult answers (D4-b), and E11/t3's consult-shaped reads. Either
 the device's bar names the template consult's answers as its own reference
 (dumped by py with the template seat), or the device keeps a model consult
-on the one LLM, which brings `run`/`step`/`do`/`fork`/`why` back into RUN.
+on the one LLM, which brings `run`/`step`/`do`/`fork` back into RUN
+(go-domain-agent step 6; `why` and `findings` are RUN already, row 25).
 The first is the ruling's, and I would take it: py can run the template
 seat and dump the reference.
 
