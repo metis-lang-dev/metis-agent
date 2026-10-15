@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/metis-lang-dev/metis-agent/go/internal/catalog"
 )
 
 func copyTree(t *testing.T, src, dst string) {
@@ -153,5 +155,27 @@ func TestTheProcessServesTheDays(t *testing.T) {
 		})
 		srv.Close()
 		t.Logf("%s from the catalog: %d input lines, %d output lines equal", c.day, n-1, lines)
+	}
+}
+
+// The records sink's place (py records_path, 68cb919): "catalog" is the
+// package's own records under the catalog the process reads, a nested
+// package included; another root is DIR/<name>/records.
+func TestTheRecordsGoWherePysGo(t *testing.T) {
+	root := t.TempDir()
+	copyTree(t, filepath.Join(catalogDir(t), "domains", "plant"), filepath.Join(root, "domains", "nested", "plant"))
+	ms, err := catalog.Scan(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range []struct{ records, want string }{
+		{"catalog", filepath.Join(root, "domains", "nested", "plant", "records")},
+		{"/r", filepath.Join("/r", "plant", "records")},
+		{"", ""},
+	} {
+		p := &Process{Root: root, Records: c.records}
+		if got := p.records(ms["plant"]); got != c.want {
+			t.Fatalf("records %q: want %s got %s", c.records, c.want, got)
+		}
 	}
 }

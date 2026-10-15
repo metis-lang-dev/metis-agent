@@ -62,7 +62,7 @@ type Process struct {
 	Names    []string
 	Seed     uint64
 	Case     string
-	Records  string // the records sink's root ("" = off; "catalog" = each package's records/)
+	Records  string // the records sink ("" = off; "catalog" = each package's own records; else DIR/<name>/records)
 	Session  string
 	Trace    bool
 }
@@ -141,12 +141,7 @@ func (p *Process) Domains(names []string) ([]Domain, error) {
 			}
 			d.Generic = true
 		}
-		if p.Records != "" {
-			d.RecordsDir = filepath.Join(p.Root, "domains", n, "records")
-			if p.Records != "catalog" {
-				d.RecordsDir = filepath.Join(p.Records, n, "records")
-			}
-		}
+		d.RecordsDir = p.records(m)
 		out = append(out, d)
 	}
 	return out, nil
@@ -316,4 +311,22 @@ func (p *Process) Add(s Server, d string) (Server, []any) {
 		out = append(out, NewReply(a.Name, "added", F{"key": a.P.Key}))
 	}
 	return NewDomains(all), out
+}
+
+// records is where a package's surprise records go (py records_path,
+// 68cb919): "catalog" — the package's own records (the manifest's
+// `records`, default records/, under its directory in the catalog this
+// process reads); another root — DIR/<name>/records; "" — off.
+func (p *Process) records(m catalog.Manifest) string {
+	switch p.Records {
+	case "":
+		return ""
+	case "catalog":
+		sub := m.Records
+		if sub == "" {
+			sub = "records"
+		}
+		return m.Path(sub)
+	}
+	return filepath.Join(p.Records, m.Name, "records")
 }
