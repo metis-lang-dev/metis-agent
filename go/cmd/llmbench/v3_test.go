@@ -205,7 +205,11 @@ func TestV3Ruled(t *testing.T) {
 
 // the tests render the REPL API from metispy's golden bundle (no copy here)
 func TestMain(m *testing.M) {
-	abs, _ := filepath.Abs("../../../../metispy/tests/goldens/artifact/plant.metis") // a test may chdir
+	py := os.Getenv("METISPY") // CI's checkout, else the sibling
+	if py == "" {
+		py = "../../../../metispy"
+	}
+	abs, _ := filepath.Abs(filepath.Join(py, "tests/goldens/artifact/plant.metis")) // a test may chdir
 	*toolsBundle = abs
 	os.Exit(m.Run())
 }
