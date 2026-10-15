@@ -300,8 +300,12 @@ snapshot as JSON data, written and read by py and Go alike; the pickle goes.
    projections start from the program's init, and the surprise record's
    likelihood is from the checkpoint over the steps since. Small: a
    `ForwardProjection` from a `State`.
-5. **K5 — fire a card's move on the live state** (`explain`). The cards'
-   events come in the artifact (C, row 6).
+5. ~~**K5 — fire a card's move on the live state** (`explain`).~~
+   **Dropped at step 3** (RUNTIME-BINDING.md §3). metispy's `explain` is a
+   deterministic witness over the fired path plus the move's c/o/p
+   (`_witness` :629), and an adoption of the host's reading as one exo row
+   named for the move (`_adopt` :513): harness work over K1/K2, with the
+   moves from the sidecar.
 
 Outside K:
 - **B:** the C ABI over K1–K5, plus load and the sidecars, the key, the
