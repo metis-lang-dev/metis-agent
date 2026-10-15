@@ -584,6 +584,182 @@ def repl_api(catalog, loaded):
     ]
 
 
+# ── several intent domains (Go v3intents.go; e2e-workflow step 4) ─────────────
+# The orchestrator dispatches to a domain, and THAT domain's intent material
+# maps the words (its manifest's intent.prompt + examples[template] and
+# intent.grammar). One intent domain: the turn and the grammar are its own,
+# byte for byte as before; two or more: every J names its domain first —
+# {"domain":"plant","intent":"WATER"} — under one grammar whose branches are
+# the domains' grammars, so the pick and the intent are one generation.
+
+class IntentDomain:
+    __slots__ = ("name", "display", "prompt", "grammar")
+
+    def __init__(self, name, display, prompt, grammar):
+        self.name, self.display, self.prompt, self.grammar = name, display, prompt, grammar
+
+    def __eq__(self, o):
+        return isinstance(o, IntentDomain) and all(getattr(self, k) == getattr(o, k) for k in self.__slots__)
+
+    def __repr__(self):
+        return "IntentDomain(%s)" % self.name
+
+
+_SHARED_VERBS = ("", "CHITCHAT", "UNKNOWN", "TIME", "DATE", "STOP", "CANCEL")
+_EXAMPLE_LINE = re.compile(r'^"([^"]*)" → (\{.*\})$', re.M)
+
+
+def _go_quote(s):
+    """Go's %q for an utterance (no '"' in it: the example regexp's): the
+    backslash escaped, the rest as is."""
+    return '"' + s.replace("\\", "\\\\") + '"'
+
+
+def domain_examples(prompt, n):
+    """The prompt's first examples, one per verb, up to n, the verbs every
+    domain shares (talk, the clock, stop) left out."""
+    out, seen = [], set()
+    for m in _EXAMPLE_LINE.finditer(prompt):
+        try:
+            j = json.loads(m.group(2))
+        except ValueError:
+            continue
+        v = j.get("intent") if isinstance(j, dict) and isinstance(j.get("intent"), str) else ""
+        if v in _SHARED_VERBS or v in seen:
+            continue
+        seen.add(v)
+        out.append((m.group(1), m.group(2)))
+        if len(out) == n:
+            break
+    return out
+
+
+def tag_j(j, domain):
+    """"domain" first in a J's text: {"intent":…} → {"domain":"d","intent":…}."""
+    t = j.strip()
+    return '{"domain":"' + domain + '",' + (t[1:] if t.startswith("{") else t)
+
+
+def j_domain(c):
+    """The domain a J names ("" untagged)."""
+    if not c.is_j():
+        return ""
+    try:
+        j = json.loads(c.j)
+    except ValueError:
+        return ""
+    d = j.get("domain") if isinstance(j, dict) else None
+    return d if isinstance(d, str) else ""
+
+
+def tag_call(c, domain):
+    """A J named for its domain (an untagged one; a tagged one stands)."""
+    if not c.is_j() or j_domain(c):
+        return c
+    return Call(j=tag_j(c.j, domain))
+
+
+def intent_turn(ds):
+    """The system turn's intent part: the first domain's material as it
+    stands, then each other domain's under its heading, then how a J names
+    its domain (Go IntentTurn, byte for byte)."""
+    if not ds:
+        return ""
+    b = [ds[0].prompt]
+    if len(ds) == 1:
+        return b[0]
+    for d in ds[1:]:
+        b.append("\n## The person's words for " + d.display + " (domain " + d.name + ")\n")
+        b.append(d.prompt)
+    names = ", ".join(d.display + " (" + d.name + ")" for d in ds)
+    b.append("\n## Several domains\nThe person's words are for one of these domains: " + names +
+             ". Every intent JSON names that domain first, \"domain\", then the intent in that domain's own words,"
+             " as its examples above show:\n")
+    for d in ds:
+        for utt, j in domain_examples(d.prompt, 3):
+            b.append("%s → %s\n" % (_go_quote(utt), tag_j(j, d.name)))
+    b.append("\n")
+    return "".join(b)
+
+
+def rule_prefix(name):
+    """A GBNF-safe prefix for a domain's rules (kitchen_shared → kitchen-shared-)."""
+    return name.replace("_", "-").replace(".", "-") + "-"
+
+
+_RULE_HEAD = re.compile(r"^([a-zA-Z0-9-]+) ::= ")
+
+
+def _ident(c):
+    return c == "-" or "0" <= c <= "9" or "a" <= c <= "z" or "A" <= c <= "Z"
+
+
+def prefix_grammar(g, p):
+    """Every rule of g renamed, where defined and where named, outside its
+    strings and character classes (one rule per line)."""
+    out = []
+    for line in g.rstrip("\n").split("\n"):
+        if not line.strip() or line.strip().startswith("#"):
+            continue
+        m = _RULE_HEAD.match(line)
+        if not m:
+            raise ValueError("not one rule per line: %r" % line)
+        o = [p + m.group(1) + " ::= "]
+        body, i = line[m.end():], 0
+        while i < len(body):
+            c = body[i]
+            if c in "\"[":
+                close = '"' if c == '"' else "]"
+                j = i + 1
+                while j < len(body) and body[j] != close:
+                    if body[j] == "\\":
+                        j += 1
+                    j += 1
+                o.append(body[i:j + 1])
+                i = j + 1
+            elif _ident(c):
+                j = i
+                while j < len(body) and _ident(body[j]):
+                    j += 1
+                o.append(p + body[i:j])
+                i = j
+            else:
+                o.append(c)
+                i += 1
+        out.append("".join(o) + "\n")
+    return "".join(out)
+
+
+def intent_grammar(ds):
+    """The person turn's grammar: one domain's own, or the union of each
+    domain's — its rules under the domain's prefix, its root's object opened
+    with "domain" first (Go IntentGrammar, byte for byte)."""
+    if not ds:
+        raise ValueError("no intent domain")
+    if len(ds) == 1:
+        return ds[0].grammar
+    alts, rules = [], []
+    for d in ds:
+        p = rule_prefix(d.name)
+        try:
+            g = prefix_grammar(d.grammar, p)
+        except ValueError as e:
+            raise ValueError("%s's intent grammar: %s" % (d.name, e))
+        opn = '"{" ' + p + "space "
+        head = p + "root ::= " + opn
+        i = g.find("\n" + head)
+        if i < 0 and g.startswith(head):
+            i = -1
+        elif i < 0:
+            raise ValueError('%s\'s intent grammar: its root is not an object opened by "{" space' % d.name)
+        at = i + 1 + len(head)
+        g = (g[:at] + '"\\"domain\\"" ' + p + 'space ":" ' + p + 'space "\\"' + d.name + '\\"" ' + p +
+             'space "," ' + p + "space " + g[at:])
+        alts.append(p + "root")
+        rules.append(g if g.endswith("\n") else g + "\n")
+    return "root ::= " + " | ".join(alts) + "\n" + "".join(rules)
+
+
 def installed_cards(turn, catalog, lines):
     """The system turn's "## Domains" card list written from the catalog's
     display lines (v3text.go InstalledCards; the manifests are the source,
@@ -855,8 +1031,11 @@ def unspeakable_line(t):
 class V3Config:
     def __init__(self, catalog=(), loaded=(), display=None, ask_check=False, again_pick=False,
                  escalate_template=False, mirror=False, rollback=False, sample_moves=False,
-                 on_gen=None, on_say=None, defer=None):
+                 on_gen=None, on_say=None, defer=None, intent_domains=()):
         self.catalog, self.loaded, self.display = list(catalog), list(loaded), dict(display or {})
+        # the served domains with intent material; two or more: every J names
+        # its domain, an alternative a domain offers is named for it
+        self.intent_domains = list(intent_domains)
         self.ask_check, self.again_pick, self.escalate_template = ask_check, again_pick, escalate_template
         self.mirror, self.rollback, self.sample_moves = mirror, rollback, sample_moves
         self.on_gen, self.on_say, self.defer = on_gen, on_say, defer
@@ -1398,6 +1577,8 @@ class Orch:
                     log.info("[v3] alternative %s: %s — the reason is spoken", jdump(raw), e)
                     b.name, b.alts = "speak", []
                     return b
+                if len(self.cfg.intent_domains) > 1:   # several intent domains: the offer is the replying domain's
+                    a = tag_call(a, r.domain)
                 b.alts.append(a)
             bl = r.blocker_text()
             if not b.alts and bl == "null":
@@ -1715,6 +1896,7 @@ class Orch:
         self.pend = []
         self.open, self.said, self.n_past = False, None, n
         self.cfg.catalog, self.cfg.loaded, self.cfg.display = list(cfg.catalog), list(cfg.loaded), dict(cfg.display)
+        self.cfg.intent_domains = list(cfg.intent_domains)
         self.api = repl_api(cfg.catalog, cfg.loaded)
 
     def reloaded(self, d):

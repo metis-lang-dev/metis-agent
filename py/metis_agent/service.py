@@ -235,11 +235,48 @@ def catalog_lines(names):
     return lines
 
 
-def build_turn(cfg):
-    """The system turn as the service uses it (--print-turn prints it)."""
+def intent_of(name, template="gemma4"):
+    """A domain's intent material from its manifest (Go IntentOf): its
+    intent.prompt + examples[template] text and its intent.grammar; None
+    when it has none."""
+    from .domains import catalog
+    try:
+        d = catalog().get(name)
+    except KeyError:
+        return None
+    i = d.manifest.get("intent") or {}
+    if not i.get("grammar") or not i.get("prompt"):
+        return None
+    prompt = d.path(i["prompt"]).read_text()
+    ex = (i.get("examples") or {}).get(template)
+    if ex:
+        prompt += d.path(ex).read_text()
+    return O.IntentDomain(name, d.manifest.get("display") or "the " + name, prompt, d.path(i["grammar"]).read_text())
+
+
+def intents_of(names, template="gemma4"):
+    """The served domains with intent material, in the processes' order."""
+    return [x for x in (intent_of(n, template) for n in names) if x is not None]
+
+
+def build_turn(cfg, intents=None, catalog_=None, loaded=None):
+    """The system turn (--print-turn prints it; Go SystemTurn): the intent
+    part (the served domains' material), the orchestrator's prompt files,
+    their "## Domains" cards from the catalog's lines, the declarations."""
     v3 = cfg["v3"]
-    prompt = "".join((ROOT / "py" / p).read_text() for p in v3["prompt"])
-    return O.system_turn(prompt, v3["catalog"], v3["loaded"], catalog_lines(v3["catalog"]))
+    if intents is None:
+        intents = intents_of(cfg["domains"]["names"], cfg.get("template", "gemma4"))
+    cat = v3["catalog"] if catalog_ is None else catalog_
+    prompt = O.intent_turn(intents) + "".join((ROOT / "py" / p).read_text() for p in v3["prompt"])
+    return O.system_turn(prompt, cat, v3["loaded"] if loaded is None else loaded, catalog_lines(cat))
+
+
+def build_grammar(cfg, intents):
+    """The person turn's grammar: the intent domains' (Go IntentGrammar), or
+    the config's intent.grammar when no served domain has intent material."""
+    if intents:
+        return O.intent_grammar(intents)
+    return (ROOT / "py" / cfg["intent"]["grammar"]).read_text()
 
 
 # ── the live loop (v3procs.go) ────────────────────────────────────────────────
@@ -275,10 +312,14 @@ class Live:
         self.proc = Process(self.names, narrate=dcfg.get("narrate"), llm=llm if uses_model else None, seat=seat,
                             trace=dcfg.get("trace", True), records=dcfg.get("records"), session=dcfg.get("session"))
         self.agents = self.proc.build(int(dcfg.get("seed", 1)), dcfg.get("case", "live"))
-        self.gbnf = (ROOT / "py" / cfg["intent"]["grammar"]).read_text()
-        self.gbnf_path = ROOT / "py" / cfg["intent"]["grammar"]
+        # the intent material of every served domain that has it (e2e-workflow
+        # step 4): the system turn opens with it, the person turn's grammar is
+        # made of it; two or more: every J names its domain
+        self.template = cfg.get("template", "gemma4")
+        self.intents = intents_of(self.names, self.template)
+        self.gbnf = build_grammar(cfg, self.intents)
         self.stop_words = list(cfg.get("stop_words") or ["stop", "halt", "freeze", "quiet"])
-        self.prompt = build_turn(cfg)
+        self.prompt = build_turn(cfg, self.intents)
         self.prompt_files = list(v3["prompt"])
         self.nctx = int(v3.get("n_ctx", 16384))
         self.ol = llm.sibling(self.nctx)
@@ -292,7 +333,8 @@ class Live:
         except Exception as e:  # noqa: BLE001 — no loader: the system turn's catalog stands in
             log.warning("[console] the catalog's list: %s", e)
             self.listed = []
-        self.intents_domain = next((n for n in self.loaded if n in self.names), "")
+        self.intents_domain = (self.intents[0].name if self.intents     # the J's domain when it names none
+                               else next((n for n in self.loaded if n in self.names), ""))
         self.off, self.pend, self.n = set(), [], 0
         # every served domain's directory from its manifest (human-loop step 1;
         # a partner reloads with its lead); domains.watch overrides a directory
@@ -311,7 +353,8 @@ class Live:
         self.narr_seq = 0
         self.ocfg = O.V3Config(self.catalog_names, self.loaded, self.display, ask_check=True, again_pick=True,
                                escalate_template=True, mirror=True, rollback=True,
-                               on_gen=self.on_gen, on_say=self.on_say, defer=self.defer)
+                               on_gen=self.on_gen, on_say=self.on_say, defer=self.defer,
+                               intent_domains=[x.name for x in self.intents])
         self.restart()
         self.jobs = queue.Queue()
         self.started = threading.Event()
@@ -321,8 +364,12 @@ class Live:
     # the orchestrator's hooks
 
     def on_gen(self, g):
-        self.journal.record({"kind": "dlg-gen", "label": g.label, "try": g.try_, "branch": g.branch,
-                             "harness": g.harness, "text": g.text, "n_ctx": g.n_ctx, "ms": int(g.all * 1000)})
+        rec = {"kind": "dlg-gen", "label": g.label, "try": g.try_, "branch": g.branch,
+               "harness": g.harness, "text": g.text, "n_ctx": g.n_ctx, "ms": int(g.all * 1000)}
+        d = self.intent_domain_of(g)
+        if d:                                   # which domain's intent material mapped the words
+            rec["domain"] = d
+        self.journal.record(rec)
         log.info("[v3] %s/%s try %d (%d tok, %d ms) %s", g.branch, g.label, g.try_, g.n_ctx, int(g.all * 1000), g.text)
 
     def on_say(self, kind, line):
@@ -338,6 +385,22 @@ class Live:
         else:
             self.emit("narration", n)
 
+    def intent_domain_of(self, g):
+        """The domain a move's J was mapped for: the one it names, or the
+        first intent domain (Go intentDomainOf)."""
+        if g.label != "move":
+            return ""
+        try:
+            j = json.loads(g.text)
+        except ValueError:
+            return ""
+        if not isinstance(j, dict) or j.get("intent") is None:
+            return ""
+        d = j.get("domain")
+        if isinstance(d, str) and d:
+            return d
+        return self.intents[0].name if self.intents else ""
+
     def restart(self):
         n = self.ol.begin_dialog(self.prompt)
         self.o = O.Orch(self.ocfg, self.ol, self)
@@ -347,14 +410,21 @@ class Live:
         """The system turn built again (the catalog, the active domains) and
         the dialog started over on it, the harness's state kept (Go's
         v3install.go reprime); journalled as dlg-restart."""
-        prompt = "".join((ROOT / "py" / p).read_text() for p in self.prompt_files)
-        turn = O.system_turn(prompt, self.ocfg.catalog, self.ocfg.loaded, catalog_lines(self.ocfg.catalog))
+        turn = build_turn(self.cfg, self.intents, self.ocfg.catalog, self.ocfg.loaded)
+        if self.intents:
+            self.gbnf = O.intent_grammar(self.intents)
+        names = [x.name for x in self.intents]
+        self.ocfg.intent_domains = names
+        if self.intents:
+            self.intents_domain = names[0]
         if turn == self.prompt:
+            self.o.cfg.intent_domains = names
             return
         n = self.ol.begin_dialog(turn)
         self.prompt = turn
         self.o.restart_dialog(n, self.ocfg)
-        self.journal.record({"kind": "dlg-restart", "why": why, "n_ctx": n, "catalog": list(self.ocfg.catalog)})
+        self.journal.record({"kind": "dlg-restart", "why": why, "n_ctx": n, "intents": names,
+                             "catalog": list(self.ocfg.catalog)})
         log.info("[v3] the dialog starts over on the system turn rebuilt (%s): %d tok", why, n)
 
     def room(self):
@@ -402,13 +472,16 @@ class Live:
         verb = j.get("intent") if isinstance(j.get("intent"), str) else ""
         if verb in ("", "CHITCHAT", "UNKNOWN") or not self.intents_domain:
             return O.Reply(), False
-        d = self.intents_domain
+        d = self.intents_domain                  # the one intent domain; with several, the J names it
+        t = j.pop("domain", None)
+        if isinstance(t, str) and t:
+            d = t
         if d in self.off:
             return self.not_active(d), True
         j.pop("intent", None)
         self.n += 1
         cid = "c%d" % self.n
-        rec = {"kind": "dlg-dispatch", "cid": cid, "j": c.text()}
+        rec = {"kind": "dlg-dispatch", "cid": cid, "j": c.text(), "domain": d}
         if self.turn_at is not None:            # the dispatch-wait column: the person's words to this dispatch
             rec["wait_ms"] = int((time.time() - self.turn_at) * 1000)
         self.journal.record(rec)
@@ -614,6 +687,9 @@ class Live:
         self.base[dom] = snapshot(self.watch[dom])
         for n in group:
             self.policy[n] = reload_policy(n, self.reload_cfg)
+        it = intent_of(dom, self.template)
+        if it is not None and all(x.name != dom for x in self.intents):
+            self.intents.append(it)             # its words: the next reprime's turn and grammar
         if dom not in self.catalog_names:
             self.catalog_names.append(dom)
             self.ocfg.catalog.append(dom)
@@ -755,16 +831,26 @@ class Live:
             self.o.reloaded(d)
             if d in self.watch:
                 self.base[d], self.changed[d] = before, ""
-            try:
-                g = self.gbnf_path.read_text()
-                if g != self.gbnf:
-                    self.gbnf = g
-                    log.info("[v3] the intent grammar re-read after the reload")
-            except OSError:
-                pass
+            self.reload_intents(d)
         self.journal.record(rec)
         self.push_catalog()
         return key, err
+
+    def reload_intents(self, d):
+        """A reloaded intent domain's material re-read from its manifest;
+        changed, the system turn and the grammar are rebuilt (Go reloadIntents)."""
+        k = next((i for i, x in enumerate(self.intents) if x.name == d), None)
+        if k is None:
+            return
+        try:
+            it = intent_of(d, self.template)
+        except OSError as e:
+            log.info("[v3] %s reloaded, its intent material not: %s", d, e)
+            return
+        if it is None or it == self.intents[k]:
+            return
+        self.intents[k] = it
+        self.reprime("reload " + d)
 
     def auto_reload(self):
         """reload: auto — a changed domain reloads at its next quiescence
@@ -1008,6 +1094,8 @@ def main():
     ap.add_argument("--no-wait-viewer", action="store_true", help="start the clock at once (else at the first page)")
     ap.add_argument("--print-turn", action="store_true",
                     help="print the orchestrator's system turn as built (the catalog's cards and declarations) and exit")
+    ap.add_argument("--print-grammar", action="store_true",
+                    help="print the person turn's grammar as built (the intent domains') and exit")
     a = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     cfg = load_config(a.config)
@@ -1017,6 +1105,9 @@ def main():
         raise SystemExit("[catalog] %s" % e)
     if a.print_turn:
         print(turn, end="")
+        return
+    if a.print_grammar:
+        print(build_grammar(cfg, intents_of(cfg["domains"]["names"], cfg.get("template", "gemma4"))), end="")
         return
     from aiohttp import web
 

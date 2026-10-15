@@ -324,3 +324,72 @@ def test_auto_reloads_at_quiescence_and_a_failure_waits_for_the_next_change(tmp_
     llp.write_text(good.replace("%% I sit down.", "%% I sit down, nice and slow.", 1))
     lv.watch_once()
     assert not lv.changed["dog"]                                                     # back to what it runs
+
+
+def _pet_catalog(tmp_path):
+    """A scratch catalog: dog, the kitchen pair, and pet — the dog's copy
+    under another name (its own host, its own intent material)."""
+    import shutil
+    import yaml
+    from metis_agent.domains import catalog
+    cat = tmp_path / "cat"
+    for n in ("dog", "kitchen", "kitchen_shared"):
+        shutil.copytree(catalog().get(n).dir, cat / "domains" / n, ignore=shutil.ignore_patterns("records", "__pycache__"))
+    d = cat / "domains/pet"
+    shutil.copytree(cat / "domains/dog", d)
+    (d / "dog.llp").rename(d / "pet.llp")
+    (d / "dog_host.py").rename(d / "pet_host.py")
+    m = yaml.safe_load((d / "domain.yaml").read_text())
+    m.update(name="pet", display="the pet", program="pet.llp", host="pet_host.py:make", line="a pet: it sits")
+    (d / "domain.yaml").write_text(yaml.safe_dump(m))
+    return cat
+
+
+def test_one_intent_domain_is_its_own_turn_and_grammar():
+    """Ruling (2)'s parity bar: one intent domain — the turn opens with its
+    material as it stands and the grammar is its own file (byte-identical to
+    Go's -print-turn / -print-grammar on the live configs: 18468 B, 6179 B)."""
+    import metis_catalog
+    cfg = S.load_config(ROOT / "py/config.live.yaml")
+    ds = S.intents_of(cfg["domains"]["names"])
+    assert [x.name for x in ds] == ["dog"]
+    dog = metis_catalog.get("dog")
+    assert S.build_grammar(cfg, ds) == dog.intent["grammar"].read_text()
+    assert S.build_turn(cfg).startswith(dog.intent["prompt"].read_text())
+
+
+def test_several_intent_domains_name_the_domain_in_the_j(tmp_path, monkeypatch):
+    """Ruling (2): with two intent domains the grammar is the union (each
+    domain's rules under its prefix, "domain" first in its root), the turn
+    says how a J names its domain, and the dispatch goes where the J says —
+    "domain" removed from the args, named in dlg-dispatch and the move's
+    dlg-gen; an untagged J goes to the first intent domain."""
+    monkeypatch.setenv("METIS_CATALOG", str(_pet_catalog(tmp_path)))
+    cfg = S.load_config(ROOT / "py/config.live.yaml")
+    cfg["v3"]["journal"] = str(tmp_path / "j.jsonl")
+    cfg["domains"].update(names=["dog", "pet", "kitchen", "kitchen_shared"], narrate=None, consult=False, records=None)
+    lv = S.Live(cfg, FakeLLM())
+    assert [x.name for x in lv.intents] == ["dog", "pet"] and lv.ocfg.intent_domains == ["dog", "pet"]
+    assert lv.gbnf.startswith("root ::= dog-root | pet-root\n") and '"\\"pet\\""' in lv.gbnf
+    assert "## Several domains" in lv.prompt and '{"domain":"pet",' in lv.prompt
+    lv.ol.intent = '{"domain":"pet","intent":"LOCAL_ACTION","action":"SIT_DOWN"}'
+    j, _, _ = lv.utterance("pet, sit down", time.time())
+    d = recs(lv, "dlg-dispatch")[-1]
+    assert d["domain"] == "pet" and '"domain"' not in json.dumps(d.get("args", {}))
+    assert [g for g in recs(lv, "dlg-gen") if g["label"] == "move"][-1]["domain"] == "pet"
+    lv.ol.intent = '{"intent":"LOCAL_ACTION","action":"STAND_UP"}'
+    lv.utterance("stand up", time.time())
+    assert recs(lv, "dlg-dispatch")[-1]["domain"] == "dog"
+
+
+def test_installing_an_intent_domain_joins_its_words(tmp_path, monkeypatch):
+    """Hot-install × ruling (2): activate pet (not served at start) — its
+    intent material joins: the grammar becomes the union, the turn the
+    several-domains turn, dlg-restart names the intents."""
+    monkeypatch.setenv("METIS_CATALOG", str(_pet_catalog(tmp_path)))
+    lv, _ = live(tmp_path)
+    assert [x.name for x in lv.intents] == ["dog"] and not lv.gbnf.startswith("root ::= dog-root")
+    assert lv.domain_verb("activate", "pet", None, "person") is None
+    assert [x.name for x in lv.intents] == ["dog", "pet"] and lv.gbnf.startswith("root ::= dog-root | pet-root\n")
+    r = recs(lv, "dlg-restart")[-1]
+    assert r["why"] == "install pet" and r["intents"] == ["dog", "pet"] and lv.o.cfg.intent_domains == ["dog", "pet"]
