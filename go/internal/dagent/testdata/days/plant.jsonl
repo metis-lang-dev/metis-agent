@@ -4,6 +4,7 @@
 {"clock": "beat"}
 {"tool": "consult", "args": {"question": "is the soil moist?"}, "id": "k1"}
 {"tool": "escalate", "args": {"text": "nothing is wrong"}, "id": "n1"}
+{"id": "c0w", "domain": "plant", "verb": "WATER", "args": {}}
 {"clock": "beat"}
 {"clock": "beat"}
 {"clock": "beat"}
