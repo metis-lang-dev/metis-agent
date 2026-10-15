@@ -61,3 +61,11 @@
 {"call": "fired", "ev": {"name": "dry_out", "consume": {"moist": 1, "sun": 1}, "produce": {"dry": 1}, "persist": {}}, "seq": 30, "beat": 42, "counts": {"dry": 1}, "text": null, "out": [{"domain": "plant", "kind": "event", "ref": {"seq": 30, "beat": 42, "event": "dry_out"}, "text": "The sun has been on me for a while; my soil dries out.", "counts": {}}]}
 {"call": "untaken", "counts": {"dry": 1}, "beat": 42, "out": [], "gone": []}
 {"call": "untaken", "counts": {"dry": 1}, "beat": 43, "out": [], "gone": []}
+{"call": "untaken", "counts": {}, "beat": 44, "out": [], "gone": []}
+{"call": "untaken", "counts": {}, "beat": 45, "out": [], "gone": []}
+{"call": "untaken", "counts": {}, "beat": 46, "out": [], "gone": []}
+{"call": "untaken", "counts": {}, "beat": 47, "out": [], "gone": []}
+{"call": "untaken", "counts": {}, "beat": 48, "out": [], "gone": []}
+{"call": "untaken", "counts": {"visitor": 1, "dry": 1}, "beat": 49, "out": [], "gone": []}
+{"call": "untaken", "counts": {"visitor": 1, "dry": 1}, "beat": 50, "out": [], "gone": []}
+{"call": "untaken", "counts": {"visitor": 1, "dry": 1}, "beat": 51, "out": [], "gone": []}

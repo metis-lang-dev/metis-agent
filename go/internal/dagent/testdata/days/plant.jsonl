@@ -51,3 +51,26 @@
 {"tool": "ctx", "args": {}}
 {"clock": "beat"}
 {"clock": "beat"}
+{"world": ["-dry"], "id": "w1"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"id": "c7", "domain": "plant", "verb": "CHECK", "args": {}}
+{"tool": "explain", "args": {"record": 0, "card": "nope", "move": "x"}, "id": "t1"}
+{"tool": "explain", "args": {"record": 0, "card": "plant+visitor", "move": "water"}, "id": "t2"}
+{"tool": "explain", "args": {"card": "plant+visitor"}, "id": "t3"}
+{"tool": "reset", "args": {"record": 5}, "id": "t4"}
+{"tool": "reset", "args": {"record": 0}, "id": "t5"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"tool": "reset", "args": {"record": 0}, "id": "t6"}
+{"tool": "reset", "args": {}, "id": "t7"}
+{"tool": "escalate", "args": {}, "id": "t8"}
+{"tool": "escalate", "args": {"text": "the soil reads dry but the model lost dry"}, "id": "t9"}
+{"clock": "beat"}
+{"world": ["+dry"], "id": "w2"}
+{"clock": "beat"}
+{"clock": "beat"}
+{"tool": "state", "args": {}}
+{"tool": "why", "args": {"atom": "dry"}}
+{"tool": "findings", "args": {}}
+{"clock": "beat"}

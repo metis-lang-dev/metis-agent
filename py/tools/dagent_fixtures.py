@@ -18,6 +18,10 @@ traffic, their outputs dumped as JSON lines for go/internal/dagent's tests.
   agenthost_<domain>[_live|_hosted].jsonl  every AgentHost call (the faces,
       submit/retract/world, each snapshot's canonical text) of that day in
       the replay and the live case, and of 40 beats of the host's own day
+  watch_<domain>.jsonl  the Watch of that day: its setup, every step's
+      signals, every intent's outbox, the agent's submit/retract/world on
+      the host between them, and at the end every surprise record (the
+      env included), the fired names, the counts and the stage
 
     py/.venv/bin/python py/tools/dagent_fixtures.py [-o DIR]   # default go/internal/dagent/testdata
 """
@@ -189,7 +193,76 @@ class RecordedAgentHost:
         return self._h.world(lines)
 
 
-def run_day(name, lines, case="replay", hostcalls=None):
+class RecordedWatch:
+    """The agent's Watch with its steps and intents recorded (the signals
+    each returns, the outbox each intent leaves) beside the host's calls."""
+
+    def __init__(self, inner, out):
+        self.__dict__["_w"], self.__dict__["_out"] = inner, out
+
+    def __getattr__(self, k):
+        return getattr(self._w, k)
+
+    def __setattr__(self, k, v):
+        setattr(self._w, k, v)
+
+    def step(self):
+        out = self._w.step()
+        self._out.append({"call": "step", "out": json.loads(json.dumps(out))})
+        return out
+
+    def intent(self, line):
+        n0 = len(self._w.outbox)
+        out = self._w.intent(line)
+        self._out.append({"call": "intent", "line": line, "out": out,
+                          "outbox": json.loads(json.dumps(self._w.outbox[n0:]))})
+        return out
+
+
+class HostFace:
+    """The agent's own calls on its host (submit, retract, world), recorded
+    into the watch trace: what the Go watch replays between its steps."""
+
+    def __init__(self, inner, out):
+        self.__dict__["_h"], self.__dict__["_out"] = inner, out
+        if callable(getattr(inner, "observe", None)):
+            self.__dict__["observe"] = inner.observe
+
+    def __getattr__(self, k):
+        if k == "observe":
+            raise AttributeError(k)
+        return getattr(self._h, k)
+
+    def __setattr__(self, k, v):
+        setattr(self._h, k, v)
+
+    def submit(self, iid, atom, payload=None):
+        self._out.append({"call": "submit", "id": iid, "atom": atom, "payload": dict(payload or {})})
+        return self._h.submit(iid, atom, payload)
+
+    def retract(self, atom):
+        self._out.append({"call": "retract", "atom": atom})
+        return self._h.retract(atom)
+
+    def world(self, lines):
+        self._out.append({"call": "world", "lines": list(lines)})
+        return self._h.world(lines)
+
+
+def canonical_body(repl):
+    """The served program's canonical_bytes before its init (grounding does
+    not read the init: a record's program_key is this body, then the
+    checkpoint's init-stage and init lines)."""
+    from metis.kernel.nets import canonical_bytes
+    text = canonical_bytes(repl.prog).decode()
+    return text[:text.index("init-stage ")]
+
+
+def records_json(repl):
+    return json.loads(json.dumps(repl.loop.records, default=str))
+
+
+def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None):
     """The day through py's serve(): (the output stream, the replier calls)."""
     import io
     import contextlib
@@ -204,6 +277,18 @@ def run_day(name, lines, case="replay", hostcalls=None):
         rec = RecordedAgentHost(h, hostcalls)
         agent.host = rec
         agent.repl.plugin = rec
+    if watchcalls is not None:
+        w = agent.watch
+        watchcalls.append({"call": "setup", "case": case, "path": w.path, "beats": w.beats,
+                           "rare_ratio": w.rare_ratio, "scope": w.scope, "operator": w.operator,
+                           "notice_after": w.notice_after, "key": agent.repl.key,
+                           "plugin_spec": agent.repl.plugin_spec or None,
+                           "canonical": canonical_body(agent.repl),
+                           "counts": dict(agent.repl.counts), "stage": agent.repl.stage,
+                           "enders": list(agent.host.ENDERS), "reports": dict(agent.host.reports),
+                           "waits": list(agent.host.waits), "commands": sorted(agent.host.commands)})
+        agent.watch = RecordedWatch(w, watchcalls)
+        agent.host = HostFace(agent.host, watchcalls)
     r = agent.replier
     calls = [{"call": "setup", "domain": r.domain, "docs": dict(r.docs), "outcomes": dict(r.outcomes),
               "commands": sorted(r.commands), "mirror": list(r.mirror), "blocking": sorted(r.blocking),
@@ -214,6 +299,10 @@ def run_day(name, lines, case="replay", hostcalls=None):
         with contextlib.redirect_stderr(io.StringIO()):
             agent, out = serve(agent, msg, proc.build, proc.reload, proc.add_line)
         stream += [{"in": msg, "out": out}]
+    if watchcalls is not None:
+        watchcalls.append({"call": "records", "records": records_json(agent.repl),
+                           "fired": list(agent.repl.fired), "counts": dict(agent.repl.counts),
+                           "stage": agent.repl.stage})
     return stream, calls
 
 
@@ -243,8 +332,12 @@ def main():
         day = dest / "days" / f"{name}.jsonl"
         if day.exists():
             lines = [json.loads(x) for x in day.read_text().splitlines() if x.strip()]
-            hostcalls = []
+            hostcalls, watchcalls = [], []
             stream, calls = run_day(name, lines, hostcalls=hostcalls)
+            run_day(name, lines, watchcalls=watchcalls)
+            (dest / f"watch_{name}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in watchcalls))
+            print(f"watch {name}: {len(watchcalls)} calls, "
+                  f"{len(watchcalls[-1]['records'])} records, {len(watchcalls[-1]['fired'])} fired")
             (dest / f"agenthost_{name}.jsonl").write_text("".join(json.dumps(r) + "\n" for r in hostcalls))
             live = []
             run_day(name, lines, case="live", hostcalls=live)

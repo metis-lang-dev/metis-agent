@@ -1,0 +1,102 @@
+{"call": "setup", "case": "replay", "path": "plant+visitor", "beats": null, "rare_ratio": 0.05, "scope": "order", "operator": null, "notice_after": 2, "key": "aa1aca319a942def6db1d28b8b2d21571fc237e01afc30682a8816511e08307a", "plugin_spec": "metis_agent.domains.plant:make", "canonical": "metis-canonical 1\nstage main\nc cmd_check:1 ; checked(dry):1 ; dry:1 ; w 1\nc cmd_check:1 ; checked(moist):1 ; moist:1 ; w 1\nc cmd_water:1,dry:1 ; done(water):1,moist:1 ; - ; w 1\nc dry:1,visitor:1 ; moist:1 ; - ; w 1\nc moist:1,sun:1 ; dry:1 ; - ; w 1\n", "counts": {"moist": 1}, "stage": "main", "enders": [], "reports": {"lost": null, "timeout": null}, "waits": ["+timeout", "+lost"], "commands": ["cmd_check", "cmd_water"]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 1, "path": "plant+visitor", "beat": 0, "stage": "main", "fired": 0, "episode_over": false}]}
+{"call": "step", "out": []}
+{"call": "submit", "id": "c1", "atom": "cmd_check", "payload": {}}
+{"call": "step", "out": [{"signal": "event", "seq": 2, "path": "plant+visitor", "beat": 2, "kind": "exo", "name": "do +cmd_check", "fired": 1, "stage": "main", "ops": ["+cmd_check"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 3, "path": "plant+visitor", "beat": 2, "kind": "clause", "name": "check_moist", "fired": 2, "stage": "main", "consume": {"cmd_check": 1}, "produce": {"checked(moist)": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 4, "path": "plant+visitor", "beat": 2, "stage": "main", "fired": 2, "episode_over": false}]}
+{"call": "step", "out": [{"signal": "event", "seq": 5, "path": "plant+visitor", "beat": 3, "kind": "exo", "name": "do -checked(moist)", "fired": 3, "stage": "main", "ops": ["-checked(moist)"]}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 6, "path": "plant+visitor", "beat": 3, "stage": "main", "fired": 3, "episode_over": false}]}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": [{"signal": "event", "seq": 7, "path": "plant+visitor", "beat": 6, "kind": "exo", "name": "do +sun", "fired": 4, "stage": "main", "ops": ["+sun"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 8, "path": "plant+visitor", "beat": 6, "kind": "clause", "name": "dry_out", "fired": 5, "stage": "main", "consume": {"moist": 1, "sun": 1}, "produce": {"dry": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 9, "path": "plant+visitor", "beat": 6, "stage": "main", "fired": 5, "episode_over": false}]}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "submit", "id": "c2", "atom": "cmd_check", "payload": {}}
+{"call": "step", "out": [{"signal": "event", "seq": 10, "path": "plant+visitor", "beat": 9, "kind": "exo", "name": "do +cmd_check", "fired": 6, "stage": "main", "ops": ["+cmd_check"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 11, "path": "plant+visitor", "beat": 9, "kind": "clause", "name": "check_dry", "fired": 7, "stage": "main", "consume": {"cmd_check": 1}, "produce": {"checked(dry)": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 12, "path": "plant+visitor", "beat": 9, "stage": "main", "fired": 7, "episode_over": false}]}
+{"call": "submit", "id": "c3", "atom": "cmd_water", "payload": {}}
+{"call": "step", "out": [{"signal": "event", "seq": 13, "path": "plant+visitor", "beat": 10, "kind": "exo", "name": "do -checked(dry) +cmd_water", "fired": 8, "stage": "main", "ops": ["-checked(dry)", "+cmd_water"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 14, "path": "plant+visitor", "beat": 10, "kind": "clause", "name": "water", "fired": 9, "stage": "main", "consume": {"dry": 1, "cmd_water": 1}, "produce": {"moist": 1, "done(water)": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 15, "path": "plant+visitor", "beat": 10, "stage": "main", "fired": 9, "episode_over": false}]}
+{"call": "step", "out": [{"signal": "event", "seq": 16, "path": "plant+visitor", "beat": 11, "kind": "exo", "name": "do -done(water)", "fired": 10, "stage": "main", "ops": ["-done(water)"]}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 17, "path": "plant+visitor", "beat": 11, "stage": "main", "fired": 10, "episode_over": false}]}
+{"call": "step", "out": [{"signal": "event", "seq": 18, "path": "plant+visitor", "beat": 12, "kind": "exo", "name": "do +sun", "fired": 11, "stage": "main", "ops": ["+sun"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 19, "path": "plant+visitor", "beat": 12, "kind": "clause", "name": "dry_out", "fired": 12, "stage": "main", "consume": {"moist": 1, "sun": 1}, "produce": {"dry": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 20, "path": "plant+visitor", "beat": 12, "stage": "main", "fired": 12, "episode_over": false}]}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "submit", "id": "c4", "atom": "cmd_check", "payload": {}}
+{"call": "step", "out": [{"signal": "event", "seq": 21, "path": "plant+visitor", "beat": 18, "kind": "exo", "name": "do +cmd_check", "fired": 13, "stage": "main", "ops": ["+cmd_check"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 22, "path": "plant+visitor", "beat": 18, "kind": "clause", "name": "check_dry", "fired": 14, "stage": "main", "consume": {"cmd_check": 1}, "produce": {"checked(dry)": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 23, "path": "plant+visitor", "beat": 18, "stage": "main", "fired": 14, "episode_over": false}]}
+{"call": "step", "out": [{"signal": "event", "seq": 24, "path": "plant+visitor", "beat": 19, "kind": "exo", "name": "do -checked(dry) +visitor", "fired": 15, "stage": "main", "ops": ["-checked(dry)", "+visitor"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 25, "path": "plant+visitor", "beat": 19, "kind": "clause", "name": "visitor_waters", "fired": 16, "stage": "main", "consume": {"dry": 1, "visitor": 1}, "produce": {"moist": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 26, "path": "plant+visitor", "beat": 19, "stage": "main", "fired": 16, "episode_over": false}]}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": [{"signal": "event", "seq": 27, "path": "plant+visitor", "beat": 24, "kind": "exo", "name": "do +sun", "fired": 17, "stage": "main", "ops": ["+sun"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 28, "path": "plant+visitor", "beat": 24, "kind": "clause", "name": "dry_out", "fired": 18, "stage": "main", "consume": {"moist": 1, "sun": 1}, "produce": {"dry": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 29, "path": "plant+visitor", "beat": 24, "stage": "main", "fired": 18, "episode_over": false}]}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "submit", "id": "c5", "atom": "cmd_water", "payload": {}}
+{"call": "step", "out": [{"signal": "event", "seq": 30, "path": "plant+visitor", "beat": 28, "kind": "exo", "name": "do +cmd_water", "fired": 19, "stage": "main", "ops": ["+cmd_water"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 31, "path": "plant+visitor", "beat": 28, "kind": "clause", "name": "water", "fired": 20, "stage": "main", "consume": {"dry": 1, "cmd_water": 1}, "produce": {"moist": 1, "done(water)": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 32, "path": "plant+visitor", "beat": 28, "stage": "main", "fired": 20, "episode_over": false}]}
+{"call": "step", "out": [{"signal": "event", "seq": 33, "path": "plant+visitor", "beat": 29, "kind": "exo", "name": "do -done(water)", "fired": 21, "stage": "main", "ops": ["-done(water)"]}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 34, "path": "plant+visitor", "beat": 29, "stage": "main", "fired": 21, "episode_over": false}]}
+{"call": "step", "out": [{"signal": "event", "seq": 35, "path": "plant+visitor", "beat": 30, "kind": "exo", "name": "do +sun", "fired": 22, "stage": "main", "ops": ["+sun"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 36, "path": "plant+visitor", "beat": 30, "kind": "clause", "name": "dry_out", "fired": 23, "stage": "main", "consume": {"moist": 1, "sun": 1}, "produce": {"dry": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 37, "path": "plant+visitor", "beat": 30, "stage": "main", "fired": 23, "episode_over": false}]}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "step", "out": [{"signal": "event", "seq": 38, "path": "plant+visitor", "beat": 37, "kind": "exo", "name": "do +visitor", "fired": 24, "stage": "main", "ops": ["+visitor"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 39, "path": "plant+visitor", "beat": 37, "kind": "clause", "name": "visitor_waters", "fired": 25, "stage": "main", "consume": {"dry": 1, "visitor": 1}, "produce": {"moist": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 40, "path": "plant+visitor", "beat": 37, "stage": "main", "fired": 25, "episode_over": false}]}
+{"call": "step", "out": []}
+{"call": "step", "out": []}
+{"call": "submit", "id": "c6", "atom": "cmd_check", "payload": {}}
+{"call": "step", "out": [{"signal": "event", "seq": 41, "path": "plant+visitor", "beat": 40, "kind": "exo", "name": "do +cmd_check", "fired": 26, "stage": "main", "ops": ["+cmd_check"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 42, "path": "plant+visitor", "beat": 40, "kind": "clause", "name": "check_moist", "fired": 27, "stage": "main", "consume": {"cmd_check": 1}, "produce": {"checked(moist)": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 43, "path": "plant+visitor", "beat": 40, "stage": "main", "fired": 27, "episode_over": false}]}
+{"call": "step", "out": [{"signal": "event", "seq": 44, "path": "plant+visitor", "beat": 41, "kind": "exo", "name": "do -checked(moist)", "fired": 28, "stage": "main", "ops": ["-checked(moist)"]}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 45, "path": "plant+visitor", "beat": 41, "stage": "main", "fired": 28, "episode_over": false}]}
+{"call": "step", "out": [{"signal": "event", "seq": 46, "path": "plant+visitor", "beat": 42, "kind": "exo", "name": "do +sun", "fired": 29, "stage": "main", "ops": ["+sun"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 47, "path": "plant+visitor", "beat": 42, "kind": "clause", "name": "dry_out", "fired": 30, "stage": "main", "consume": {"moist": 1, "sun": 1}, "produce": {"dry": 1}}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 48, "path": "plant+visitor", "beat": 42, "stage": "main", "fired": 30, "episode_over": false}]}
+{"call": "step", "out": []}
+{"call": "world", "lines": ["-dry"]}
+{"call": "step", "out": [{"signal": "event", "seq": 49, "path": "plant+visitor", "beat": 44, "kind": "exo", "name": "do -dry", "fired": 31, "stage": "main", "ops": ["-dry"]}]}
+{"call": "step", "out": [{"signal": "quiescence", "seq": 50, "path": "plant+visitor", "beat": 44, "stage": "main", "fired": 31, "episode_over": false}]}
+{"call": "step", "out": [{"signal": "surprise", "seq": 51, "path": "plant+visitor", "beat": 45, "record": 0, "kind": "unmodeled", "likelihood": 0, "steps": 1, "observed": {"moist": 0, "dry": 1}, "model": {"moist": 0, "dry": 0}, "diff": {"dry": 1}, "observe_only": true}]}
+{"call": "intent", "line": "explain 0 nope x", "out": {"ok": true, "intent": 1}, "outbox": [{"signal": "result", "seq": 52, "path": "plant+visitor", "beat": 45, "intent": 1, "verb": "explain", "status": "refused", "reason": "no card 'nope' at this node", "record": 0}]}
+{"call": "intent", "line": "explain 0 plant+visitor water", "out": {"ok": true, "intent": 2}, "outbox": [{"signal": "result", "seq": 53, "path": "plant+visitor", "beat": 45, "intent": 2, "verb": "explain", "status": "refused", "reason": "the served world is scored at exactly k=1 over its own fired path: the record's own verdict (unmodeled) \u2014 it may not invent its own moves", "record": 0, "card": "plant+visitor", "horizon": {"served": 1}}]}
+{"call": "intent", "line": "explain 0 plant+visitor", "out": {"ok": true, "intent": 3}, "outbox": [{"signal": "result", "seq": 54, "path": "plant+visitor", "beat": 45, "intent": 3, "verb": "explain", "status": "refused", "reason": "the served world is scored at exactly k=1 over its own fired path: the record's own verdict (unmodeled) \u2014 it may not invent its own moves", "record": 0, "card": "plant+visitor", "horizon": {"served": 1}}]}
+{"call": "intent", "line": "reset 5", "out": {"ok": true, "intent": 4}, "outbox": [{"signal": "result", "seq": 55, "path": "plant+visitor", "beat": 45, "intent": 4, "verb": "reset", "status": "refused", "reason": "no record 5"}]}
+{"call": "intent", "line": "reset 0", "out": {"ok": true, "intent": 5}, "outbox": [{"signal": "result", "seq": 56, "path": "plant+visitor", "beat": 45, "intent": 5, "verb": "reset", "status": "admitted", "reason": "the reading is set aside as noise; resumed on the model \u2014 the next reading checks it", "record": 0}]}
+{"call": "step", "out": [{"signal": "surprise", "seq": 57, "path": "plant+visitor", "beat": 46, "record": 1, "kind": "unmodeled", "likelihood": 0, "steps": 1, "observed": {"moist": 0, "dry": 1}, "model": {"moist": 0, "dry": 0}, "diff": {"dry": 1}, "observe_only": true}]}
+{"call": "step", "out": []}
+{"call": "intent", "line": "reset 0", "out": {"ok": true, "intent": 6}, "outbox": [{"signal": "result", "seq": 58, "path": "plant+visitor", "beat": 47, "intent": 6, "verb": "reset", "status": "refused", "reason": "record 0 is not open (reset at beat 45)", "record": 0}]}
+{"call": "intent", "line": "reset 1", "out": {"ok": true, "intent": 7}, "outbox": [{"signal": "result", "seq": 59, "path": "plant+visitor", "beat": 47, "intent": 7, "verb": "reset", "status": "refused", "reason": "the same surprise came back after a reset \u2014 no more resets; escalate", "record": 1, "mined_text": "the same misreading (dry +1) recurred after a reset of record 0 at beat 45: not a one-off"}]}
+{"call": "intent", "line": "escalate 1", "out": {"ok": true, "intent": 8}, "outbox": [{"signal": "result", "seq": 60, "path": "plant+visitor", "beat": 47, "intent": 8, "verb": "escalate", "status": "refused", "reason": "escalate needs the description (mined_text)", "record": 1}]}
+{"call": "intent", "line": "escalate 1 the soil reads dry but the model lost dry", "out": {"ok": true, "intent": 9}, "outbox": [{"signal": "result", "seq": 61, "path": "plant+visitor", "beat": 47, "intent": 9, "verb": "escalate", "status": "admitted", "reason": "stamped on the record for the revision loop; still observe-only", "record": 1, "chars": 41}]}
+{"call": "step", "out": []}
+{"call": "world", "lines": ["+dry"]}
+{"call": "step", "out": [{"signal": "event", "seq": 62, "path": "plant+visitor", "beat": 49, "kind": "exo", "name": "do +visitor +dry", "fired": 32, "stage": "main", "ops": ["+visitor", "+dry"]}]}
+{"call": "step", "out": [{"signal": "event", "seq": 63, "path": "plant+visitor", "beat": 49, "kind": "reading", "consistent": true, "diff": {}, "record": 1}]}
+{"call": "step", "out": [{"signal": "event", "seq": 64, "path": "plant+visitor", "beat": 50, "kind": "reading", "consistent": false, "diff": {"moist": 1, "dry": -1}, "record": 1}]}
+{"call": "records", "records": [{"format": "metis-surprise", "version": 1, "program_key": "20558b74c19b72f471e6618a62ea8c7c6ae1899c3ced77738904f3f345706f75", "steps": 1, "init": {}, "observed": {"moist": 0, "dry": 1}, "likelihood": 0, "kind": "unmodeled", "meta": {"path": "plant+visitor", "beat": 45, "fired": 31, "stage": "main", "since": [], "host": "metis_agent.domains.plant:make", "diff": {"dry": 1}}, "env": {"format": "json", "hash": "2c6ae4238b23e747777d1c6fa6eb4efb44e9f9eb538d42606a9c28aae4c0d2a1", "data": {"acted": [{"beat": 2, "event": "check_moist", "id": "c1", "payload": {}}, {"beat": 9, "event": "check_dry", "id": "c2", "payload": {}}, {"beat": 10, "event": "water", "id": "c3", "payload": {}}, {"beat": 18, "event": "check_dry", "id": "c4", "payload": {}}, {"beat": 28, "event": "water", "id": "c5", "payload": {}}, {"beat": 40, "event": "check_moist", "id": "c6", "payload": {}}], "host": [45, [], [[2, "check_moist", []], [6, "dry_out", []], [9, "check_dry", []], [10, "water", []], [12, "dry_out", []], [18, "check_dry", []], [19, "visitor_waters", []], [24, "dry_out", []], [28, "water", []], [30, "dry_out", []], [37, "visitor_waters", []], [40, "check_moist", []], [42, "dry_out", []]], false, 3, 0], "inflight": {}, "live_waits": [], "queue": [], "world_lines": []}}, "resolution": {"by": "reset", "beat": 45}}, {"format": "metis-surprise", "version": 1, "program_key": "20558b74c19b72f471e6618a62ea8c7c6ae1899c3ced77738904f3f345706f75", "steps": 1, "init": {}, "observed": {"moist": 0, "dry": 1}, "likelihood": 0, "kind": "unmodeled", "meta": {"path": "plant+visitor", "beat": 46, "fired": 31, "stage": "main", "since": [], "host": "metis_agent.domains.plant:make", "diff": {"dry": 1}}, "env": {"format": "json", "hash": "a51751f4fade4d7890d3fe99ac814eeab9a13d42d4ec3bfdd4a6960987c6a99b", "data": {"acted": [{"beat": 2, "event": "check_moist", "id": "c1", "payload": {}}, {"beat": 9, "event": "check_dry", "id": "c2", "payload": {}}, {"beat": 10, "event": "water", "id": "c3", "payload": {}}, {"beat": 18, "event": "check_dry", "id": "c4", "payload": {}}, {"beat": 28, "event": "water", "id": "c5", "payload": {}}, {"beat": 40, "event": "check_moist", "id": "c6", "payload": {}}], "host": [46, [], [[2, "check_moist", []], [6, "dry_out", []], [9, "check_dry", []], [10, "water", []], [12, "dry_out", []], [18, "check_dry", []], [19, "visitor_waters", []], [24, "dry_out", []], [28, "water", []], [30, "dry_out", []], [37, "visitor_waters", []], [40, "check_moist", []], [42, "dry_out", []]], false, 4, 0], "inflight": {}, "live_waits": [], "queue": [], "world_lines": []}}, "refusals": ["reset"], "facts": ["the same misreading (dry +1) recurred after a reset of record 0 at beat 45: not a one-off"], "mined_text": "the same misreading (dry +1) recurred after a reset of record 0 at beat 45: not a one-off\nthe soil reads dry but the model lost dry", "escalated": {"beat": 47, "facts": 1}}], "fired": ["do +cmd_check", "check_moist", "do -checked(moist)", "do +sun", "dry_out", "do +cmd_check", "check_dry", "do -checked(dry) +cmd_water", "water", "do -done(water)", "do +sun", "dry_out", "do +cmd_check", "check_dry", "do -checked(dry) +visitor", "visitor_waters", "do +sun", "dry_out", "do +cmd_water", "water", "do -done(water)", "do +sun", "dry_out", "do +visitor", "visitor_waters", "do +cmd_check", "check_moist", "do -checked(moist)", "do +sun", "dry_out", "do -dry", "do +visitor +dry"], "counts": {"visitor": 1, "dry": 1}, "stage": "main"}
