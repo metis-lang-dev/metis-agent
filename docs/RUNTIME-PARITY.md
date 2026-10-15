@@ -1,7 +1,7 @@
 # Runtime parity — what the C++ IR runtime needs for agent/go
 
-runtime-parity s-c39746ca step 1 (opus, 2026-10-15). This is a matrix, no
-code. It sets every kernel and REPL capability the py agent uses against
+runtime-parity s-c39746ca: step 1 (opus) the matrix, step 2 the ruling
+(architect with the user) and the re-cut (opus), all 2026-10-15. No code. It sets every kernel and REPL capability the py agent uses against
 what the C++ IR runtime and a Go binding have today. Each row gets the gap
 and a cost class, and the step-2 ruling is taken from it. The question is
 the user's: what the C++ IR runtime needs so the small-LLM agent on agent/go
@@ -76,195 +76,273 @@ its OCaml-authoritative semantics checked) and `go-domain-agent` (opus, nina
 reviews parity: the H rows, the JSON env on both stacks, a device host
 contract). Not before the re-cut matrix below carries the RUN/DESIGN column.
 
-## Where things stand (read this first)
+## Step 2 — the re-cut (opus): the corrections checked against the record
 
-1. **There is no binding of the C++ IR runtime today.**
-   - Go's only cgo is llama.cpp (`internal/llm`). `build.sh` links nothing
-     else.
-   - `go/internal/kernel` is a JSON-lines client of a metispy process:
-     `python3 -m metis.lang.repl --json` for `-loop v2`, and the py domain
-     agent processes for `-loop v3`. No Go code executes an .llp program.
-   - DESIGN ("Two stacks", "The process shape") says go/ carries "the cgo
-     binding of the C++/IR runtime". INTEGRATION.md has it right: the C++
-     kernel "EXISTS as a library; no process, no wire, no loop verbs", and
-     the cgo embedding is a future phase. **DESIGN needs correcting** (step
-     2).
-2. **The C++ runtime is two engines, neither a live loop.** Both are
-   header-only C++17 (`metis-lang/runtime/include/metis/`, ~2,200 lines; CI
-   builds two tools with g++, no CMake).
-   - **The ground-wire kernel** (`loader.hpp`, `kernel.hpp`, `sampler.hpp`,
-     `registry.hpp`, `evaluator.hpp`) has events with consume, produce and
-     persist, counts and stages, and the exact forward projection
-     (`ForwardProjection`: marginals, `p_done`). It also has weight ports
-     (`Registry`, B-manifest), overlays, and a hot reload with
-     degrade-to-last-good.
-   - **The IR factor-graph evaluator** (`ir.hpp`) has marginals and the
-     likelihood of observed finals under evidence clamps, plus `do()`
-     clamps.
-   - Neither steps a *live* state event by event and returns the event. The
-     library's `run_once` returns only the end state, and samples with
-     `mt19937`; the normative splitmix64 sampler is tool-local in
-     `sample_run.cpp`. There is no snapshot or restore, no watch, no
-     surprise record, no recover, no cards, no `%%` text, no program key.
-3. **Only metispy compiles today.** metisc (OCaml) emits only the corpus
-   form of the IR. The two product artifacts are emitted by metispy alone:
-   the ground wire `N/E/I/S/B` (`kernel/wire.py`) and the product IR
-   (`kernel/ir.py`). DESIGN puts compiling .llp into the consuming project.
-   That project's tool is metispy today, or metisc once it emits the
-   product forms.
-4. **The domain agent is Python end to end.** Its mapper, replier,
-   narrator, AgentHost queueing, watch loop and consult harness are all
-   py. The hosts are Python modules (`dog_host.py`, `plant_host.py`, the
-   kitchen's `pair.py`). A Go deployment on the C++ runtime needs a Go
-   domain agent and Go (or C++) hosts, beyond the runtime itself.
+The ruling's four corrections were checked against every repo's history:
+metis-agent, metis-lang, metispy, and archive/metis, nina_speak and FSTTM,
+all branches. Two hold as stated, and two hold only in part. The evidence
+follows, because the build plan depends on it.
+
+**(a) "A cgo binding of the C++ IR runtime existed when metis-agent started
+and was lost to shortcuts" — not as a binding.**
+- **No cgo or C binding of the runtime was ever written.** No repo, in any
+  commit, has an `extern "C"` over metis or a cgo/pybind/ctypes wrapper of
+  it. The cgo that existed wraps llama.cpp, RHVoice and AEC. metis-agent's
+  first DESIGN (46c116e, `DESIGN.md:240-243`) says: "the certified side is a
+  runtime in its own process, reached through ports. **Neither embeds the
+  other.**" The "ROS gone" of 6463725 is nina_speak's rclgo link to the
+  robot (`/nina/action`, `/cmd_vel` …), not to metis.
+- **What did exist is the theia package in archive/metis** (e11c8c5, stage
+  16). It was a GenServer actor **MetisCtrl**, reached over TIPC IPC, with
+  the header-only kernel inside. Its API was two calls: `Ping` and
+  `Eval(golden path) → parity{ok, total, cases, first_fail}`
+  (`system/metis/package.art:40-43`, `MetisCtrl_handlers.cc:48-61`), a
+  conformance harness.
+  - The same day, "Variant C" (9f8da95, `docs/integration-design.md:10-19,
+    95-103`) made metis a **linked library**: Bazel `@metis//:kernel` →
+    `//cpp:metis_kernel`, for C++ consumers (chariot/wayplan). MetisCtrl
+    "never ships in production".
+  - archive/metis was frozen in ba916e5 ("the theia side … not yet
+    rehomed"). Only the headers moved to metis-lang (b239635), and **the
+    library target and the actor were left behind**.
+- **What was lost to shortcuts:** the runtime as a linked library with a
+  host-facing seam. agent/go took the shortcut of a JSON-lines client of
+  metispy (30884da) and never linked the C++. The "existed" wording in
+  DESIGN (10ff46c, 75a121b) should say this.
+- **The redo is not from zero.** The headers are in metis-lang, the golden
+  conformance suite (`golden.hpp`, `run_goldens`) is the binding's first
+  test, the Bazel `metis_kernel` target and the BUILD files are in the
+  archive to rehome, and the MetisCtrl seam shows the conformance call.
+  What was never built, and is new, is a C ABI and cgo.
+
+**(b) "The runtime progresses on the ports' input, has the surprise record
+and a trace callback for a narrator" — partly.**
+- **It progresses on the ports' input, yes, as a decision cycle.**
+  `Decision Evaluator::tick(Blackboard&)` (`evaluator.hpp:108-154`):
+  1. checks the `ports_in` bindings on the blackboard;
+  2. asks the domain seam for its candidates (`CatalogDomain`, 44-55);
+  3. builds a fresh exact `ForwardProjection` per candidate from the seam's
+     init;
+  4. picks the lexicographic argmin of the rounded scores (`plan.hpp:32-57`);
+  5. writes `ports_out`. `Decision{action, doomed, dof, scores}`
+     (`registry.hpp:50-55`).
+
+  `IrEvaluator::tick` (262-295) does the same over evidence. **No model
+  state lives across ticks**, and it does not sample: it projects and
+  chooses. That is a planner's cycle. The py agent's lower half is a
+  sampler's: one fired event at a time, watched against the host's reading.
+- **The surprise test, yes; the record, no.**
+  `IrEval::likelihood(observed, evidence)` (`ir.hpp:812-828`) is "the
+  runtime surprise op; 0 is the UNMODELED verdict" (`ir_mass` 111-141;
+  checked in `tools/ir_eval_smoke.cpp:110`). The record (program_key,
+  steps, init, observed, likelihood, kind unmodeled/rare, meta, env) is
+  metispy's `surprise_record` (`kernel/record.py:39-71`) only.
+- **A trace callback, yes, but of distributions, not of events.**
+  `using Observer = std::function<void(int, const Dist&)>`
+  (`kernel.hpp:116-119`) is `ForwardProjection`'s, called after each step
+  with the whole slice. Neither evaluator passes one through, and it never
+  sees a fired event. A narrator needs the fired event with its `%%` line.
+  So the callback's seam is there, and **its payload has to become the
+  event** (K1).
+
+**(c) metispy's product artifacts are the cover for now.** The C rows stand:
+metispy compiles, and the runtime loads the artifact.
+
+**(d) One neutral env on both stacks.** Row 22 becomes RUN: the host's
+snapshot as JSON data, written and read by py and Go alike; the pickle goes.
+
+## Where things stand (as of this re-cut)
+
+1. **agent/go runs no domain model itself.** `go/internal/kernel` is a
+   JSON-lines client of metispy (`-loop v2`), and `-loop v3` runs the py
+   domain agent processes. The only cgo is llama.cpp. INTEGRATION.md:51 is
+   right ("EXISTS as a library; no process, no wire, no loop verbs").
+2. **The C++ runtime is header-only** (metis-lang `runtime/include/metis/`,
+   ~2,200 lines). Its parts:
+   - the ground-wire kernel: events with c/o/p, stages, the exact
+     `ForwardProjection`, weight ports with the B-manifest, overlays, hot
+     reload;
+   - the IR evaluator: marginals, the likelihood-0 surprise test, `do()`
+     clamps;
+   - the planning `Evaluator::tick` over ports.
+
+   It has no live stepping core:
+   - `run_once` samples with `mt19937` and returns only the end state;
+   - the normative splitmix64 sampler with trace indices is file-local in
+     `tools/sample_run.cpp:62-161`;
+   - there is no snapshot, watch, record, cards, `%%` text or program key.
+3. **Only metispy emits the product artifacts**: the ground wire
+   (`kernel/wire.py`) and the product IR (`kernel/ir.py`). metisc emits the
+   corpus IR.
+4. **The domain agent and its hosts are Python end to end.**
 
 **Cost classes:**
-- **K**: the C++ runtime grows the capability, in the kernel library.
-- **B**: binding only, a C ABI over what C++ has plus cgo.
-- **H**: the Go harness, Go code over the binding (the domain agent's py
-  logic ported).
-- **C**: compile time, meaning the artifact carries it; the consuming
-  project's build tool emits it, and the runtime only loads it.
-- **D**: the development stack only. The deployment can do without it
-  (py keeps it; the loop console uses it).
+- **K**: the C++ runtime grows the capability.
+- **B**: the binding (a C ABI over the runtime, plus cgo).
+- **H**: the Go harness, agent/py's logic adapted.
+- **C**: the artifact carries it (metispy emits it).
+- **—**: nothing to build.
 
-## The matrix
+**RUN** is on the device. **DESIGN** is the development stack only.
+**Δ** marks where this pass differs from the ruling's first table.
+
+## The matrix, RUN / DESIGN
 
 ### A. The served program
 
-| # | capability | agent/py calls (where) | what it is for | C++ IR runtime today | gap | cost |
+| # | capability (agent/py) | RUN/DESIGN | C++ today | gap | cost | note |
 |---|---|---|---|---|---|---|
-| 1 | load the program | `Repl(CATALOG, seed, plugin, host)` (domain_agent.py:159) → parse, compile, ground | one runtime per domain, from `#init` | ground wire `load_program` (loader.hpp:40), product IR `load_ir_artifact` (ir.hpp:604); no compile by design | load present; compile is metispy's | **C** + **B** |
-| 2 | program key | `repl.key` (sink `catalog_hash`, `reloaded`/`added` replies) | which program a record or reply belongs to | missing (only the `C <name>` header); OCaml has `Nets.program_key` | missing | **C** (key in the artifact header) + **B** |
-| 3 | packs merged into the served program | `apply_packs`: `cmd_text`, `cmd_llp`, `cmd_gate`, `cmd_accept` (domain_agent.py:113) | program + `packs/*.llp`, gated, the key over the union (the architect's ruling) | missing; admission is metisc `Catalog.admit` or metispy's gate | missing in the runtime, and right so | **C** (the union compiled and admitted at build; the runtime loads one artifact) |
-| 4 | each rule's `%%` line | `rule_docs`: `parser.parse_file`, `Stage`, `_words` (domain_agent.py:91) | reply text and reason, slot binding, own-voice check | missing in both wire formats (metisc parses docs, grounding drops them; `ir.hpp` rejects the py `D` sidecar) | missing | **C** (event → line sidecar) + **H** (or **K**: accept a doc record) |
-| 5 | the script of cards | `metis.loop.cards.script(repl)` (domain_agent.py:135) | the narrator's system prompt; the consultant's script | missing | missing | **C** (text sidecar by program key) + **H** |
-| 6 | cards and their moves (siblings, extends) | `cards(repl)`, `card_program` (domain_agent.py:141, 507) | the surprise's `cards`; the consult's move enum; `explain` adopts a card's move | missing | missing | **C** (each card's added events and effects compiled in) + **K** (fire a card's move on the live state, row 19) |
-| 7 | `#query` atoms (the mirror's counts) | `mirror_atoms(repl.text)` + `repl.counts` (domain_agent.py:130, replier.py:55) | the mirror counts on `event` replies (current counts; the P[] marginals are v2-only) | counts present (`Counts`, `State`); queries only as compiled `O/U` records | partial | **C** (the query list) + **B** |
-| 8 | notch overlay | implicit: `#notch` shipped at load (`_ship_pending_notch`) | fitted weights | `Registry::overlay` on the ground path; the IR path ignores overlays (`ir.hpp:880` uses `find`, not `resolved`); no notch JSON loader | partial; no served agent domain uses a notch today (only rddl tamarisk, wildfire) | **K** (small) + **H**; deferrable |
-| 9 | port pricing | implicit: `PortPricer` at bind; the host's weight ports (the kitchen's `w_partner`) | event weights, so the surprise likelihood | present: `make_weight_policy` (registry.hpp:181), B-manifest fail-fast | present | **B** (bind weights from the Go host) |
+| 1 | load the program (`Repl(CATALOG…)`: parse, compile, ground) | **RUN**: load the artifact · DESIGN: the compile | `load_program` (loader.hpp:40), `load_ir_artifact` (ir.hpp:604) | load present | C + B | |
+| 2 | the program key (`repl.key`) | **RUN** | missing | missing | C + B | the KV prefix cache keys on it |
+| 3 | packs merged (`apply_packs`: gate, accept) | **RUN**: the merged artifact · DESIGN: gate/accept | missing in the runtime | right so | C | admitted at build |
+| 4 | each rule's `%%` line (`rule_docs`) | **RUN** | missing in both wires | missing | C (+ K: accept a doc record, or H: a sidecar) | the narrator, the replier's text and reason |
+| 5 | the script of cards (`cards.script`) | **RUN** | missing | missing | C + H | the narrator's prompt / RAG |
+| 6 | cards and their moves (`cards`, `card_program`) | **RUN** | missing | missing | C + K5 | `explain` fires a card's move |
+| 7 | `#query` atoms, the mirror's current counts | **RUN** | counts present; queries only as `O/U` records | partial | C + B | |
+| 8 | notch overlay (`#notch` at load) | **RUN** | `Registry::overlay` (ground path); IR ignores overlays (`ir.hpp:880` `find`, not `resolved`) | partial | K (small) + H | no served agent domain has one today |
+| 9 | port pricing (`PortPricer`, host weight ports) | **RUN** | present: `make_weight_policy` (registry.hpp:181) | — | B | |
 
 ### B. The tick
 
-| # | capability | agent/py calls (where) | what it is for | C++ IR runtime today | gap | cost |
+| # | capability (agent/py) | RUN/DESIGN | C++ today | gap | cost | note |
 |---|---|---|---|---|---|---|
-| 10 | **step one thing on a live state** (sample an enabled event, fire it, return it) | `watch.step()` → `_candidates`, `_sample`, `_fire` (domain_agent.py:299, 596) | the clock: every fired move, quiescence, env beat | `run_once` returns only the end state, with `mt19937`; the normative splitmix64 sampler with trace indices is tool-local (`sample_run.cpp:111`) | **missing: the core gap** | **K** (a stepping API on a live state with the normative sampler, seeded, returning the event) + **B** |
-| 11 | enabled events / would a command fire / the beat boundary | `repl._candidates()`, `w.quiet`, `w.observe_only` (domain_agent.py:290) | `{"clock":"beat"}` runs steps until the runtime would tick; "no rule took the command" | `transition_count(e, counts) > 0` (kernel.hpp:75); `choice_` private | partial | **K** (public enabled-events) + **B** |
-| 12 | do-lines `+atom` / `-atom N` on the live state (an exo row) | `AgentHost.tick` → `plugin.tick` → `exo_event`, `parse_do_line` (fw/plugin.py:128) | a command atom asserted on the next tick; world lines; retracting an untaken command | candidate `init_for` replaces the whole multiset; IR evidence clamps; no incremental edit | partial | **K** (small: apply a delta to the live state as a row) |
-| 13 | stages and the host tick at quiescence | `Repl._tick`, `beat_stage` | the beat loop: quiet → the host ticks → new facts | stages, links, `kDone` present (kernel.hpp:49) | partial | **H** (the loop) over **K** (rows 10–12) |
-| 14 | the host faces: tick, on_event, observe, snapshot, restore (PortPlugin) | `Repl(plugin=…)`; `AgentHost` wraps the catalog host (agent_host.py) | the world: commands out, readings in | a BT.cpp-style seam (`Registry` weight/input/output/guard bindings, `Blackboard`, `Evaluator::tick`); no PortPlugin; guard bindings never called | different shape | **H** (the PortPlugin contract in Go) + **porting each host** out of Python (the dog's, the plant's, the kitchen's) |
-| 15 | fired rows (kind, stage, event, consume / produce / persist, the line) | `repl.fired_rows`, `ev.consume/produce/persist`, `len(repl.fired)` (domain_agent.py:333) | `event`/`result` replies, the blocker, the trace reply (`dlg-trace`) | `Event` with c/o/p on the ground wire (kernel.hpp:49); absent in the IR artifact; `Observer` sees slices, not events | partial | **K** (row 10 returns the event) + **H** (the journal); the live loop runs on the ground wire, not the IR |
+| 10 | step one thing on a live state (`watch.step` → `_candidates`, `_sample`, `_fire`) | **RUN** | **Δ** `Evaluator::tick` progresses on the ports' input as a *planner* (projection + argmin, no live state, `evaluator.hpp:108-154`); `run_once` samples with `mt19937`, end state only (`sampler.hpp:14`); the normative splitmix64 is tool-local (`sample_run.cpp:62-161`) | **missing: a live sampling core** | **K1** + B | parity needs the sampler, the `<` rule and the canonical event order of `sample_run.cpp`, in the library |
+| 11 | enabled events; the beat boundary (`_candidates`, `quiet`, `observe_only`) | **RUN** | `transition_count > 0` (kernel.hpp:75); `choice_` private | partial | **K2** + B | |
+| 12 | do-lines `+atom` / `-atom N` as an exo row (`plugin.tick` → `exo_event`) | **RUN** | `init_for` replaces the multiset; IR clamps | partial | **K2** | |
+| 13 | stages and the host tick at quiescence (`Repl._tick`) | **RUN** | stages, links, `kDone` present | partial | H over K1/K2 | |
+| 14 | the host faces: tick, on_event, observe, snapshot, restore (PortPlugin) | **RUN** | a different seam: `Registry` input/output/guard bindings, `Blackboard`, the planner's tick (guards never called) | different shape | H + a C ABI for C++ device hosts | the dog, plant and kitchen hosts leave Python |
+| 15 | fired rows: kind, stage, event, c/o/p, the line (`fired_rows`, the trace reply) | **RUN** | **Δ** `Observer(step, Dist)` (kernel.hpp:116) reports distribution slices, not fired events; no evaluator passes it through | the callback's seam exists, the payload is wrong | **K1** (the step returns the event; the observer reports it) + H (the journal, the narrator) | "the trace callback → the narrator" is K1's event observer |
 
 ### C. Surprise
 
-| # | capability | agent/py calls (where) | what it is for | C++ IR runtime today | gap | cost |
+| # | capability (agent/py) | RUN/DESIGN | C++ today | gap | cost | note |
 |---|---|---|---|---|---|---|
-| 16 | the surprise test: the host's `observe()` against the program, from the checkpoint | implicit in `watch.step()` → `_read`, `_record`, `surprise_record` (watch.py:156, record.py:39) | a reading of probability 0 is a surprise; the domain becomes observe-only | `ForwardProjection` exact filter present but always from `init`; IR `likelihood` of observed finals (ir.hpp:814); "likelihood 0 = unmodeled" | partial | **K** (project from a given state over N steps) + **H** (the watch: checkpoint, read, diff) |
-| 17 | the surprise record (ground, steps, init, observed, likelihood, kind, meta, env) | `repl.loop.records[k]` (domain_agent.py:270, 425, 560) | the refusal while open; the consult's evidence; the sink | missing | missing | **H** (the record) + **K** (row 16's likelihood); `env`, see row 22 |
-| 18 | the open-surprise gate (one templated refusal) | `watch.open` (domain_agent.py:247) | no new orders while a surprise is open | n/a | — | **H** |
-| 19 | `explain(card, move)`: the witness over k+1 beats, the move adopted as an exo row, the streak notice | `watch.intent("explain R CARD MOVE")` → `_intent_explain`, `_witness`, `_adopt` (watch.py:352, 622, 506) | close a surprise by a sibling card's move | missing | missing | **K** (fire a card's event on the live state; the likelihood check) + **H** (the verb's bookkeeping) |
-| 20 | `reset` (noise; a same-signature recurrence refused) · `escalate` (`mined_text` = facts + text) · the operator resume | `_intent_reset`, `_intent_escalate`, `_operator` (watch.py:325, 449, 473) | the other closes | n/a | — | **H** (resume on the model = row 10) |
-| 21 | the records sink (metispy's JSONL: record + close) | `sink_record` (domain_agent.py:551), `records_path` | the loop's input: sink, record, replay, mine, revise | n/a | — | **H**, except row 22 |
-| 22 | the record's `env` (the host's snapshot: hash + pickle blob) | `env_record`, `env_unblob` (domain_agent.py:563) | the loop's REPL restores the host to replay the record | n/a: a Go host cannot write a Python pickle | **a format question** | **H** + a neutral env encoding (JSON) that the py host restores, or the record replayed without env ("matches" by hash only); a step-2 ruling |
-| 23 | `recover` / replay | not in the agent: the loop console's `replay` (verbs.py:405 → record.py:104) | before and after a fix: `fixed: true` | missing | missing | **D** (the records are replayed on the development stack) |
+| 16 | the surprise test from the checkpoint (`Watch._read`, `_record`) | **RUN** | **Δ** the test is there: `IrEval::likelihood` (ir.hpp:812, 0 = UNMODELED), and `ForwardProjection` exact (kernel.hpp:123), both from the program's init | **projection from a given state** missing | **K4** (a projection from a `State`, small) + H (the watch: checkpoint, read, diff) | K4 is needed: the record's likelihood is from the checkpoint, not from init |
+| 17 | the surprise record (program_key, steps, init, observed, likelihood, kind, meta, env) | **RUN** | **Δ** no record in C++: it is metispy's `surprise_record` (record.py:39) | missing | H (over K4) | |
+| 18 | the open-surprise gate (one templated refusal) | **RUN** | n/a | — | H | |
+| 19 | `explain(card, move)`: witness over k+1, adopt as an exo row, notice | **RUN** | missing | missing | **K5** + H | |
+| 20 | `reset` · `escalate` (mined_text) · the operator resume | **RUN** | n/a | — | H | |
+| 21 | the records sink (metispy's JSONL) | **RUN** | n/a | — | H | the device's records are replayed on the development stack |
+| 22 | the record's `env` | **RUN** **Δ** | n/a | the pickle is a shortcut | H on both stacks: **one neutral JSON env** (the host's snapshot as data), py first | the ruling's (d) |
+| 23 | `recover` / replay | DESIGN | missing | — | — | the loop's "fixed: true" |
 
-### D. The REPL reads and the consult
+### D. Reads and the consult
 
-| # | capability | agent/py calls (where) | what it is for | C++ IR runtime today | gap | cost |
+| # | capability (agent/py) | RUN/DESIGN | C++ today | gap | cost | note |
 |---|---|---|---|---|---|---|
-| 24 | `state` · `events` · `ctx` | `repl.capture(name)` (domain_agent.py:388) | the orchestrator's T reads | counts and events available; no formatter | partial | **H** (over **B**) |
-| 25 | `why(atom)` (the structural cone) · `findings` | `capture("why", …)` (domain_agent.py:404: the harness's first read after a refusal) | the consult's evidence band | missing (spec 09/11 are REPL-only) | missing | **K** (the cone over the ground program) or **D**/template on the deployment (decide in step 2) |
-| 26 | the consult in a fork of the live session | `LiveKernel`: `fork`, `back`, `shelf`, `intro` (consult.py:61); `live_unchanged` | the specialist simulates without touching the live world | missing (no snapshot) | missing | **K** (state snapshot/restore: counts, stage, rng, fired length; cheap) + **H** |
-| 27 | the consult's tools: `run` `step` `events` `state` `ctx` `list` `why` `findings` `narrate` `graph` `do` `fork` `back` `undo` `necessity` `sufficiency` | `WHITELIST` (repl_tools.py:20) | the counterfactual reads a consult may make | `do()` as IR clamps; no `necessity`/`sufficiency`; no `undo` | mostly missing | **K** for `run`/`step`/`do`/`undo` (rows 10–12, 26); `necessity`/`sufficiency`/`graph`/`narrate`: **D**, or the deployment's consult stays the harness's template (DESIGN's template consult) |
-| 28 | snapshot/restore of the runtime state (fork, undo, the checkpoint) | `_snapshot_world`, `_env_push` after every row | consult forks; the watch's checkpoint | missing | missing | **K** (small) + **H** (the host's own snapshot, row 14) |
+| 24 | `state` · `events` · `ctx` (the orchestrator's T reads) | **RUN** | counts, events | partial | H over B | |
+| 25 | `why(atom)` · `findings` | DESIGN | missing | — | — | **Δ** the device's refusal path takes its blocker from the replier (row 15); py's harness also reads `why(refused(ACT))` for the consult's evidence, which the device's template consult does without |
+| 26 | the consult in a fork (`fork`, `back`) | DESIGN (the model consult) · **RUN**: the snapshot it rests on (row 28) | missing | — | — | **Δ** on the device the consult is the harness's template plus the cards' moves (the ruling) |
+| 27 | the consult's tools (`run` `step` `do` `undo` `necessity` `sufficiency` `graph` `narrate` `whatif`) | DESIGN | `do()` clamps only | — | — | **Δ** `run`/`step`/`do`/`undo` too: the template consult makes none |
+| 28 | snapshot/restore of the runtime state | **RUN** | none (no snapshot anywhere in `include/` or `tools/`) | missing | **K3** + H (the host's own, row 14) | **Δ** needed on the device for the watch's checkpoint and the explain witness, not only for a consult fork |
 
 ### E. Lifecycle and the scene
 
-| # | capability | agent/py calls (where) | what it is for | C++ IR runtime today | gap | cost |
+| # | capability (agent/py) | RUN/DESIGN | C++ today | gap | cost | note |
 |---|---|---|---|---|---|---|
-| 29 | reset (a fresh runtime and host) | `Process.build` (domain_agent.py:834) | `{"reset"}`; a new day | load present | — | **B** + **H** |
-| 30 | reload (from disk; the old runs on a failure) · add (hot-install) | `Process.reload`, `add_line` (a new `Repl`; no state carried) | e2e step 3/4, human-loop | `Evaluator::reload` hot-swap with degrade-to-last-good (no state, no recompile) | present for a loaded artifact; the recompile is **C** | **C** (rebuild the artifact) + **B** |
-| 31 | the ports reply (pairs, held, reports, handles) | `ports()` (domain_agent.py:629): module data + `repl.counts` | the agent console's world ports | counts present | — | **H** (the module data from intent.yaml / the host) |
-| 32 | the kitchen pair scene (two runtimes, one env, interleaved steps) | `PLUGIN = …pair:make_pair_kitchen`, `METIS_PAIR_DIR`, `Domains.pair_beat` (domain_agent.py:752) | the first cook surprised by the second's `partner_load` | missing (only `Blackboard::child` scopes) | missing | **H** (two runtimes in one process over a shared host env), given **K** rows 10–12 |
-| 33 | the domain agent's own logic: mapper, replier, narrator, AgentHost queues, the consult harness | py (`mapper.py`, `replier.py`, `narrator.py`, `agent_host.py`, `consult.py`) | the lower half | n/a | all py today | **H** (the largest harness item: the generic agent ported to Go, its tables from `intent.yaml` as on py) |
+| 29 | reset (a fresh runtime and host) | **RUN** | load | — | B + H | |
+| 30 | reload · add (hot-install) | **RUN** | `Evaluator::reload` hot-swap, degrade-to-last-good (evaluator.hpp:68-97) | present for an artifact | C (the rebuild) + B | |
+| 31 | the ports reply (pairs, held, reports, handles) | **RUN** | counts | — | H | |
+| 32 | the kitchen pair scene (two runtimes, one env) | **RUN** | missing (`Blackboard::child` scopes) | missing | H over K1/K2 | |
+| 33 | the generic domain agent: mapper, replier, narrator, AgentHost queues, the consult harness | **RUN** | n/a | all py | **H** (the bulk) | |
+| — | compile, gate/accept, formalize, mine, revise; `intents` drafting; `apply`; the loop console; the parity traces and benches | DESIGN | — | — | — | |
 
-## The parity bar for agent/go on the IR runtime
+## What the C++ runtime must grow (K), in order
 
-The bar is DESIGN's "What parity means", extended down to the lower half.
+1. **K1 — the live sampling core.** A live state with a stepping API: sample
+   one enabled event with the normative splitmix64 sampler, seeded, fire it,
+   and return the event (index, c/o/p). This means:
+   - moving the sampler from `tools/sample_run.cpp:62-161` into the
+     library, with its `<` rule and the loader's canonical order;
+   - weights through the existing policy;
+   - an event observer: the trace callback the narrator and the journal
+     read, beside the slice `Observer` (row 15).
+2. **K2 — enabled events and do-line deltas.** The enabled set on the live
+   state (the beat boundary, "no rule took the command"), and `+atom` /
+   `-atom N` applied to it as an exo row. The stage/quiescence tick is H
+   over K1/K2.
+3. **K3 — snapshot/restore of the runtime state** (counts, stage, rng
+   state, fired length), for the watch's checkpoint, the explain witness and
+   the consult fork.
+4. **K4 — projection from a given state.** Verified needed: the C++
+   projections start from the program's init, and the surprise record's
+   likelihood is from the checkpoint over the steps since. Small: a
+   `ForwardProjection` from a `State`.
+5. **K5 — fire a card's move on the live state** (`explain`). The cards'
+   events come in the artifact (C, row 6).
 
-**The upper half.** Driven by the same inputs and answered by the same
-generations, the Go orchestrator writes the same `dlg-*` records. This
-already holds (TestDumpV3Trace, TestDumpDialogTrace, py 180/180 and 42/42).
+Outside K:
+- **B:** the C ABI over K1–K5, plus load and the sidecars, the key, the
+  weight bindings and the trace callback; cgo in go/.
+- **H:** the rest of RUN.
+- **The planning tick** (`Evaluator::tick`) stays for the C++ consumers
+  that plan over ports. agent/go's lower half needs the sampler's loop for
+  parity with py.
 
-**The lower half: the same generic reply stream.** The Go domain agent on
-the C++ runtime answers with the same replies as the py domain agent on
-metispy, given the same program artifact, seed, host and line input.
-- **What has to match:** the replies' kinds, ids, statuses and texts; their
-  `ref.seq` and `ref.beat`; the surprise's record, difference and cards;
-  the results of `explain`/`reset`/`escalate`.
-- **What that requires (K, row 10):**
-  - the same sampler: the normative splitmix64 with metispy's trace
-    indices, not `mt19937`;
-  - the same canonical event order;
-  - the same seed semantics.
-- **How to check it without a model:** dump the py domain agent's reply
-  streams on the scripted days (the dog's, the plant's, the kitchen pair's
-  in the `replay` case) and diff Go's against them, as the orchestrator
-  traces are diffed today.
-- **On the model:** the 14 timelines' reads, the integration replay's reads
-  with the real domains, and the plant's A4–A6, with the same counts.
+## The parity bar, and one consequence of the device's consult
 
-Generation-for-generation identity stays a property of one llama.cpp build.
+The bar is DESIGN "What parity means", carried to the lower half.
+- **The reply stream.** The Go domain agent on the C++ runtime writes the
+  same generic replies as the py domain agent on metispy, given the same
+  artifact, seed, host and line input. That covers kinds, ids, statuses,
+  texts, `ref.seq`/`ref.beat`, and the surprise's record, difference and
+  cards.
+- **How it is checked:** without a model, against reply streams dumped by
+  py on the scripted days (the dog, the plant, the kitchen pair in the
+  `replay` case). On the model: the 14 timelines, the integration replay,
+  and the plant's A4–A6, holding with py's counts.
 
-## What the one-model optimization needs from the runtime
+**One consequence to rule on.** The device's consult is the harness's
+template plus the cards' moves. The py reads that rest on the model
+consult's answers cannot hold on the device as they are: the integration
+replay's consult answers (D4-b), and E11/t3's consult-shaped reads. Either
+the device's bar names the template consult's answers as its own reference
+(dumped by py with the template seat), or the device keeps a model consult
+on the one LLM, which brings `run`/`step`/`do`/`fork`/`why` back into RUN.
+The first is the ruling's, and I would take it: py can run the template
+seat and dump the reference.
 
-The one-model shape is the orchestrator, narrator and consult seat on one
-small LLM, swapping contexts. The context (KV) swap itself is llama.cpp's
-(`llama_state_seq_get/set`, already in Go's cgo), not the runtime's.
+## Proposal: the two build subjects
 
-The runtime must supply:
-- **(a) Cheap snapshots of its own state** (counts, stage, rng, fired
-  length; row 28). A consult runs in a fork while the orchestrator's
-  context is swapped out, then the live state resumes untouched.
-- **(b) The RAG material, by program key** (rows 2, 4, 5), compiled into
-  sidecars:
-  - each event's `%%` line, for the narrator's per-event retrieval in place
-    of the whole script in its prompt;
-  - the cards' script and their moves, for the consult's retrieval;
-  - the packs' text, already merged into the artifact at build time
-    (row 3).
-- **(c) The program key** (row 2), so the KV prefix of a prompt built from
-  a program's script is cached per key and invalidated by a reload.
-- **(d) A stepping API that returns the fired event with its line** (rows
-  10 and 15), so the narrator is fed per event, as on py.
+**runtime-binding** (opus; the runtime's semantics checked against metispy
+and, where it is authoritative, metisc):
+1. **The library rehomed.** A build target for the headers in metis-lang
+   (CMake or Bazel, after the archive's `metis_kernel`), the goldens in CI
+   (`run_goldens`: the MetisCtrl conformance call as a library test), and
+   the archive's smokes revived.
+2. **K1** in the library: the normative sampler, the live state, step →
+   event, the event observer. The test: seeded traces byte-equal to
+   metispy's (the same indices) on the dog, the plant and the kitchen
+   ground wires.
+3. **K2 + K3:** enabled events, do-line deltas, snapshot/restore. The test:
+   metispy `Repl` runs with do-lines, and fork/back round-trips.
+4. **K4 + K5:** projection from a state (the test: metispy's surprise
+   likelihoods on recorded surprises, the plant and the kitchen) and firing
+   a card's move.
+5. **The C ABI and cgo** (`go/internal/rt`): load the artifact and sidecars,
+   the key, the weight bindings, the calls above. The artifacts' sidecars
+   (the key, `%%` lines, cards and their moves, the query list) are emitted
+   by metispy. `build.sh` and CI link it.
 
-It does not need marginals in the live loop: the mirror is current counts,
-and the `#query` P[] marginals are only the `-loop v2` path's.
-
-## For step 2: the shape of the gap
-
-- **The runtime (K) must grow a live stepping core** on the ground-wire
-  kernel. The IR evaluator stays the marginals and likelihood engine. The
-  core is:
-  - a live state, with snapshot and restore;
-  - enabled events;
-  - sample, fire and return the event, with the normative sampler;
-  - do-line deltas;
-  - forward projection from a given state, for the surprise likelihood;
-  - firing a card's event (`explain`).
-- **The binding (B) is a small C ABI** over that, plus load, weights and
-  the key.
-- **The artifact (C) gains** the key, the `%%` lines, the cards' events and
-  script, and the query list. Packs are merged at build.
-- **The harness (H) is the bulk:**
-  - the generic domain agent in Go (mapper, replier, narrator, watch,
-    surprise verbs, sink, ports, pair scene);
-  - the hosts out of Python;
-  - the records' env encoding.
-- **The development stack keeps (D):** `recover`/replay, `why`/`findings`
-  and the counterfactual consult tools — unless step 2 rules them into the
-  deployment. On the deployment, the consult can stay the harness's
-  template, the E11 seat being a py convenience.
-
-**One correction for DESIGN:** go/ does not carry a cgo binding of the C++
-runtime yet. That binding is this subject's build.
+**go-domain-agent** (opus; nina reviews parity):
+1. **The neutral JSON env on both stacks.** py first: the records carry the
+   host's snapshot as JSON data; metispy's `record`/`replay` read it; the
+   pickle goes.
+2. **The device host contract.** A Go PortPlugin (tick, on_event, observe,
+   snapshot, restore) and a C ABI for C++ hosts. The plant's and the dog's
+   hosts ported; the kitchen pair's shared env.
+3. **The generic domain agent in Go** over `go/internal/rt`:
+   - the mapper and replier from `intent.yaml`, the AgentHost queues;
+   - the watch (checkpoint, the surprise test, the record, the open gate)
+     and the surprise verbs;
+   - the sink, the ports reply, the pair scene;
+   - the narrator fed by the event observer;
+   - the template consult with the cards' moves.
+4. **Parity, without a model:** py dumps the domain agent's reply streams
+   on the scripted days, with the template consult; Go's are diffed against
+   them.
+5. **Parity on the model**, with the Go domain agent in-process: the 14
+   timelines, the integration replay, the plant's A4–A6.
+6. **The one-model shape:** one LLM, the context swap (KV per role) and the
+   RAG of the `%%` lines and cards by key, measured on the same reads at the
+   device's footprint.
