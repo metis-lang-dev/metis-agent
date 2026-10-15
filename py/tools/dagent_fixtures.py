@@ -306,7 +306,7 @@ def run_pair_day(names, lines):
     return stream
 
 
-def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None):
+def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None, trace=False):
     """The day through py's serve(): (the output stream, the replier calls)."""
     import io
     import contextlib
@@ -360,6 +360,7 @@ def run_day(name, lines, case="replay", hostcalls=None, watchcalls=None):
                                "out": json.loads(json.dumps(out)), "record": json.loads(json.dumps(agent.consults[-1]))})
             return out
         agent.consult = consult
+    agent.tracing = trace
     r = agent.replier
     calls = [{"call": "setup", "domain": r.domain, "docs": dict(r.docs), "outcomes": dict(r.outcomes),
               "commands": sorted(r.commands), "mirror": list(r.mirror), "blocking": sorted(r.blocking),
@@ -439,6 +440,13 @@ def main():
                     k = o.get("kind") or ("ack" if "ack" in o else "clock")
                     kinds[k] = kinds.get(k, 0) + 1
             print(f"day {name}: {len(lines)} lines -> {dict(sorted(kinds.items()))}; replier calls {len(calls)}")
+    # --trace (the console's REPL log): the plant's day once more, traced
+    day = dest / "days" / "plant.jsonl"
+    if day.exists():
+        lines = [json.loads(x) for x in day.read_text().splitlines() if x.strip()]
+        stream, _ = run_day("plant", lines, trace=True)
+        (dest / "days" / "plant.trace.out.jsonl").write_text("".join(json.dumps(r) + "\n" for r in stream))
+        print(f"day plant traced: {sum(1 for r in stream[1:] for o in r['out'] if o.get('kind') == 'trace')} traces")
     day = dest / "days" / "kitchen.jsonl"
     if day.exists():
         lines = [json.loads(x) for x in day.read_text().splitlines() if x.strip()]

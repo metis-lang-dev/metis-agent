@@ -42,14 +42,18 @@ func testDomain(t *testing.T, d string) Domain {
 }
 
 func TestTheAgentStreamIsPys(t *testing.T) {
-	for _, d := range []string{"dog", "plant"} {
+	for _, tc := range []struct {
+		d, stream string
+		trace     bool
+	}{{"dog", "dog.out", false}, {"plant", "plant.out", false}, {"plant", "plant.trace.out", true}} {
+		d := tc.d
 		a, err := NewAgent(testDomain(t, d), 1, "replay")
 		if err != nil {
 			t.Fatal(err)
 		}
-		a.Sink.Path, a.Sink.Session = filepath.Join(t.TempDir(), "records", "fixture.jsonl"), "fixture"
+		a.Tracing = tc.trace // py's day runs have no records sink: a trace lists none
 		n, lines := 0, 0
-		jsonl(t, "testdata/days/"+d+".out.jsonl", func(raw []byte) {
+		jsonl(t, "testdata/days/"+tc.stream+".jsonl", func(raw []byte) {
 			var row struct {
 				In  json.RawMessage   `json:"in"`
 				Out []json.RawMessage `json:"out"`
@@ -75,12 +79,12 @@ func TestTheAgentStreamIsPys(t *testing.T) {
 				t.Fatalf("%s line %d %s: %d outputs, py %d:\n got %s\n want %s", d, n, row.In, len(got), len(row.Out), js(got), js(row.Out))
 			}
 			for i := range got {
-				sameJSON(t, d+" line "+strconv.Itoa(n)+" "+string(row.In)+" out "+strconv.Itoa(i), row.Out[i], got[i])
+				sameJSON(t, d+" line "+strconv.Itoa(n)+" "+string(row.In)+" out "+strconv.Itoa(i), unfile(row.Out[i]), unfile(got[i]))
 			}
 			lines += len(got)
 		})
 		a.Close()
-		t.Logf("%s: %d input lines, %d output lines equal", d, n-1, lines)
+		t.Logf("%s: %d input lines, %d output lines equal", tc.stream, n-1, lines)
 	}
 }
 
@@ -157,4 +161,23 @@ func TestTheKitchenPairStreamIsPys(t *testing.T) {
 		lines += len(got)
 	})
 	t.Logf("kitchen pair: %d input lines, %d output lines equal", n-1, lines)
+}
+
+// unfile drops what a trace carries of the machine (a sunk record's file
+// path) so the streams compare on what the agent did.
+func unfile(v any) json.RawMessage {
+	b, _ := json.Marshal(v)
+	var x map[string]any
+	if json.Unmarshal(b, &x) != nil || x["kind"] != "trace" {
+		return b
+	}
+	if recs, ok := x["records"].([]any); ok {
+		for _, r := range recs {
+			if m, ok := r.(map[string]any); ok {
+				delete(m, "file")
+			}
+		}
+	}
+	out, _ := json.Marshal(x)
+	return out
 }

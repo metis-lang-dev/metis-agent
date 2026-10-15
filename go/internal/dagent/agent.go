@@ -924,3 +924,82 @@ func kindOf(msg map[string]any) string {
 type pyError struct{ typ, msg string }
 
 func (e pyError) Error() string { return e.typ + ": " + e.msg }
+
+// Trace is what the agent did since the last trace (py trace(): the fired
+// rows, narrated fragments, consults, reads, world lines and sunk records):
+// one trace reply, or nil.
+func (a *Agent) Trace() *Reply {
+	f0, c0 := a.cursor[0], a.cursor[2]
+	rows, cons := a.Sh.Rows[f0:], a.consults[c0:]
+	a.cursor = [3]int{len(a.Sh.Rows), 0, len(a.consults)}
+	reads, worlds, sunk := a.reads, a.worlds, a.Sink.Sunk
+	a.reads, a.worlds, a.Sink.Sunk = nil, nil, nil
+	if len(rows) == 0 && len(cons) == 0 && len(reads) == 0 && len(worlds) == 0 && len(sunk) == 0 {
+		return nil
+	}
+	var fired []any
+	first := 0
+	if len(rows) > 40 {
+		first = len(rows) - 40
+	}
+	for j, r := range rows[first:] {
+		cons, prod := []string{}, []string{}
+		for _, c := range r.Ev.Consume {
+			cons = append(cons, c.Atom)
+		}
+		for _, c := range r.Ev.Produce {
+			prod = append(prod, c.Atom)
+		}
+		sort.Strings(cons)
+		sort.Strings(prod)
+		row := Ordered{}.With("seq", f0+first+j+1).With("kind", r.Kind).With("event", r.Ev.Name).
+			With("consume", cons).With("produce", prod)
+		if r.Kind != "exo" {
+			if line, _ := a.Replier.Line(r.Ev.Name); line != "" {
+				row = row.With("line", line)
+			}
+		}
+		fired = append(fired, row)
+	}
+	f := F{"beat": a.BeatNo(), "ref": a.ref(true, "")}
+	if len(fired) > 0 {
+		f["fired"] = fired
+	}
+	if len(rows) > 40 {
+		f["more"] = len(rows) - 40
+	}
+	if len(cons) > 0 {
+		var cs []any
+		for _, c := range cons {
+			cs = append(cs, Ordered{}.With("situation", c["situation"]).With("stop", c["stop"]).With("text", c["text"]).
+				With("answer", c["answer"]).With("calls", []any{}).With("first_read", c["first_read"]).With("ms", 0))
+		}
+		f["consults"] = cs
+	}
+	if len(reads) > 0 {
+		var rs []any
+		for _, r := range reads {
+			rs = append(rs, Ordered{}.With("tool", r["tool"]).With("arg", r["arg"]).With("out", r["out"]))
+		}
+		f["reads"] = rs
+	}
+	if len(worlds) > 0 {
+		f["world"] = worlds
+	}
+	if len(sunk) > 0 {
+		f["records"] = sunk
+	}
+	r := a.reply("trace", f)
+	return &r
+}
+
+// Traces are the traced agents' trace replies (one agent: itself).
+func (a *Agent) Traces() []any {
+	if !a.Tracing {
+		return nil
+	}
+	if t := a.Trace(); t != nil {
+		return []any{*t}
+	}
+	return nil
+}

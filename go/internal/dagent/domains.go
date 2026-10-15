@@ -16,6 +16,7 @@ type Server interface {
 	Handle(msg map[string]any) ([]any, error)
 	Ready() Ordered
 	Close()
+	Traces() []any // --trace: what the line made each agent do
 }
 
 // ServerName is the agent's name.
@@ -82,6 +83,15 @@ func (d *Domains) Over() bool {
 func (d *Domains) Ready() Ordered {
 	return Ordered{}.With("clock", "ready").With("domain", d.Name).With("beat", d.BeatNo()).
 		With("domains", append([]string{}, d.Order...))
+}
+
+// Traces are every traced agent's trace reply, in order.
+func (d *Domains) Traces() []any {
+	var out []any
+	for _, n := range d.Order {
+		out = append(out, d.Agents[n].Traces()...)
+	}
+	return out
 }
 
 // Close frees every runtime.
@@ -221,6 +231,15 @@ func Serve(s Server, msg map[string]any, rebuild func(seed uint64, caseName stri
 			rs = []any{NewReply(s.ServerName(), "error", F{"id": msg["id"], "error": err.Error()})}
 		}
 		out = rs
+	}
+	if !hasKey(msg, "reset") && !hasKey(msg, "reload") && !hasKey(msg, "add") {
+		if ts := s.Traces(); len(ts) > 0 { // before the ack, or before the clock line
+			if hasKey(msg, "clock") && len(out) > 0 {
+				out = append(append(append([]any{}, out[:len(out)-1]...), ts...), out[len(out)-1])
+			} else {
+				out = append(out, ts...)
+			}
+		}
 	}
 	if !hasKey(msg, "clock") {
 		out = append(out, Ordered{}.With("ack", kindOf(msg)).With("id", msg["id"]))
