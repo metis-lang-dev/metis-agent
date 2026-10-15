@@ -1,7 +1,7 @@
 # Shaping the first release (proposal v0, architect, 2026-10-15 — for the user to iterate)
 
 The user's direction (2026-10-15 evening): the catalog, the loop and the agent
-are ours; the catalog needs the **pack** concept; **any domain in the catalog
+are ours; the catalog needs the **extension** concept (then called "pack"; glossary below); **any domain in the catalog
 must load into the agent**; developing a domain in the AI metis-agent-loop is
 the right approach for any domain, and a small backend simulation per domain
 gets almost any domain — probably even IPC 2023's, since the RDDL simulator is
@@ -9,7 +9,9 @@ already a host. Shape the project towards a first release.
 
 This is the proposal. Nothing here is settled until the user says so.
 
-## 1. The catalog's domain model (the pack concept)
+## 1. The catalog's domain model (the package and its extensions)
+
+Glossary (ruled with the user 2026-10-15): a **domain** is the thing modelled; a **package** is its directory `domains/<name>/` in the catalog, so the catalog consists of domain packages; a **bundle** is what the emitter forms for the C++/Go runtime (ground.wire + sidecar.json + optional program.ir + tools.json), the word replacing "artifact"; an **extension** is a file `extensions/<card>.llp` that `extends` the program — the loop's accepted candidate, which the REPL still calls a *pack* while it is gated; a **card** is as in CATALOG.md.
 
 A domain is one directory, `domains/<name>/`:
 
@@ -17,24 +19,24 @@ A domain is one directory, `domains/<name>/`:
 |---|---|---|---|
 | manifest | `domain.yaml` | the loop console (`new`, `intents save`) or by hand | everyone (`metis_catalog`) |
 | program | `<name>.llp` with `%%` lines and `#init` | the loop (formalize, apply) | the kernel, both agents, the loop |
-| **packs** | `packs/<card>.llp`, each `catalog <card> 1. extends <name>.` | the loop's accepted candidates (human: `apply`; AI: `export` → apply) | **served with the program by every consumer**: the key is over the union; a bad pack keeps the old program (nina a1cca22, loader 3c6f4a8) |
+| **extensions** | `extensions/<card>.llp`, each `catalog <card> 1. extends <name>.` | the loop's accepted candidates (human: `apply`; AI: `export` → apply) | **served with the program by every consumer**: the key is over the union; a bad extension keeps the old program (nina a1cca22, loader 3c6f4a8) |
 | host | `<name>_host.py:make` — the small backend sim (PortPlugin: tick, on_event, observe) | by hand, or generated (RDDL below) | both agents, the loop's one-click open |
 | intents | `intent.yaml` → generated `intent/` | the loop (`intents`, Claude's draft) | the orchestrator (both backends) |
 | records | `records/<session>.jsonl` (git-ignored) | the domain agent (sink) | the loop's Records dock |
 | docs/tests | `README.md`, `tests/` | by hand | people, CI |
 
 What is new in this proposal:
-- **`packs` is a first-class manifest key**: optional, a list of pack files in
-  order; absent = every `packs/*.llp` by name. `has()` says `packs`.
-  `CATALOG.md` documents a pack as the unit the loop produces and the agent
+- **`extensions` is a first-class manifest key**: optional, a list of extension files in
+  order; absent = every `extensions/*.llp` by name. `has()` says `extensions`.
+  `CATALOG.md` documents an extension as the unit the loop produces and the agent
   consumes — the hand-off of stage 5/6 in WORKFLOW.md.
-- **One pack per surprise class**: the loop's `gate`/`accept` names the card;
+- **One extension per surprise class**: the loop's `gate`/`accept` names the card;
   the AI agent's `export` and the human's `apply` write the same file to the
   same place (agent-loop step 1's convergence note).
-- **Pack rules need a trigger the program does not make itself** (a host
+- **Extension rules need a trigger the program does not make itself** (a host
   report, a person's command): a triggerless rule is sampled by the kernel
   and models the event away (the plant's visitor, found 2026-10-15). The
-  gate refuses a pack rule whose premises are all program-produced atoms
+  gate refuses an extension rule whose premises are all program-produced atoms
   unless the author says `#free` on it (a check in `tools/intents.py check`
   and the loop's `gate`, to build).
 
@@ -72,7 +74,7 @@ To get from "loads" to "talks" for any of them, two generic pieces:
 AGENT-LOOP.md (agent-loop s-c5b49dee step 1, passed) is the path for any
 domain: design/formalize in the REPL → intents → exercise under the emulated
 orchestrator against the real domain agent → records → revise/gate → apply
-(a pack) → reload. The human developer does the same in the two consoles
+(an extension) → reload. The human developer does the same in the two consoles
 (WORKFLOW.md, human-loop s-4b71aabf). The two paths produce the same files.
 
 ## 4. What the first release is
@@ -102,9 +104,10 @@ Release criteria (proposed):
 
 ## 5. Subjects proposed (none opened yet)
 
-- **catalog-packs** (nina loader + loop, opus Go + the gate's trigger check):
-  the `packs` manifest key, CATALOG.md, the trigger check, the AI/human
-  convergence on `packs/<card>.llp`. Small; most of it landed today.
+- **catalog-entry** (opened 2026-10-15 as s-65dd0863, nina + opus): the package's final
+  shape on the dog, the `extensions` key, CATALOG.md with the glossary and every
+  key's reader, the loader refusing unknown keys; the gate's trigger check stays
+  a follow-up.
 - **any-domain** (opus host + RDDL path, nina intents + loop): the generic
   RDDL host, `intents` for a domain without `cmd_*`, three IPC 2023 domains
   through AGENT-LOOP.md; the acceptance = "load any catalog domain".

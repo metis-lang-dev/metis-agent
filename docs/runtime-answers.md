@@ -6,7 +6,7 @@ aspiration. Each answer names the existing mechanism.
 
 ## 1. Composition: whole-tree certificates, pre-enumerated for v1
 
-Certificates do NOT compose today. `gate` admits a PACK against a
+Certificates do NOT compose today. `gate` admits a PACK (the REPL's word for a gated candidate; accepted into a package it is an `extensions/<card>.llp` file) against a
 BASE (containment, produce-rights) and `accept` re-serves the MERGED
 world under a new key; the class-F/factorization certificate is
 recomputed for the whole. So `activate` on a device is either:
