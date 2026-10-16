@@ -50,13 +50,24 @@ way:
 
 ## 2. The bundle: one directory, one loader, one Program
 
-metispy compiles (the cover, per the ruling). A new metispy emitter writes,
+**metisc compiles the wire; metispy forms the bundle** (bundle-compiler
+s-3985caf6, 2026-10-16).
+- `ground.wire` comes from the OCaml compiler, `metisc --wire <program>
+  [--extension e.llp]…`, which is OCaml-authoritative.
+- metispy's `emit_artifact` is the cover when metisc is absent. It is
+  byte-equal: metis-lang gate 12 checks the catalog wires as fixtures, and
+  metispy gate 4 checks every package.
+- The emitter logs `ground.wire by metisc|metispy`, and the Go agent's
+  startup log repeats it per domain.
+- A failing metisc is an error, never covered.
+
+metispy's emitter (`python -m metis.kernel.artifact`) writes,
 per domain, **the served program with its extensions merged** (the
 `apply_extensions` union, so the key is the union's):
 
 ```
 domains/<n>/build/<n>.metis/
-  ground.wire       N/E/I/S/B — the existing product ground wire (kernel/wire.py emit_artifact; Go reads it as data too, rt.ReadWire: the event table and the canonical body): events c/o/p, stages, init, steps, the B port manifest
+  ground.wire       N/E/I/S/B — the existing product ground wire (metisc --wire; cover: kernel/wire.py emit_artifact; Go reads it as data too, rt.ReadWire: the event table and the canonical body): events c/o/p, stages, init, steps, the B port manifest
   sidecar.json      what the RUN rows need beyond the wire (below)
   program.ir        the product IR (kernel/ir.py) — OPTIONAL: marginals and the planner (IrEvaluator); no RUN row needs it
 ```
@@ -290,7 +301,7 @@ The journals of both modes are diffed in CI on the scripted days.
      checked against metispy's on the kitchen and the plant);
    - the sink with the JSON env, the ports reply, the pair scene;
    - the narrator fed by `OnEvent`, the template consult;
-   - **reload = rebuild the bundle** through metispy's emitter from the
+   - **reload = rebuild the bundle** through metispy's emitter (its wire by metisc) from the
      program plus its extensions, then `Reload` (the architect's note at
      step 3), so the human loop's `apply` reaches the device.
 4. **Parity without a model.** py's reply streams with the template seat on

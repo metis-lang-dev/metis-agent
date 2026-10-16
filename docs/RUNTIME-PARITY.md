@@ -30,8 +30,9 @@ stack; agent/go runs the domain models those developments produce.
   ports' input (the Evaluator tick path), it has the surprise record, and a
   trace callback that can be redirected to a narrator — rows 10, 15, 16, 17
   are re-cut against that;
-- product artifacts from metispy only is the cover for now: the compile
-  stays metispy's, the runtime loads the artifact (C rows stand);
+- the product wire is compiled by metisc (OCaml-authoritative), and
+  metispy covers byte-equal when metisc is absent; the runtime loads the
+  bundle (C rows stand). Rewritten by bundle-compiler s-3985caf6 (see (c));
 - the record's env as a Python pickle is a shortcut: ONE neutral env format
   (JSON: the host's snapshot as data) for py and go, both write and read it.
 
@@ -177,8 +178,15 @@ and a trace callback for a narrator" — partly.**
   So the callback's seam is there, and **its payload has to become the
   event** (K1).
 
-**(c) metispy's product artifacts are the cover for now.** The C rows stand:
-metispy compiles, and the runtime loads the artifact.
+**(c) The bundle's wire is metisc's** (rewritten 2026-10-16 by
+bundle-compiler s-3985caf6; it was "metispy's product artifacts are the
+cover for now").
+- `ground.wire` is compiled by the OCaml compiler (`metisc --wire`).
+- metispy's `emit_artifact` covers when metisc is absent. It is byte-equal
+  on every catalog package (metis-lang gate 12, metispy gate 4) and logged.
+- metispy still forms the bundle's harness data (sidecar.json, tools.json,
+  program.ir).
+- The C rows stand: the runtime loads the bundle.
 
 **(d) One neutral env on both stacks.** Row 22 becomes RUN: the host's
 snapshot as JSON data, written and read by py and Go alike; the pickle goes.

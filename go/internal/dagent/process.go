@@ -10,6 +10,7 @@ package dagent
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -98,8 +99,15 @@ func (p *Process) Emit(name string) (string, error) {
 	}
 	cmd := exec.Command(p.Python, "-m", "metis.kernel.artifact", name, "-o", out)
 	cmd.Env = append(os.Environ(), "METIS_CATALOG="+p.Root)
-	if b, err := cmd.CombinedOutput(); err != nil {
+	b, err := cmd.CombinedOutput()
+	if err != nil {
 		return "", fmt.Errorf("the emitter on %s: %v: %s", name, err, strings.TrimSpace(string(b)))
+	}
+	// who compiled the served wire: metisc (OCaml-authoritative) or
+	// metispy's cover (bundle-compiler s-3985caf6 step 3)
+	if i := strings.Index(string(b), "ground.wire by "); i >= 0 {
+		by, _, _ := strings.Cut(string(b)[i+len("ground.wire by "):], "\n")
+		log.Printf("%s's bundle: ground.wire by %s", name, strings.TrimSpace(by))
 	}
 	return out, nil
 }
