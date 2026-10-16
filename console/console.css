@@ -1,6 +1,6 @@
 /* console.css — the metis-agent console's own rules, on the shell
-   (fsttm-web lib/shell.css: the loop console's top bar, docks, strip and
-   colour tokens). The source labels take the shell's colours: you = cyan,
+   (shell.css, this console's copy: the loop console's top bar, docks,
+   strip and colour tokens). The source labels take the shell's colours: you = cyan,
    model = purple, a relay of the domain's text = green, the harness =
    yellow, a cut = red. */
 :root{--person:var(--cyan);--model:var(--purple);--relay:var(--green);--harness:var(--yellow);--cut:var(--red);--hl:var(--sel)}

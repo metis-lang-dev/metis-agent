@@ -3,8 +3,8 @@
 // installed catalog; a tab per domain (its stream, its REPL log, its world
 // ports); the dlg-* journal live. The floor and the voice are fsttm-web's
 // library (lib/dialog.js), served at lib/ (run.sh LIB_DIR); the shell — the
-// top bar, the docks and their strip, the colours — is fsttm-web's
-// lib/shell.css + shell.js, the loop console's own (domain-catalog step 3).
+// top bar, the docks and their strip, the colours — is console/shell.css +
+// shell.js, this console's own copy of the loop console's (shell-copy).
 //
 //   /                      live, on the service's /ws (run.sh)
 //   ?replay=fixtures/live-1710.jsonl[&id=D1-c][&speed=10][&voice]
@@ -49,7 +49,7 @@ const ports = {};             // domain → the ports reply
 let rendered = 0;             // J.chat rows on the page
 let tab = 'dog', sub = 'stream';
 
-// ── the shell: the docks and their strip, the splitter (fsttm-web lib/shell.js) ──
+// ── the shell: the docks and their strip, the splitter (shell.js) ──
 const dockUI = MetisShell.docks({
   names: ['chat', 'catalog', 'domain', 'world'], key: 'agentconsole.docks.v1',
   defaults: { chat: { shown: true, open: true }, catalog: { shown: true, open: true },

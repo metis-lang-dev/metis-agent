@@ -1,0 +1,103 @@
+/* shell.css — the console's shell: the loop console's top bar, its tool
+   panels (docks) with the strip that toggles them, the splitter, and its
+   colour tokens. The metis-agent console's own copy (shell-copy
+   s-7c739dd7); the metis-loop console keeps its own copy of the same file,
+   lifted from its loop_console.html. shell.js drives it.
+
+   The markup it styles (both pages):
+
+     <header id="band"> <div class="l"> <span class="brand">TITLE</span>
+         <span><b>FIELD</b><span class="v">value</span></span> …
+         <span id="sessbar"> inputs · .btn … </span> </div> <div class="l"> … </div> </header>
+     <div id="banner" hidden></div>
+     <main>
+       <section id="left"> the page's own content </section>
+       <div id="split"></div>
+       <aside id="right">
+         <section class="dock" id="dock-NAME" data-dock="NAME">
+           <header><span class="tw">▾</span><span class="tt">TITLE</span><button class="x">✕</button></header>
+           <div class="dbody"> … </div>
+         </section> …
+       </aside>
+       <nav id="strip"><button data-strip="NAME">Name</button> …</nav>
+     </main>
+
+   The catalog rows (.dlist .dm) are shared too: both consoles list
+   metis_catalog's index with the same row. */
+:root{
+  --bg:#0d1014;--panel:#11151b;--line:#232a33;--fg:#c9d1d9;--dim:#7d8590;
+  --faint:#4a525c;--green:#3fb950;--purple:#bc8cff;--yellow:#d29922;
+  --red:#f85149;--cyan:#39c5cf;--gray:#6e7681;--sel:#1b2330;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--bg);color:var(--fg)}
+body{font:12.5px/1.45 var(--mono);display:flex;flex-direction:column;overflow:hidden}
+button,input{font:inherit;color:inherit}
+a{color:var(--cyan)}
+#band{border-bottom:1px solid var(--line);padding:6px 12px;background:var(--panel);flex:none}
+#band .l{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;min-height:19px}
+#band b{color:var(--dim);font-weight:normal;margin-right:5px;font-size:11px;letter-spacing:.04em}
+#band .v{color:var(--fg)}
+#band .brand{color:var(--cyan);font-weight:bold;letter-spacing:.04em}
+#tokens{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+#sessbar{margin-left:auto;display:flex;gap:6px;align-items:center}
+#sessbar input{background:var(--bg);border:1px solid var(--line);padding:1px 6px;width:190px}
+.btn{background:transparent;border:1px solid var(--line);padding:1px 8px;cursor:pointer}
+.btn:hover{border-color:var(--dim)}
+.btn:focus-visible,.chip:focus-visible,input:focus-visible{outline:1px solid var(--cyan);outline-offset:1px}
+.btn[disabled]{opacity:.4;cursor:default}
+#banner{background:#2a2111;color:var(--yellow);padding:3px 12px;border-bottom:1px solid var(--line);flex:none}
+#banner[hidden]{display:none}
+main{flex:1;display:flex;min-height:0}
+#left{flex:1 1 62%;display:flex;flex-direction:column;min-width:0}
+#split{flex:none;width:4px;cursor:col-resize;background:var(--line)}
+#right{flex:1 1 38%;display:flex;flex-direction:column;min-width:240px;min-height:0}
+#right[hidden],#split[hidden]{display:none!important}
+/* tool panels (Android Studio style): a vertical strip toggles them;
+   shown panels stack and share the height; each collapses to its header */
+#strip{flex:none;width:26px;background:#0b0e12;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:2px;padding-top:4px}
+#strip button{writing-mode:vertical-rl;background:none;border:none;border-left:2px solid transparent;color:var(--dim);
+  font:11px var(--mono);letter-spacing:.06em;padding:10px 4px;cursor:pointer}
+#strip button[aria-pressed="true"]{color:var(--fg);border-left-color:var(--cyan);background:#11161d}
+#strip button:hover{color:var(--fg)}
+.dock{display:flex;flex-direction:column;min-height:0;border-bottom:1px solid var(--line)}
+.dock[hidden]{display:none!important}
+.dock.open{flex:1 1 0;min-height:90px}.dock.collapsed{flex:none}
+.dock>header{display:flex;align-items:center;gap:6px;padding:3px 10px;background:#161b22;cursor:pointer;user-select:none;
+  color:var(--dim);font-size:11px;letter-spacing:.06em;flex:none}
+.dock>header .tw{width:1em;color:var(--fg)}.dock>header .tt{flex:1;color:var(--fg)}
+.dock>header .x{background:none;border:none;color:var(--dim);cursor:pointer;font:inherit;padding:0 2px}
+.dock>header .x:hover{color:var(--fg)}
+.dock.collapsed>.dbody{display:none}
+.dbody{flex:1;min-height:0;overflow:auto;padding:6px 10px 8px}
+.wrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:2px 0 6px}
+.ph{color:var(--dim);font-size:11px;letter-spacing:.06em;margin:0 0 6px}
+.empty{color:var(--dim)}
+.chip{background:transparent;border:1px solid var(--line);padding:0 8px;cursor:pointer;color:var(--fg)}
+.chip:hover{border-color:var(--cyan)}
+.chip[aria-pressed="true"]{border-color:var(--cyan);color:var(--cyan)}
+.chip[disabled]{opacity:.4;cursor:default}
+.pill{font-size:10.5px;padding:0 5px;border:1px solid var(--line);margin-left:8px;color:var(--dim)}
+.pill.refused,.pill.error{color:var(--red);border-color:#5a2a2a}
+.pill.queued{color:var(--yellow)}
+/* the catalog list (domain-catalog): domains first, one click opens */
+.dlist .dm{border-top:1px solid var(--line);padding:4px 0;cursor:pointer}
+.dlist .dm:hover{background:var(--sel)}
+.dlist .dm.cur{border-left:2px solid var(--cyan);padding-left:4px}
+.dlist .dm .hd{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap}
+.dlist .dm .nm{color:var(--fg);font-weight:bold}
+.dlist .dm .ln{color:var(--dim);margin-top:1px}
+.dlist .tag{font-size:10.5px;padding:0 5px;border:1px solid var(--line);color:var(--cyan)}
+.dlist .tag.off{color:var(--faint)}
+.dlist details{margin-top:3px}.dlist details summary{color:var(--dim);cursor:pointer;font-size:11px}
+.dlist .rd{white-space:pre-wrap;color:var(--dim);font-size:11.5px;margin:4px 0 2px;max-height:16em;overflow:auto}
+.dlist .cat{display:flex;gap:8px;border-top:1px solid var(--line);padding:2px 0;cursor:pointer}
+.dlist .cat:hover{background:var(--sel)}.dlist .cat .ln{color:var(--faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:760px){
+  main{flex-direction:column}#split{display:none}
+  #left{flex:1 1 auto;min-height:60vh}#right{flex:none;height:70vh;border-top:1px solid var(--line)}
+  #strip{flex-direction:row;width:auto;height:auto}#strip button{writing-mode:horizontal-tb}
+  #sessbar{margin-left:0;width:100%}#sessbar input{flex:1;width:auto}
+}

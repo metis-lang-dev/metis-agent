@@ -16,9 +16,9 @@
 #
 #   BACKEND=py|go   CONFIG=<yaml>   UI_DIR=console   LIB_DIR=../fsttm-web/lib   ADDR=:8395
 #
-# The page: console/ (on fsttm-web's shell, lib/shell.css + shell.js, the
-# loop console's top bar, docks and colours; UI_DIR=../fsttm-web/web for the
-# plain page). Every typed or spoken line is a person turn of the
+# The page: console/ (on its own copy of the loop console's shell,
+# console/shell.css + shell.js: the top bar, docks and colours;
+# UI_DIR=../fsttm-web/web for the plain page). Every typed or spoken line is a person turn of the
 # orchestrator. The domains' clock starts when the first page connects.
 # Each start keeps the previous journal (go: session-<time>.jsonl; py: its
 # session-py.jsonl rotated by the service).
@@ -76,7 +76,6 @@ case "$UI_DIR" in /*) ;; *) UI_DIR="$ROOT/$UI_DIR" ;; esac
 # fsttm-web's library (lib/dialog.js …) at /lib/, beside whichever page
 LIB_DIR="${LIB_DIR:-$(cd "$ROOT/.." && pwd)/fsttm-web/lib}"
 [ -f "$LIB_DIR/dialog.js" ] || { echo "no fsttm-web lib at $LIB_DIR (set LIB_DIR)" >&2; exit 1; }
-[ -f "$LIB_DIR/shell.css" ] || { echo "the fsttm-web lib at $LIB_DIR has no shell.css (the console's shell; update fsttm-web)" >&2; exit 1; }
 PY="$ROOT/py/.venv/bin/python"
 [ -x "$PY" ] || { echo "no py/.venv — the domain agents need it (cd py && python3 -m venv .venv && .venv/bin/pip install -e .)" >&2; exit 1; }
 
