@@ -27,8 +27,8 @@ import (
 // AttachAudio loads the multimodal projector (an mmproj GGUF with an audio
 // encoder) next to the text model; on the GPU when the model is.
 func (l *LLM) AttachAudio(mmproj string, gpu bool, threads int) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	p := C.mtmd_context_params_default()
 	p.use_gpu = C.bool(gpu)
 	p.print_timings = C.bool(false)
@@ -68,8 +68,8 @@ func (l *LLM) TwoPassAudio(systemPrompt string, pcm []float32, gbnf string) (*Re
 	if len(pcm) == 0 {
 		return nil, errors.New("llm: empty audio")
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	mctx := (*C.mtmd_context)(l.mtmd)
 	return l.twoPassLocked(systemPrompt, gbnf, func() (time.Duration, error) {
 		bmp := C.mtmd_bitmap_init_from_audio(C.size_t(len(pcm)), (*C.float)(unsafe.Pointer(&pcm[0])))

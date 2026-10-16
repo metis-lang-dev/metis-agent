@@ -25,8 +25,8 @@ import (
 // text with special tokens rendered (the native call markup), the KV mark
 // after it for SpeakFrom, and the time from the call to the last token.
 func (l *LLM) Propose(systemPrompt, user, gbnf string, maxTokens int) (string, int, time.Duration, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	t0 := time.Now()
 	nPrefix, err := l.primeLocked(systemPrompt)
 	if err != nil {
@@ -71,8 +71,8 @@ func (l *LLM) Propose(systemPrompt, user, gbnf string, maxTokens int) (string, i
 // its first token with cont's evaluation included, the whole time, and
 // cont's token count.
 func (l *LLM) SpeakFrom(mark int, cont string) (string, time.Duration, time.Duration, int, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	t0 := time.Now()
 	mem := C.llama_get_memory(l.ctx)
 	if !bool(C.llama_memory_seq_rm(mem, 0, C.llama_pos(mark), -1)) {

@@ -180,6 +180,7 @@ func main() {
 	dogAsIs := flag.Bool("dog-as-is", false, "integration step 1: the dog's world as dog.llp has it (the timelines' premise lines off; the person's own acts kept)")
 	kitReal := flag.Bool("kitchen-real", false, "integration step 2: the kitchen pair real, in -dog-proc's process (--domain dog,kitchen,kitchen_shared)")
 	kernelF := flag.String("kernel", "py", "-dog-proc's kernel: py (spawn the command line) | cgo (the Go domain agent in-process on the same flags, its narrator on a context of -model; go-domain-agent step 5)")
+	v3Model := flag.String("v3-model", "two", "-kernel cgo: the model shape — two (the narrator a sibling context) | one (the narrator a role on the loaded context, its KV swapped per turn; go-domain-agent step 6)")
 	cgoRoot := flag.String("catalog-root", "../../metis-catalog", "-kernel cgo: the metis-catalog checkout the bundles are emitted from")
 	cgoPython := flag.String("catalog-python", "../py/.venv/bin/python", "-kernel cgo: the interpreter that runs metispy's emitter")
 	dogDir := flag.String("dog-dir", "../py", "integration step 1: -dog-proc's working directory")
@@ -318,13 +319,18 @@ func main() {
 				fail(err)
 			}
 			defer lf.Close()
+			shape, merr := agent.CheckModel(*v3Model)
+			if merr != nil {
+				fail(merr)
+			}
 			switch k, kerr := agent.CheckKernel(*kernelF); {
 			case kerr != nil:
 				fail(kerr)
 			case k == agent.KernelCgo:
 				dog, err = agent.StartDomainCgo("dog", strings.Fields(*dogProc), *dogDir, agent.CgoEnv{Root: *cgoRoot, Python: *cgoPython,
 					Speaker: func() (dagent.Speaker, error) {
-						return l.SiblingWith(8192, llm.Pass2{Temp: 0.4, TopK: 40, MaxTokens: 50, Seed: 1})
+						// the orchestrator runs on l itself here
+						return agent.NarratorSpeaker(l, l, shape)
 					}})
 			default:
 				dog, err = agent.StartDomain("dog", strings.Fields(*dogProc), *dogDir, []string{"METIS_CONFIG="}, lf)
@@ -339,6 +345,13 @@ func main() {
 		if dog != nil {
 			emit(map[string]any{"kind": "int-vram", "tag": *tag, "at": "end", "nvidia": vramApps()})
 		}
+		// the footprint (go-domain-agent step 6): the KV swap's cost, the
+		// process's peak and resident memory, its GPU memory at the end
+		sw := l.Swaps()
+		hwm, rss := procMemKB()
+		emit(map[string]any{"kind": "int-footprint", "tag": *tag, "model": *v3Model, "kernel": *kernelF,
+			"swaps": sw.Swaps, "swap_bytes": sw.Bytes, "swap_ms": float64(sw.Time.Microseconds()) / 1000,
+			"max_state_bytes": sw.MaxState, "vm_hwm_kb": hwm, "vm_rss_kb": rss, "nvidia": vramApps()})
 		return
 	}
 	if *v3F != "" {
@@ -580,6 +593,29 @@ func callClass(text string) string {
 		c += ":" + strings.ToLower(m[2])
 	}
 	return c
+}
+
+// procMemKB is this process's peak and current resident memory
+// (/proc/self/status VmHWM, VmRSS), in kB; 0 when unreadable.
+func procMemKB() (hwm, rss int) {
+	b, err := os.ReadFile("/proc/self/status")
+	if err != nil {
+		return 0, 0
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		f := strings.Fields(line)
+		if len(f) < 2 {
+			continue
+		}
+		n, _ := strconv.Atoi(f[1])
+		switch f[0] {
+		case "VmHWM:":
+			hwm = n
+		case "VmRSS:":
+			rss = n
+		}
+	}
+	return hwm, rss
 }
 
 // gpuMiB samples nvidia-smi: whole-GPU used memory and this process's.

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/dagent"
-	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
 )
 
 // The live -loop v3 with real domain agents (integration step 2,
@@ -224,8 +223,9 @@ func (v *v3) startDomain(s DomainSpec, lf io.Writer) (*DomainProc, error) {
 	}
 	return StartDomainCgo(s.Name, s.Argv, s.Dir, CgoEnv{Root: v.sc.Root, Python: v.sc.Python,
 		Speaker: func() (dagent.Speaker, error) {
-			// py's narrator: its own context (n_ctx 8192) on the same GGUF, top-k 40, temp 0.4, seed 1
-			return v.l.SiblingWith(8192, llm.Pass2{Temp: 0.4, TopK: 40, MaxTokens: 50, Seed: 1})
+			// py's narrator: its own context (n_ctx 8192) on the same GGUF, top-k 40, temp 0.4, seed 1;
+			// the one-model shape: a role on the loaded context, the same budget
+			return NarratorSpeaker(v.root, v.l, v.sc.Model)
 		}})
 }
 

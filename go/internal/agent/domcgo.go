@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/dagent"
+	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
 )
 
 // Kernel names who serves the domain agents: "py" (the default and the
@@ -38,6 +39,42 @@ func CheckKernel(k string) (string, error) {
 		return KernelCgo, nil
 	}
 	return "", fmt.Errorf("v3.kernel: py | cgo, not %q", k)
+}
+
+// The model shape (v3.model): "two" (the default) gives every role a
+// context of its own on the loaded weights; "one" runs every role on the
+// loaded context, its KV swapped in per turn (internal/llm Role;
+// go-domain-agent step 6, RUNTIME-BINDING.md §7.6).
+const (
+	ModelTwo = "two"
+	ModelOne = "one"
+)
+
+// CheckModel is a v3.model value or the error naming the two.
+func CheckModel(m string) (string, error) {
+	switch m {
+	case "", ModelTwo:
+		return ModelTwo, nil
+	case ModelOne:
+		return ModelOne, nil
+	}
+	return "", fmt.Errorf("v3.model: two | one, not %q", m)
+}
+
+// NarratorSampling is py's Narrator's: top-k 40, temp 0.4, 50 tokens, seed 1.
+var NarratorSampling = llm.Pass2{Temp: 0.4, TopK: 40, MaxTokens: 50, Seed: 1}
+
+// NarratorCtx is the narrator's budget: py's Narrator context (n_ctx 8192).
+const NarratorCtx = 8192
+
+// NarratorSpeaker is a cgo narrator's model: a sibling context of near (the
+// orchestrator's) in the two-model shape, a role on root (the loaded
+// context) in the one-model shape — the same budget and sampling either way.
+func NarratorSpeaker(root, near *llm.LLM, model string) (dagent.Speaker, error) {
+	if model == ModelOne {
+		return root.Role(NarratorCtx, NarratorSampling)
+	}
+	return near.SiblingWith(NarratorCtx, NarratorSampling)
 }
 
 // CgoEnv is what the cgo kernel builds its domain agents from.

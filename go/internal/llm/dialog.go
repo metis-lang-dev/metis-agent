@@ -22,8 +22,8 @@ import (
 // BeginDialog puts the KV at the cached system prefix (priming it when the
 // prompt changed) and returns the token count there.
 func (l *LLM) BeginDialog(systemPrompt string) (int, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	n, err := l.primeLocked(systemPrompt)
 	if err != nil {
 		return 0, err
@@ -37,8 +37,8 @@ func (l *LLM) BeginDialog(systemPrompt string) (int, error) {
 // Inject decodes text (special tokens parsed: <|turn>, <|tool_response>,
 // <|"|>) at the end of the dialog and returns the token count after it.
 func (l *LLM) Inject(text string) (int, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	if text == "" {
 		return l.nPast, nil
 	}
@@ -56,8 +56,8 @@ func (l *LLM) Inject(text string) (int, error) {
 // rendered, the tokens in context before it, the time to the first token
 // and the whole time.
 func (l *LLM) Gen(gbnf string, sampled bool, maxTokens int, stop string) (string, int, time.Duration, time.Duration, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	t0 := time.Now()
 	before := l.nPast
 	chain := C.llama_sampler_chain_init(C.llama_sampler_chain_default_params())
@@ -97,8 +97,8 @@ func (l *LLM) Gen(gbnf string, sampled bool, maxTokens int, stop string) (string
 // the tokens before it): a caught forgery is cut back to where it began
 // (orchestrator-agent step 2 ruling), the replacement decoded after.
 func (l *LLM) Rollback(mark int) error {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	if mark < 0 || mark > l.nPast {
 		return errors.New("llm: Rollback past the dialog's end")
 	}

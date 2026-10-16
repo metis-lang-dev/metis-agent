@@ -87,6 +87,10 @@ type config struct {
 		// Kernel: who serves the domains: py (default) | cgo (the Go domain
 		// agent in-process; go-domain-agent step 5); -kernel overrides
 		Kernel string `yaml:"kernel"`
+		// Model: two (default: a context per role) | one (every role on
+		// the loaded context, its KV swapped per turn; go-domain-agent
+		// step 6); -v3-model overrides
+		Model string `yaml:"model"`
 	} `yaml:"v3"`
 	WS struct {
 		Addr  string `yaml:"addr"`
@@ -115,6 +119,7 @@ func main() {
 	loop := flag.String("loop", "v2", "v2: the dog's two-pass path; v3: the orchestrator agent (DESIGN v3; config v3:)")
 	printTurn := flag.Bool("print-turn", false, "-loop v3: print the orchestrator's system turn as built (the catalog's cards and declarations) and exit")
 	printGrammar := flag.Bool("print-grammar", false, "-loop v3: print the person turn's intent grammar as built (one intent domain's own, or several's union) and exit")
+	modelF := flag.String("v3-model", "", "-loop v3: the model shape — two (the default, v3.model: a context per role) | one (every role on one context, its KV swapped per turn)")
 	kernelF := flag.String("kernel", "", "-loop v3: who serves the domain agents — py (the default, v3.kernel) | cgo (the Go domain agent in-process over the C++ runtime)")
 	waitViewer := flag.Bool("wait-viewer", false, "attach the domains (v2), start the domain agents' clock (v3) when the first page connects (it hears the run from its start)")
 	flag.Parse()
@@ -230,6 +235,13 @@ func main() {
 		if v3.Kernel, err = agent.CheckKernel(k); err != nil {
 			log.Fatal(err)
 		}
+		m := cfg.V3.Model
+		if *modelF != "" {
+			m = *modelF
+		}
+		if v3.Model, err = agent.CheckModel(m); err != nil {
+			log.Fatal(err)
+		}
 		if manifests != nil {
 			// the manifests are the source, the config selects: every selected
 			// domain is installed, and its card in the system turn is its line
@@ -300,7 +312,21 @@ func main() {
 		return
 	}
 
-	l, err := llm.Load(llm.Config{ModelPath: cfg.LLM.Model, NCtx: cfg.LLM.NCtx,
+	// the one-model shape: the loaded context sized for its largest role
+	// (the orchestrator's v3.n_ctx, a cgo narrator's 8192), the main role
+	// kept at llm.n_ctx (llm.Limit)
+	loadCtx := cfg.LLM.NCtx
+	if *loop == "v3" && v3.Model == agent.ModelOne {
+		oc := v3.NCtx
+		if oc <= 0 {
+			oc = 8192 // startV3's default
+		}
+		loadCtx = max(loadCtx, oc)
+		if v3.Kernel == agent.KernelCgo {
+			loadCtx = max(loadCtx, agent.NarratorCtx)
+		}
+	}
+	l, err := llm.Load(llm.Config{ModelPath: cfg.LLM.Model, NCtx: loadCtx,
 		NBatch: cfg.LLM.NBatch, NThreads: cfg.LLM.NThreads,
 		NGpuLayers: cfg.LLM.NGpuLayers, Template: cfg.LLM.Template,
 		Pass2: llm.Pass2{Temp: cfg.LLM.Pass2.Temperature, TopK: cfg.LLM.Pass2.TopK,
@@ -309,6 +335,12 @@ func main() {
 		log.Fatal(err)
 	}
 	defer l.Close()
+	if loadCtx != cfg.LLM.NCtx {
+		if err := l.Limit(cfg.LLM.NCtx); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("[llm] the one-model shape: one context of %d (the main role's budget %d)", loadCtx, cfg.LLM.NCtx)
+	}
 	log.Printf("[llm] %s: template=%s", cfg.LLM.Model, l.Template())
 
 	srv := console.New(cfg.WS.UIDir)

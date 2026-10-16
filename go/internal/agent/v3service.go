@@ -63,6 +63,11 @@ type V3Service struct {
 	// processes) or "cgo" (the Go domain agent in-process, on the bundles
 	// metispy's emitter builds from Root; go-domain-agent step 5)
 	Kernel string
+	// Model: how many contexts the roles take — "two" (the default: the
+	// orchestrator and each narrator a context of their own on the loaded
+	// weights) or "one" (every role on the loaded context, its KV swapped
+	// in per turn: internal/llm Role; go-domain-agent step 6)
+	Model string
 	// Tools: the REPL API's declarations, from the served packages' bundles
 	// (ServedTools; repl-tools step 3)
 	Tools []repltools.Tool
@@ -72,6 +77,7 @@ type v3 struct {
 	sc     V3Service // the service's configuration: the system turn is rebuilt from it (hot-install, an intent reload)
 	mu     sync.Mutex
 	l      *llm.LLM
+	root   *llm.LLM // the loaded context (the one-model shape's roles are made on it)
 	prompt string
 	gbnf   string
 	cfg    V3Config
@@ -129,7 +135,12 @@ func (a *Agent) startV3(l *llm.LLM) error {
 	if sc.NCtx <= 0 {
 		sc.NCtx = 8192
 	}
-	ol, err := l.Sibling(sc.NCtx)
+	var ol *llm.LLM
+	if sc.Model == ModelOne {
+		ol, err = l.Role(sc.NCtx, l.Pass2Config())
+	} else {
+		ol, err = l.Sibling(sc.NCtx)
+	}
 	if err != nil {
 		return err
 	}
@@ -140,7 +151,7 @@ func (a *Agent) startV3(l *llm.LLM) error {
 			return err
 		}
 	}
-	v := &v3{l: ol, prompt: b.String(), gbnf: gbnf, nctx: sc.NCtx, sc: sc,
+	v := &v3{l: ol, root: l, prompt: b.String(), gbnf: gbnf, nctx: sc.NCtx, sc: sc,
 		cfg: V3Config{Tools: sc.Tools, Catalog: sc.Catalog, Loaded: sc.Loaded, Display: sc.Display, IntentDomains: domainNames(sc.Intents), Asks: asksOf(sc.Intents),
 			AskCheck: ruled, AgainPick: ruled, EscalateTemplate: ruled, Mirror: true, Rollback: true}}
 	v.listed = sc.Listed

@@ -92,6 +92,13 @@ type LLM struct {
 	mtmdClose func()
 	cfg       Config
 	sibling   bool // a second context on another LLM's model (Sibling): Close keeps the model
+	// the one-model shape (role.go): a role on another LLM's context (Role),
+	// the context its roles share, this role's saved state while another
+	// role holds the context
+	view   bool
+	sh     *share
+	state  []byte
+	logits []float32 // its last output's logits, saved with state
 }
 
 type Config struct {
@@ -291,8 +298,8 @@ func (l *LLM) SiblingWith(nCtx int, p Pass2) (*LLM, error) {
 // call). A bench sets one per repeat, so identical insertions in one
 // repeat get one answer across its rows.
 func (l *LLM) SetSeed(seed uint32) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lockRole()
+	defer l.unlock()
 	l.pass2.Seed = seed
 }
 
@@ -312,8 +319,8 @@ func (l *LLM) singleToken(text string) C.llama_token {
 // Tokens exposes the tokenizer (ids) for boundary checks: the cached prefix
 // is only valid if tokenize(prefix)+tokenize(tail) == tokenize(prefix+tail).
 func (l *LLM) Tokens(text string, addSpecial bool) []int32 {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lockRole()
+	defer l.unlock()
 	toks := l.tokenize(text, addSpecial)
 	out := make([]int32, len(toks))
 	for i, t := range toks {
@@ -325,8 +332,8 @@ func (l *LLM) Tokens(text string, addSpecial bool) []int32 {
 // Split renders a system prompt + user text the way PrimePrefix/TwoPass
 // will: the KV-cached prefix and the per-turn tail.
 func (l *LLM) Split(system, user string) (prefix, tail string, err error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lockRole()
+	defer l.unlock()
 	prefix, tailFmt, err := l.splitPrompt(system)
 	if err != nil {
 		return "", "", err
@@ -347,8 +354,16 @@ func (l *LLM) Template() string {
 func (l *LLM) EOT() string { return l.eotText }
 
 func (l *LLM) Close() {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	if l.view { // a role on another LLM's context: the owner frees it
+		return
+	}
+	if l.sh != nil {
+		l.sh.mu.Lock()
+		defer l.sh.mu.Unlock()
+	} else {
+		l.mu.Lock()
+		defer l.mu.Unlock()
+	}
 	if l.mtmdClose != nil {
 		l.mtmdClose() // the projector references the model: free it first
 		l.mtmd, l.mtmdClose = nil, nil
@@ -666,8 +681,8 @@ func (l *LLM) TokenCounts() (decoded, generated int64) { return l.nDecoded.Load(
 // KV cache; each turn then drops only the tokens after it. Call at startup
 // (pre-warm) — TwoPass re-primes automatically if the prefix changed.
 func (l *LLM) PrimePrefix(systemPrompt string) (int, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	return l.primeLocked(systemPrompt)
 }
 
@@ -755,8 +770,8 @@ func (l *LLM) rewind(systemPrompt string, nPrefix int) error {
 // the spoken ack (temp 0.4 / top_k 40). The KV is CONTINUED across both
 // passes — no state save/load.
 func (l *LLM) TwoPass(systemPrompt, userText, gbnf string) (*Result, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	return l.twoPassLocked(systemPrompt, gbnf, func() (time.Duration, error) {
 		return 0, l.decodeTokens(l.tailTokens(userText))
 	})
@@ -930,8 +945,8 @@ func dropChannel(t string) string {
 // user turn, then only the spoken-response pass — no intent JSON. One
 // sentence, pass-2 sampling, stops at the first newline.
 func (l *LLM) Narrate(systemPrompt, event string) (string, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	nPrefix, err := l.primeLocked(systemPrompt)
 	if err != nil {
 		return "", err
@@ -996,8 +1011,8 @@ func (l *LLM) DecideTimed(systemPrompt, user, cont, gbnf string, maxTokens int) 
 	if l.tmpl != TemplateGemma4 {
 		return "", 0, errors.New("llm: Decide needs the gemma4 template (native tool calls)")
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	t0 := time.Now() // after the lock: the splice cost, not the wait behind a narration
 	if l.prefix != systemPrompt || l.nPrefix == 0 {
 		if _, err := l.primeLocked(systemPrompt); err != nil {
@@ -1059,8 +1074,8 @@ func (l *LLM) Speak(systemPrompt, user string, think bool) (string, time.Duratio
 func (l *LLM) SpeakCap(systemPrompt, user string, thinkCap int) (string, time.Duration, string, error) {
 	think := thinkCap > 0
 	t0 := time.Now()
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	base, err := l.primeLocked(systemPrompt)
 	if err != nil {
 		return "", 0, "", err
@@ -1148,8 +1163,8 @@ const sentenceGBNF = `root ::= " "? "\""? [A-Z] [a-zA-Z0-9 ,;'()%-]{3,200} [.!?]
 // included) and the whole call. The turn is rolled back by the next call.
 func (l *LLM) Answer(systemPrompt, user string, maxTokens int) (string, time.Duration, time.Duration, error) {
 	t0 := time.Now()
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	base, err := l.primeLocked(systemPrompt)
 	if err != nil {
 		return "", 0, 0, err
@@ -1204,8 +1219,8 @@ func (l *LLM) TapeTurn(role, text string) string {
 // context of prefix+tape, decoded once, kept. A turn in flight is rolled
 // back first (the tape is written only between turns).
 func (l *LLM) AppendTape(systemPrompt, text string) (Splice, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	t0 := time.Now()
 	base, err := l.primeLocked(systemPrompt)
 	if err != nil {
@@ -1229,8 +1244,8 @@ func (l *LLM) AppendTape(systemPrompt, text string) (Splice, error) {
 // SetTape replaces the whole tape (compaction): the KV is cut back to the
 // prefix and the new tape decoded once.
 func (l *LLM) SetTape(systemPrompt, text string) (Splice, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	t0 := time.Now()
 	if _, err := l.primeLocked(systemPrompt); err != nil {
 		return Splice{}, err
@@ -1252,8 +1267,8 @@ func (l *LLM) SetTape(systemPrompt, text string) (Splice, error) {
 
 // TapeTokens is the tape's size in tokens.
 func (l *LLM) TapeTokens() int {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lockRole()
+	defer l.unlock()
 	return len(l.tapeToks)
 }
 
@@ -1313,8 +1328,8 @@ type Sampling struct {
 // by the next call: the caller tapes it.
 func (l *LLM) Chat(systemPrompt, user string, s Sampling, onText func(string) bool) (string, time.Duration, error) {
 	t0 := time.Now()
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	base, err := l.primeLocked(systemPrompt)
 	if err != nil {
 		return "", 0, err
@@ -1377,8 +1392,8 @@ func (l *LLM) Chat(systemPrompt, user string, s Sampling, onText func(string) bo
 // decoded. The dialog's context cut (FRAMEWORK §5): the reply heard up to
 // the cut word keeps the KV up to that word.
 func (l *LLM) SpliceTape(systemPrompt, text string) (Splice, error) {
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	l.lock()
+	defer l.unlock()
 	t0 := time.Now()
 	if _, err := l.primeLocked(systemPrompt); err != nil {
 		return Splice{}, err
