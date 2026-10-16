@@ -1,0 +1,26 @@
+load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: control-looking token:      1 '<eos>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: '</s>' is a normal token here, removing it from EOG list
+llama_kv_cache_iswa: using full-size SWA cache (ref: https://github.com/ggml-org/llama.cpp/pull/13194#issuecomment-2868343055)
+W1       trace     reached False                                                    | I do not have access to a model that describes a farmer, goat, wolf, and cabbage problem. The loaded model is `wgc.llp`,
+W2       why       reached True  state → why                                        | The cabbage was eaten by the goat, as indicated by event 3, which is an `eat` event.
+W3       what-if   reached True  state → events → do → state                        | The cabbage is now on the far side, while the goat and wolf remain on the near side. No one has been eaten yet.
+W4       necessity reached True  state → why → necessity                            | Carrying the wolf across first was not necessary for the cabbage to be gone, as the necessity check for the eating event
+W5       why       reached True  state → why                                        | The goat is on the far bank because of event 1, which was a `carry` event. This event was caused by the initial state (`
+W6       trace     reached True  run                                                | The boat crossed the river 3 times. At the end, the goat is on the far side.
+B1       what-if   reached True  state                                              | The current state shows that the wick has 15 minutes left. To answer your question, I need to know the rules governing t
+B2       what-if   reached False                                                    | I do not have enough information to answer this question. The current model state does not contain any information about
+B3       why       reached True  state → why → list                                 | The atom `pos(d,far)` was last produced by event 1, which was `pair8[S=near,X=c,Y=d,T=far]`. This event moved `d` to the
+B4       necessity reached False state → events                                     | The current state shows `pos(d,far)`, which suggests 'd ending on the far bank' is true. However, the `events` list only
+B5       trace     reached True  run                                                | The session stopped after running, and the final state shows that there was 1 crossing made. The torch is at the far ban
+H1       trace     reached True  state                                              | The ring r1 is currently on bottom_p3.
+H2       why       reached True  state → why                                        | The atom `on(r1,bottom_p3)` was last produced by event 4, which is `putdown_on_post[R=r1,B=bottom_p3,P=p3,V=top_r1]`. Th
+H3       necessity reached False state → events                                     | The events listed are 1 and 2, so there is no event 3. Please check the event numbers or provide the atom for the ring b
+H4       what-if   reached False state                                              | The current state shows that the arm is free, and the rings are stacked as follows: r3 is on bottom_p1, r2 is on top_r3,
+K1       trace     reached True  state                                              | The blocks are stacked as follows: 'a' is on 'c', and 'c' is on 'b'. Block 'a' is on the table.
+K2       why       reached True  state → why                                        | The state shows that `on(b,c)` is the result of event 6, which was `put_on_block[X=b,Y=c]`. This event required that the
+K3       necessity reached True  state → necessity                                  | Event 5, which was picking up b from the table, was necessary for b being on c. The analysis showed that without event 5
+K4       necessity reached True  sufficiency                                        | The `sufficiency` tool requires an atom argument, which is the state you are checking for, not the event itself. Please 
+K5       what-if   reached True  state → events                                     | The arm can pick up block b from the table, or it can pick up block c from block a. If it picks up block b, the next pos
+{"kind": "summary", "seat": "gemma4", "think_cap": 0, "model": "gemma-4-E4B-it-Q5_K_M.gguf", "persona": "b", "items": 20, "reached": 15, "ms": 37458}

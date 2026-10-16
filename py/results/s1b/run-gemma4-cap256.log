@@ -1,0 +1,26 @@
+load: control-looking token:    212 '</s>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: control-looking token:     50 '<|tool_response>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: control-looking token:      1 '<eos>' was not control-type; this is probably a bug in the model. its type will be overridden
+load: '</s>' is a normal token here, removing it from EOG list
+llama_kv_cache_iswa: using full-size SWA cache (ref: https://github.com/ggml-org/llama.cpp/pull/13194#issuecomment-2868343055)
+W1       trace     reached True  state → list                                       | The farmer and the goat are on the destination bank, while the wolf and the cabbage are on the starting bank.
+W2       why       reached True  state → why                                        | The cabbage was eaten by the goat. This is indicated by the last event that produced the `gone(cabbage)` atom being the 
+W3       what-if   reached True  state → events → do → state → why → narrate        | Based on the trace, forcing the farmer to carry the cabbage across resulted in the cabbage being on the 'far' side. The 
+W4       necessity reached True  state → why → necessity → necessity                | The event that caused the cabbage to be gone was eating the cabbage (event 3), and this event was necessary for the cabb
+W5       why       reached True  state → why → ctx                                  | The goat is on the far bank because of a `carry` event (event 1), which is caused by the boat, the farmer's position, an
+W6       trace     reached True  run                                                | The boat crossed the river 2 times. The goat is at the far side.
+B1       what-if   reached True  state → list → run                                 | After running 10 steps, the simulation ended, and the final wick value is 15.
+B2       what-if   reached True  state → list                                       | Based on the current state, there are 15 minutes of wick left.
+B3       why       reached True  state → why → events                               | 'd' moved to the far bank as part of a `pair8` operation involving 'c'.
+B4       necessity reached True  state → graph → necessity → necessity → necessity  | Yes, the state `pos(d,far)` is produced by event 1, which is the `pair8` event representing the crossing of 'c' and 'd' 
+B5       trace     reached True  run                                                | The session has stopped. The final state shows the torch is at the far bank.
+H1       trace     reached True  state                                              | Based on the current state, `top_r1` is cleared, meaning ring r1 is not on the top rod.
+H2       why       reached True  state → why                                        | Ring r1 is on post p3 because it was placed there by the event `putdown_on_post[R=r1,B=bottom_p3,P=p3,V=top_r1]` (event 
+H3       necessity reached False state → why                                        | The pickup at event 3 was not necessary for ring r1 being on post p3, as event 4, `putdown_on_post[R=r1,B=bottom_p3,P=p3
+H4       what-if   reached False state → list                                       | The arm can pick up a ring if its top is clear. Based on the current state, the arm can pick up any ring whose top is cl
+K1       trace     reached True  state                                              | Block 'a' is on the table, block 'c' is on block 'a', and block 'b' is on block 'c'.
+K2       why       reached True  state → why                                        | The relationship where block `b` is on block `c` is established by event 6, which is `put_on_block[X=b,Y=c]`. This event
+K3       necessity reached True  necessity → necessity → state → events → list → wh | Based on the causal cone analysis, event 6 (`put_on_block[X=b,Y=c]`) was the last event that produced the atom `on(b,c)`
+K4       necessity reached True  state → sufficiency                                | Forcing the pickup of 'b' from the table (event 5) brings about 'b on c' with a probability of 0.5, compared to a chance
+K5       what-if   reached False state → list                                       | If the arm picks up block 'b' from the table, it can put it down on a clear block, such as block 'c', or it can put it d
+{"kind": "summary", "seat": "gemma4", "think_cap": 256, "model": "gemma-4-E2B-it-Q4_K_M.gguf", "persona": "b", "items": 20, "reached": 17, "ms": 98994}
