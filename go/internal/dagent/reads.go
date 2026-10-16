@@ -177,6 +177,98 @@ func (r *Reads) causal() CGraph {
 	return CausalGraph(r.rows(), r.Sh.BaseCounts, r.Sh.BaseStage, 1)
 }
 
+// AtomRows is py's atom_rows, `state`'s rendering (specialist S1b): every
+// atom as pred(args) (":n" when n > 1), one row per predicate, wrapped at 78.
+func AtomRows(counts map[string]int) []string {
+	atoms := make([]string, 0, len(counts))
+	for a := range counts {
+		atoms = append(atoms, a)
+	}
+	sort.Strings(atoms)
+	var preds []string
+	by := map[string][]string{}
+	for _, a := range atoms {
+		n := counts[a]
+		if n <= 0 {
+			continue
+		}
+		pred, _, _ := strings.Cut(a, "(")
+		it := a
+		if n > 1 {
+			it += fmt.Sprintf(":%d", n)
+		}
+		if _, ok := by[pred]; !ok {
+			preds = append(preds, pred)
+		}
+		by[pred] = append(by[pred], it)
+	}
+	var out []string
+	for _, p := range preds {
+		line := " "
+		for _, it := range by[p] {
+			if rlen(line)+rlen(it)+1 > 78 && strings.TrimSpace(line) != "" {
+				out = append(out, strings.TrimRight(line, " "))
+				line = " "
+			}
+			line += " " + it
+		}
+		out = append(out, strings.TrimRight(line, " "))
+	}
+	return out
+}
+
+// NearestHeld is py's nearest_held: the held atom nearest to atom (the same
+// predicate, the fewest differing arguments, then sort order; spaces in
+// atom ignored), "" when no held atom has its predicate.
+func NearestHeld(atom string, counts map[string]int) string {
+	q := strings.Join(strings.Fields(atom), "")
+	pred, rest, _ := strings.Cut(q, "(")
+	split := func(r string) []string {
+		if r == "" {
+			return nil
+		}
+		return strings.Split(strings.TrimRight(r, ")"), ",")
+	}
+	args := split(rest)
+	atoms := make([]string, 0, len(counts))
+	for a := range counts {
+		atoms = append(atoms, a)
+	}
+	sort.Strings(atoms)
+	best, bd := "", -1
+	for _, a := range atoms {
+		p, r, _ := strings.Cut(a, "(")
+		if counts[a] <= 0 || p != pred {
+			continue
+		}
+		aa := split(r)
+		d := 0
+		for i := 0; i < len(args) && i < len(aa); i++ {
+			if args[i] != aa[i] {
+				d++
+			}
+		}
+		if len(args) > len(aa) {
+			d += len(args) - len(aa)
+		} else {
+			d += len(aa) - len(args)
+		}
+		if bd < 0 || d < bd {
+			best, bd = a, d
+		}
+	}
+	return best
+}
+
+// NearestText is py's nearest_text: the refusal's pointer to a held atom.
+func NearestText(atom string, counts map[string]int) string {
+	if near := NearestHeld(atom, counts); near != "" {
+		return "the nearest held atom: " + near
+	}
+	pred, _, _ := strings.Cut(strings.Join(strings.Fields(atom), ""), "(")
+	return "no held atom has the predicate " + pred
+}
+
 // StateTable is py's state_table: a multiset tabulated by predicate.
 func StateTable(counts map[string]int) []string {
 	atoms := make([]string, 0, len(counts))
@@ -232,7 +324,7 @@ func StateTable(counts map[string]int) []string {
 
 // State is `state`.
 func (r *Reads) State() string {
-	rows := StateTable(r.Sh.Counts.Map())
+	rows := AtomRows(r.Sh.Counts.Map())
 	if rows == nil {
 		rows = []string{"  (empty)"}
 	}
@@ -685,7 +777,7 @@ func (r *Reads) Why(arg string) string {
 		case sh.BaseCounts[a] > 0:
 			roots, what = []int{0}, a+" (from the base state)"
 		default:
-			return a + " was never produced and is not in the base state — 'state' lists atoms, 'log' events"
+			return a + " was never produced and is not in the base state — " + NearestText(a, sh.Counts.Map()) + "; 'state' lists atoms, 'log' events"
 		}
 		if sh.Counts.N[a] == 0 {
 			what += " — not present now"

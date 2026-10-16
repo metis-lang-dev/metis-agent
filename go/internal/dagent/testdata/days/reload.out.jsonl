@@ -21,6 +21,6 @@
 {"in": {"id": "c1", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}, "out": [{"domain": "dog", "kind": "result", "ref": {"beat": 1}, "text": "Accepted.", "id": "c1", "status": "accepted"}, {"ack": "intent", "id": "c1"}]}
 {"in": {"clock": "beat"}, "out": [{"domain": "dog", "kind": "result", "ref": {"seq": 2, "beat": 2, "event": "sit[P=standing]"}, "text": "I sit down.", "id": "c1", "status": "done", "voice": "line"}, {"clock": "beat", "beat": 10, "over": false, "domains": {"plant": {"beat": 10, "over": false}, "dog": {"beat": 2, "over": false}}}]}
 {"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 11, "over": false, "domains": {"plant": {"beat": 11, "over": false}, "dog": {"beat": 3, "over": false}}}]}
-{"in": {"tool": "state", "args": {}, "domain": "plant", "id": "t1"}, "out": [{"domain": "plant", "kind": "read", "ref": {"seq": 2, "beat": 11}, "tool": "state", "output": "stage main\n  dry  \u00b7"}, {"ack": "tool", "id": "t1"}]}
+{"in": {"tool": "state", "args": {}, "domain": "plant", "id": "t1"}, "out": [{"domain": "plant", "kind": "read", "ref": {"seq": 2, "beat": 11}, "tool": "state", "output": "stage main\n  dry"}, {"ack": "tool", "id": "t1"}]}
 {"in": {"reload": {}, "domain": "dog", "id": "r3"}, "out": [{"domain": "dog", "kind": "reloaded", "key": "f2927673f8e455d9f5bb83ce678f6a4adc533aa100cb29f40ccc082e1f82cb67"}, {"ack": "reload", "id": "r3"}]}
 {"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 12, "over": false, "domains": {"plant": {"beat": 12, "over": false}, "dog": {"beat": 1, "over": false}}}]}
