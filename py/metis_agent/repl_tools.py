@@ -28,6 +28,8 @@ ARG_HELP = "everything after the verb on the REPL line, as you would type it (em
 # frozen (SPECIALIST.md §7, 2026-10-13): generic, never tuned on a question.
 # An event is name[bindings] as `events` lists it; an atom is pred(args) as
 # `state` prints it; K is an event number as run/step/why report it.
+# Re-frozen once (S1b, SPECIALIST §5b, 2026-10-16), when `state` came to
+# print pred(args): every atom argument names that form the same way.
 ARG_SHAPES = {
     "run": "N: how many steps to sample (it stops early at quiescence)",
     "step": "empty to sample one event; or k, the number `events` lists; or an event name[bindings] exactly as `events` lists it",
@@ -39,12 +41,12 @@ ARG_SHAPES = {
     "findings": "empty for all, or N for the N-th in full",
     "narrate": "empty: the fired events since the last reset, as beats, with the final state and the rules' docs",
     "graph": "empty",
-    "do": "an event name[bindings] exactly as `events` lists it, forced now (an event, never an atom); +ATOM [N] or -ATOM [N] to add or remove tokens of an atom pred(args); ~EVENT to block an event or a whole rule; empty lists the interventions so far",
+    "do": "an event name[bindings] exactly as `events` lists it, forced now (an event, never an atom); +ATOM [N] or -ATOM [N] to add or remove tokens of an atom pred(args) as `state` prints it; ~EVENT to block an event or a whole rule; empty lists the interventions so far",
     "fork": "K: branch at event number K (empty = here); the actual world is kept aside, and `back` returns to it",
     "back": "empty: leave the fork and restore the actual world",
     "undo": "empty: take back the last command that changed the session",
     "necessity": "K ATOM: K the event number that fired, ATOM pred(args) as `state` prints it; was K necessary for ATOM",
-    "sufficiency": "K ATOM: K the event number, ATOM pred(args); does forcing K bring ATOM about",
+    "sufficiency": "K ATOM: K the event number, ATOM pred(args) as `state` prints it; does forcing K bring ATOM about",
 }
 
 

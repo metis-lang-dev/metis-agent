@@ -48,6 +48,34 @@ def norm(s):
     return " " + re.sub(r"\s+", " ", s.lower().replace("’", "'")) + " "
 
 
+# S1b (SPECIALIST §5b): the scorer's two form misses fixed; paraphrase stays a hand read
+QUOTE = re.compile(r"[`\"]|(?<![a-z])'|'(?![a-z])")      # a quote around a name, not can't's
+
+
+def unquote(s):
+    return QUOTE.sub("", s)
+
+
+def has(phrase, a):
+    """phrase in the normalized answer a, as a substring (stems match:
+    'carr' is carried); a side the phrase pads with a space is a word
+    boundary there (B3's ' c ' never matches inside "cannot")."""
+    p = norm(unquote(phrase)).strip()
+    lead = r"(?<!\w)" if phrase[:1].isspace() else ""
+    trail = r"(?!\w)" if phrase[-1:].isspace() else ""
+    return re.search(lead + re.escape(p) + trail, a) is not None
+
+
+GROUPED = re.compile(r"^\s+([a-z_]\w*)\s+((?:\([^()]*\)(?::\d+)?\s*)+)$", re.M)
+
+
+def expand_rows(outs):
+    """`state`'s grouped rows as printed before S1b (`on  (b,c) (c,a)`),
+    each atom also in the form the answer writes it (on(b,c) on(c,a))."""
+    extra = [p + a for p, row in GROUPED.findall(outs) for a in re.findall(r"\([^()]*\)", row)]
+    return outs + ("\n" + " ".join(extra) if extra else "")
+
+
 def nums(s):
     return [float(x) for x in NUM.findall(s)]
 
@@ -60,14 +88,14 @@ def rounds_to(n, text_n, pool):
 
 def score(it, rec):
     ans = rec.get("answer") or ""
-    a = norm(ans)
-    outs = "\n".join(c.get("output", "") for c in rec.get("calls", []))
+    a = norm(unquote(ans))
+    outs = expand_rows("\n".join(c.get("output", "") for c in rec.get("calls", [])))
     why = []
     for g in it["must"]:
-        if not any(norm(x).strip() in a for x in g):
+        if not any(has(x, a) for x in g):
             why.append("missing %s" % g[0])
     for f in it.get("forbid", []):
-        if norm(f).strip() in a:
+        if has(f, a):
             why.append("says %r" % f)
     correct = not why
     pool = nums(outs) + nums(it["question"]) + nums(" ".join(x for _, x in it.get("setup", []))) + [float(x) for x in it.get("numbers", [])]
