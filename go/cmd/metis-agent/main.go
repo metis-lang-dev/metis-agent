@@ -44,6 +44,9 @@ type config struct {
 			Temperature float32 `yaml:"temperature"`
 			TopK        int     `yaml:"top_k"`
 			MaxTokens   int     `yaml:"max_tokens"`
+			// Seed: every sampled line's draw seeded (0 = random per call,
+			// the default) — a live session reproducible run to run
+			Seed uint32 `yaml:"seed"`
 		} `yaml:"pass2"`
 	} `yaml:"llm"`
 	Prompt      string             `yaml:"prompt"`       // the intent persona
@@ -330,7 +333,7 @@ func main() {
 		NBatch: cfg.LLM.NBatch, NThreads: cfg.LLM.NThreads,
 		NGpuLayers: cfg.LLM.NGpuLayers, Template: cfg.LLM.Template,
 		Pass2: llm.Pass2{Temp: cfg.LLM.Pass2.Temperature, TopK: cfg.LLM.Pass2.TopK,
-			MaxTokens: cfg.LLM.Pass2.MaxTokens}})
+			MaxTokens: cfg.LLM.Pass2.MaxTokens, Seed: cfg.LLM.Pass2.Seed}})
 	if err != nil {
 		log.Fatal(err)
 	}
