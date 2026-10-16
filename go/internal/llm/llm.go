@@ -276,6 +276,17 @@ func withContext(model *C.struct_llama_model, ctx *C.struct_llama_context, cfg C
 	return l, nil
 }
 
+// SiblingWith is Sibling with its own pass-2 sampling (the domain agent's
+// narrator: top-k 40, temp 0.4, 50 tokens, seed 1, as py's Narrator).
+func (l *LLM) SiblingWith(nCtx int, p Pass2) (*LLM, error) {
+	s, err := l.Sibling(nCtx)
+	if err != nil {
+		return nil, err
+	}
+	s.pass2 = p.withDefaults()
+	return s, nil
+}
+
 // SetSeed fixes the pass-2 sampler's seed from now on (0 = random per
 // call). A bench sets one per repeat, so identical insertions in one
 // repeat get one answer across its rows.

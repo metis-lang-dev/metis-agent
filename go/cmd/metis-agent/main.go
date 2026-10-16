@@ -84,6 +84,9 @@ type config struct {
 		// (human-loop step 2): one word for all, or {name: propose|auto},
 		// over each manifest's reload: (default propose)
 		Reload any `yaml:"reload"`
+		// Kernel: who serves the domains: py (default) | cgo (the Go domain
+		// agent in-process; go-domain-agent step 5); -kernel overrides
+		Kernel string `yaml:"kernel"`
 	} `yaml:"v3"`
 	WS struct {
 		Addr  string `yaml:"addr"`
@@ -112,6 +115,7 @@ func main() {
 	loop := flag.String("loop", "v2", "v2: the dog's two-pass path; v3: the orchestrator agent (DESIGN v3; config v3:)")
 	printTurn := flag.Bool("print-turn", false, "-loop v3: print the orchestrator's system turn as built (the catalog's cards and declarations) and exit")
 	printGrammar := flag.Bool("print-grammar", false, "-loop v3: print the person turn's intent grammar as built (one intent domain's own, or several's union) and exit")
+	kernelF := flag.String("kernel", "", "-loop v3: who serves the domain agents — py (the default, v3.kernel) | cgo (the Go domain agent in-process over the C++ runtime)")
 	waitViewer := flag.Bool("wait-viewer", false, "attach the domains (v2), start the domain agents' clock (v3) when the first page connects (it hears the run from its start)")
 	flag.Parse()
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
@@ -219,6 +223,13 @@ func main() {
 		v3.Domains, v3.TickMs, v3.Journal = cfg.V3.Domains, cfg.V3.TickMs, cfg.V3.Journal
 		v3.Intents, v3.Install, v3.Template = v3Intents, cfg.V3.Install, cfg.LLM.Template
 		v3.Root, v3.Python = cfg.Catalog.Root, cfg.Catalog.Python
+		k := cfg.V3.Kernel
+		if *kernelF != "" {
+			k = *kernelF
+		}
+		if v3.Kernel, err = agent.CheckKernel(k); err != nil {
+			log.Fatal(err)
+		}
 		if manifests != nil {
 			// the manifests are the source, the config selects: every selected
 			// domain is installed, and its card in the system turn is its line

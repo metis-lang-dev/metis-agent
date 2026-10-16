@@ -15,6 +15,9 @@ traffic, their outputs dumped as JSON lines for go/internal/dagent's tests.
   days/kitchen.out.jsonl  the kitchen pair's day (both cooks, one env, the
       pair's clock): the second cook's load surprises the first, the
       template consult explains it, explain adopts it
+  narrator_<domain>.txt  the narrator's system text on the model (py's
+      Narrator.system(): the doctrine, the script as the agent holds it, the
+      display names) — Go's ModelNarrator renders it from the bundle's sidecar
   days/<domain>.out.jsonl  the scripted day (days/<domain>.jsonl: intents,
       clock beats, tools, world and ports lines) through py's own serve() on a
       `replay`-case process, every output line in order — the reply stream
@@ -557,6 +560,19 @@ def main():
                        env=dict(os.environ, METIS_CATALOG=str(tmp)), stderr=subprocess.DEVNULL)
         n = sum(1 for _ in open(out)) - 1
         print(f"day reload: {n} lines")
+    # the narrator on the model (step 5): its system text per domain, no model call
+    import io
+    import contextlib
+    from metis_agent.domain_agent import Process
+    from metis_agent.narrator import Narrator
+    for names in (("dog",), ("plant",), ("kitchen", "kitchen_shared")):
+        with contextlib.redirect_stderr(io.StringIO()):
+            built = Process(list(names), seat="template").build(1, "replay")
+        ags = built.agents if hasattr(built, "agents") else {names[0]: built}
+        for n, ag in ags.items():
+            text = Narrator(None, {ag.name: ag.script}, ag.names, own_voice=ag.own_voice).system()
+            (dest / f"narrator_{n}.txt").write_text(text)
+            print(f"narrator {n}: {len(text)} chars")
     day = dest / "days" / "kitchen.jsonl"
     if day.exists():
         lines = [json.loads(x) for x in day.read_text().splitlines() if x.strip()]

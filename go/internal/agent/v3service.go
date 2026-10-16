@@ -59,6 +59,10 @@ type V3Service struct {
 	// override, for a hot-installed domain
 	Policy    map[string]string
 	ReloadCfg any
+	// Kernel: who serves Domains — "py" (the default: py's domain agent
+	// processes) or "cgo" (the Go domain agent in-process, on the bundles
+	// metispy's emitter builds from Root; go-domain-agent step 5)
+	Kernel string
 	// Tools: the REPL API's declarations, from the served packages' bundles
 	// (ServedTools; repl-tools step 3)
 	Tools []repltools.Tool

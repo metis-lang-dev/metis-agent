@@ -9,6 +9,9 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/metis-lang-dev/metis-agent/go/internal/dagent"
+	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
 )
 
 // The live -loop v3 with real domain agents (integration step 2,
@@ -212,6 +215,20 @@ func (ld *liveDomains) watchNow() map[string]string {
 	return w
 }
 
+// startDomain starts one configured domain agent process on the
+// service's kernel: py spawns it, cgo builds it in-process from the same
+// command line, its narrator on a context of the service's model.
+func (v *v3) startDomain(s DomainSpec, lf io.Writer) (*DomainProc, error) {
+	if v.sc.Kernel != KernelCgo {
+		return StartDomain(s.Name, s.Argv, s.Dir, append([]string{"METIS_CONFIG="}, s.Env...), lf)
+	}
+	return StartDomainCgo(s.Name, s.Argv, s.Dir, CgoEnv{Root: v.sc.Root, Python: v.sc.Python,
+		Speaker: func() (dagent.Speaker, error) {
+			// py's narrator: its own context (n_ctx 8192) on the same GGUF, top-k 40, temp 0.4, seed 1
+			return v.l.SiblingWith(8192, llm.Pass2{Temp: 0.4, TopK: 40, MaxTokens: 50, Seed: 1})
+		}})
+}
+
 func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journal string) error {
 	ld := &liveDomains{specs: specs, procs: map[string]*DomainProc{}, byName: map[string]*DomainProc{}, tick: tick,
 		portsDue: map[string]bool{}, watch: map[string]string{}, base: map[string]map[string]string{},
@@ -234,7 +251,7 @@ func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journa
 	}
 	for _, s := range specs {
 		lf, _ := os.Create(fmt.Sprintf("%s-%s.log", journalStem(journal), s.Name))
-		p, err := StartDomain(s.Name, s.Argv, s.Dir, append([]string{"METIS_CONFIG="}, s.Env...), lf)
+		p, err := v.startDomain(s, lf)
 		if err != nil {
 			return fmt.Errorf("domain %s: %w", s.Name, err)
 		}
@@ -248,7 +265,7 @@ func (v *v3) startProcs(a *Agent, specs []DomainSpec, tick time.Duration, journa
 		ld.byName[s.Name] = p
 		name := s.Name
 		p.OnTook = func(t Took) { ld.wire(name, t) }
-		log.Printf("[v3] domain agent %s (%v) up (pid %d)", s.Name, doms, p.Pid())
+		log.Printf("[v3] domain agent %s (%v) up (kernel %s, pid %d)", s.Name, doms, p.Kernel(), p.Pid())
 	}
 	intents := ""
 	for _, n := range v.cfg.Loaded {

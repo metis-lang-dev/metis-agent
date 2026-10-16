@@ -65,6 +65,19 @@ type Process struct {
 	Records  string // the records sink ("" = off; "catalog" = each package's own records; else DIR/<name>/records)
 	Session  string
 	Trace    bool
+	// Narrate: the domains the narrator speaks for ("*" = every one; py
+	// --narrate), on Speaker (the model's speaking turn; nil = none)
+	Narrate []string
+	Speaker Speaker
+}
+
+func (p *Process) narrated(d string) bool {
+	for _, n := range p.Narrate {
+		if n == "*" || n == d {
+			return true
+		}
+	}
+	return false
 }
 
 // served resolves a `serves` entry: a path relative to the package, or
@@ -130,6 +143,14 @@ func (p *Process) Domains(names []string) ([]Domain, error) {
 		if h.Display != "" {
 			d.Display = h.Display
 		}
+		for _, pn := range h.Pair {
+			if pd := Hosts[pn].Display; pd != "" && pn != n {
+				if d.Displays == nil {
+					d.Displays = map[string]string{}
+				}
+				d.Displays[pn] = pd
+			}
+		}
 		if d.Display == "" {
 			d.Display = n
 		}
@@ -153,6 +174,12 @@ func (p *Process) agent(d Domain, seed uint64, caseName string) (*Agent, error) 
 		return nil, err
 	}
 	a.Tracing = p.Trace
+	if p.Speaker != nil && p.narrated(d.Name) {
+		if a.Narrator, err = NewModelNarrator(a, p.Speaker); err != nil {
+			a.Close()
+			return nil, err
+		}
+	}
 	if d.RecordsDir != "" {
 		a.Sink.Path, a.Sink.Session = filepath.Join(d.RecordsDir, p.Session+".jsonl"), p.Session
 	}

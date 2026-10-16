@@ -42,6 +42,7 @@ type Domain struct {
 	OwnDay     bool   // a replay or live case keeps the host's own day
 	Pair       []string
 	PricedBy   string
+	Displays   map[string]string // the display names of the paths its script names beside its own (py DISPLAYS)
 }
 
 // Agent is py's DomainAgent.

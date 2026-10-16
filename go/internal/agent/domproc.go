@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/metis-lang-dev/metis-agent/go/internal/dagent"
 )
 
 // DomainProc is a real domain agent behind the orchestrator (integration
@@ -29,6 +31,9 @@ type DomainProc struct {
 	Took []Took // every request, in order
 	// OnTook, when set, sees each request's round trip (the live journal's dlg-wire)
 	OnTook func(Took)
+	// the cgo kernel (StartDomainCgo): the Go domain agent in-process
+	srv   dagent.Server
+	dproc *dagent.Process
 }
 
 // Took is one request's round trip.
@@ -69,7 +74,20 @@ func StartDomain(name string, argv []string, dir string, env []string, logw io.W
 }
 
 // Pid is the process's id (for its VRAM).
-func (p *DomainProc) Pid() int { return p.cmd.Process.Pid }
+func (p *DomainProc) Pid() int {
+	if p.srv != nil {
+		return cgoPid()
+	}
+	return p.cmd.Process.Pid
+}
+
+// Kernel is who serves this process: py (a spawned process) or cgo.
+func (p *DomainProc) Kernel() string {
+	if p.srv != nil {
+		return KernelCgo
+	}
+	return KernelPy
+}
 
 func (p *DomainProc) readUntil(last func(map[string]any) bool) ([]map[string]any, error) {
 	var out []map[string]any
@@ -119,10 +137,7 @@ func (p *DomainProc) Do(req map[string]any) ([]map[string]any, error) {
 		kind = "add"
 	}
 	t0 := time.Now()
-	if _, err := p.in.Write(append(b, '\n')); err != nil {
-		return nil, err
-	}
-	out, err := p.readUntil(func(m map[string]any) bool {
+	end := func(m map[string]any) bool {
 		switch kind {
 		case "clock":
 			return m["clock"] != nil
@@ -130,7 +145,16 @@ func (p *DomainProc) Do(req map[string]any) ([]map[string]any, error) {
 			return m["ack"] != nil
 		}
 		return m["ack"] != nil
-	})
+	}
+	var out []map[string]any
+	if p.srv != nil {
+		out, err = p.doInproc(req, end)
+	} else {
+		if _, err := p.in.Write(append(b, '\n')); err != nil {
+			return nil, err
+		}
+		out, err = p.readUntil(end)
+	}
 	tk := Took{Kind: kind, Replies: len(out), D: time.Since(t0)}
 	p.Took = append(p.Took, tk)
 	if p.OnTook != nil {
@@ -186,6 +210,10 @@ func (p *DomainProc) Reset(args map[string]any) error {
 
 // Close ends the process (its stdin closed, then a wait).
 func (p *DomainProc) Close() error {
+	if p.srv != nil {
+		p.srv.Close()
+		return nil
+	}
 	_ = p.in.Close()
 	done := make(chan error, 1)
 	go func() { done <- p.cmd.Wait() }()

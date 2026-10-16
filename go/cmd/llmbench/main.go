@@ -46,10 +46,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/metis-lang-dev/metis-agent/go/internal/agent"
+	"github.com/metis-lang-dev/metis-agent/go/internal/dagent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/intent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/kernel"
 	"github.com/metis-lang-dev/metis-agent/go/internal/llm"
-	"github.com/metis-lang-dev/metis-agent/go/internal/agent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/wire"
 )
 
@@ -178,6 +179,9 @@ func main() {
 	dogProc := flag.String("dog-proc", "", "integration step 1: the real dog for -dialog — the domain agent's command line, run in -dog-dir (e.g. \".venv/bin/python -m metis_agent.domain_agent --domain dog --narrate\")")
 	dogAsIs := flag.Bool("dog-as-is", false, "integration step 1: the dog's world as dog.llp has it (the timelines' premise lines off; the person's own acts kept)")
 	kitReal := flag.Bool("kitchen-real", false, "integration step 2: the kitchen pair real, in -dog-proc's process (--domain dog,kitchen,kitchen_shared)")
+	kernelF := flag.String("kernel", "py", "-dog-proc's kernel: py (spawn the command line) | cgo (the Go domain agent in-process on the same flags, its narrator on a context of -model; go-domain-agent step 5)")
+	cgoRoot := flag.String("catalog-root", "../../metis-catalog", "-kernel cgo: the metis-catalog checkout the bundles are emitted from")
+	cgoPython := flag.String("catalog-python", "../py/.venv/bin/python", "-kernel cgo: the interpreter that runs metispy's emitter")
 	dogDir := flag.String("dog-dir", "../py", "integration step 1: -dog-proc's working directory")
 	dialogF := flag.String("dialog", "", "E13 step 3: the dialog-control corpus (tools/e13-dialog.py) through the orchestrator agent against emulated domains; -gbnf, -e10-ids, -pass2_seed")
 	v3TurnF := flag.String("v3-turn", "", "-v3 / -dialog: this system turn for every scenario and timeline (metis-agent -print-turn: the turn built from the catalog's manifests)")
@@ -314,7 +318,18 @@ func main() {
 				fail(err)
 			}
 			defer lf.Close()
-			if dog, err = agent.StartDomain("dog", strings.Fields(*dogProc), *dogDir, []string{"METIS_CONFIG="}, lf); err != nil {
+			switch k, kerr := agent.CheckKernel(*kernelF); {
+			case kerr != nil:
+				fail(kerr)
+			case k == agent.KernelCgo:
+				dog, err = agent.StartDomainCgo("dog", strings.Fields(*dogProc), *dogDir, agent.CgoEnv{Root: *cgoRoot, Python: *cgoPython,
+					Speaker: func() (dagent.Speaker, error) {
+						return l.SiblingWith(8192, llm.Pass2{Temp: 0.4, TopK: 40, MaxTokens: 50, Seed: 1})
+					}})
+			default:
+				dog, err = agent.StartDomain("dog", strings.Fields(*dogProc), *dogDir, []string{"METIS_CONFIG="}, lf)
+			}
+			if err != nil {
 				fail(err)
 			}
 			defer dog.Close()

@@ -145,7 +145,7 @@ func (v *v3) install(dom string) error {
 	} else {
 		lf, _ := os.Create(fmt.Sprintf("%s-%s.log", journalStem(sc.Journal), spec.Name))
 		var err error
-		if p, err = StartDomain(spec.Name, spec.Argv, spec.Dir, append([]string{"METIS_CONFIG="}, spec.Env...), lf); err != nil {
+		if p, err = v.startDomain(spec, lf); err != nil {
 			return fmt.Errorf("%s's domain agent: %w", dom, err)
 		}
 		p.OnTook = func(t Took) { ld.wire(spec.Name, t) }
