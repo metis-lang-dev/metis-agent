@@ -120,7 +120,7 @@ def test_kitchen_surprise_verbs():
         again = a.handle({"tool": "reset", "id": "x2", "args": {"record": 0}})
         assert again[0]["status"] == "refused"                          # nothing open to reset
     finally:
-        del os.environ["METIS_PAIR_DIR"]
+        os.environ.pop("METIS_PAIR_DIR", None)
 
 
 def test_no_blocker_refusals_offer_the_catalogs_alternative():
@@ -225,3 +225,64 @@ def test_computed_missing_needs_no_model_call():
     refused(ag3)
     r3 = ag3.handle({"tool": "consult", "id": "k", "args": {"question": "Why?"}})[0]
     assert r3["calls"] == 1 and r3["text"] == "Closed." and seat.seen
+
+
+def _kitchen_surprise():
+    """The first cook's surprise open (record 0), the pair stepped to it on
+    a fresh shared env (the pair's env is a file: a new one per pair)."""
+    from metis_agent.domains import kitchen, kitchen_shared
+    os.environ["METIS_PAIR_DIR"] = tempfile.mkdtemp()
+    a, b = DomainAgent(kitchen), DomainAgent(kitchen_shared)
+    while a.watch.open is None:
+        for ag in (a, b):
+            ag.handle({"clock": "step"})
+            if a.watch.open is not None:
+                break
+    return a
+
+
+def _results(out):
+    return [(r["status"], r.get("reason")) for r in out if r.get("kind") == "result"]
+
+
+import pytest  # noqa: E402
+
+
+@pytest.mark.parametrize("verb, args", [
+    ("explain", {"card": "kitchen_shared", "move": "partner load"}),
+    ("escalate", {"text": "the pot holds an onion I did not put there"}),
+    ("reset", {}),
+])
+def test_a_surprise_verb_takes_the_record_as_tools_json_declares_it(verb, args):
+    """tools.json declares record a STRING: "the refused call's id, or the
+    surprise's record (#N)". '#0', '0' and 0 name record 0; the id of a call
+    the open surprise refused names it too; anything else is refused with
+    why — never 'TypeError: %d format' (the OpenRouter trial hit it 12 times:
+    the string reached the narrator's %d)."""
+    try:
+        for rec in ("#0", "0", " #0 ", 0):
+            a = _kitchen_surprise()
+            out = a.handle({"tool": verb, "id": "v", "args": {"record": rec, **args}})
+            assert _results(out)[0][0].startswith("admitted"), (rec, out)
+            assert a.watch.open is None or verb == "escalate", rec
+            assert all(isinstance(r.get("record", 0), int) for r in out)
+        # the id of the call the open surprise refused (a held surprise_open refusal)
+        a = _kitchen_surprise()
+        a.handle({"id": "c7", "verb": "STOP", "args": {}})
+        assert a.refused_by == {"c7": 0}
+        out = a.handle({"tool": verb, "id": "v", "args": {"record": "c7", **args}})
+        assert _results(out)[0][0].startswith("admitted"), out
+        # a call id it did not refuse, garbage, a record that is not there: refused with why
+        a = _kitchen_surprise()
+        for rec, why in (("c99", "no record 'c99': name the surprise's record (#N) or the id of a call it refused"),
+                         ("#zero", "no record '#zero'"), (True, "not True")):
+            out = a.handle({"tool": verb, "id": "v", "args": {"record": rec, **args}})
+            assert _results(out)[0][0] == "refused" and why in _results(out)[0][1], (rec, out)
+            assert out[0]["text"] and a.watch.open == 0
+        out = a.handle({"tool": verb, "id": "v", "args": {"record": "#9", **args}})
+        assert _results(out) == [("refused", "no record 9")] and "surprise 9" in out[0]["text"]
+        # no record named: the open one
+        out = a.handle({"tool": verb, "id": "v", "args": {"record": "", **args}})
+        assert _results(out)[0][0].startswith("admitted"), out
+    finally:
+        os.environ.pop("METIS_PAIR_DIR", None)

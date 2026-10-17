@@ -50,8 +50,12 @@
 {"tool": "findings", "args": {}, "domain": "kitchen", "id": "r2-5"}
 {"tool": "consult", "args": {"question": "what happened?"}, "domain": "kitchen", "id": "k1"}
 {"verb": "LOAD", "args": {}, "domain": "kitchen", "id": "c1"}
+{"tool": "explain", "args": {"record": "c1", "card": "nope", "move": "m"}, "domain": "kitchen", "id": "x0a"}
+{"tool": "escalate", "args": {"record": "#9", "text": "an onion I did not put there"}, "domain": "kitchen", "id": "x0b"}
+{"tool": "reset", "args": {"record": "c99"}, "domain": "kitchen", "id": "x0c"}
+{"tool": "reset", "args": {"record": true}, "domain": "kitchen", "id": "x0d"}
 {"tool": "explain", "args": {"card": "kitchen shared", "move": "partner load"}, "domain": "kitchen", "id": "x1"}
-{"tool": "explain", "args": {"card": "kitchen_shared", "move": "partner_load"}, "domain": "kitchen", "id": "x2"}
+{"tool": "explain", "args": {"card": "kitchen_shared", "move": "partner_load", "record": "#0"}, "domain": "kitchen", "id": "x2"}
 {"tool": "state", "args": {}, "domain": "kitchen", "id": "r3-0"}
 {"tool": "events", "args": {}, "domain": "kitchen", "id": "r3-1"}
 {"tool": "ctx", "args": {}, "domain": "kitchen", "id": "r3-2"}

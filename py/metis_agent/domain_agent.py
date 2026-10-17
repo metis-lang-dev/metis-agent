@@ -199,6 +199,7 @@ class DomainAgent:
         self.over = False
         self.log = []        # what the mapper did, per intent (the report's table)
         self.held = []       # replies owed at the next beat (a surprise_open refusal)
+        self.refused_by = {}  # call id -> the surprise record whose being open refused it
         self.narrated = []   # (fragment, sentence) per narrated fragment
         self.consults = []   # every consult's full record (the report's transcripts)
         self.last_refusal = None   # the latest refusal not yet consulted: the consult's situation
@@ -274,6 +275,8 @@ class DomainAgent:
         dtext = ", ".join("%s %+d" % (a.replace("_", " "), n) for a, n in sorted(diff.items()))
         text = "surprise #%s open%s: I take no new orders until it is closed" % (k, " (%s)" % dtext if dtext else "")
         self.log.append({"id": iid, "verb": msg.get("verb"), "args": msg.get("args"), "refused": "surprise_open"})
+        if iid is not None:
+            self.refused_by[str(iid)] = k      # a surprise verb may name this call for the record
         return reply(self.name, "result", id=iid, status="refused", reason="surprise_open", blocker=None,
                      ref={"seq": len(self.repl.fired), "beat": self.beat_no()}, text=text, voice="template")
 
@@ -518,8 +521,30 @@ class DomainAgent:
                 return {"card": c["name"], "move": mv}
         return {"card": card, "move": move}
 
+    def record_of(self, r):
+        """A surprise verb's record as tools.json declares it — "the id of
+        the reply this closes: the refused call's id, or the surprise's
+        record (#N)" — as the record number, or (None, why): '#N', 'N' or
+        N is record N; a call id is the record whose being open refused
+        that call (surprise_open_refusal)."""
+        if isinstance(r, bool):
+            return None, "a record is #N or the id of a refused call, not %r" % r
+        if isinstance(r, int):
+            return r, None
+        if isinstance(r, float) and r == int(r):
+            return int(r), None
+        t = str(r).strip()
+        n = t[1:].strip() if t.startswith("#") else t
+        if n.isdigit():
+            return int(n), None
+        if t in self.refused_by:
+            return self.refused_by[t], None
+        return None, ("no record %r: name the surprise's record (#N) or the id of a call it refused" % t)
+
     def surprise_verb(self, iid, verb, args):
-        rec = args.get("record", self.watch.open)
+        rec = args.get("record")
+        if rec is None or rec == "":
+            rec = self.watch.open
         if rec is None:
             # nothing open and no record named (the architect's ruling): a
             # final refusal under the domain's name — the watch is not asked,
@@ -528,6 +553,13 @@ class DomainAgent:
             return [reply(self.name, "result", id=iid, status="refused", reason="no surprise is open",
                           ref={"seq": len(self.repl.fired), "beat": self.beat_no()}, text="no surprise is open",
                           voice="template")]
+        rec, why = self.record_of(rec)
+        if rec is None:
+            # a record the verb cannot name (neither #N nor a refused call's
+            # id): refused here, the watch not asked — never a crash
+            self.watch.outbox.clear()
+            return [reply(self.name, "result", id=iid, status="refused", reason=why,
+                          ref={"seq": len(self.repl.fired), "beat": self.beat_no()}, text=why, voice="template")]
         if verb == "explain":
             cm = self.card_names(args.get("card", ""), args.get("move", ""))
             line = "explain %s %s %s" % (rec, cm["card"], cm["move"])

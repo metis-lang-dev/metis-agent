@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/host"
@@ -64,6 +65,7 @@ type Agent struct {
 	reports  map[string]any
 	handles  map[string]string
 	held     []Reply
+	refused  map[string]int // call id -> the record whose being open refused it (py refused_by)
 	lastRef  *Refusal
 	consults []map[string]any
 	Narrator Narrator // nil: no narrator (the replies speak the lines and the refs)
@@ -389,6 +391,12 @@ func (a *Agent) surpriseOpenRefusal(id any) Reply {
 	d := ""
 	if len(parts) > 0 {
 		d = " (" + strings.Join(parts, ", ") + ")"
+	}
+	if id != nil {
+		if a.refused == nil {
+			a.refused = map[string]int{}
+		}
+		a.refused[pyStr(id)] = k // a surprise verb may name this call for the record
 	}
 	return a.reply("result", F{"id": id, "status": "refused", "reason": "surprise_open", "blocker": nil,
 		"ref": a.ref(true, ""), "text": fmt.Sprintf("surprise #%d open%s: I take no new orders until it is closed", k, d),
@@ -786,12 +794,43 @@ func (a *Agent) cardNames(card, move string) (string, string) {
 	return card, move
 }
 
+// recordOf is py's record_of: a surprise verb's record as tools.json
+// declares it ("the refused call's id, or the surprise's record (#N)") as the
+// record number, or why not: '#N', 'N' or N is record N; a call id is the
+// record whose being open refused that call (surpriseOpenRefusal).
+func (a *Agent) recordOf(v any) (int, string) {
+	switch t := v.(type) {
+	case bool:
+		return -1, "a record is #N or the id of a refused call, not " + pyStr(t)
+	case int:
+		return t, ""
+	case float64:
+		if t == float64(int(t)) {
+			return int(t), ""
+		}
+	}
+	s := strings.TrimSpace(pyStr(v))
+	n := s
+	if strings.HasPrefix(s, "#") {
+		n = strings.TrimSpace(s[1:])
+	}
+	if n != "" && strings.Trim(n, "0123456789") == "" {
+		if k, err := strconv.Atoi(n); err == nil {
+			return k, ""
+		}
+	}
+	if k, ok := a.refused[s]; ok {
+		return k, ""
+	}
+	return -1, fmt.Sprintf("no record %s: name the surprise's record (#N) or the id of a call it refused", pyRepr(s))
+}
+
 func (a *Agent) surpriseVerb(id any, verb string, args map[string]any) ([]Reply, error) {
 	var rec any = nil
 	if a.W.Open >= 0 {
 		rec = a.W.Open
 	}
-	if v, ok := args["record"]; ok {
+	if v, ok := args["record"]; ok && v != nil && v != "" {
 		rec = v
 	}
 	if rec == nil {
@@ -802,6 +841,15 @@ func (a *Agent) surpriseVerb(id any, verb string, args map[string]any) ([]Reply,
 		return []Reply{a.reply("result", F{"id": id, "status": "refused", "reason": "no surprise is open",
 			"ref": a.ref(true, ""), "text": "no surprise is open", "voice": "template"})}, nil
 	}
+	k, why := a.recordOf(rec)
+	if why != "" {
+		// a record the verb cannot name (neither #N nor a refused call's
+		// id): refused here, the watch not asked
+		a.W.Outbox = nil
+		return []Reply{a.reply("result", F{"id": id, "status": "refused", "reason": why,
+			"ref": a.ref(true, ""), "text": why, "voice": "template"})}, nil
+	}
+	rec = k
 	var line string
 	switch verb {
 	case "explain":
