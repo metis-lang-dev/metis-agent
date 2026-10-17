@@ -17,7 +17,7 @@ var replyKinds = map[string][]string{
 	"result":     {"id", "status", "reason", "alternatives", "blocker"},
 	"read":       {"tool", "output"},
 	"event":      {"counts"},
-	"quiescence": {"goal_pending", "over"},
+	"quiescence": {"goal_pending", "over", "unsettled"}, // unsettled: the beat stopped at its step cap
 	"surprise":   {"record", "difference", "cards"},
 	"notice":     {"record", "card", "move"},
 	"error":      {"id", "error"},

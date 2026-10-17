@@ -282,6 +282,13 @@ func (o *Orch) Handle(in Inbound, gbnf string, stopWords []string) (woke bool, e
 // it must, elsewhere.
 func (o *Orch) quiescenceSpoken(r Reply) bool {
 	d := r.Domain
+	if len(r.Unsettled) > 0 { // a beat stopped at its step cap: spoken once until (re)activation
+		if o.uHeard[d] {
+			return false
+		}
+		o.uHeard[d] = true
+		return true
+	}
 	switch {
 	case r.Over || strings.Contains(strings.ToLower(r.Text), "day is over"):
 	case !o.qHeard[d]:
@@ -295,7 +302,10 @@ func (o *Orch) quiescenceSpoken(r Reply) bool {
 
 // Activated: the domain was (re)activated — its next quiescence is its
 // first.
-func (o *Orch) Activated(d string) { delete(o.qHeard, d) }
+func (o *Orch) Activated(d string) {
+	delete(o.qHeard, d)
+	delete(o.uHeard, d)
+}
 
 // keyword: a stop word fires the intent without the model (the dog path's
 // keyword stop); the turn is kept as the dialog's past.

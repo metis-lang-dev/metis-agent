@@ -147,7 +147,7 @@ func (p *Process) Domains(names []string) ([]Domain, error) {
 		}
 		d := Domain{Name: n, Display: m.Display, Voice: m.Voice, Bundle: bundle, Source: string(src),
 			Tables: h.Tables, PluginSpec: h.PluginSpec, Answers: h.Answers, ExoEvents: h.ExoEvents, FragCounts: h.FragCounts,
-			Quiescence: h.Quiescence, Beats: h.Beats, OwnDay: h.OwnDay, Pair: h.Pair, PricedBy: h.PricedBy}
+			Quiescence: h.Quiescence, Beats: h.Beats, BeatSteps: m.Clock.Steps, OwnDay: h.OwnDay, Pair: h.Pair, PricedBy: h.PricedBy}
 		if h.Display != "" {
 			d.Display = h.Display
 		}

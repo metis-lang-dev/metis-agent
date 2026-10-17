@@ -104,6 +104,19 @@ def test_reloaded_drops_the_tasks_and_says_so():
     assert o.quiescence_spoken(O.Reply({"domain": "dog", "kind": "quiescence", "text": "quiet"}))  # first again
 
 
+def test_an_unsettled_beat_speaks_once_until_activation():
+    """A beat stopped at its step cap (BEAT_STEPS): the quiescence that did
+    not come is spoken once, though the domain's first has spoken; again
+    after a reload (activation). As Go's TestQuiescenceRule."""
+    o = O.Orch(O.V3Config(CATALOG, LOADED, DISPLAY, mirror=True), Rec([]), Domains([]))
+    o.quiescence_spoken(O.Reply({"domain": "dog", "kind": "quiescence", "text": "quiet"}))
+    u = O.Reply({"domain": "dog", "kind": "quiescence", "text": "did not settle", "unsettled": [["sit", 200]]})
+    assert u.to_map()["unsettled"] == [["sit", 200]]
+    assert o.quiescence_spoken(u) and not o.quiescence_spoken(u)
+    o.reloaded("dog")
+    assert o.quiescence_spoken(u)
+
+
 def test_the_repl_api_is_metispys(monkeypatch):
     """repl-tools step 2: the REPL API's declarations are rendered from the
     installed metispy's metis.lang.repl_api, never from a copy here — a

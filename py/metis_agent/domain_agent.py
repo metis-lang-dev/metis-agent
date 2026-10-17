@@ -211,6 +211,10 @@ class DomainAgent:
         self.frag_counts = counts or getattr(module, "FRAG_COUNTS", "left")
         self.exo_events = getattr(module, "EXO_EVENTS", False)
         self.quiescence = getattr(module, "QUIESCENCE", "episode")
+        # the watch steps one beat may take (BEAT_STEPS below): the domain's
+        # own, else its manifest's clock: {steps: N}
+        steps = (getattr(getattr(module, "MANIFEST", None), "clock", None) or {}).get("steps")
+        self.beat_steps = int(getattr(module, "BEAT_STEPS", 0) or steps or self.BEAT_STEPS)
         self.narrator = None
         self.script = scripts_of(self.repl, self.extensions)
         if llm is not None:
@@ -280,10 +284,13 @@ class DomainAgent:
         return reply(self.name, "result", id=iid, status="refused", reason="surprise_open", blocker=None,
                      ref={"seq": len(self.repl.fired), "beat": self.beat_no()}, text=text, voice="template")
 
-    # a domain with no host runs its own day: at most this many watch steps
-    # per beat, so a program that never quiesces (wgc's search fires ~100k
-    # moves a second) cannot hold the orchestrator's thread
-    OWN_DAY_STEPS = 200
+    # at most this many watch steps per beat, host or not: a program that never
+    # quiesces cannot hold the orchestrator's thread (wgc's search fires ~100k
+    # moves a second) nor grow its fired history without end (persist_lit :
+    # lit -o lit in a hosted lamp: a 22.9 GB OOM, openrouter-trial run 3).
+    # The beat stops there and says so: a quiescence that names the rules that
+    # kept firing (unsettled); the clock does not advance until it settles
+    BEAT_STEPS = 200
 
     # ── the clock: one beat of the watch ──
     def beat(self):
@@ -291,13 +298,13 @@ class DomainAgent:
         self.held = []
         if self.over:
             return out
-        b0 = w.beat
-        cap, n = (self.OWN_DAY_STEPS if isinstance(self.host, _NoHost) else None), 0
+        b0, f0, n = w.beat, len(self.repl.fired_rows), 0
         while not w.done:
             would_tick = w.observe_only or (w.quiet and not self.repl._candidates())
             if w.beat > b0 and would_tick:
                 break
-            if cap is not None and n >= cap:
+            if n >= self.beat_steps:
+                out += self.unsettled(f0, n)
                 break
             n += 1
             for s in w.step():
@@ -308,6 +315,19 @@ class DomainAgent:
         for atom in gone:
             self.host.retract(atom)
         return out + late
+
+    def unsettled(self, f0, n):
+        """The beat that stopped at its step cap: a quiescence that did not
+        come — the rules that fired in it, the most first ([rule, times])."""
+        times = {}
+        for kind, _, ev in self.repl.fired_rows[f0:]:
+            if kind != "exo":
+                times[ev.name] = times.get(ev.name, 0) + 1
+        rules = sorted(times.items(), key=lambda kv: (-kv[1], kv[0]))
+        text = "%s did not settle: %d steps in one beat, and %s kept firing; the beat stopped there" % (
+            self.display, n, ", ".join("%s (%d)" % kv for kv in rules[:5]) or "no rule")
+        return [reply(self.name, "quiescence", goal_pending=False, unsettled=[list(kv) for kv in rules],
+                      ref={"seq": len(self.repl.fired), "beat": self.beat_no()}, text=text, voice="template")]
 
     def narrate(self, f):
         if self.narrator is None:
@@ -870,8 +890,9 @@ class Process:
     narrate: None, "*" (every domain) or "dog,kitchen"."""
 
     def __init__(self, names, narrate=None, llm=None, seat=None, missing_seat=False, trace=False,
-                 records=None, session=None):
+                 records=None, session=None, beat_steps=None):
         self.names, self.llm, self.seat = list(names), llm, seat
+        self.beat_steps = beat_steps
         self.missing_seat, self.trace, self.records, self.session_id = missing_seat, trace, records, session
         from . import domains
         self.modules = [domains.load(d) for d in self.names]           # from the catalog's manifests
@@ -901,6 +922,8 @@ class Process:
         if m.NAME not in self.narrated:
             ag.narrator = None
         ag.tracing = self.trace
+        if self.beat_steps:
+            ag.beat_steps = self.beat_steps
         if self.records:
             ag.session = self.state.setdefault("session", self.session_id or time.strftime("%Y%m%d-%H%M%S"))
             ag.sink = records_path(m, self.records, ag.session)
@@ -1021,6 +1044,9 @@ def main():
                     help="the records sink: every surprise record and its close appended to "
                          "DIR/<domain>/records/<session>.jsonl (bare: the metis-catalog checkout's domains/)")
     ap.add_argument("--session", default=None, help="the sink's session id (default: the start time)")
+    ap.add_argument("--beat-steps", type=int, default=None, metavar="N",
+                    help="the watch steps one beat may take before it stops unsettled (default: the domain's "
+                         "clock: {steps}, else %d)" % DomainAgent.BEAT_STEPS)
     ap.add_argument("--trace", action="store_true", help="a trace reply per line (the console's REPL log): "
                     "the fired rows, narrated fragments, consults, reads and world lines it caused")
     a = ap.parse_args()
@@ -1039,7 +1065,7 @@ def main():
     proc = Process([d.strip() for d in a.domain.split(",") if d.strip()],
                    narrate=(None if not a.narrate else "*" if a.narrate == "*" else a.narrate),
                    llm=llm, seat=seat, missing_seat=a.missing_seat, trace=a.trace,
-                   records=a.records, session=a.session)
+                   records=a.records, session=a.session, beat_steps=a.beat_steps)
     build, reload, add = proc.build, proc.reload, proc.add_line
     agent = build(a.seed, a.case)
     print(json.dumps(ready(agent)), flush=True)

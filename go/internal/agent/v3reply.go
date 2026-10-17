@@ -51,6 +51,9 @@ type Reply struct {
 	Ref      json.RawMessage `json:"ref,omitempty"`
 	Text     string          `json:"text,omitempty"`
 	Over     bool            `json:"over,omitempty"` // a quiescence: the domain's day is over
+	// a quiescence that did not come: the beat stopped at its step cap,
+	// [[rule, times], …] that kept firing (dagent BeatSteps)
+	Unsettled json.RawMessage `json:"unsettled,omitempty"`
 }
 
 // FlexText is a reply field the domains write in more than one shape

@@ -287,3 +287,72 @@ def test_domains_in_one_process_route_by_domain_and_step_the_pair():
         assert res[0]["status"].startswith("admitted")
     finally:
         del os.environ["METIS_PAIR_DIR"]
+
+
+SPIN = """catalog spin 1.
+extends plant.
+stage main {
+  %% I stay moist, and say so again, and again.
+  stays_moist [dyn] : moist -o moist.
+}
+"""
+
+
+def test_a_beat_that_never_settles_stops_at_its_cap_under_a_memory_limit(tmp_path):
+    """openrouter-trial run 3: a hosted lamp with persist_lit : lit -o lit
+    stepped one beat forever (the cap was the host-less day's only) and grew
+    its fired history to a 22.9 GB OOM. Every beat is capped now (BEAT_STEPS,
+    the manifest's clock: {steps}, --beat-steps): here the plant with a rule
+    that never settles, the domain agent's process under a 2 GB address-space
+    limit, each beat ends promptly with an unsettled quiescence naming it."""
+    import os
+    import resource
+    import shutil
+    import subprocess
+    import time
+    from metis_agent.intent_domain import catalog_domains
+    d = tmp_path / "domains/plant"
+    shutil.copytree(catalog_domains() / "plant", d, ignore=shutil.ignore_patterns("records", "build", "__pycache__"))
+    (d / "extensions/spin.llp").write_text(SPIN)
+
+    def run(*flags, beats=3):
+        cap = 2 << 30
+        t0 = time.monotonic()
+        r = subprocess.run([sys.executable, "-m", "metis_agent.domain_agent", "--domain", "plant", "--case", "replay",
+                            "--consult", "template", *flags],
+                           input='{"clock": "beat", "domain": "plant", "n": 1}\n' * beats, capture_output=True, text=True,
+                           timeout=120, cwd=str(ROOT / "py"), env=dict(os.environ, METIS_CATALOG=str(tmp_path)),
+                           preexec_fn=lambda: resource.setrlimit(resource.RLIMIT_AS, (cap, cap)))
+        assert r.returncode == 0, r.stderr[-2000:]
+        lines = [json.loads(l) for l in r.stdout.splitlines()]
+        assert not any(l.get("kind") == "error" for l in lines), [l for l in lines if l.get("kind") == "error"]
+        return lines, time.monotonic() - t0
+
+    lines, took = run()
+    clocks = [i for i, l in enumerate(lines) if "clock" in l and l["clock"] == "beat"]
+    assert len(clocks) == 3 and took < 60
+    for n, i in enumerate(clocks, 1):
+        q = lines[i - 1]
+        assert q["kind"] == "quiescence" and q["unsettled"] == [["stays_moist", 200]], q
+        assert q["ref"]["seq"] == 200 * n and "stays_moist (200) kept firing" in q["text"]
+        assert lines[i]["beat"] == 0             # the clock does not advance until the program settles
+    check(lines[clocks[0] - 1])
+    # the cap is the domain's: --beat-steps, else the manifest's clock: {steps}
+    lines, _ = run("--beat-steps", "25", beats=1)
+    assert [l for l in lines if l.get("kind") == "quiescence"][0]["unsettled"] == [["stays_moist", 25]]
+    mf = d / "domain.yaml"
+    mf.write_text(mf.read_text().replace("clock: {beats: 1}", "clock: {beats: 1, steps: 30}"))
+    lines, _ = run(beats=1)
+    assert [l for l in lines if l.get("kind") == "quiescence"][0]["unsettled"] == [["stays_moist", 30]]
+
+
+def test_a_beat_that_settles_is_not_capped():
+    """The cap is a ceiling, not a slice: the dog's replay day settles every
+    beat well inside it, and no quiescence says unsettled."""
+    from metis_agent.domain_agent import DomainAgent
+    ag = DomainAgent(dog, case="replay")
+    assert ag.beat_steps == DomainAgent.BEAT_STEPS == 200
+    out = []
+    for _ in range(6):
+        out += ag.handle({"clock": "beat"})
+    assert ag.beat_no() == 6 and not any("unsettled" in r for r in out)

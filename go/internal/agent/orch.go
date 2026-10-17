@@ -52,6 +52,7 @@ type Orch struct {
 	// when it is the domain's first since activation, or at the day's end
 	asked  map[string]bool // a person's task went to the domain since its last spoken quiescence
 	qHeard map[string]bool // the domain's first quiescence has spoken
+	uHeard map[string]bool // the domain's unsettled beat has spoken (since its activation)
 
 	br   branch
 	last struct {
@@ -140,7 +141,7 @@ type branch struct {
 func NewOrch(cfg V3Config, l DialogLLM, dom Domains) *Orch {
 	return &Orch{cfg: cfg, l: l, dom: dom, api: replAPIFrom(cfg.Tools, cfg.Catalog, cfg.Loaded),
 		byID: map[string]Call{}, answers: map[string]Reply{}, refusals: map[refusal]int{}, surprises: map[string]Reply{},
-		m: newMirror(), quiet: map[string]bool{}, spoke: map[string]bool{}, asked: map[string]bool{}, qHeard: map[string]bool{},
+		m: newMirror(), quiet: map[string]bool{}, spoke: map[string]bool{}, asked: map[string]bool{}, qHeard: map[string]bool{}, uHeard: map[string]bool{},
 		deferred: map[string]deferredConsult{}}
 }
 

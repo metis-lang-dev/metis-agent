@@ -212,7 +212,7 @@ class Reply:
     """DESIGN v3's generic reply as the Go agent reads it (the Reply struct:
     its fields and their omitempty, FlexText for record and difference)."""
     STR = ("domain", "kind", "id", "status", "reason", "tool", "card", "move", "error", "answer_kind", "text")
-    RAW = ("blocker", "output", "counts", "goal_pending", "cards", "ref")
+    RAW = ("blocker", "output", "counts", "goal_pending", "cards", "ref", "unsettled")
 
     def __init__(self, obj=None):
         obj = obj or {}
@@ -270,6 +270,8 @@ class Reply:
             m["text"] = self.text
         if self.over:
             m["over"] = True
+        if self.unsettled is not _ABSENT:
+            m["unsettled"] = self.unsettled
         return m
 
 
@@ -1297,6 +1299,7 @@ class Orch:
         self.m = Mirror()
         self.q, self.qseq = None, 0
         self.quiet, self.spoke, self.asked, self.q_heard = {}, {}, {}, {}
+        self.u_heard = {}       # the domain's unsettled beat has spoken (since its activation)
         self.br = Branch()
         self.last_call, self.last_name, self.last_key, self.last_cano = Call(), "", "", ""
 
@@ -1888,6 +1891,11 @@ class Orch:
 
     def quiescence_spoken(self, r):
         d = r.domain
+        if r.unsettled is not _ABSENT:     # a beat stopped at its step cap: spoken once until (re)activation
+            if self.u_heard.get(d):
+                return False
+            self.u_heard[d] = True
+            return True
         if r.over or "day is over" in r.text.lower():
             pass
         elif not self.q_heard.get(d):
@@ -1901,6 +1909,7 @@ class Orch:
 
     def activated(self, d):
         self.q_heard.pop(d, None)
+        self.u_heard.pop(d, None)
 
     def is_ask(self, c):
         """The J asks its domain something (Go isAsk): a verb its domain lists

@@ -202,6 +202,16 @@ func TestQuiescenceRule(t *testing.T) {
 	if !o.quiescenceSpoken(Reply{Domain: "kitchen", Kind: "quiescence", Text: "quiet"}) {
 		t.Fatal("the first after activation speaks")
 	}
+	// a beat stopped at its step cap (dagent BeatSteps): spoken once, though
+	// the domain's first quiescence has spoken; again after (re)activation
+	u := Reply{Domain: "kitchen", Kind: "quiescence", Text: "did not settle", Unsettled: json.RawMessage(`[["stir",200]]`)}
+	if !o.quiescenceSpoken(u) || o.quiescenceSpoken(u) {
+		t.Fatal("an unsettled beat speaks, once")
+	}
+	o.Activated("kitchen")
+	if !o.quiescenceSpoken(u) {
+		t.Fatal("an unsettled beat speaks again after activation")
+	}
 }
 
 // question-form words the intent pass moved as a world command are judged:

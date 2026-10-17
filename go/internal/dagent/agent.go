@@ -40,6 +40,7 @@ type Domain struct {
 	FragCounts string // the fragment's counts: "left" (default) | "touched"
 	Quiescence string // "episode" (default) | "every"
 	Beats      int    // the watch's env beats; 0: no limit
+	BeatSteps  int    // the watch steps one beat may take (the manifest's clock: {steps}); 0: BeatSteps
 	OwnDay     bool   // a replay or live case keeps the host's own day
 	Pair       []string
 	PricedBy   string
@@ -403,8 +404,13 @@ func (a *Agent) surpriseOpenRefusal(id any) Reply {
 		"voice": "template"})
 }
 
-// OwnDaySteps caps the watch steps per beat of a domain with no host.
-const OwnDaySteps = 200
+// BeatSteps caps the watch steps per beat, host or not (py BEAT_STEPS): a
+// program that never quiesces cannot hold the clock (wgc's search) nor grow
+// its fired history without end (persist_lit : lit -o lit in a hosted lamp:
+// a 22.9 GB OOM, openrouter-trial run 3). The beat stops there and says so:
+// a quiescence naming the rules that kept firing (unsettled); the clock does
+// not advance until it settles.
+const BeatSteps = 200
 
 // Beat is one beat of the watch (py beat()).
 func (a *Agent) Beat() ([]Reply, error) {
@@ -414,8 +420,11 @@ func (a *Agent) Beat() ([]Reply, error) {
 		return out, nil
 	}
 	w := a.W
-	b0 := w.Beat
-	n := 0
+	b0, f0, n := w.Beat, len(a.Sh.Rows), 0
+	steps := a.D.BeatSteps
+	if steps <= 0 {
+		steps = BeatSteps
+	}
 	for !w.Done {
 		cs, err := a.Sh.Candidates()
 		if err != nil {
@@ -425,7 +434,8 @@ func (a *Agent) Beat() ([]Reply, error) {
 		if w.Beat > b0 && wouldTick {
 			break
 		}
-		if a.Host == nil && n >= OwnDaySteps {
+		if n >= steps {
+			out = append(out, a.unsettled(f0, n))
 			break
 		}
 		n++
@@ -449,6 +459,47 @@ func (a *Agent) Beat() ([]Reply, error) {
 		a.Host.Retract(atom)
 	}
 	return append(out, late...), nil
+}
+
+// unsettled is the beat that stopped at its step cap (py unsettled): a
+// quiescence that did not come — the rules that fired in it, the most first.
+func (a *Agent) unsettled(f0, n int) Reply {
+	times := map[string]int{}
+	var names []string
+	for _, r := range a.Sh.Rows[f0:] {
+		if r.Kind == "exo" {
+			continue
+		}
+		if _, ok := times[r.Ev.Name]; !ok {
+			names = append(names, r.Ev.Name)
+		}
+		times[r.Ev.Name]++
+	}
+	sort.Slice(names, func(i, j int) bool {
+		if times[names[i]] != times[names[j]] {
+			return times[names[i]] > times[names[j]]
+		}
+		return names[i] < names[j]
+	})
+	rules := make([]any, 0, len(names))
+	var said []string
+	for i, nm := range names {
+		rules = append(rules, []any{nm, times[nm]})
+		if i < 5 {
+			said = append(said, fmt.Sprintf("%s (%d)", nm, times[nm]))
+		}
+	}
+	kept := strings.Join(said, ", ")
+	if kept == "" {
+		kept = "no rule"
+	}
+	display := a.D.Display
+	if display == "" {
+		display = a.Name
+	}
+	return a.reply("quiescence", F{"goal_pending": false, "unsettled": rules, "ref": a.ref(true, ""),
+		"text":  fmt.Sprintf("%s did not settle: %d steps in one beat, and %s kept firing; the beat stopped there", display, n, kept),
+		"voice": "template"})
 }
 
 // Step is one watch step (the clock of an interleaved pair).

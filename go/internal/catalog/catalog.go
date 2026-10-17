@@ -48,6 +48,7 @@ type Manifest struct {
 	Serves        []string `yaml:"serves"`
 	Clock         struct {
 		Beats int `yaml:"beats"`
+		Steps int `yaml:"steps"` // the watch steps one beat may take (dagent BeatSteps when 0)
 	} `yaml:"clock"`
 	Pair      []string `yaml:"pair"`
 	PartnerOf string   `yaml:"partner_of"`

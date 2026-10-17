@@ -19,7 +19,9 @@ KINDS = {
     "result": ("id", "status", "reason", "alternatives", "blocker"),
     "read": ("tool", "output"),
     "event": ("counts",),
-    "quiescence": ("goal_pending", "over"),    # over: the day's end (episode_over)
+    # over: the day's end (episode_over); unsettled: the beat stopped at its step
+    # cap, no quiescence — [[rule, times], …] that kept firing (BEAT_STEPS)
+    "quiescence": ("goal_pending", "over", "unsettled"),
     "surprise": ("record", "difference", "cards"),
     "notice": ("record", "card", "move"),
     "error": ("id", "error"),
