@@ -22,12 +22,13 @@ the order the cooks made them.
 """
 import io
 import json
-import os
 import sys
 from pathlib import Path
 
+from metis_loop_sdk import catalog
+
 ROOT = Path(__file__).resolve().parents[2]
-CATALOG = Path(os.environ.get("METIS_CATALOG") or ROOT.parent / "metis-catalog")
+CATALOG = catalog.root()                     # the loop SDK's root: $METIS_CATALOG, else the sibling checkout
 
 
 class Recorder:

@@ -87,8 +87,10 @@ def main():
     if a.mapper:
         return mapper_parity(a.ref, a.out_dir)
 
-    persona = (GO / "../../metis-catalog/domains/dog/intent/dog-prompt.txt").read_text() + (GO / "../../metis-catalog/domains/dog/intent/dog-spoken.txt").read_text()
-    gbnf = (GO / "../../metis-catalog/domains/dog/intent/dog.gbnf").read_text()
+    from metis_loop_sdk import catalog
+    dog = catalog.intents("dog")          # the dog's generated intent material, at its fixed names
+    persona = dog["prompt"].read_text() + dog["examples"]["gemma4"].read_text()
+    gbnf = dog["grammar"].read_text()
     rows = [json.loads(l) for l in Path(a.ref).read_text().splitlines() if l.strip()]
     turns = [r for r in rows if r.get("kind") == "turn"]
     summ = next((r for r in rows if r.get("kind") == "summary"), {})

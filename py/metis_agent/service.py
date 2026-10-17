@@ -26,6 +26,8 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from metis_loop_sdk.catalog import snapshot
+
 from . import orchestrator as O
 from .domain_agent import Process, serve
 
@@ -125,28 +127,8 @@ class Journal:
 
 # ── watched domain directories (v3reload.go) ──────────────────────────────────
 
-def _watched(name):
-    return (Path(name).suffix in (".llp", ".py", ".gbnf") or name in ("intent.yaml", "domain.yaml")
-            or name.endswith((".notch.json", "-prompt.txt", "-spoken.txt")))
-
-
-def snapshot(d):
-    out = {}
-    if not d:
-        return out
-    d = Path(d)
-    for sub in (d, d / "intent", d / "extensions"):
-        try:
-            entries = sorted(sub.iterdir())
-        except OSError:
-            continue
-        for e in entries:
-            if e.is_file() and _watched(e.name):
-                try:
-                    out[str(e.relative_to(d))] = e.read_text(errors="replace")
-                except OSError:
-                    pass
-    return out
+# snapshot(d): what a reload takes, by content — the loop SDK's
+# stale detection (metis_loop_sdk.catalog; v3reload.go keeps the rule natively)
 
 
 def summary(base, now):
@@ -171,18 +153,12 @@ def summary(base, now):
 
 
 def catalog_list():
-    """The consoles' list, as Go's catalog.List reads it: metis_catalog's
-    index, its domains (the display line, what each has), plus each partner
-    (partner_of: listed by its pair's lead in the index) as kind partner."""
+    """The consoles' list, as Go's catalog.List reads it: the loop SDK's
+    catalog.listing() — the index's domains (the display line, what each
+    has), plus each partner (partner_of: listed by its pair's lead in the
+    index) as kind partner."""
     from .domains import catalog
-    mc = catalog()
-    out = [{k: e.get(k) for k in ("name", "kind", "display", "line", "has")}
-           for e in mc.index() if e["kind"] == "domain"]
-    for d in mc.domains():
-        if d.partner_of:
-            out.append({"name": d.name, "kind": "partner", "display": d.display, "line": d.line,
-                        "has": d.has(), "partner_of": d.partner_of})
-    return out
+    return catalog().listing()
 
 
 RELOAD_POLICIES = ("propose", "auto")
@@ -238,7 +214,7 @@ def catalog_lines(names):
 def intent_of(name, template="gemma4"):
     """A domain's intent material from its package (Go IntentOf): the
     generated prompt + examples[template] text and grammar at their fixed
-    names in intent/ (metis_catalog's Domain.intent, derived from the
+    names in intent/ (the loader's Domain.intent, derived from the
     manifest's intent: {spec}); None when it has none."""
     from .domains import catalog
     try:
@@ -969,7 +945,8 @@ def _plain(v):
 
 def make_app(live, ui_dir, lib_dir=None):
     """aiohttp: /ws (the console's wire), /lib/ (fsttm-web's library: the
-    fsttm_web package when installed, else lib_dir), the page at /."""
+    fsttm_web package when installed, else lib_dir), /sdk/catalog/ (the loop
+    SDK's CATALOG widget), the page at /."""
     import asyncio
 
     from aiohttp import WSMsgType, web
@@ -1082,6 +1059,10 @@ def make_app(live, ui_dir, lib_dir=None):
     except ImportError:
         if lib_dir:
             app.router.add_static("/lib/", lib_dir)
+
+    # the CATALOG widget, the loop SDK's (MetisCatalog: the list both consoles show)
+    from metis_loop_sdk.catalog import WIDGET_DIR, WIDGET_URL
+    app.router.add_static(WIDGET_URL, WIDGET_DIR)
 
     async def index(request):
         return web.FileResponse(Path(ui_dir) / "index.html", headers={"Cache-Control": "no-store"})

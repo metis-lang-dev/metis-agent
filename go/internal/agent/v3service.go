@@ -32,7 +32,7 @@ type V3Service struct {
 	Domains []DomainSpec
 	TickMs  int    // one clock tick (default 1500 ms)
 	Journal string // the journal's file ("" = none)
-	// Listed: the consoles' list of the catalog (metis_catalog.index(), via
+	// Listed: the consoles' list of the catalog (the loop SDK's catalog.listing(), via
 	// the loader; domain-catalog step 2) — what the catalog frame shows
 	Listed []Listed
 	// Lines: the selected catalog's display lines from their manifests —

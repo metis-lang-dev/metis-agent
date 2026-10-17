@@ -57,14 +57,8 @@ code,.mono{font-family:var(--mono)}
 #say input{flex:1;background:var(--bg);border:1px solid var(--line);padding:2px 6px;caret-color:var(--cyan);outline:none}
 #say input:focus-visible{border-color:var(--cyan)}
 
-/* the catalog: the shell's .dlist rows, with each domain's state */
-.dlist .dm .st{font-size:10.5px;padding:0 5px;border:1px solid var(--line);color:var(--dim)}
-.dlist .dm .st.active{color:var(--green);border-color:#2a4d33}
-.dlist .dm .st.task{color:var(--cyan);border-color:currentColor}
-.dlist .dm .st.surprise{color:var(--red);border-color:#5a2a2a}
-.dlist .dm .acts{margin-left:auto;display:flex;gap:4px}
-.dlist .dm .chg{color:var(--yellow);margin-top:1px}
-.dlist .foot{border-top:1px solid var(--line);padding-top:4px;margin-top:2px}
+/* the catalog: the shell's .dlist rows; the state chip, actions, changed line and
+   foot are the loop SDK's CATALOG widget's (sdk/catalog/catalog.css) */
 
 /* the domain: its tabs, its stream, its REPL log */
 #tabs,#subtabs{display:flex;gap:4px;flex-wrap:wrap;margin:0 0 6px}

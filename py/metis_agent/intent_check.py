@@ -13,28 +13,23 @@ The corpus is TSV: utterance <TAB> expected intent [<TAB> source]; default
 domains/<name>/intent/<name>-corpus.tsv.
 """
 import argparse
-import importlib.util
 import json
 import sys
 import time
 from pathlib import Path
 
-from .intent_domain import CATALOG_ROOT, build
+from .intent_domain import build, catalog_domains
 from .mapper import Mapped, Mapper
 
 GGUF = Path(__file__).resolve().parents[2] / "go/models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf"
 
 
-def generator(root=CATALOG_ROOT):
-    """metis-catalog's tools/intents.py — the checkout's (a scratch domains/
-    root, e.g. the loop console's proposal check, uses the real one)."""
-    p = Path(root).parent / "tools/intents.py"
-    if not p.is_file():
-        p = CATALOG_ROOT.parent / "tools/intents.py"
-    spec = importlib.util.spec_from_file_location("metis_catalog_intents", p)
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+def generator(root=None):
+    """metis-catalog's tools/intents.py, through the loop SDK, reading the
+    catalog whose domains/ directory is `root` (a scratch domains/ root,
+    e.g. the loop console's proposal check, uses the real generator)."""
+    from metis_loop_sdk import catalog
+    return catalog.generator(Path(root).parent if root else None)
 
 
 def corpus(path):
@@ -81,7 +76,8 @@ def mapped(mapper, js):
     return None, got.error
 
 
-def check(name, rows, model=str(GGUF), root=CATALOG_ROOT, log=print, gpu_layers=99, threads=6):
+def check(name, rows, model=str(GGUF), root=None, log=print, gpu_layers=99, threads=6):
+    root = root or catalog_domains()
     gen = generator(root)
     spec = gen.load_from(Path(root) / name)
     persona, gbnf = gen.prompt(spec) + gen.spoken(spec), gen.grammar(spec)
@@ -108,8 +104,9 @@ def check(name, rows, model=str(GGUF), root=CATALOG_ROOT, log=print, gpu_layers=
     return out
 
 
-def check_examples(name, root=CATALOG_ROOT):
+def check_examples(name, root=None):
     """No model: every example in intent.yaml maps to one command atom."""
+    root = root or catalog_domains()
     spec = generator(root).load_from(Path(root) / name)
     dom = build(name, root=root)
     mapper, preds = Mapper(dom["CARD"]), declared(dom)
@@ -128,7 +125,7 @@ def main(argv=None):
     ap.add_argument("domain")
     ap.add_argument("--corpus", default="")
     ap.add_argument("--model", default=str(GGUF))
-    ap.add_argument("--root", default=str(CATALOG_ROOT), help="the catalog's domains/ directory")
+    ap.add_argument("--root", default=None, help="the catalog's domains/ directory (default: the loop SDK's catalog)")
     ap.add_argument("--json", default="", help="write the rows as JSON lines")
     ap.add_argument("--no-model", action="store_true", help="intent.yaml's examples through the mapper only")
     ap.add_argument("--examples", action="store_true",
@@ -136,6 +133,7 @@ def main(argv=None):
     ap.add_argument("--gpu-layers", type=int, default=99, help="0: the model on the CPU (the GPU held elsewhere)")
     ap.add_argument("--threads", type=int, default=6)
     a = ap.parse_args(argv)
+    a.root = a.root or str(catalog_domains())
     if a.no_model:
         recs = check_examples(a.domain, a.root)
         for r in recs:

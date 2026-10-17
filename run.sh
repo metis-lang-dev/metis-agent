@@ -79,6 +79,15 @@ LIB_DIR="${LIB_DIR:-$(cd "$ROOT/.." && pwd)/fsttm-web/lib}"
 PY="$ROOT/py/.venv/bin/python"
 [ -x "$PY" ] || { echo "no py/.venv — the domain agents need it (cd py && python3 -m venv .venv && .venv/bin/pip install -e .)" >&2; exit 1; }
 
+# the catalog: the loop SDK (metis-loop/sdk: the one access to metis-catalog, the
+# CATALOG widget) — both backends read it (Go through its CLI)
+if ! "$PY" -c "import metis_loop_sdk.catalog as c; c.loader()" 2>/dev/null; then
+  SDK="$(cd "$ROOT/.." && pwd)/metis-loop/sdk"
+  [ -f "$SDK/pyproject.toml" ] || { echo "no loop SDK at $SDK (a metis-loop checkout beside this one)" >&2; exit 1; }
+  echo "installing the catalog's loader and the loop SDK into py/.venv …"
+  "$ROOT/py/.venv/bin/pip" install -q -e "$(cd "$ROOT/.." && pwd)/metis-catalog" && "$ROOT/py/.venv/bin/pip" install -q -e "$SDK"
+fi
+
 mkdir -p "$RUN"
 if [ "$BACKEND" = go ]; then
   # build if the binary is missing or older than a Go source
@@ -92,10 +101,11 @@ if [ "$BACKEND" = go ]; then
     mv "$J" "$RUN/session-$(date -r "$J" +%Y%m%d-%H%M%S).jsonl"
   fi
   cd "$GO"
-  nohup "$BIN" -config "$CONFIG" -loop v3 -no-domains -wait-viewer -addr "$ADDR" -ui-dir "$UI_DIR" -lib-dir "$LIB_DIR" >"$LOG" 2>&1 &
+  WIDGET_DIR="$("$PY" -c 'from metis_loop_sdk.catalog import WIDGET_DIR; print(WIDGET_DIR)')"   # the loop SDK's CATALOG widget
+  nohup "$BIN" -config "$CONFIG" -loop v3 -no-domains -wait-viewer -addr "$ADDR" -ui-dir "$UI_DIR" -lib-dir "$LIB_DIR" -widget-dir "$WIDGET_DIR" >"$LOG" 2>&1 &
 else
-  "$PY" -c "import aiohttp, llama_cpp, metis_catalog" 2>/dev/null || {
-    echo "py/.venv lacks the service's packages: $ROOT/py/.venv/bin/pip install -r $ROOT/py/requirements.txt -e $ROOT/../metis-catalog" >&2; exit 1; }
+  "$PY" -c "import aiohttp, llama_cpp" 2>/dev/null || {
+    echo "py/.venv lacks the service's packages: $ROOT/py/.venv/bin/pip install -r $ROOT/py/requirements.txt" >&2; exit 1; }
   cd "$ROOT/py"
   nohup "$PY" -m metis_agent.service --config "$CONFIG" --addr "$ADDR" --ui-dir "$UI_DIR" --lib-dir "$LIB_DIR" >"$LOG" 2>&1 &
 fi

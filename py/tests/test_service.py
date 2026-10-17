@@ -128,18 +128,18 @@ def test_world_reload_and_the_watcher(tmp_path):
     assert "nav" not in cat                                                # E13's fixture: no manifest, not listed
 
 
-def test_the_catalog_frame_lists_metis_catalogs_index(tmp_path):
+def test_the_catalog_frame_lists_the_sdks_listing(tmp_path):
     """domain-catalog step 3: the CATALOG dock lists the loop console's rows
-    (metis_catalog.index()'s domains: line, has, kind; a partner as its own
+    (the loop SDK's catalog.index() domains: line, has, kind; a partner as its own
     row), each with its state here — as Go's catalog frame does."""
-    import metis_catalog
+    from metis_loop_sdk import catalog
     lv, _ = live(tmp_path)
     cat = lv.catalog()
-    index = [e["name"] for e in metis_catalog.index() if e["kind"] == "domain"]
+    index = [e["name"] for e in catalog.index() if e["kind"] == "domain"]
     assert set(index) <= {e["name"] for e in cat}
     by = {e["name"]: e for e in cat}
     assert by["dog"]["loaded"] and by["dog"]["kind"] == "domain" and by["dog"]["has"]["intent"]
-    assert by["dog"]["line"] == metis_catalog.get("dog").line
+    assert by["dog"]["line"] == catalog.get("dog").line
     assert by["kitchen_shared"]["kind"] == "partner" and by["kitchen_shared"]["partner_of"] == "kitchen"
     assert by["wgc"]["served"] is False and by["wgc"]["has"]["agent"]
 
@@ -164,8 +164,8 @@ def test_the_system_turn_is_built_from_the_manifests():
     assert O.installed_cards(base, [n for n, _ in rows], dict(rows)) == base
     cfg = S.load_config(ROOT / "py/config.live.yaml")
     turn = S.build_turn(cfg)
-    import metis_catalog
-    assert "Cards:\n- kitchen: %s\n\nExamples:" % metis_catalog.get("kitchen").line in turn
+    from metis_loop_sdk import catalog
+    assert "Cards:\n- kitchen: %s\n\nExamples:" % catalog.get("kitchen").line in turn
     assert "- nav:" not in turn[turn.index("## Domains"):]
     cfg["v3"]["catalog"] = ["kitchen", "nav"]
     try:
@@ -206,13 +206,13 @@ def test_activate_installs_a_manifest_domain_at_runtime(tmp_path):
     ticks, its card and enum entry join the system turn, the dialog starts
     over with the mirror kept (its line "installed"), the row goes active.
     A name with no manifest, and a partner on its own, are refused."""
-    import metis_catalog
+    from metis_loop_sdk import catalog
     lv, frames = live(tmp_path)
     lv.o.m.last["dog"] = "sat down"
     assert "wgc" not in lv.names and "- wgc:" not in lv.prompt
     assert lv.domain_verb("activate", "wgc", None, "person") is None
     assert "wgc" in lv.names and "wgc" in lv.loaded and "wgc" in lv.agents.agents
-    assert "- wgc: %s" % metis_catalog.get("wgc").line in lv.prompt and '<|"|>wgc<|"|>' in lv.prompt   # the card and the enum
+    assert "- wgc: %s" % catalog.get("wgc").line in lv.prompt and '<|"|>wgc<|"|>' in lv.prompt   # the card and the enum
     assert lv.o.m.last == {"dog": "sat down", "wgc": "installed"}                           # the mirror kept
     rs = recs(lv, "dlg-restart")
     assert len(rs) == 1 and rs[0]["why"] == "install wgc" and "wgc" in rs[0]["catalog"]
@@ -283,11 +283,11 @@ def test_every_served_domain_is_watched_with_its_reload_policy(tmp_path):
     manifests' (a partner reloads with its lead); each row carries its
     reload policy — propose by default, the config's override over the
     manifest's."""
-    import metis_catalog
+    from metis_loop_sdk import catalog
     cfg = S.load_config(ROOT / "py/config.live.yaml")
     assert "watch" not in cfg["domains"]
     lv, _ = live(tmp_path)
-    assert set(lv.watch) == {"dog", "kitchen"} and lv.watch["kitchen"] == str(metis_catalog.get("kitchen").dir)
+    assert set(lv.watch) == {"dog", "kitchen"} and lv.watch["kitchen"] == str(catalog.get("kitchen").dir)
     rows = {e["name"]: e for e in lv.catalog()}
     assert rows["dog"]["reload"] == rows["kitchen"]["reload"] == "propose" and "reload" not in rows["wildfire"]
     assert S.reload_policy("dog", {"dog": "auto"}) == "auto" and S.reload_policy("kitchen", "auto") == "auto"
@@ -359,11 +359,11 @@ def test_one_intent_domain_is_its_own_turn_and_grammar():
     """Ruling (2)'s parity bar: one intent domain — the turn opens with its
     material as it stands and the grammar is its own file (byte-identical to
     Go's -print-turn / -print-grammar on the live configs: 18468 B, 6179 B)."""
-    import metis_catalog
+    from metis_loop_sdk import catalog
     cfg = S.load_config(ROOT / "py/config.live.yaml")
     ds = S.intents_of(cfg["domains"]["names"])
     assert [x.name for x in ds] == ["dog"]
-    dog = metis_catalog.get("dog")
+    dog = catalog.get("dog")
     assert S.build_grammar(cfg, ds) == dog.intent["grammar"].read_text()
     assert S.build_turn(cfg).startswith(dog.intent["prompt"].read_text())
 
@@ -495,3 +495,19 @@ def test_the_stop_words_with_nothing_running_send_nothing(tmp_path):
     n = len(recs(lv, "dlg-dispatch"))
     j, voice, _ = lv.utterance("stop", time.time())
     assert voice == "Nothing is running." and len(recs(lv, "dlg-dispatch")) == n
+
+
+def test_the_catalog_is_the_loop_sdks(tmp_path):
+    """catalog-sdk s-bc1718e3: the consoles' list is the loop SDK's
+    catalog.listing() (Go's catalog.List calls the same, through the SDK's
+    CLI), and the page's CATALOG widget is served from the installed SDK at
+    /sdk/catalog/."""
+    from metis_loop_sdk import catalog
+    assert S.catalog_list() == catalog.listing()
+    lv, _ = live(tmp_path)
+    app = S.make_app(lv, str(ROOT / "console"))
+    got = {r.canonical: r.get_info().get("directory") for r in app.router.resources()}
+    assert Path(got["/sdk/catalog"]) == catalog.WIDGET_DIR
+    page = (ROOT / "console/index.html").read_text()
+    assert '<script src="sdk/catalog/catalog.js"></script>' in page and 'href="sdk/catalog/catalog.css"' in page
+    assert "MetisCatalog.render(box, catalog.domains," in (ROOT / "console/console.js").read_text()

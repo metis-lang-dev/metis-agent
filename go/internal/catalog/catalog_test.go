@@ -115,3 +115,20 @@ func TestThePackageShape(t *testing.T) {
 		t.Fatalf("toy %+v", toy)
 	}
 }
+
+// the CATALOG widget is the loop SDK's: its directory, as the SDK names it
+func TestWidgetDirIsTheSDKs(t *testing.T) {
+	py := "../../../py/.venv/bin/python"
+	if _, err := os.Stat(py); err != nil {
+		t.Skip("no py venv")
+	}
+	d, err := WidgetDir(py)
+	if err != nil {
+		t.Skip(err) // the SDK not installed here
+	}
+	for _, f := range []string{"catalog.js", "catalog.css"} {
+		if _, err := os.Stat(filepath.Join(d, f)); err != nil {
+			t.Fatalf("widget %s: %v", f, err)
+		}
+	}
+}

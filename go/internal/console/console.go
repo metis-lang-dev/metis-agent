@@ -61,6 +61,9 @@ type Server struct {
 	joined chan struct{}            // closed at the first viewer
 	once   sync.Once
 	LibDir string // served at /lib/ (fsttm-web's lib/); "" = <ui-dir>/../lib when it exists
+	// WidgetDir is served at /sdk/catalog/: the loop SDK's CATALOG widget
+	// (catalog.js, catalog.css; catalog.WidgetDir), the list both consoles show
+	WidgetDir string
 }
 
 func New(uiDir string) *Server {
@@ -83,6 +86,9 @@ func (s *Server) Handler() http.Handler {
 		// the fsttm-web library beside the page (its import map points at
 		// lib/): the repo's lib/, which llama-server needs copied in
 		mux.Handle("/lib/", http.StripPrefix("/lib/", noCache(http.FileServer(http.Dir(s.LibDir)))))
+	}
+	if s.WidgetDir != "" {
+		mux.Handle("/sdk/catalog/", http.StripPrefix("/sdk/catalog/", noCache(http.FileServer(http.Dir(s.WidgetDir)))))
 	}
 	if s.uiDir != "" {
 		fs := http.FileServer(http.Dir(s.uiDir))

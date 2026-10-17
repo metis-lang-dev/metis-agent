@@ -4,9 +4,10 @@
 // manifest — display, line, voice, the intent spec and the generated files
 // at their fixed names, the extensions, the clock, the pair — natively and
 // by the loader's rules (the name is the directory's; an unknown key is
-// refused), and the console's list through the catalog's own loader
-// (`python -m metis_catalog list --json`), so both backends list the same
-// domains by the same rules.
+// refused), and the console's list through the loop SDK's catalog CLI
+// (`python -m metis_loop_sdk.catalog list --consoles --json`: the loader's
+// rows, catalog-sdk s-bc1718e3), so both backends list the same domains by
+// the same rules.
 package catalog
 
 import (
@@ -220,7 +221,7 @@ func Scan(root string) (map[string]Manifest, error) {
 	return out, nil
 }
 
-// Entry is one row of the consoles' list (metis_catalog.index()).
+// Entry is one row of the consoles' list (the loop SDK's catalog.listing()).
 type Entry struct {
 	Name    string          `json:"name"`
 	Kind    string          `json:"kind"`
@@ -232,42 +233,61 @@ type Entry struct {
 	PartnerOf string `json:"partner_of,omitempty"`
 }
 
-// listPy is py's service.catalog_list: the loader's domains, then each
-// partner (listed under its lead in the index) as its own row, with what
-// it has by the loader's rule.
-const listPy = `import json, sys
-import metis_catalog as mc
-out = [{k: e.get(k) for k in ("name", "kind", "path", "display", "line", "has")}
-       for e in mc.index() if e["kind"] == "domain"]
-for d in mc.domains():
-    if d.partner_of:
-        out.append({"name": d.name, "kind": "partner", "path": str(d.dir), "display": d.display,
-                    "line": d.line, "has": d.has(), "partner_of": d.partner_of})
-json.dump(out, sys.stdout, default=str)
-`
-
-// List is the consoles' list as the catalog's loader makes it, a partner
-// as its own row (python is an interpreter with metis_catalog importable,
-// or the checkout beside it on its path).
-func List(python, root string) ([]Entry, error) {
+// sdk runs the loop SDK's catalog CLI on python (an interpreter with
+// metis_loop_sdk installed) over the catalog root and returns its JSON.
+func sdk(python, root string, args ...string) ([]byte, error) {
 	if strings.Contains(python, "/") {
 		if abs, err := filepath.Abs(python); err == nil {
-			python = abs // the command runs in root
+			python = abs
 		}
 	}
-	cmd := exec.Command(python, "-c", listPy)
-	cmd.Dir = root // the checkout: `import metis_catalog` finds the package there when it is not installed
+	argv := []string{"-m", "metis_loop_sdk.catalog"}
+	if root != "" {
+		if abs, err := filepath.Abs(root); err == nil {
+			root = abs
+		}
+		argv = append(argv, "--root", root)
+	}
+	cmd := exec.Command(python, append(argv, args...)...)
 	b, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("metis_catalog list: %v: %s", err, ee.Stderr)
+			return nil, fmt.Errorf("metis_loop_sdk.catalog %s: %v: %s", args[0], err, ee.Stderr)
 		}
-		return nil, fmt.Errorf("metis_catalog list: %w", err)
+		return nil, fmt.Errorf("metis_loop_sdk.catalog %s: %w", args[0], err)
+	}
+	return b, nil
+}
+
+// List is the consoles' list as the catalog's loader makes it, through the
+// loop SDK (py's service.catalog_list is the same call): the index's
+// domains, then each partner as its own row.
+func List(python, root string) ([]Entry, error) {
+	b, err := sdk(python, root, "list", "--consoles", "--json")
+	if err != nil {
+		return nil, err
 	}
 	var es []Entry
 	if err := json.Unmarshal(b, &es); err != nil {
-		return nil, fmt.Errorf("metis_catalog list: %w", err)
+		return nil, fmt.Errorf("metis_loop_sdk.catalog list: %w", err)
 	}
 	sort.SliceStable(es, func(i, j int) bool { return es[i].Kind == "domain" && es[j].Kind != "domain" })
 	return es, nil
+}
+
+// WidgetDir is the directory of the loop SDK's CATALOG widget (catalog.js,
+// catalog.css), which the console serves at /sdk/catalog/ — the same files
+// the py backend and the metis-loop console serve.
+func WidgetDir(python string) (string, error) {
+	b, err := sdk(python, "", "widget")
+	if err != nil {
+		return "", err
+	}
+	var w struct {
+		Dir string `json:"dir"`
+	}
+	if err := json.Unmarshal(b, &w); err != nil || w.Dir == "" {
+		return "", fmt.Errorf("metis_loop_sdk.catalog widget: %v %q", err, b)
+	}
+	return w.Dir, nil
 }

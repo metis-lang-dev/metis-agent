@@ -677,7 +677,7 @@ class DomainAgent:
 
 def records_path(module, where, session):
     """Where a domain's records go: "catalog" — its package's records
-    (metis_catalog Domain.records: the manifest's `records`, default
+    (the loader's Domain.records: the manifest's `records`, default
     records/, under the package's own directory in the catalog the loader
     reads, $METIS_CATALOG included; catalog-entry step 2); else DIR/<name>/
     when --records DIR names another root."""

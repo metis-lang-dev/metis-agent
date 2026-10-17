@@ -151,7 +151,10 @@ jobs:
         run: |
           pip install -r metis-agent/py/requirements.txt
           pip install -e ./metispy
-          pip install -e ./metis-catalog     # the domains' loader: metis_agent.domains reads the manifests
+          pip install -e ./metis-catalog     # the domains' loader, which the loop SDK imports
+          # the loop SDK (metis-loop/sdk: the one access to the catalog, the CATALOG
+          # widget) at its tag; after the two above, which it names as dependencies
+          pip install "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@sdk-v0.1.0#subdirectory=sdk"
       - name: One llama.cpp for both stacks (the submodule = llama_cpp_python's vendored commit)
         run: metis-agent/third_party/check-pin.sh python
       - name: pytest py/tests

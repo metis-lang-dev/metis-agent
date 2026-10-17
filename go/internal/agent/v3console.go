@@ -13,7 +13,7 @@ import (
 // deactivate from the page, a domain's world ports, and every spoken line's
 // source (dlg-say src).
 
-// Listed is one row of the catalog's list (metis_catalog.index()).
+// Listed is one row of the catalog's list (the loop SDK's catalog.listing()).
 type Listed struct {
 	Name, Kind, Display, Line string
 	Has                       json.RawMessage

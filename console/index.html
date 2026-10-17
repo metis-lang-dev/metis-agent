@@ -7,6 +7,7 @@
 <!-- the shell (top bar, docks, strip, splitter, colours): this console's own copy, the loop console's look -->
 <link rel="stylesheet" href="shell.css">
 <link rel="stylesheet" href="console.css">
+<link rel="stylesheet" href="sdk/catalog/catalog.css">
 </head>
 <body>
 <header id="band" aria-label="context">
@@ -72,7 +73,7 @@
     </section>
     <section class="dock" id="dock-catalog" data-dock="catalog" aria-label="catalog">
       <header><span class="tw">▾</span><span class="tt">CATALOG · installed &amp; active</span><button class="x" title="hide">✕</button></header>
-      <div class="dbody"><div id="domains" class="dlist"></div></div>
+      <div class="dbody"><div id="domains"></div></div>
     </section>
     <section class="dock" id="dock-domain" data-dock="domain" aria-label="the domain">
       <header><span class="tw">▾</span><span class="tt" id="domTitle">DOMAIN</span><button class="x" title="hide">✕</button></header>
@@ -99,6 +100,7 @@
 </main>
 
 <script src="shell.js"></script>
+<script src="sdk/catalog/catalog.js"></script>
 <script type="importmap">
 { "imports": { "fsttm-web/fsttm": "./lib/fsttm.js", "fsttm-web/attention": "./lib/attention.js",
                "fsttm-web/dialog": "./lib/dialog.js", "fsttm-web/tts": "./lib/tts.js" } }

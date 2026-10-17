@@ -259,7 +259,7 @@ function domState(name) {
   if (d.task) return { text: `task ${d.task}`, cls: 'task' };
   return { text: d.state ?? 'idle', cls: '' };
 }
-// the catalog: metis_catalog's index (the loop console's rows: the display
+// the catalog: the loop SDK's catalog listing (the loop console's rows: the display
 // line, what each domain has), each with its state here. One click opens a
 // domain: an active one shows its tab; an inactive one is activated.
 const HAS = ['agent', 'intent', 'host', 'notch', 'readme'];
@@ -285,40 +285,43 @@ function openDomain(d) {
 }
 let pendingTab = null;
 function renderDomains() {
+  // the list is the loop SDK's CATALOG widget (MetisCatalog, /sdk/catalog/catalog.js:
+  // the same component the loop console shows); this console adds each
+  // domain's state, its activate/reload actions and the changed-on-disk line
   const box = $('domains');
-  box.replaceChildren();
-  const active = [];
-  for (const d of catalog.domains) {
-    if (d.loaded) active.push(d.name);
-    const st = stateOf(d);
-    const tags = HAS.filter(k => d.has && k in d.has).map(k => el('span', { class: d.has[k] ? 'tag' : 'tag off', title: d.has[k] ? `it has ${k}` : `no ${k}` }, k));
-    const acts = el('span', { class: 'acts' });
-    if (d.loaded && !/pair/.test(d.state ?? '')) {
-      const off = el('button', { class: 'btn', title: 'deactivate(domain): detach it from the runtime tree' }, 'deactivate');
-      off.disabled = !ws || !catalogLive;
-      off.onclick = e => { e.stopPropagation(); send({ ev: 'deactivate', domain: d.name }); off.disabled = true; };
-      acts.append(off);
-    }
-    if (d.served !== false && (d.loaded || d.served) && !(d.partner_of || /pair/.test(d.state ?? ''))) {
-      const rl = el('button', { class: 'btn', title: d.changed ? `reload: the files changed — ${d.changed}` : 'reload(domain): the domain agent recompiles from its files' }, d.changed ? 'reload ●' : 'reload');
-      rl.disabled = !ws || !catalogLive;
-      rl.onclick = e => { e.stopPropagation(); send({ ev: 'reload', domain: d.name }); rl.disabled = true; };
-      acts.append(rl);
-    }
-    const row = el('div', { class: `dm${d.name === tab ? ' cur' : ''}`, tabindex: '0', role: 'button', 'data-dom': d.name,
-      title: d.loaded ? `open ${d.name}'s tab` : canActivate(d) ? (d.served === false ? `activate ${d.name}: its agent is installed from the manifest` : `activate ${d.name}`) : '' },
-      el('div', { class: 'hd' }, el('span', { class: 'nm' }, d.name), d.display && d.display !== d.name ? el('span', { class: 'empty' }, d.display) : null,
-        el('span', { class: `st ${st.cls}`, title: st.text }, st.text.length > 46 ? st.text.slice(0, 44) + '…' : st.text || '—'), ...tags, acts),
-      d.line ? el('div', { class: 'ln' }, d.line) : null,
-      d.changed ? el('div', { class: 'chg', title: 'the domain runs an older program than the catalog has: reload takes the new one' },
-        `STALE · changed on disk: ${d.changed}`) : null);
-    row.onclick = () => openDomain(d);
-    row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openDomain(d); } };
-    box.append(row);
+  const active = catalog.domains.filter(d => d.loaded).map(d => d.name);
+  const foot = catalogLive
+    ? `${catalog.domains.length} domain(s) from the catalog — the program-only catalogs open in the loop console`
+    : 'the catalog comes from the live service (a replay shows the loaded domains)';
+  if (!window.MetisCatalog) {
+    box.replaceChildren(el('div', { class: 'empty' }, 'The catalog widget did not load (/sdk/catalog/catalog.js: the loop SDK).'));
+  } else {
+    MetisCatalog.render(box, catalog.domains, {
+      tags: HAS, display: true, key: d => d.name, empty: foot, foot,
+      tagTitle: (d, k, on) => on ? `it has ${k}` : `no ${k}`,
+      current: d => d.name === tab,
+      title: d => d.loaded ? `open ${d.name}'s tab` : canActivate(d) ? (d.served === false ? `activate ${d.name}: its agent is installed from the manifest` : `activate ${d.name}`) : '',
+      decorate: (d, parts) => {
+        const st = stateOf(d);
+        parts.lead.push(el('span', { class: `st ${st.cls}`, title: st.text }, st.text.length > 46 ? st.text.slice(0, 44) + '…' : st.text || '—'));
+        if (d.loaded && !/pair/.test(d.state ?? '')) {
+          const off = el('button', { class: 'btn', title: 'deactivate(domain): detach it from the runtime tree' }, 'deactivate');
+          off.disabled = !ws || !catalogLive;
+          off.onclick = e => { e.stopPropagation(); send({ ev: 'deactivate', domain: d.name }); off.disabled = true; };
+          parts.acts.push(off);
+        }
+        if (d.served !== false && (d.loaded || d.served) && !(d.partner_of || /pair/.test(d.state ?? ''))) {
+          const rl = el('button', { class: 'btn', title: d.changed ? `reload: the files changed — ${d.changed}` : 'reload(domain): the domain agent recompiles from its files' }, d.changed ? 'reload ●' : 'reload');
+          rl.disabled = !ws || !catalogLive;
+          rl.onclick = e => { e.stopPropagation(); send({ ev: 'reload', domain: d.name }); rl.disabled = true; };
+          parts.acts.push(rl);
+        }
+        if (d.changed) parts.after.push(el('div', { class: 'chg', title: 'the domain runs an older program than the catalog has: reload takes the new one' },
+          `STALE · changed on disk: ${d.changed}`));
+      },
+      onOpen: openDomain,
+    });
   }
-  box.append(el('div', { class: 'foot empty' }, catalogLive
-    ? `${catalog.domains.length} domain(s) from metis_catalog — the program-only catalogs open in the loop console`
-    : 'the catalog comes from the live service (a replay shows the loaded domains)'));
   $('b-active').textContent = active.join(', ') || '—';
   if (pendingTab && active.includes(pendingTab)) { const t = pendingTab; pendingTab = null; selectTab(t); }
 }

@@ -21,8 +21,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "py"))
 from metis_agent.loop import Specialist  # noqa: E402
+from metis_loop_sdk import catalog  # noqa: E402
 
-WGC = ROOT.parent / "metis-catalog/domains/planning/wgc/wgc.llp"
+WGC = catalog.root() / "domains/planning/wgc/wgc.llp"
 
 ITEMS = [
     {"kind": "trace", "setup": [],

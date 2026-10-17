@@ -554,7 +554,8 @@ def main():
         import subprocess
         import tempfile
         tmp = Path(tempfile.mkdtemp(prefix="dagent-reload-"))
-        reload_catalog(ROOT.parent / "metis-catalog", tmp)
+        from metis_loop_sdk import catalog
+        reload_catalog(catalog.root(), tmp)
         out = dest / "days" / "reload.out.jsonl"
         subprocess.run([sys.executable, __file__, "--reload-day", str(day), str(out)], check=True,
                        env=dict(os.environ, METIS_CATALOG=str(tmp)), stderr=subprocess.DEVNULL)

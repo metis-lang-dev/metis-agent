@@ -106,7 +106,7 @@ type config struct {
 	// console's list by the catalog's loader
 	Catalog struct {
 		Root   string `yaml:"root"`
-		Python string `yaml:"python"` // an interpreter the loader runs on (python -m metis_catalog)
+		Python string `yaml:"python"` // an interpreter with the loop SDK (python -m metis_loop_sdk.catalog)
 		Intent string `yaml:"intent"` // the domain the intent pass maps for (dog): -loop v2's; -loop v3 maps for every served domain with intent material
 	} `yaml:"catalog"`
 }
@@ -118,6 +118,7 @@ func main() {
 	uiDir := flag.String("ui-dir", "", "serve this static UI at / (fsttm-web web/; overrides ws.ui_dir)")
 	addr := flag.String("addr", "", "listen address (overrides ws.addr)")
 	libDir := flag.String("lib-dir", "", "serve this directory at /lib/ (fsttm-web's lib/; default <ui-dir>/../lib when it has dialog.js)")
+	widgetDir := flag.String("widget-dir", "", "serve this directory at /sdk/catalog/ (the loop SDK's CATALOG widget; default: the one catalog.python's SDK names)")
 	noDomains := flag.Bool("no-domains", false, "attach no domain (the persona alone: the parity bar)")
 	loop := flag.String("loop", "v2", "v2: the dog's two-pass path; v3: the orchestrator agent (DESIGN v3; config v3:)")
 	printTurn := flag.Bool("print-turn", false, "-loop v3: print the orchestrator's system turn as built (the catalog's cards and declarations) and exit")
@@ -349,6 +350,14 @@ func main() {
 	srv := console.New(cfg.WS.UIDir)
 	if *libDir != "" {
 		srv.LibDir = *libDir
+	}
+	srv.WidgetDir = *widgetDir
+	if srv.WidgetDir == "" && cfg.Catalog.Python != "" { // the loop SDK names its CATALOG widget
+		if d, err := catalog.WidgetDir(cfg.Catalog.Python); err != nil {
+			log.Printf("[catalog] the CATALOG widget: %v (the page lists no catalog)", err)
+		} else {
+			srv.WidgetDir = d
+		}
 	}
 	if *waitViewer && *loop == "v3" && len(v3.Domains) > 0 {
 		v3.Start = srv.Joined()

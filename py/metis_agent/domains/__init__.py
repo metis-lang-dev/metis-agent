@@ -1,6 +1,7 @@
 """The domain modules, from the catalog (domain-catalog s-2a2bc758 step 2):
 no domain file lives in metis-agent. A domain's module is built from its
-manifest, metis-catalog domains/<…>/domain.yaml (metis_catalog):
+manifest, metis-catalog domains/<…>/domain.yaml, read through the loop SDK
+(metis_loop_sdk.catalog: the one access to the catalog):
 
   agent: agent.py[:variant]   the catalog's domain-agent module, executed
                               as metis_agent.domains.<name> (the variant's
@@ -24,17 +25,13 @@ import importlib.util
 import sys
 from pathlib import Path
 
-_SIBLING = Path(__file__).resolve().parents[4] / "metis-catalog"   # perotheia-packages/metis-catalog
-
 
 def catalog():
-    """metis_catalog, installed or from the sibling checkout."""
-    try:
-        import metis_catalog
-    except ImportError:
-        sys.path.insert(0, str(_SIBLING))
-        import metis_catalog
-    return metis_catalog
+    """The loop SDK's catalog (metis_loop_sdk.catalog): get, domains, index,
+    listing, root, … — the root ($METIS_CATALOG, else the sibling checkout)
+    and the loader are the SDK's."""
+    from metis_loop_sdk import catalog as c
+    return c
 
 
 class _Loader(importlib.abc.Loader):
