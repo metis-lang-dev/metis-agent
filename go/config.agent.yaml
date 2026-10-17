@@ -20,7 +20,7 @@ llm:
 # prompt, pass-2 examples (for the template above) and grammar from the dog's
 # manifest — generated from its intent.yaml, re-read after a reload; the
 # domains' display names, clocks, partners and watched directories from theirs;
-# the console's list by the catalog's loader (python -m metis_catalog list)
+# the console's list by the loop SDK (python -m metis_loop_sdk.catalog list --consoles)
 catalog:
     root: ../../metis-catalog
         intent: dog
