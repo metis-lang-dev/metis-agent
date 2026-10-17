@@ -23,6 +23,7 @@ python3 -m venv py/.venv
 CUDACXX=/usr/local/cuda/bin/nvcc CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITECTURES=120" \
     py/.venv/bin/pip install llama-cpp-python==0.3.36      # vendors llama.cpp 0c1e57098bba
 py/.venv/bin/pip install -e ../metispy pytest
+py/.venv/bin/pip install -e ../metis-catalog -e ../metis-loop/sdk   # the loop SDK: the claude seat's process
 ```
 
 `py/requirements.txt` pins what this venv has (CI installs it, with

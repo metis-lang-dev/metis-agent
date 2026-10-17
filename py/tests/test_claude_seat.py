@@ -32,3 +32,18 @@ def test_cont_round_trip():
     seat._call = lambda sys_text, prompt, first: (sent.append((prompt, first)) or ("A.", "end_turn", 1.0))
     seat.turn("sys", [], "Q2?", "")       # a new question opens a new session
     assert sent[-1] == ("Q2?", True) and seat.session != s1
+
+
+def test_the_request_shape_is_the_sdk_seats():
+    """The process is the loop SDK's seat face (metis_loop_sdk.models.claude),
+    the argv as this seat always sent it."""
+    seat = ClaudeSeat(model="opus", effort="high", cwd="/tmp")
+    seat.session = "U"
+    assert seat.argv("SYS", True) == ["claude", "-p", "--safe-mode", "--tools", "", "--strict-mcp-config",
+                                      "--output-format", "json", "--model", "opus", "--system-prompt", "SYS",
+                                      "--effort", "high", "--session-id", "U"]
+    assert seat.argv("SYS", False)[-2:] == ["--resume", "U"]
+    tools = [{"name": "state", "description": "the state", "parameters": {"properties": {"arg": {"description": "none"}}}}]
+    assert seat.system(" You reason. ", tools) == ("You reason.\n\nHow to call a tool: write the REPL line on a line of its own"
+                                                  + seat.system("", tools).split("on a line of its own", 1)[1])
+    assert seat.system("S", tools).endswith("The tools:\n- state: the state\n  argument: none")
