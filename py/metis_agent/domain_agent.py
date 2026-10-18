@@ -798,7 +798,26 @@ class DomainAgent:
         except ValueError as e:
             return [reply(self.name, "error", id=msg.get("id"), error=str(e))]
         self.worlds.append(lines)
+        inner = getattr(self.host, "inner", self.host)
+        if hasattr(inner, "sync"):
+            self.sync_world(inner)
         return []
+
+    def sync_world(self, inner):
+        """A host that applied the world lines itself (an RDDL world's gym):
+        the program brought to the world's state now, as one exo row with no
+        world step (the repl's own tick bookkeeping, the host's sync as its
+        do-lines), the watch checkpointed there and revived — so the
+        program's next move starts from the scenario (rddl-worlds review R1)."""
+        self.repl.plugin.tick = inner.sync
+        try:
+            self.repl._tick(quiet_rows=False)
+        finally:
+            del self.repl.plugin.tick
+        self.watch._checkpoint()
+        self.watch.quiet = False
+        if not getattr(inner, "done", False):     # a reset after the episode's end: a new episode
+            self.watch.done, self.over = False, False
 
     # ── the console's faces (agent-console, s-7f3d1088) ──
     def ports(self, msg):

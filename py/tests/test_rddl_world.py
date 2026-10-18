@@ -140,3 +140,21 @@ def test_a_wrong_rate_scores_lower_on_the_same_seeds(tmp_path, monkeypatch):
     for m in [m for m in sys.modules if m.startswith("nav_host") or m.startswith("metis_agent.domains.nav")]:
         monkeypatch.delitem(sys.modules, m)                 # the host module as the scratch catalog has it
     assert _mean_outcome_log(scored()) < true - 0.1
+
+
+def test_world_lines_hold_before_the_programs_next_move():
+    """nina's review R1: a scenario set by world lines is the state the
+    program's first move starts from — the gym changes at once, and the
+    program is brought along as one exo row, with no gym step."""
+    p = Process(["nav"], seat="template")
+    a = p.build(1, "replay")
+    a, r = serve(a, {"reset": {"seed": 2}}, p.build, p.reload, p.add_line)
+    a, r = serve(a, {"world": ["-at(x21_y12)", "+at(x6_y12)"], "id": "w"}, p.build, p.reload, p.add_line)
+    assert r == [{"ack": "world", "id": "w"}]
+    assert a.repl.counts.get("at(x6_y12)") == 1 and not a.repl.counts.get("at(x21_y12)")
+    a, r = serve(a, {"ports": {}, "id": "p"}, p.build, p.reload, p.add_line)
+    assert r[0]["host"]["gym"]["step"] == 0                                # no gym step for the lines
+    a, r = serve(a, {"clock": "beat"}, p.build, p.reload, p.add_line)
+    first = next(l["ref"]["event"] for l in r if l.get("kind") == "event")
+    assert "C=x6_y12" in first, first                                      # the first move is from the scenario's cell
+    assert not any(l.get("kind") == "surprise" for l in r)
