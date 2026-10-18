@@ -118,7 +118,8 @@ func TestTheProcessServesTheDays(t *testing.T) {
 	for _, c := range []struct {
 		day   string
 		names []string
-	}{{"dog", []string{"dog"}}, {"plant", []string{"plant"}}, {"kitchen", []string{"kitchen", "kitchen_shared"}}} {
+	}{{"dog", []string{"dog"}}, {"plant", []string{"plant"}}, {"kitchen", []string{"kitchen", "kitchen_shared"}},
+		{"love_triangle", []string{"love_triangle"}}} { // a program only: no host, no intent.yaml, no verbs
 		proc := &Process{Root: catalogDir(t), Metispy: metispyDir(t), Python: python,
 			BuildDir: t.TempDir(), Names: c.names}
 		srv, err := proc.Build(1, "replay")

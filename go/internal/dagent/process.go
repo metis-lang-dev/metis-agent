@@ -127,7 +127,8 @@ func (p *Process) Domains(names []string) ([]Domain, error) {
 			return nil, fmt.Errorf("no domain %s in the catalog", pyRepr(n))
 		}
 		h, ok := Hosts[n]
-		if !ok {
+		bare := !ok && m.Agent == "" && m.Host == "" // a program only: no host, no verbs (py intent_domain.bare)
+		if !ok && !bare {
 			return nil, fmt.Errorf("domain %s has no Go host", n)
 		}
 		files := m.Serves
@@ -162,13 +163,15 @@ func (p *Process) Domains(names []string) ([]Domain, error) {
 		if d.Display == "" {
 			d.Display = n
 		}
-		newHost := h.New
-		d.NewHost = func() rt.Host { return newHost(env) }
+		if !bare {
+			newHost := h.New
+			d.NewHost = func() rt.Host { return newHost(env) }
+		}
 		if m.Intent.Spec != "" && m.Agent == "" {
 			if d.Spec, err = LoadSpec(m.Path(m.Intent.Spec)); err != nil {
 				return nil, err
 			}
-			d.Generic = true
+			d.Generic = !bare // no host to wrap: its verbs reach none (py _NoHost)
 		}
 		d.RecordsDir = p.records(m)
 		out = append(out, d)

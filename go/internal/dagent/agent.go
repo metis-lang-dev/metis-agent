@@ -26,7 +26,7 @@ type Domain struct {
 	Name, Display, Voice string
 	Bundle               string // the bundle directory (ground.wire + sidecar.json)
 	Source               string // the served program's source text (the rule spans)
-	Spec                 *Spec  // intent.yaml (nil: a domain with no intents, the kitchen's cooks)
+	Spec                 *Spec  // intent.yaml (nil: a domain with no intents, the kitchen's cooks, a program-only domain)
 	Generic              bool   // the generic agent: the host wrapped as the AgentHost (intent.spec)
 	NewHost              func() rt.Host
 	Tables               *host.Tables
@@ -126,6 +126,9 @@ func initOrder(dir string) (Counts, error) {
 	}
 	return c, nil
 }
+
+// NoIntents is the refusal of every intent by a domain with no verbs (py NO_INTENTS).
+const NoIntents = "this domain takes no intents"
 
 // NewAgent builds the agent on its bundle (py DomainAgent.__init__):
 // case "" or "hosted" keeps the host's own day, "replay" and "live" turn
@@ -370,6 +373,11 @@ func (a *Agent) intent(msg map[string]any) []Reply {
 	}
 	verb, _ := msg["verb"].(string)
 	args, _ := msg["args"].(map[string]any)
+	if len(a.Mapper.Commands) == 0 {
+		// no verbs (a program-only domain, the kitchen's cooks): refused
+		// where the mapper would be, as py's (agent-no-intent s-7fd29000)
+		return []Reply{a.errorReply(id, NoIntents)}
+	}
 	m, errText := a.Mapper.Map(verb, args)
 	if m == nil {
 		return []Reply{a.errorReply(id, "mapper: "+errText)}

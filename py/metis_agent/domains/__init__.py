@@ -9,6 +9,10 @@ manifest, metis-catalog domains/<…>/domain.yaml, read through the loop SDK
   intent.spec (no agent)      the generic agent (intent_domain.build: the
                               card, outcomes and alternatives of intent.yaml,
                               the host's world)
+  a program only               the generic agent with no verbs (intent_domain
+  (no agent, intent, host)    .bare, agent-no-intent s-7fd29000): the clock
+                              beats, the reads and surprises work, every
+                              intent is refused ("this domain takes no intents")
 
 NAME, DISPLAY and VOICE come from the manifest unless the module sets them;
 CATALOG (the served program) and EXTENSIONS from the manifest's Domain.serves()
@@ -59,8 +63,15 @@ class _Loader(importlib.abc.Loader):
             mod.__file__ = str(d.dir / "domain.yaml")
             mod.__dict__.update(build(d.name, display=d.display, voice=d.manifest.get("voice", ""), dir=d.dir,
                                       module=mod.__name__, fresh=self.fresh))
+        elif d.manifest.get("host"):
+            raise ImportError("domain %r has a host but neither an agent module nor an intent.spec: the generic "
+                              "agent wraps a host with its commands (%s)" % (self.name, d.dir))
+        elif d.serves():
+            from ..intent_domain import bare
+            mod.__file__ = str(d.dir / "domain.yaml")
+            mod.__dict__.update(bare(d.name, display=d.display, voice=d.manifest.get("voice", "")))
         else:
-            raise ImportError("domain %r has neither an agent module nor an intent.spec (%s)" % (self.name, d.dir))
+            raise ImportError("domain %r has no program, agent module or intent.spec (%s)" % (self.name, d.dir))
         mod.MANIFEST = d
         # the served program from the manifest only (runtime-binding Q1, the
         # architect's ruling): Domain.serves() — `serves: [files]`, else the

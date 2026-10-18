@@ -1,0 +1,9 @@
+{"id": "c1", "domain": "love_triangle", "verb": "KISS", "args": {"who": "hermia"}}
+{"clock": "beat"}
+{"tool": "events", "args": {}}
+{"id": "c2", "domain": "love_triangle", "verb": "UNKNOWN", "args": {}}
+{"tool": "state", "args": {}}
+{"tool": "consult", "args": {"question": "who is angry at whom?"}, "id": "k1"}
+{"clock": "beat"}
+{"tool": "why", "args": {"atom": "anger(hermia,helena)"}}
+{"clock": "beat"}

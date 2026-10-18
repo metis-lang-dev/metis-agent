@@ -119,3 +119,12 @@ def build(name, display=None, voice="", root=None, module=None, fresh=False, dir
         ns.update(make=make, PLUGIN="%s:make" % (module or "metis_agent.domains." + name),
                   PAIRS=host.PAIRS, flips=host.flips, words=host.words)
     return ns
+
+
+def bare(name, display=None, voice=""):
+    """A program-only domain's namespace (agent-no-intent s-7fd29000): no
+    host, no intent.yaml, no verbs — the program runs its own day and
+    DomainAgent refuses every intent ("this domain takes no intents")."""
+    return dict(NAME=name, DISPLAY=display or name, VOICE=voice, PLUGIN=None,
+                CARD={"rows": [], "values": {}, "handles": {}}, OUTCOMES={},
+                alternatives=lambda rule, counts: [], HANDLE_NAMES={}, REPORTS={}, STANDING=set(), INTENT=None)

@@ -12,6 +12,8 @@ traffic, their outputs dumped as JSON lines for go/internal/dagent's tests.
   days/reload.out.jsonl  reload and add on a scratch catalog (dog, plant,
       kitchen_shared copied): the plant's %% line edited mid-day, reloaded
       (the new key, the new line spoken), the dog added, the error forms
+  days/love_triangle.out.jsonl  a program-only domain's day (no host, no
+      intent.yaml): the beats, the reads and the consult, every intent refused
   days/kitchen.out.jsonl  the kitchen pair's day (both cooks, one env, the
       pair's clock): the second cook's load surprises the first, the
       template consult explains it, explain adopts it
@@ -44,6 +46,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "py"))
 
 DOMAINS = ("dog", "plant")
+PROGRAM_ONLY = ("love_triangle",)
 
 
 def gathered_js():
@@ -525,6 +528,16 @@ def main():
                     k = o.get("kind") or ("ack" if "ack" in o else "clock")
                     kinds[k] = kinds.get(k, 0) + 1
             print(f"day {name}: {len(lines)} lines -> {dict(sorted(kinds.items()))}; replier calls {len(calls)}")
+    # a program-only domain (agent-no-intent s-7fd29000): no host, no
+    # intent.yaml, no verbs — its day beats, reads and consults, every
+    # intent refused
+    for name in PROGRAM_ONLY:
+        day = dest / "days" / f"{name}.jsonl"
+        if day.exists():
+            lines = [json.loads(x) for x in day.read_text().splitlines() if x.strip()]
+            stream, _ = run_day(name, lines)
+            (dest / "days" / f"{name}.out.jsonl").write_text("".join(json.dumps(r) + "\n" for r in stream))
+            print(f"day {name} (program only): {len(lines)} lines -> {sum(len(r['out']) for r in stream[1:])} outputs")
     # the narration's wiring: the dog's and the plant's days narrated by the
     # stub narrator, traced (the narrated fragments in the traces)
     for name in ("dog", "plant"):

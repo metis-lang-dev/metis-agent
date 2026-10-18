@@ -149,6 +149,10 @@ def offered_moves(repl):
     return {c["name"]: list(c.get("moves") or []) for c in cards(repl) if c["relation"] != "served"}
 
 
+# a domain with no verbs refuses every intent with this (py and Go)
+NO_INTENTS = "this domain takes no intents"
+
+
 class DomainAgent:
     def __init__(self, module, seed=1, llm=None, counts=None, consult_seat=None, consult_missing="template", case=None):
         os.environ.setdefault("METIS_CONFIG", "")   # the kernel's llm endpoint is never called
@@ -259,6 +263,11 @@ class DomainAgent:
             self.held.append(self.surprise_open_refusal(iid, msg))
             return [reply(self.name, "result", id=iid, status="accepted", ref={"beat": self.beat_no()},
                           text="Accepted.")]
+        if not self.mapper.commands:
+            # no verbs (a program-only domain, the wgc, the kitchen's cooks):
+            # refused where the mapper would be, as Go's (agent-no-intent s-7fd29000)
+            self.log.append({"id": iid, "verb": msg.get("verb"), "args": msg.get("args"), "error": NO_INTENTS})
+            return [reply(self.name, "error", id=iid, error=NO_INTENTS)]
         m = self.mapper.map(msg)
         self.log.append({"id": iid, "verb": msg.get("verb"), "args": msg.get("args"),
                          **({"atom": m.atom, "act": m.act, "dropped": m.dropped} if isinstance(m, Mapped)
