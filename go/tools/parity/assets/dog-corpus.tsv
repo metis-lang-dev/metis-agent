@@ -1,0 +1,55 @@
+# utterance	expected_intent	source   (source: prompt = in the few-shot examples; heldout = paraphrase)
+stand up	LOCAL_ACTION	prompt
+sit	LOCAL_ACTION	prompt
+lie down	LOCAL_ACTION	prompt
+lay down	LOCAL_ACTION	prompt
+turn left ninety degrees	LOCAL_ACTION	prompt
+turn around	LOCAL_ACTION	prompt
+take a step forward	LOCAL_ACTION	prompt
+go one meter forward	LOCAL_ACTION	prompt
+back up half a meter	LOCAL_ACTION	prompt
+take a step back	LOCAL_ACTION	prompt
+give me your paw	LOCAL_ACTION	prompt
+wave at me	LOCAL_ACTION	prompt
+where is the chair	QUERY	prompt
+what is next to the table	QUERY	prompt
+go to the door	NAVIGATE	prompt
+go to the chair next to the window	NAVIGATE	prompt
+go to the kitchen	NAVIGATE	prompt
+go to tag five	NAVIGATE	prompt
+walk to april tag three	NAVIGATE	prompt
+go to the tag	NAVIGATE	prompt
+find a fire extinguisher	FIND	prompt
+go find the red chair near the window	FIND	prompt
+follow me	FOLLOW	prompt
+stop	STOP	prompt
+never mind	CANCEL	prompt
+what time is it	TIME	prompt
+good boy	CHITCHAT	prompt
+order me a pizza	UNKNOWN	prompt
+do a front flip	UNKNOWN	prompt
+do a backflip	UNKNOWN	prompt
+roll over	UNKNOWN	prompt
+dance	UNKNOWN	prompt
+jump	UNKNOWN	prompt
+pounce	UNKNOWN	prompt
+could you sit down please	LOCAL_ACTION	heldout
+get up	LOCAL_ACTION	heldout
+turn right	LOCAL_ACTION	heldout
+move forward two meters	LOCAL_ACTION	heldout
+shake hands	LOCAL_ACTION	heldout
+is there a chair around here	QUERY	heldout
+what do you see near the window	QUERY	heldout
+head over to the kitchen	NAVIGATE	heldout
+go to april tag seven	NAVIGATE	heldout
+walk to the sofa	NAVIGATE	heldout
+look for my keys	FIND	heldout
+search for a blue bottle	FIND	heldout
+come with me	FOLLOW	heldout
+halt	STOP	heldout
+forget it	CANCEL	heldout
+what's the date today	DATE	heldout
+hi there buddy	CHITCHAT	heldout
+make me a coffee	UNKNOWN	heldout
+do a somersault	UNKNOWN	heldout
+play dead	UNKNOWN	heldout

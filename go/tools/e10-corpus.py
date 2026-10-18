@@ -53,7 +53,7 @@ def _load(name):
 
 gt = _load("gemma_tools")
 
-REF = GO.parent.parent / "fsttm-web/test/fixtures/harness-e2b.jsonl"
+REF = GO / "tools/parity/assets/harness-e2b.jsonl"     # the harness's E2B answers (from fsttm-web, fsttm-cleanup)
 TURN, END = "<|turn>", "<turn|>\n"
 
 

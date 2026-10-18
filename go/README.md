@@ -65,7 +65,7 @@ any GGUF; `llm.template: auto` takes the chat template from the GGUF,
 #   open http://localhost:8395/ — the page finds /ws and uses metis-agent
 #   -wait-viewer   attach the domains when the first page connects
 #   -no-domains    the persona alone (the parity bar)
-node --experimental-websocket ../../fsttm-web/test/parity.mjs ws://localhost:8395/ws   # 54-row corpus
+node --experimental-websocket tools/parity/parity.mjs ws://localhost:8395/ws   # the dog's 54-row intent parity (tools/parity/)
 ./bin/llmbench -model <gguf> -ngl 99 -corpus ../../metis-catalog/domains/dog/intent/dog-corpus.tsv                     # GPU; -ngl 0 = CPU
 ```
 
