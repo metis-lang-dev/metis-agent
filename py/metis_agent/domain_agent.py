@@ -52,6 +52,22 @@ harness lines like the clock, not part of either interface):
       {"clock": "ready", "domain", "beat": 0}.
     {"world": ["-closed(kitchen)", "+open(kitchen)"], "id"?}: do-lines on
       the host's next tick, as the script's world changes are.
+    {"clock": "beat", "score": true}: the beat, scored (rddl-worlds
+      s-242c7c3f, the agentic loop's domain_episodes): its clock line also
+      carries `score` {likelihood, steps, kind, mismatch, counts} — the
+      served program's probability of the host's reading after the beat,
+      from the state the beat started in, over its program steps (the
+      kernel's surprise_record, as the watch scores a surprise, but on
+      every beat); kind unmodeled | rare | null; mismatch the watch's diffs
+      during the beat; counts the reported atoms; and, for a host that
+      maps rules to actions (`action_of`: an RDDL world), `outcomes`: per
+      action the program sent, P(the world's answer | that action) under
+      the program — the same-action alternatives of the tier it was drawn
+      from, the weight of those whose effect is the host's reading over
+      the weight of them all (unscored, p null, when the program's state
+      already differed from the world's before it). That conditional is the statistical measure
+      a wrong rate shows in (the program's own choice of action is not
+      the world's to answer). Null for a host with no sensor face.
     Every non-clock line's replies end with {"ack": intent|tool|world|reset|error,
       "id": the line's id or null}; a clock line's with its clock line.
 
@@ -305,12 +321,17 @@ class DomainAgent:
     BEAT_STEPS = 200
 
     # ── the clock: one beat of the watch ──
-    def beat(self):
+    def beat(self, score=False):
         w, out = self.watch, self.held
         self.held = []
+        self.scored = None
         if self.over:
             return out
         b0, f0, n = w.beat, len(self.repl.fired_rows), 0
+        start, diffs, outcomes = (self.repl.stage, dict(self.repl.counts)), [], []
+        fire = self.repl.__dict__.get("_fire")
+        if score:
+            self.repl._fire = self.scoring_fire(outcomes)
         while not w.done:
             would_tick = w.observe_only or (w.quiet and not self.repl._candidates())
             if w.beat > b0 and would_tick:
@@ -320,13 +341,92 @@ class DomainAgent:
                 break
             n += 1
             for s in w.step():
+                if score and isinstance(s.get("diff"), dict) and s["diff"]:
+                    diffs.append(dict(s["diff"]))
                 out += self.signal(s)
+        if score:
+            if fire is None:
+                del self.repl._fire
+            else:
+                self.repl._fire = fire
         if w.done:
             self.over = True
+        if score:
+            self.scored = self.score_beat(start, f0, diffs)
+            if self.scored is not None and hasattr(getattr(self.host, "inner", self.host), "action_of"):
+                self.scored["outcomes"] = outcomes
         late, gone = self.replier.untaken(self.repl.counts, self.beat_no())
         for atom in gone:
             self.host.retract(atom)
         return out + late
+
+    def scoring_fire(self, outcomes):
+        """The Repl's _fire for a scored beat: each sampled event the host
+        turns into an action is scored as the world answers it (outcomes)."""
+        from metis.lang.repl import _ground_args
+        sh = self.repl
+        inner = getattr(self.host, "inner", self.host)
+        act, observe = getattr(inner, "action_of", None), getattr(inner, "observe", None)
+        orig = type(sh)._fire.__get__(sh)
+        if act is None or observe is None:
+            outcomes.clear()
+            return orig
+
+        def fire(i, how="sampled", ws=None):
+            ws = sh._candidates() if ws is None else ws
+            before, live = dict(sh.counts), not getattr(inner, "done", False)
+            # scored only from a state the world shares: after a mismatch earlier in the beat
+            # (the program's state is the world's again at the tick), an action is not the world's to answer
+            was = {x: int(n) for x, n in dict(observe(before)).items()}
+            agreed = all(before.get(x, 0) == n for x, n in was.items())
+            name = orig(i, how, ws)
+            ev = sh.events_tbl[i][2]
+            a = act(ev.name, _ground_args(ev.name)) if how == "sampled" and live else None
+            if a is not None and not agreed:
+                outcomes.append({"event": ev.name, "action": a, "p": None, "unscored": "the program's state differs from the world's"})
+            elif a is not None:
+                reading = {x: int(n) for x, n in dict(observe(dict(sh.counts))).items()}
+                group = [(j, w) for j, w in ws
+                         if act(sh.events_tbl[j][2].name, _ground_args(sh.events_tbl[j][2].name)) == a]
+
+                def answers(j):
+                    e = sh.events_tbl[j][2]
+                    post = dict(before)
+                    for q, n in e.consume.items():
+                        post[q] = post.get(q, 0) - n
+                    for q, n in e.produce.items():
+                        post[q] = post.get(q, 0) + n
+                    return all(post.get(x, 0) == n for x, n in reading.items())
+                total = sum(w for _, w in group)
+                hit = [sh.events_tbl[j][2].name for j, _ in group if answers(j)]
+                outcomes.append({"event": ev.name, "action": a, "alternatives": len(group),
+                                 "answered_by": hit,
+                                 "p": (sum(w for j, w in group if answers(j)) / total) if total else None})
+            return name
+        return fire
+
+    def score_beat(self, start, f0, diffs):
+        """The beat's score (the clock line's `score`): the served program's
+        probability of the host's reading now, from `start` (stage, counts)
+        over the beat's program steps, by surprise_record as the watch
+        scores a surprise; None without a sensor face."""
+        from metis.kernel.record import surprise_record
+        sh = self.repl
+        observe = getattr(sh.plugin, "observe", None)
+        if observe is None:
+            return None
+        reading = {a: int(n) for a, n in dict(observe(dict(sh.counts))).items()}
+        steps = sum(1 for kind, _, _ in sh.fired_rows[f0:] if kind != "exo")
+        stage, counts = start
+        try:
+            prog = sh.doc.catalog.ground(dict(counts), init_stage=stage)
+            policy = sh.pricer.policy(prog) if sh.pricer is not None else None
+            rec = surprise_record(prog, max(1, steps), reading, policy=policy, rare_ratio=self.watch.rare_ratio)
+            like, kind = rec["likelihood"], rec["kind"]
+        except Exception as e:          # noqa: BLE001 — a projection past its budget: said, not fatal
+            like, kind = None, "unscored: %s: %s" % (type(e).__name__, str(e)[:200])
+        return {"likelihood": like, "steps": steps, "kind": kind, "mismatch": diffs,
+                "counts": self.replier.counts(sh.counts)}
 
     def unsettled(self, f0, n):
         """The beat that stopped at its step cap: a quiescence that did not
@@ -673,8 +773,11 @@ class DomainAgent:
 
     def handle(self, msg):
         if "clock" in msg:
-            out = self.step() if msg["clock"] == "step" else self.beat()
-            return out + [{"clock": msg["clock"], "beat": self.beat_no(), "over": self.over}]
+            if msg["clock"] == "step":
+                return self.step() + [{"clock": "step", "beat": self.beat_no(), "over": self.over}]
+            out = self.beat(score=bool(msg.get("score")))
+            return out + [{"clock": "beat", "beat": self.beat_no(), "over": self.over,
+                           **({"score": self.scored} if msg.get("score") else {})}]
         if "tool" in msg:
             return self.tool(msg)
         if "verb" in msg:

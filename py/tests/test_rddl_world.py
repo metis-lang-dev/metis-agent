@@ -86,3 +86,57 @@ def test_a_planted_wrong_rule_surprises(tmp_path, monkeypatch):
     assert len(hit) >= 5                                    # the robot vanishes and the program cannot say so
     s = next(l for l in hit[0]["lines"] if l.get("kind") == "surprise")
     assert s["text"] and "dead" in json.dumps(s)
+
+
+def scored(n=20, root=None):
+    """n seeded episodes with every beat scored: (the clock lines' scores per episode)."""
+    p = Process(["nav"], seat="template")
+    a = p.build(1, "replay")
+    out = []
+    for seed in range(1, n + 1):
+        a, r = serve(a, {"reset": {"seed": seed, "case": "replay"}}, p.build, p.reload, p.add_line)
+        eps = []
+        for _ in range(200):
+            a, r = serve(a, {"clock": "beat", "score": True}, p.build, p.reload, p.add_line)
+            eps.append(r[-1]["score"])
+            if r[-1]["over"]:
+                break
+        out.append(eps)
+    return out
+
+
+def _mean_outcome_log(es):
+    import math
+    ps = [o["p"] for e in es for s in e for o in s["outcomes"] if o.get("p") is not None]
+    assert ps and all(p > 0 for p in ps)
+    return sum(math.log(p) for p in ps) / len(ps)
+
+
+def test_a_scored_beat_says_the_programs_probability_of_what_the_world_answered():
+    """rddl-worlds B: {"clock": "beat", "score": true}; per action the program sent, P(the gym's answer | that action)."""
+    e1, e2 = scored(), scored()
+    assert json.dumps(e1) == json.dumps(e2)                                  # deterministic per seed
+    s = e1[0][0]
+    assert set(s) >= {"likelihood", "steps", "kind", "mismatch", "counts", "outcomes"}
+    os_ = [o for e in e1 for b in e for o in b["outcomes"]]
+    scored_ = [o for o in os_ if o.get("p") is not None]
+    assert scored_ and all(0 < o["p"] <= 1 for o in scored_)                  # the true program: no impossible answer
+    assert all(o["answered_by"] and o["alternatives"] >= len(o["answered_by"]) for o in scored_)
+    assert all(o["unscored"] for o in os_ if o.get("p") is None)             # only after a mismatch in the same beat
+    assert {k for o in scored_ for k in o["action"]} <= {"move-north", "move-south", "move-east", "move-west"}
+
+
+def test_a_wrong_rate_scores_lower_on_the_same_seeds(tmp_path, monkeypatch):
+    """die ×5, every rule kept: nothing is impossible, the outcomes are less likely (the statistical surprise)."""
+    from metis_loop_sdk import catalog
+    root = catalog.root()
+    true = _mean_outcome_log(scored())
+    shutil.copytree(root / "tools", tmp_path / "tools", ignore=shutil.ignore_patterns("__pycache__"))
+    shutil.copytree(root / "domains/nav", tmp_path / "domains/nav", ignore=shutil.ignore_patterns("build", "records"))
+    h = tmp_path / "domains/nav/nav_host.py"
+    h.write_text(h.read_text().replace("else _p(host, c2)", "else 5 * _p(host, c2)"))
+    monkeypatch.setenv("METIS_CATALOG", str(tmp_path))
+    monkeypatch.setenv("METIS_RDDL_PY", GYM_PY)
+    for m in [m for m in sys.modules if m.startswith("nav_host") or m.startswith("metis_agent.domains.nav")]:
+        monkeypatch.delitem(sys.modules, m)                 # the host module as the scratch catalog has it
+    assert _mean_outcome_log(scored()) < true - 0.1

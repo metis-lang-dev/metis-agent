@@ -265,3 +265,18 @@ def test_an_extension_applied_then_reloaded_is_the_served_program(tmp_path, monk
     assert [x.name for x in ag.extensions] == ["visitor.llp"]
     assert ag.replier.docs["visitor_waters"] == "A visitor has watered me; my soil is moist again."
     assert day(ag) == [] and "visitor_waters" in ag.repl.fired                 # modeled now: no surprise
+
+
+def test_a_scored_beat_without_actions_is_the_beats_likelihood():
+    """rddl-worlds s-242c7c3f B: {"clock": "beat", "score": true} on a host with a sensor face and no actions
+    (the plant): the program's probability of the reading after the beat; no `outcomes`. Unscored beats
+    keep their clock line as it was."""
+    from metis_agent.domain_agent import Process, serve
+    p = Process(["plant"], seat="template")
+    a = p.build(1, "replay")
+    a, r = serve(a, {"clock": "beat"}, p.build, p.reload, p.add_line)
+    assert "score" not in r[-1]
+    for _ in range(3):
+        a, r = serve(a, {"clock": "beat", "score": True}, p.build, p.reload, p.add_line)
+        s = r[-1]["score"]
+        assert set(s) == {"likelihood", "steps", "kind", "mismatch", "counts"} and 0 <= s["likelihood"] <= 1
