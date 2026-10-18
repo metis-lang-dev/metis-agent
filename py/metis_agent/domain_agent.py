@@ -329,10 +329,18 @@ class DomainAgent:
             return out
         b0, f0, n = w.beat, len(self.repl.fired_rows), 0
         start, diffs, outcomes = (self.repl.stage, dict(self.repl.counts)), [], []
+        s0 = f0                                  # the score's start: the beat's, or its last input's
         fire = self.repl.__dict__.get("_fire")
         if score:
             self.repl._fire = self.scoring_fire(outcomes)
+        inner = getattr(self.host, "inner", self.host)
         while not w.done:
+            if getattr(inner, "done", False):
+                # the world's episode is over (an RDDL gym's horizon) though the
+                # program would go on (xtraffic's epochs never go quiet): the
+                # beat and the agent's episode end with it (rddl-worlds step 3)
+                w.done = True
+                break
             would_tick = w.observe_only or (w.quiet and not self.repl._candidates())
             if w.beat > b0 and would_tick:
                 break
@@ -344,6 +352,12 @@ class DomainAgent:
                 if score and isinstance(s.get("diff"), dict) and s["diff"]:
                     diffs.append(dict(s["diff"]))
                 out += self.signal(s)
+            rows = self.repl.fired_rows
+            if score and len(rows) > s0 and rows[-1][0] == "exo":
+                # the beat's input arrived (the tick): the score starts there, as the
+                # watch's checkpoint does — an observing world's transition is the
+                # state, the action and the tick in, its cycle out (rddl-worlds step 3)
+                start, s0 = (self.repl.stage, dict(self.repl.counts)), len(rows)
         if score:
             if fire is None:
                 del self.repl._fire
@@ -352,7 +366,7 @@ class DomainAgent:
         if w.done:
             self.over = True
         if score:
-            self.scored = self.score_beat(start, f0, diffs)
+            self.scored = self.score_beat(start, s0, diffs)
             if self.scored is not None and hasattr(getattr(self.host, "inner", self.host), "action_of"):
                 self.scored["outcomes"] = outcomes
         late, gone = self.replier.untaken(self.repl.counts, self.beat_no())
