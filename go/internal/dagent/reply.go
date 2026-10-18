@@ -22,7 +22,7 @@ var replyKinds = map[string][]string{
 	"notice":     {"record", "card", "move"},
 	"error":      {"id", "error"},
 	"consult":    {"id", "answer_kind", "cause", "resource", "evidence", "calls"},
-	"ports":      {"world", "pairs", "reports", "handles", "held"},
+	"ports":      {"world", "pairs", "reports", "handles", "held", "host"},
 	"trace":      {"beat", "fired", "more", "narrated", "consults", "reads", "world", "records"},
 	"reloaded":   {"key"},
 	"added":      {"key"},

@@ -125,7 +125,7 @@ def test_world_reload_and_the_watcher(tmp_path):
     assert {e["name"]: e for e in lv.catalog()}["kitchen"]["state"] == "inactive"
     cat = {e["name"]: e for e in lv.catalog()}
     assert cat["wildfire"]["state"] == "not installed" and cat["wildfire"]["kind"] == "domain"
-    assert "nav" not in cat                                                # E13's fixture: no manifest, not listed
+    assert "nowhere" not in cat and cat["nav"]["kind"] == "domain"      # no manifest, not listed (nav is a package now)
 
 
 def test_the_catalog_frame_lists_the_sdks_listing(tmp_path):
@@ -167,12 +167,12 @@ def test_the_system_turn_is_built_from_the_manifests():
     from metis_loop_sdk import catalog
     assert "Cards:\n- kitchen: %s\n\nExamples:" % catalog.get("kitchen").line in turn
     assert "- nav:" not in turn[turn.index("## Domains"):]
-    cfg["v3"]["catalog"] = ["kitchen", "nav"]
+    cfg["v3"]["catalog"] = ["kitchen", "nowhere"]
     try:
         S.build_turn(cfg)
-        assert False, "nav has no manifest: the start must be refused"
+        assert False, "nowhere has no manifest: the start must be refused"
     except ValueError as e:
-        assert "nav" in str(e)
+        assert "nowhere" in str(e)
 
 
 def test_a_failed_reload_leaves_the_old_domain_running(tmp_path, monkeypatch):
@@ -224,7 +224,7 @@ def test_activate_installs_a_manifest_domain_at_runtime(tmp_path):
     for _ in range(3):
         lv.tick()
     assert 0 < len(lv.agents.agents["wgc"].repl.fired) - fired <= 3 * 200                  # its own day, bounded per beat
-    assert "no domain 'nav' in the catalog" in lv.domain_verb("activate", "nav", None, "person")
+    assert "no domain 'nowhere' in the catalog" in lv.domain_verb("activate", "nowhere", None, "person")
     assert lv.domain_verb("deactivate", "wgc", None, "person") is None and "wgc" in lv.off
 
 

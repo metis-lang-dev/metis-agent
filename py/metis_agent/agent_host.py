@@ -54,7 +54,11 @@ class AgentHost:
 
     def world(self, lines):
         """World changes from the driver ("-closed(kitchen)", "+open(kitchen)"):
-        do-lines on the next tick, as the hosted script's world changes are."""
+        do-lines on the next tick, as the hosted script's world changes are.
+        A host with its own world face (an RDDL world: the gym's state, a
+        seed) takes them itself (rddl-worlds s-242c7c3f)."""
+        if hasattr(self.inner, "world"):
+            return self.inner.world(lines)
         bad = [l for l in lines if not (isinstance(l, str) and l[:1] in "+-" and len(l) > 1)]
         if bad:
             raise ValueError("world lines are +atom / -atom, not %r" % bad)

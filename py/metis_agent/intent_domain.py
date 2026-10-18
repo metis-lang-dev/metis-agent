@@ -101,7 +101,8 @@ def build(name, display=None, voice="", root=None, module=None, fresh=False, dir
     whose `make` the kernel attaches as the plugin; root: a domains/
     directory, default the catalog's)."""
     d = Path(dir) if dir else Path(root or catalog_domains()) / name    # the domain's directory (the manifest's)
-    spec = yaml.safe_load((d / "intent.yaml").read_text())
+    f = d / "intent.yaml"
+    spec = (yaml.safe_load(f.read_text()) or {}) if f.exists() else {}     # none: a host with no verbs
     host = _host_module(d, name, fresh)
     c = card(spec)
     commands = {r["atom"].split("(")[0] for r in c["rows"]}
@@ -117,7 +118,8 @@ def build(name, display=None, voice="", root=None, module=None, fresh=False, dir
               AgentHost=AgentHost)
     if host is not None:
         ns.update(make=make, PLUGIN="%s:make" % (module or "metis_agent.domains." + name),
-                  PAIRS=host.PAIRS, flips=host.flips, words=host.words)
+                  PAIRS=getattr(host, "PAIRS", ()), flips=getattr(host, "flips", lambda a: None),
+                  words=getattr(host, "words", lambda a, names=None: None))
     return ns
 
 

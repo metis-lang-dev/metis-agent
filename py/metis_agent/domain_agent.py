@@ -169,6 +169,9 @@ class DomainAgent:
             raise RuntimeError("domain agent: host %s did not attach" % plugin)
         if self.host is None:
             self.host = _NoHost()            # a catalog with no host (wgc): consult and reads only
+        inner = getattr(self.host, "inner", self.host)
+        if hasattr(inner, "reseed"):
+            inner.reseed(seed)               # the agent's seed is the world's episode (an RDDL gym)
         self.watch = Watch(self.repl, beats=getattr(module, "BEATS", None))
         self.mapper = Mapper(module.CARD)
         self.flips = getattr(module, "flips", lambda a: None)
@@ -706,9 +709,11 @@ class DomainAgent:
         standing = set(getattr(self.mod, "STANDING", ()))
         handles = {k: [{"id": h, "display": self.display_of(h)} for h, _ in hs if h not in standing]
                    for k, hs in kinds.items()}
+        inner = getattr(self.host, "inner", self.host)
+        extra = {"host": inner.ports()} if hasattr(inner, "ports") else {}    # the host's own (an RDDL world's gym)
         return [reply(self.name, "ports", world=hasattr(self.host, "world"), pairs=pairs,
                       reports=dict(getattr(self.mod, "REPORTS", {})), handles=handles, held=held,
-                      ref={"seq": len(self.repl.fired), "beat": self.beat_no()})]
+                      ref={"seq": len(self.repl.fired), "beat": self.beat_no()}, **extra)]
 
     def trace(self):
         """What the agent did since the last trace (fired rows, narrated

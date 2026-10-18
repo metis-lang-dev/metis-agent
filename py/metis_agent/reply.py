@@ -28,7 +28,7 @@ KINDS = {
     "consult": ("id", "answer_kind", "cause", "resource", "evidence", "calls"),
     # the console's (agent-console, s-7f3d1088): never into the orchestrator's
     # inbox — the host's world ports, and what the agent did on a line
-    "ports": ("world", "pairs", "reports", "handles", "held"),
+    "ports": ("world", "pairs", "reports", "handles", "held", "host"),
     "trace": ("beat", "fired", "more", "narrated", "consults", "reads", "world", "records"),
     # e2e-workflow step 3: a domain rebuilt from the files on disk (WIRE.md reload)
     "reloaded": ("key",),

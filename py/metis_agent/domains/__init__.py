@@ -9,6 +9,8 @@ manifest, metis-catalog domains/<…>/domain.yaml, read through the loop SDK
   intent.spec (no agent)      the generic agent (intent_domain.build: the
                               card, outcomes and alternatives of intent.yaml,
                               the host's world)
+  a host, no intent.spec      the generic agent with the host and no verbs
+                              (an RDDL world, rddl-worlds s-242c7c3f)
   a program only               the generic agent with no verbs (intent_domain
   (no agent, intent, host)    .bare, agent-no-intent s-7fd29000): the clock
                               beats, the reads and surprises work, every
@@ -58,14 +60,13 @@ class _Loader(importlib.abc.Loader):
             exec(compile(Path(path).read_text(), str(path), "exec"), mod.__dict__)
             if variant:
                 mod.__dict__.update(mod.variant(variant))
-        elif d.intent.get("spec"):
+        elif d.intent.get("spec") or d.manifest.get("host"):
+            # intents, or a host with none (an RDDL world: its program acts,
+            # the gym answers; rddl-worlds s-242c7c3f): the generic agent
             from ..intent_domain import build
             mod.__file__ = str(d.dir / "domain.yaml")
             mod.__dict__.update(build(d.name, display=d.display, voice=d.manifest.get("voice", ""), dir=d.dir,
                                       module=mod.__name__, fresh=self.fresh))
-        elif d.manifest.get("host"):
-            raise ImportError("domain %r has a host but neither an agent module nor an intent.spec: the generic "
-                              "agent wraps a host with its commands (%s)" % (self.name, d.dir))
         elif d.serves():
             from ..intent_domain import bare
             mod.__file__ = str(d.dir / "domain.yaml")
