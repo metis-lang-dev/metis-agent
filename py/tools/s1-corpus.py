@@ -41,11 +41,11 @@ sys.path.insert(0, str(ROOT / "py"))
 os.environ.setdefault("METIS_CONFIG", "")
 from metis_agent.repl_tools import Kernel  # noqa: E402
 
-PLAN = "../metis-catalog/domains/planning/"
-WGC = PLAN + "wgc/wgc.llp"
-BRIDGE = PLAN + "bridge-torch/bridge.llp"
-HANOI = PLAN + "tower_of_hanoi.llp"
-BLOCKS = PLAN + "blocks_world.llp"
+CAT = "../metis-catalog/domains/"
+WGC = CAT + "wgc/wgc.llp"
+BRIDGE = CAT + "bridge/bridge.llp"
+HANOI = CAT + "tower_of_hanoi/tower_of_hanoi.llp"
+BLOCKS = CAT + "blocks_world/blocks_world.llp"
 OUT = ROOT / "py/tools/s1-corpus.jsonl"
 
 NUMW = {"1": ["1", "one"], "2": ["2", "two"], "3": ["3", "three"], "4": ["4", "four"], "5": ["5", "five"],
