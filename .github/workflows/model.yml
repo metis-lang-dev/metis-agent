@@ -29,11 +29,11 @@ permissions:
   contents: read
 
 concurrency:
-  group: model-${{ github.ref }}
+  # per event: a push never cancels the daily run (which keeps the weights' cache from eviction)
+  group: model-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 env:
-  METIS_LANG_COMMIT: d7e5a33fae7f586c8a6311c8fe7e68fb132bd5f7   # as ci.yml
   E2B_REPO: unsloth/gemma-4-E2B-it-GGUF
   E2B_REV: 0314792d7f1f7e229411f620751375812bb9faf2
   E2B_FILE: gemma-4-E2B-it-Q4_K_M.gguf
@@ -51,6 +51,11 @@ jobs:
       - name: The llama.cpp pin (the submodule's commit)
         id: pin
         run: echo "llama=$(git -C metis-agent rev-parse HEAD:third_party/llama.cpp)" >> "$GITHUB_OUTPUT"
+      - name: The metis-lang pin, read from ci.yml (one pin, never two)
+        run: |
+          c=$(sed -n 's/^  METIS_LANG_COMMIT: *\([0-9a-f]\{40\}\).*/\1/p' metis-agent/.github/workflows/ci.yml)
+          [ -n "$c" ] || { echo "::error::no METIS_LANG_COMMIT in ci.yml"; exit 1; }
+          echo "METIS_LANG_COMMIT=$c" >> "$GITHUB_ENV"
       - name: Checkout metispy (public; the golden bundle's tools the agent test reads)
         uses: actions/checkout@v4
         with:

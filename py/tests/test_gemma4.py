@@ -12,7 +12,8 @@ from metis_agent.repl_tools import WHITELIST, Kernel, scrub, tools  # noqa: E402
 
 # the wolf-goat-cabbage package wherever the catalog keeps it (domains/planning/wgc,
 # then domains/wgc: catalog-packages s-a2c529d6 moves it)
-WGC = next((ROOT.parent / "metis-catalog/domains").glob("**/wgc/wgc.llp"))
+WGC = next((ROOT.parent / "metis-catalog/domains").glob("**/wgc/wgc.llp"), None)
+assert WGC, f"no wgc package (wgc/wgc.llp) under {ROOT.parent / 'metis-catalog/domains'}"
 
 
 def test_call_round_trip():
