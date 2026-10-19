@@ -67,8 +67,9 @@ as JSON text against native tool calls (E9: equal accuracy, the grammar
 sampler costing at least 240 of J's 418\,ms mean); the executive's IO round-trip
 (E10: the tool-response turn invites completion claims, so outcomes stay
 text); the consult loop (E11: the harness owns the branch, the model chooses
-within it); one model for both agents (NO-GO as a task, then measured: the same
-reads at 1.4\,GB less, the sampled wording drifting past the model's 512-token
+within it); one model for both agents (set aside on the Python development stack,
+where two instances fit; built as the Go deployment's shape, where it ships: the same
+reads at 1.4\,GB less, with a sampled line able to drift past the model's 512-token
 window); the specialist's limit (S1: a small model cannot continue a REPL read);
 parity between the Python development stack and the Go embedded runtime on
 recorded days (30 of 30 fixtures byte-equal, the C ABI's goldens 46/46, 95/95
@@ -523,20 +524,26 @@ date answer from the clock, never from the model.
 
 \subsection{E12: one model for both agents}\label{sec:onemodel}
 
-The integration measure ruled the single-model optimization \textbf{NO-GO as a task}: two
-E2B instances take 5.3 of 8.1\,GB and VRAM does not bind; one model would serialize the
-kitchen consult (6.9\,s) with the orchestrator's own generations; and the one-process shape
-makes weight-sharing nearly free later \src{integration step 3 ``E12''}. It was then built
-as the Go deployment's shape and measured on the same reads \src{go-domain-agent step 6;
-metis-agent 60ccbe0, 7074f98}: the orchestrator and every narrator are roles on one loaded
-context, each with its own budget, prefix, tape and sampling, swapped by KV state
+Two decisions, in order. \textbf{First, at integration, the single-model optimization was
+set aside as a task on the Python development stack}, for three reasons: two E2B instances
+take 5.3 of 8.1\,GB and VRAM does not bind there; one model would serialize the kitchen
+consult (6.9\,s) with the orchestrator's own generations; and the one-process shape makes
+weight-sharing nearly free later \src{integration step 3 ``E12''}. \textbf{Second, it was
+built as the Go deployment's shape} and measured on the same reads \src{go-domain-agent
+step 6; metis-agent 60ccbe0, 7074f98}: the orchestrator and every narrator are roles on one
+loaded context, each with its own budget, prefix, tape and sampling, swapped by KV state
 save/load (204 swaps in a 14-timeline replay, about 24\,ms each). Every read is identical
 to the two-model run; the dispatched intents are equal 7/7 live; the live service's VRAM
-falls from 3846 to 2436\,MiB at the session's end ($-1410$; 3792 to 2432 at its start). One finding, with its cause established: past Gemma~4's 512-token
-sliding window a restored KV is exact in content but laid out differently, the attention's
-fp16 accumulation moves, and a \emph{sampled} line can take another word --- greedy moves
-keep their argmax, so no read and no dispatch moves. Byte-exact one-model would need a
-layout-preserving restore; it is a follow-up, not a blocker.
+falls from 3846 to 2436\,MiB at the session's end ($-1410$; 3792 to 2432 at its start). One
+finding, with its cause established: past Gemma~4's 512-token sliding window a restored KV
+is exact in content but laid out differently, the attention's fp16 accumulation moves, and
+a \emph{sampled} line can take another word --- greedy moves keep their argmax, so no read
+and no dispatch moves.
+
+So, plainly: the Python stack runs two model instances, because it is for development and
+the two halves must be exercised apart; the Go runtime runs one model, because it is for
+deployment and the footprint is the point. Byte-exact one-model serving, which needs a
+layout-preserving KV restore, is the follow-up.
 
 \subsection{S1: the specialist's limit}\label{sec:s1}
 
@@ -599,7 +606,7 @@ E10 & tool call as the API & T fails parity (52/54, 3 leaks, 4 claims); wins onl
 E11 & the consult loop & generic cue fails 3/4 reads; branch cue + restricted grammar: all hold & adopted: the harness owns the branch \\
 E13 & dialog control vs emulated domains & every bar after 3 runs; 9 harness rules & phase 2 complete \\
 integration & the real dog behind it & every bar after 5 more rules & phase 3 step 1 done \\
-E12 & one model for both agents & NO-GO as a task; built later: reads equal, $-1410$\,MiB, sampled wording drifts & the Go deployment's shape \\
+E12 & one model for both agents & set aside on the Python stack (two instances fit); built for Go: reads equal, $-1410$\,MiB, a sampled line may drift & two models to develop, one model to deploy \\
 S1 & the model as the kernel's user & read 2 fails on every Gemma seat (E4B off 8/20; Claude 15) & the specialist waits for a stronger small model \\
 E7/E8 & structural RAG vs flat mixing & S 0.80 = F 0.80; names did it & flat mixing; the RAG an experiment \\
 \bottomrule
