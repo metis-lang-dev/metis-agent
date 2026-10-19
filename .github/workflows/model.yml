@@ -1,0 +1,128 @@
+name: model
+
+# The local model on CPU (catalog-packages s-a2c529d6, part B): Gemma 4 E2B,
+# Q4_K_M, through the Go adapter (internal/llm) on the CPU llama.cpp ci.yml
+# builds and caches, and the dog's verb turns through the agent. Its own
+# workflow, never a required check: a doc change never waits on it.
+#
+# The weights: unsloth/gemma-4-E2B-it-GGUF (a GGUF of google/gemma-4-E2B-it),
+# Apache-2.0, public and ungated on Hugging Face: no token, no secret. Pinned
+# by the repo's revision and the file's sha256 (the LFS hash the HF API
+# gives); cached by both (actions/cache: 3.1 GB of the repo's 10 GB).
+#
+# When: every day, by hand, and on a push that changes what runs the model
+# (the adapter, the agent, the llama.cpp pin, this file). Numbers and the
+# decision: catalog-packages steps/step1-B-report.md.
+
+on:
+  schedule:
+    - cron: '17 3 * * *'        # daily: also keeps the weights' cache from its 7-day eviction
+  workflow_dispatch:
+  push:
+    paths:
+      - 'go/internal/llm/**'
+      - 'go/internal/agent/**'
+      - 'third_party/**'
+      - '.github/workflows/model.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  METIS_LANG_COMMIT: d7e5a33fae7f586c8a6311c8fe7e68fb132bd5f7   # as ci.yml
+  E2B_REPO: unsloth/gemma-4-E2B-it-GGUF
+  E2B_REV: 0314792d7f1f7e229411f620751375812bb9faf2
+  E2B_FILE: gemma-4-E2B-it-Q4_K_M.gguf
+  E2B_SHA256: 740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8
+
+jobs:
+  e2b-cpu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: metis-agent
+          submodules: true
+      - name: The llama.cpp pin (the submodule's commit)
+        id: pin
+        run: echo "llama=$(git -C metis-agent rev-parse HEAD:third_party/llama.cpp)" >> "$GITHUB_OUTPUT"
+      - name: Checkout metispy (public; the golden bundle's tools the agent test reads)
+        uses: actions/checkout@v4
+        with:
+          repository: metis-lang-dev/metispy
+          path: metispy
+      - name: Checkout metis-catalog (public; the dog's prompt, grammar and spoken examples)
+        uses: actions/checkout@v4
+        with:
+          repository: metis-lang-dev/metis-catalog
+          path: metis-catalog
+      - name: Checkout metis-lang at the pin (public; the runtime internal/rt binds)
+        uses: actions/checkout@v4
+        with:
+          repository: metis-lang-dev/metis-lang
+          ref: ${{ env.METIS_LANG_COMMIT }}
+          path: metis-lang
+      - name: Cache libmetis_rt (the pinned commit)
+        uses: actions/cache@v4
+        with:
+          path: metis-lang/runtime/build
+          key: metis-rt-${{ runner.os }}-${{ env.METIS_LANG_COMMIT }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: metis-agent/go/go.mod
+          cache-dependency-path: metis-agent/go/go.sum
+      - name: Cache llama.cpp's build (CPU, the submodule's commit; ci.yml's key)
+        id: llama
+        uses: actions/cache@v4
+        with:
+          path: metis-agent/third_party/llama.cpp/build
+          key: llama-cpu-${{ runner.os }}-${{ steps.pin.outputs.llama }}-${{ hashFiles('metis-agent/third_party/build-llama.sh', 'metis-agent/third_party/patches/**') }}
+      - name: Build llama.cpp (CPU, in the submodule)
+        if: steps.llama.outputs.cache-hit != 'true'
+        run: JOBS=$(nproc) metis-agent/third_party/build-llama.sh cpu
+      - name: Cache the weights (the revision and the hash)
+        id: weights
+        uses: actions/cache@v4
+        with:
+          path: metis-agent/go/models/gemma4/${{ env.E2B_FILE }}
+          key: e2b-${{ env.E2B_REV }}-${{ env.E2B_SHA256 }}
+      - name: Download the weights (public, no token)
+        if: steps.weights.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p metis-agent/go/models/gemma4
+          start=$(date +%s)
+          curl -fsSL --retry 5 -o "metis-agent/go/models/gemma4/$E2B_FILE" \
+            "https://huggingface.co/$E2B_REPO/resolve/$E2B_REV/$E2B_FILE"
+          echo "### weights: downloaded $(stat -c %s "metis-agent/go/models/gemma4/$E2B_FILE") bytes in $(( $(date +%s) - start )) s" >> "$GITHUB_STEP_SUMMARY"
+      - name: The weights' hash
+        run: echo "$E2B_SHA256  metis-agent/go/models/gemma4/$E2B_FILE" | sha256sum -c -
+      # the dog's verb turns: the two-pass intent (v2) and the orchestrator's turn and voice (v3)
+      # on the dog's prompt and grammar; the tape kept through turns; two roles on one context.
+      # The splice test (chat_test.go) is left out: it holds a spliced KV and the same tape
+      # decoded at once to one greedy answer, which on CPU parts after ~15 tokens (the two
+      # decode in different batch shapes, and the rounding tips a greedy pick).
+      # A skip here is a failure: gputest.LoadOK skips a load that fails.
+      - name: E2B on CPU (4 threads)
+        working-directory: metis-agent/go
+        env:
+          METIS_LANG_DIR: ${{ github.workspace }}/metis-lang
+        run: |
+          rc=0
+          start=$(date +%s)
+          ./build.sh test -count=1 -v -timeout 25m \
+            -run 'TestLoopFlag|TestTapeSurvivesTurnsAndMatchesSetTape|TestRolesOnOneContextAreContexts' \
+            ./internal/agent/ ./internal/llm/ > e2b-test.log 2>&1 || rc=$?
+          grep -E '^(ok|FAIL|--- )|^\s+\S+_test\.go:[0-9]+:' e2b-test.log || true
+          {
+            echo "### E2B on CPU: $(grep -c -- '--- PASS' e2b-test.log) passed, $(grep -c -- '--- SKIP' e2b-test.log) skipped, $(grep -c -- '--- FAIL' e2b-test.log) failed in $(( $(date +%s) - start )) s"
+            echo '```'
+            grep -E -- '--- |_test\.go:[0-9]+:' e2b-test.log | sed 's/^ *//' || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ "$(grep -c -- '--- PASS' e2b-test.log)" = 3 ] || { echo "::error::expected 3 passes (a skip is a failed load)"; exit 1; }
+          exit $rc
