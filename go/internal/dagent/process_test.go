@@ -170,6 +170,38 @@ func TestAWorldWithAPyHostIsRefusedByName(t *testing.T) {
 	}
 }
 
+// A lockstep or followed world (rddl-watch s-cfe94dca: clock {lockstep: true}
+// reads once per pass, {follow: true} adopts an explained reading) is py's
+// watch only: the Go process refuses the setting by name, before its host —
+// the catalog's own (gol, elevators) and a program-only package alike.
+func TestAPyOnlyClockIsRefusedByName(t *testing.T) {
+	proc := &Process{Root: catalogDir(t)}
+	for n, key := range map[string]string{"gol": "lockstep", "wildfire": "lockstep", "elevators": "follow"} {
+		want := "domain " + n + ": clock " + key + " is py's watch only (py's domain agent serves it)"
+		if _, err := proc.Domains([]string{n}); err == nil || err.Error() != want {
+			t.Fatalf("%s: %v", n, err)
+		}
+	}
+	root := t.TempDir()
+	dir := filepath.Join(root, "domains", "cycle")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	src, err := os.ReadFile(filepath.Join(catalogDir(t), "domains", "plant", "plant.llp"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for f, b := range map[string]string{"cycle.llp": string(src), "domain.yaml": "program: cycle.llp\nclock: {beats: 1, lockstep: true}\n"} {
+		if err := os.WriteFile(filepath.Join(dir, f), []byte(b), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	bare := &Process{Root: root}
+	if _, err := bare.Domains([]string{"cycle"}); err == nil || err.Error() != "domain cycle: clock lockstep is py's watch only (py's domain agent serves it)" {
+		t.Fatalf("cycle: %v", err)
+	}
+}
+
 // The records sink's place (py records_path, 68cb919): "catalog" is the
 // package's own records under the catalog the process reads, a nested
 // package included; another root is DIR/<name>/records.

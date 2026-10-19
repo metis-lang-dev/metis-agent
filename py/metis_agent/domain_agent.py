@@ -188,7 +188,21 @@ class DomainAgent:
         inner = getattr(self.host, "inner", self.host)
         if hasattr(inner, "reseed"):
             inner.reseed(seed)               # the agent's seed is the world's episode (an RDDL gym)
-        self.watch = Watch(self.repl, beats=getattr(module, "BEATS", None))
+        # a lockstep world (the manifest's clock: {lockstep: true}, rddl-watch
+        # s-cfe94dca): the watch reads once per pass of the program's stage
+        # pipeline; it and a followed world are priced exact within a state
+        # budget and sampled past it
+        clock = getattr(getattr(module, "MANIFEST", None), "clock", None) or {}
+        lockstep = bool(clock.get("lockstep"))
+        # a world the program follows row by row (clock: {follow: true}): a
+        # reading it explains is adopted, the window starts again there
+        follow = bool(clock.get("follow"))
+        tier = None
+        if lockstep or follow:
+            tier = {"max_states": int(clock.get("exact_states", self.EXACT_STATES)),
+                    "samples": int(clock.get("samples", self.SAMPLES)), "seed": seed}
+        self.watch = Watch(self.repl, beats=getattr(module, "BEATS", None), lockstep=lockstep, tier=tier,
+                           follow=follow)
         self.mapper = Mapper(module.CARD)
         self.flips = getattr(module, "flips", lambda a: None)
         # the host's words for a blocker (None: the host has no table, the model writes them)
@@ -236,7 +250,7 @@ class DomainAgent:
         self.quiescence = getattr(module, "QUIESCENCE", "episode")
         # the watch steps one beat may take (BEAT_STEPS below): the domain's
         # own, else its manifest's clock: {steps: N}
-        steps = (getattr(getattr(module, "MANIFEST", None), "clock", None) or {}).get("steps")
+        steps = clock.get("steps")
         self.beat_steps = int(getattr(module, "BEAT_STEPS", 0) or steps or self.BEAT_STEPS)
         self.narrator = None
         self.script = scripts_of(self.repl, self.extensions)
@@ -262,6 +276,12 @@ class DomainAgent:
         if consult_seat is None and llm is not None:
             from .seat import Gemma4Seat
             self.consult_seat = Gemma4Seat(llm)    # one model: the narrator's and the consultant's
+        if hasattr(inner, "sync"):
+            # a host whose world has its own start (an RDDL gym's reset state):
+            # the program starts there, brought along by the exo row world lines
+            # use (sync_world) — nothing when its #init is that state already
+            # (rddl-watch s-cfe94dca, N4: elevators' #init is not the gym's)
+            self.sync_world(inner)
 
     def beat_no(self):
         return getattr(self.host, "beat", self.watch.beat)
@@ -320,6 +340,15 @@ class DomainAgent:
     # kept firing (unsettled); the clock does not advance until it settles
     BEAT_STEPS = 200
 
+    # a lockstep or followed world's pricing tier (the manifest's clock:
+    # {exact_states, samples} override): the exact filter while its cumulative
+    # retained states stay within EXACT_STATES, else SAMPLES seeded
+    # reference-sampler runs (gol's pass: 6665 states; wildfire's and
+    # tamarisk's: past 300k, so sampled; 500 runs: 0.35 s a wildfire pass, a
+    # 95% half-width of 0.028 at p = 0.9)
+    EXACT_STATES = 10000
+    SAMPLES = 500
+
     # ── the clock: one beat of the watch ──
     def beat(self, score=False):
         w, out = self.watch, self.held
@@ -334,6 +363,9 @@ class DomainAgent:
         if score:
             self.repl._fire = self.scoring_fire(outcomes)
         inner = getattr(self.host, "inner", self.host)
+        # a lockstep world's beat is one pass of its stage pipeline: the first
+        # beat the #init pass, every other the beat's tick and the pass it starts
+        lock = getattr(w, "lockstep", False)
         while not w.done:
             if getattr(inner, "done", False):
                 # the world's episode is over (an RDDL gym's horizon) though the
@@ -341,22 +373,25 @@ class DomainAgent:
                 # beat and the agent's episode end with it (rddl-worlds step 3)
                 w.done = True
                 break
-            would_tick = w.observe_only or (w.quiet and not self.repl._candidates())
-            if w.beat > b0 and would_tick:
+            # (a lockstep world's wrapped pass is held for the beat as a quiet one is)
+            would_tick = w.observe_only or (w.quiet and not self.repl._candidates()) or getattr(w, "held", False)
+            if would_tick and (w.beat > b0 or (lock and len(self.repl.fired_rows) > f0)):
                 break
             if n >= self.beat_steps:
                 out += self.unsettled(f0, n)
                 break
             n += 1
+            beat = w.beat
             for s in w.step():
                 if score and isinstance(s.get("diff"), dict) and s["diff"]:
                     diffs.append(dict(s["diff"]))
                 out += self.signal(s)
             rows = self.repl.fired_rows
-            if score and len(rows) > s0 and rows[-1][0] == "exo":
+            if score and ((len(rows) > s0 and rows[-1][0] == "exo") or (lock and w.beat > beat)):
                 # the beat's input arrived (the tick): the score starts there, as the
                 # watch's checkpoint does — an observing world's transition is the
-                # state, the action and the tick in, its cycle out (rddl-worlds step 3)
+                # state, the action and the tick in, its cycle out (rddl-worlds step 3);
+                # a lockstep world's at its tick, input or not (its step's boundary)
                 start, s0 = (self.repl.stage, dict(self.repl.counts)), len(rows)
         if score:
             if fire is None:
@@ -402,6 +437,17 @@ class DomainAgent:
                 reading = {x: int(n) for x, n in dict(observe(dict(sh.counts))).items()}
                 group = [(j, w) for j, w in ws
                          if act(sh.events_tbl[j][2].name, _ground_args(sh.events_tbl[j][2].name)) == a]
+                if getattr(self.watch, "lockstep", False) or getattr(self.watch, "follow", False):
+                    # a lockstep world's step is a pass: the world's answer to the action is
+                    # read on what the action's alternatives decide (xtraffic's robot); the
+                    # rest of the reading (its obstacles) is the pass's, scored by the beat;
+                    # a followed world's other atoms are the world's own step (elevators'
+                    # arrivals), its readings priced by the watch
+                    # (what they consume and produce; a premise they only read — xtraffic's
+                    # dier reads the pre-shift obstacle — is not theirs to answer)
+                    touched = {q for j, _ in group for e in (sh.events_tbl[j][2],)
+                               for q in list(e.consume) + list(e.produce)}
+                    reading = {x: n for x, n in reading.items() if x in touched}
 
                 def answers(j):
                     e = sh.events_tbl[j][2]
@@ -424,7 +470,6 @@ class DomainAgent:
         probability of the host's reading now, from `start` (stage, counts)
         over the beat's program steps, by surprise_record as the watch
         scores a surprise; None without a sensor face."""
-        from metis.kernel.record import surprise_record
         sh = self.repl
         observe = getattr(sh.plugin, "observe", None)
         if observe is None:
@@ -432,15 +477,17 @@ class DomainAgent:
         reading = {a: int(n) for a, n in dict(observe(dict(sh.counts))).items()}
         steps = sum(1 for kind, _, _ in sh.fired_rows[f0:] if kind != "exo")
         stage, counts = start
+        tier = {}
         try:
-            prog = sh.doc.catalog.ground(dict(counts), init_stage=stage)
-            policy = sh.pricer.policy(prog) if sh.pricer is not None else None
-            rec = surprise_record(prog, max(1, steps), reading, policy=policy, rare_ratio=self.watch.rare_ratio)
+            prog = self.watch.program_at(counts, stage)
+            # the watch's pricing: exact, or a lockstep world's tier (its record says which)
+            rec = self.watch.price(prog, max(1, steps), reading)
             like, kind = rec["likelihood"], rec["kind"]
+            tier = {k: rec[k] for k in ("tier", "n", "seed", "ci") if k in rec}
         except Exception as e:          # noqa: BLE001 — a projection past its budget: said, not fatal
             like, kind = None, "unscored: %s: %s" % (type(e).__name__, str(e)[:200])
         return {"likelihood": like, "steps": steps, "kind": kind, "mismatch": diffs,
-                "counts": self.replier.counts(sh.counts)}
+                "counts": self.replier.counts(sh.counts), **tier}
 
     def unsettled(self, f0, n):
         """The beat that stopped at its step cap: a quiescence that did not

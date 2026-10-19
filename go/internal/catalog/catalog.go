@@ -49,6 +49,11 @@ type Manifest struct {
 	Clock         struct {
 		Beats int `yaml:"beats"`
 		Steps int `yaml:"steps"` // the watch steps one beat may take (dagent BeatSteps when 0)
+		// py's watch only (rddl-watch s-cfe94dca): a lockstep world read once
+		// per pass of its stage pipeline, a followed world's explained
+		// readings adopted; the Go process refuses either by name
+		Lockstep bool `yaml:"lockstep"`
+		Follow   bool `yaml:"follow"`
 	} `yaml:"clock"`
 	Pair      []string `yaml:"pair"`
 	PartnerOf string   `yaml:"partner_of"`

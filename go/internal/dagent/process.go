@@ -126,6 +126,16 @@ func (p *Process) Domains(names []string) ([]Domain, error) {
 		if !ok {
 			return nil, fmt.Errorf("no domain %s in the catalog", pyRepr(n))
 		}
+		// the watch's py-only clock settings (rddl-watch s-cfe94dca): refused by
+		// name, before anything else, as Go's watch reads row by row
+		for _, c := range []struct {
+			on  bool
+			key string
+		}{{m.Clock.Lockstep, "lockstep"}, {m.Clock.Follow, "follow"}} {
+			if c.on {
+				return nil, fmt.Errorf("domain %s: clock %s is py's watch only (py's domain agent serves it)", n, c.key)
+			}
+		}
 		h, ok := Hosts[n]
 		bare := !ok && m.Agent == "" && m.Host == "" // a program only: no host, no verbs (py intent_domain.bare)
 		if !ok && !bare {
