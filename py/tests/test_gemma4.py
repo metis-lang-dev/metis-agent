@@ -10,7 +10,9 @@ sys.path.insert(0, str(ROOT / "py"))
 from metis_agent import gemma4  # noqa: E402
 from metis_agent.repl_tools import WHITELIST, Kernel, scrub, tools  # noqa: E402
 
-WGC = ROOT.parent / "metis-catalog/domains/planning/wgc/wgc.llp"
+# the wolf-goat-cabbage package wherever the catalog keeps it (domains/planning/wgc,
+# then domains/wgc: catalog-packages s-a2c529d6 moves it)
+WGC = next((ROOT.parent / "metis-catalog/domains").glob("**/wgc/wgc.llp"))
 
 
 def test_call_round_trip():

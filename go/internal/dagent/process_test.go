@@ -159,6 +159,17 @@ func TestTheProcessServesTheDays(t *testing.T) {
 	}
 }
 
+// The selected packages' fifth, nav (catalog-packages s-a2c529d6): its host
+// is py's (nav_host.py over the catalog's RDDL host, the IPPC gym), so the
+// Go process refuses it by name, as any package with a host and no Go host.
+// py's domain agent serves it (py/tests/test_selected_packages.py).
+func TestAWorldWithAPyHostIsRefusedByName(t *testing.T) {
+	proc := &Process{Root: catalogDir(t), Names: []string{"nav"}}
+	if _, err := proc.Domains(proc.Names); err == nil || err.Error() != "domain nav has no Go host" {
+		t.Fatalf("nav: %v", err)
+	}
+}
+
 // The records sink's place (py records_path, 68cb919): "catalog" is the
 // package's own records under the catalog the process reads, a nested
 // package included; another root is DIR/<name>/records.

@@ -67,6 +67,16 @@ jobs:
         run: |
           pip install -e ./metispy
           echo "METISPY=$GITHUB_WORKSPACE/metispy" >> "$GITHUB_ENV"
+      # py/.venv: the Go tests that check the Go process against py's (the day replays from the
+      # catalog: dog, plant, kitchen, love_triangle; the cgo kernel against py's domain agent; the
+      # loader's list; the bundles' REPL API) run py's side there and skip without it. No
+      # llama_cpp_python: no Go test loads weights through py
+      - name: The py venv the Go tests run py's side in
+        run: |
+          python -m venv metis-agent/py/.venv
+          metis-agent/py/.venv/bin/pip install -q -e ./metispy -e ./metis-catalog PyYAML==6.0.3 \
+            "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@sdk-v0.1.6#subdirectory=sdk"
+          cd metis-agent/py && .venv/bin/python -c "import metis.kernel.artifact, metis_agent.domain_agent"
       - name: Checkout metis-lang at the pin (public; the runtime internal/rt binds)
         uses: actions/checkout@v4
         with:
@@ -155,9 +165,20 @@ jobs:
           # the loop SDK at its tag (brief/repo-alignment.md §2): the one access to the
           # catalog, the CATALOG widget, the claude seat's process; after the two above,
           # which it names as dependencies
-          pip install "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@sdk-v0.1.0#subdirectory=sdk"
+          # sdk-v0.1.6: the SDK the domain agent is tested against locally (metis-loop's sdk/ at
+          # its head); v0.1.0 predates take, edit, the notch and an RDDL package's program
+          pip install "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@sdk-v0.1.6#subdirectory=sdk"
       - name: One llama.cpp for both stacks (the submodule = llama_cpp_python's vendored commit)
         run: metis-agent/third_party/check-pin.sh python
+      # nav's host steps the IPPC gym (metis-catalog tools/rddl_gym.py) in an interpreter of its
+      # own: pyRDDLGym and rddlrepository, public on PyPI (MIT), pinned as the packages' .venv
+      # has them; ~15 s and 181 MB with no pip cache. With it the RDDL tests run, required
+      - name: The gym for the RDDL packages' hosts (its own venv, METIS_RDDL_PY)
+        run: |
+          python -m venv /tmp/gym
+          /tmp/gym/bin/pip install -q pyRDDLGym==2.7 rddlrepository==2.2
+          echo "METIS_RDDL_PY=/tmp/gym/bin/python" >> "$GITHUB_ENV"
       - name: pytest py/tests
         working-directory: metis-agent/py
+        env: {METIS_AGENT_REQUIRE_GYM: '1'}
         run: python -m pytest -q tests
