@@ -415,10 +415,12 @@ func project(t *testing.T, g liveGolden, r *Runtime) {
 
 func TestTheLiveGoldensThroughGo(t *testing.T) {
 	fx := filepath.Join(langDir(t), "runtime/fixtures")
-	for _, n := range []string{"cascade", "love_triangle", "weights"} {
+	// the love triangle's fixtures sit in ceptre/, under interactive-lp's license
+	for _, c := range []string{"cascade", "ceptre/love_triangle", "weights"} {
+		dir, n := filepath.Split(c)
 		t.Run(n, func(t *testing.T) {
-			wire := filepath.Join(fx, "live_"+n+".wire")
-			g := readGolden(t, filepath.Join(fx, "live_"+n+".txt"))
+			wire := filepath.Join(fx, dir, "live_"+n+".wire")
+			g := readGolden(t, filepath.Join(fx, dir, "live_"+n+".txt"))
 			names := wireNames(t, wire)
 			open := func() (*Runtime, []string) {
 				r := New()
@@ -431,7 +433,7 @@ func TestTheLiveGoldensThroughGo(t *testing.T) {
 			replay(t, g, open)
 			r, _ := open()
 			defer r.Close()
-			p := readGolden(t, filepath.Join(fx, "proj_"+n+".txt"))
+			p := readGolden(t, filepath.Join(fx, dir, "proj_"+n+".txt"))
 			project(t, p, r)
 		})
 	}
@@ -613,7 +615,7 @@ func TestTickAndArgs(t *testing.T) {
 
 	lt := New()
 	defer lt.Close()
-	if err := lt.LoadWire(filepath.Join(fx, "live_love_triangle.wire"), nil, nil); err != nil {
+	if err := lt.LoadWire(filepath.Join(fx, "ceptre/live_love_triangle.wire"), nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := lt.Seed(5); err != nil {

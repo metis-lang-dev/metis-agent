@@ -30,4 +30,9 @@ and its runtime are [metis-lang](https://github.com/metis-lang-dev/metis-lang).
 
 ## License
 
-Apache License 2.0 (see `LICENSE`, `NOTICE`).
+Apache License 2.0 (see `LICENSE`, `NOTICE`) — the Go and Python code,
+the console, the docs and the experiments. Copyright 2026 Robofortis.
+
+Exceptions: the paper under `paper/` is copyright its authors, all
+rights reserved (it is licensed by its publication venue, not by this
+repository); `third_party/llama.cpp` retains its own upstream license.

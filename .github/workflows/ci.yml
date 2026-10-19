@@ -18,7 +18,7 @@ env:
   # the one py's llama_cpp_python vendors (third_party/check-pin.sh, py job)
   # the metis runtime (go/internal/rt): metis-lang (public) at the commit the
   # binding is built and tested against; build.sh builds libmetis_rt there
-  METIS_LANG_COMMIT: d7e5a33fae7f586c8a6311c8fe7e68fb132bd5f7
+  METIS_LANG_COMMIT: 18da80344eac87603b97b9d80b05004a80ac5ddd
   # metispy and metis-catalog are public siblings, checked out beside the repo
 
 jobs:

@@ -6,3 +6,6 @@ Licensed under the Apache License, Version 2.0 (see LICENSE).
 The Go harness under go/ is derived from nina_speak (Robofortis,
 2026), the voice stack of the Nina robot project, carried over without
 its history.
+
+The paper under paper/ is copyright its authors, all rights reserved,
+and is not covered by the Apache-2.0 grant (see README).
