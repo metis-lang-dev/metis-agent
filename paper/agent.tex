@@ -64,7 +64,7 @@ device gets smarter by catalog changes through a human-gated loop, never by
 retraining. We report the experiments that fixed the design: the model switch
 (E2B maps the 54-turn dog corpus 54/54 at 458\,ms median, in 2136\,MiB); intent
 as JSON text against native tool calls (E9: equal accuracy, the grammar
-sampler costing at least 240 of the 418\,ms); the executive's IO round-trip
+sampler costing at least 240 of J's 418\,ms mean); the executive's IO round-trip
 (E10: the tool-response turn invites completion claims, so outcomes stay
 text); the consult loop (E11: the harness owns the branch, the model chooses
 within it); one model for both agents (NO-GO as a task, then measured: the same
@@ -328,7 +328,7 @@ the same generic replies, the same records \src{DESIGN ``What parity means''}. W
 model, the dog's, the plant's, the kitchen pair's and love\_triangle's scripted days are
 dumped by Python and replayed into Go, the streams diffed as parsed JSON with likelihoods at
 $10^{-9}$: 30 of 30 fixtures byte-equal, re-generated and compared on 2026-10-19
-\src{\texttt{go/tools/dagent-parity.sh}; rddl-watch step 1 review}. With a model, the
+\src{\texttt{go/tools/dagent-parity.sh}; rddl-watch step 1 report}. With a model, the
 orchestrator ported to Python decodes the same chunks under the same grammars and samplers as
 the Go one (180/180 scenario replays, 42/42 timeline replays, mutation-checked), and on the
 model 90 of 114 generations are identical, every first divergence at a token-equal context
@@ -360,13 +360,13 @@ E2B Q4 + whisper base.en, co-resident, one process & M-E budget line & 2368--237
 Go service (E2B + the dog's prefix + the orchestrator 8k) & integration step 3 & 2868--2874\,MiB \\
 py domain agents (dog, kitchen, kitchen\_shared) & integration step 3 & 2360--2370\,MiB \\
 both resident & integration step 3 & 5339\,MiB (2.7\,GB free) \\
-live service, two models $\to$ one model & go-domain-agent step 6 & 3792 $\to$ 2432\,MiB \\
+live service, two models $\to$ one model (the session's end) & go-domain-agent step 6 & 3846 $\to$ 2436\,MiB ($-1410$) \\
 voice, ms per token at 5.9k context, py off $\to$ py AUTO $\to$ Go & llama-pin step 3 & 12.89 $\to$ 7.37 $\to$ 7.39 \\
 voice, ms per token live & llama-pin step 3 & 18.4 $\to$ 9.5 \\
 a person turn: move generation, median & integration step 3 (go-scripted) & 464\,ms \\
 a spoken line: voice generation, median & integration step 3 & 68\,ms \\
 a reply $\to$ its line spoken, median & integration step 3 & 80\,ms \\
-the wire, per request & integration step 3 & 0--1\,ms \\
+the wire, per intent (a tool call waits for its answer: the kitchen's consult, 6.9\,s) & integration step 3 & 0--1\,ms \\
 a beat with the narrator & integration step 1 run 2 & 113\,ms \\
 CI, E2B on a public runner's CPU: 3 tests & model.yml, first run & 5\,min 14\,s \\
 llama-bench pp512 / tg64, 4 threads, CI's CPU build (local) & catalog-packages 1B & 123 / 17.9 tok/s \\
@@ -460,7 +460,7 @@ T-noex (no examples) & 50/54 & 32/54 & 493 & 2461 \\
 Class ties, 54/54; the tool call loses two rows on arguments and is 112\,ms slower from
 its larger grammar; without the 40 examples both class and arguments fall. The ruling: J
 stays \src{M-E E9 ruling}. The finding to act on is latency, not format: the grammar
-sampler costs at least 240 of J's 418\,ms, and unpinned the model writes a well-formed,
+sampler costs at least 240 of J's 418\,ms mean (p50 416), and unpinned the model writes a well-formed,
 correct JSON on 54/54 rows in at most 178\,ms --- free-then-verify (E9b) is the proposal
 that acts on it. The certified surface stays grammar-pinned because nothing unvalidated may
 reach the dispatcher; these numbers are the price of that.
@@ -531,8 +531,8 @@ as the Go deployment's shape and measured on the same reads \src{go-domain-agent
 metis-agent 60ccbe0, 7074f98}: the orchestrator and every narrator are roles on one loaded
 context, each with its own budget, prefix, tape and sampling, swapped by KV state
 save/load (204 swaps in a 14-timeline replay, about 24\,ms each). Every read is identical
-to the two-model run; the dispatched intents are equal 7/7 live; the service's VRAM falls
-from 3792 to 2432\,MiB. One finding, with its cause established: past Gemma~4's 512-token
+to the two-model run; the dispatched intents are equal 7/7 live; the live service's VRAM
+falls from 3846 to 2436\,MiB at the session's end ($-1410$; 3792 to 2432 at its start). One finding, with its cause established: past Gemma~4's 512-token
 sliding window a restored KV is exact in content but laid out differently, the attention's
 fp16 accumulation moves, and a \emph{sampled} line can take another word --- greedy moves
 keep their argmax, so no read and no dispatch moves. Byte-exact one-model would need a
@@ -661,7 +661,7 @@ $\leftarrow$ \{"kind": "result", "id": "c2", "status": "accepted", "text": "Acce
 $\leftarrow$ \{"kind": "result", "id": "c2", "status": "refused", "reason": "the way to it is closed",\\
 \quad\ "text": "I can't go to the kitchen: the way to it is closed.",\\
 \quad\ "alternatives": [\{"verb": "go", "args": \{"place": "door"\}\},\\
-\quad\quad\quad\quad\quad\quad\quad\quad\quad\ \{"verb": "go", "args": \{"place": "tag3"\}\}, \ldots]\}\\[1ex]
+\quad\quad\quad\quad\quad\quad\quad\quad\quad\ \{"verb": "go", "args": \{"place": "tag3"\}\}]\}\\[1ex]
 $\to$ \{"tool": "consult", "args": \{"question": "why did you not go?"\}, "id": "k1"\}\\
 $\leftarrow$ \{"kind": "consult", "id": "k1", "answer\_kind": "missing",\\
 \quad\ "resource": \{"atom": "closed(kitchen)", "words": "open the way to the kitchen"\},\\
@@ -680,10 +680,10 @@ table; \texttt{calls: 0} --- no model call was needed.}
 The rules are in the Ceptre lineage of linear-logic programming for interactive worlds
 (Martens, \emph{Ceptre: a language for modeling generative interactive systems}, AIIDE
 2015); what metis adds is the measure over runs and the certified evaluation (the language
-paper). Turn-taking is the finite-state turn-taking model of Raux and Eskenazi (NAACL
+paper). Turn-taking is the finite-state turn-taking model of Raux and Eskenazi (NAACL-HLT
 2009), kept as the dialog engine in front of every model. Constraining a model's output to
-a grammar is llama.cpp's GBNF sampler, and the cost we measure for it (\S\ref{sec:e9}) is in
-line with the known overhead of grammar-constrained decoding. LLM agents that act through
+a grammar is llama.cpp's GBNF sampler; \S\ref{sec:e9} measures what it costs here. LLM
+agents that act through
 tools (the ReAct line, Yao et al., ICLR 2023) put the model in charge of the loop; here the
 loop is the harness's and the model's authority is a table of narrow, checked jobs
 (Table~\ref{tab:roles}). Neuro-symbolic planners pair a model with a planner it calls; here
@@ -727,7 +727,7 @@ agent-console & s-7f3d1088 step 2 report (metis-agent 8d35cfa, 4304c63, 0a13ebe,
 llama-pin & s-aeb12858 step 3 report (metis-agent 53ce367): flash attention, the voice profile \\
 integration & s-f82a578f step 3 report (metis-agent fae45b3): VRAM, latency, E12 \\
 catalog-packages 1B & s-a2c529d6 step 1 part B report (metis-agent 737c4ac, 896f1cb): \texttt{model.yml}, E2B on CPU \\
-parity on days & \texttt{go/tools/dagent-parity.sh}, \texttt{go/internal/dagent/testdata/days/}; rddl-watch s-cfe94dca step 1 review (30/30, 2026-10-19) \\
+parity on days & \texttt{go/tools/dagent-parity.sh}, \texttt{go/internal/dagent/testdata/days/}; rddl-watch s-cfe94dca step 1 report (the fixtures 30/30, 2026-10-19) \\
 the dog & metis-catalog \texttt{domains/dog/}: \texttt{dog.llp}, \texttt{intent.yaml}, \texttt{intent/dog-corpus.tsv} \\
 \bottomrule
 \end{tabular}
