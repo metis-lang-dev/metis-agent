@@ -493,6 +493,30 @@ class Live:
 
     turn_at = None
 
+    def typed(self, d, iid, j, page=None):
+        """A typed intent from a page (WIRE.md intent{domain, id, j}): the J dispatched to
+        the domain as the orchestrator would, with no model pass — a page's own command (the
+        dialog panel's push-to-talk: cmd_hold on press, cmd_release on release). Its replies
+        go where a dispatch's do: the orchestrator's inbox on the next beat (the results, their
+        words). A page host's domain takes them from its owning page only. → an error or None."""
+        if d not in self.names:
+            return "no domain %r" % d
+        if d in self.off:
+            return "%s is not active" % d
+        if page is not None and self.page_host(d) and self.owner.get(d, page) != page:
+            return "page %s does not own %s: page %s does (its hello claims it)" % (page, d, self.owner[d])
+        if not isinstance(j, dict) or not isinstance(j.get("intent"), str) or not j["intent"]:
+            return "j is an intent object: {intent: VERB, …its slots}"
+        args = {k: v for k, v in j.items() if k not in ("intent", "domain")}
+        self.n += 1
+        cid = "c%d" % self.n
+        self.journal.record({"kind": "dlg-dispatch", "cid": cid, "j": json.dumps({"intent": j["intent"], **args}),
+                             "domain": d, "by": "page", **({"req": iid} if iid else {}), **({"page": page} if page else {})})
+        rs = self.serve_line({"id": cid, "domain": d, "verb": j["intent"], "args": args}, "intent")
+        err = next((r.get("error") for r in rs if r.get("kind") == "error"), None)
+        self.pend += [r for r in rs if r.get("kind") != "error"]
+        return err
+
     def call(self, c):
         dom = (c.args or {}).get("domain")
         dom = dom if isinstance(dom, str) else ""
@@ -1086,6 +1110,9 @@ def make_app(live, ui_dir, lib_dir=None):
                     atoms = m.get("atoms") or str(m.get("text") or "").split()
                     err = await ask(live.world, d, atoms, pid)
                     await send("world_ack", {"domain": d, "lines": atoms, **({"error": str(err)} if err else {})})
+                elif ev == "intent":
+                    err = await ask(live.typed, m.get("domain") or "", m.get("id"), m.get("j"), pid)
+                    await send("intent_ack", {"id": m.get("id"), "domain": m.get("domain"), **({"error": str(err)} if err else {})})
                 elif ev in ("activate", "deactivate"):
                     err = await ask(live.domain_verb, ev, m.get("domain") or "", m.get("bindings"), "person")
                     await send("domain_ack", {"verb": ev, "domain": m.get("domain"), **({"error": str(err)} if err else {})})

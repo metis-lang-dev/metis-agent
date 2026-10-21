@@ -637,3 +637,55 @@ def test_two_pages_on_the_wire_one_owns(tmp_path):
         asyncio.run(go())
     finally:
         lv.stop.set()
+
+
+def test_a_typed_intent_is_dispatched_without_the_model(tmp_path):
+    """console-nav item 20: intent{domain, id, j} dispatches the J to the domain as the
+    orchestrator would, no model pass (no dlg-gen); its result wakes the orchestrator on the
+    next beat; a page host's domain takes it from its owner only; a bad J says what it needs."""
+    lv, frames, inner = _page_live(tmp_path)
+    gens = len(recs(lv, "dlg-gen"))
+    assert lv.typed("dog", "h1", {"intent": "NAVIGATE", "goal": {"type": "OBJECT", "description": "kitchen"}}, "p1") is None
+    d = recs(lv, "dlg-dispatch")[-1]
+    assert d["by"] == "page" and d["req"] == "h1" and d["page"] == "p1" and d["domain"] == "dog"
+    assert json.loads(d["j"]) == {"intent": "NAVIGATE", "goal": {"type": "OBJECT", "description": "kitchen"}}
+    for _ in range(3):
+        lv.tick()
+    wakes = [r for r in recs(lv, "dlg-wake") if r.get("cid") == d["cid"]]
+    assert wakes and wakes[0]["what"].startswith("result"), wakes
+    assert len([g for g in recs(lv, "dlg-gen") if g.get("label") == "move"]) == len([g for g in recs(lv, "dlg-gen")[:gens] if g.get("label") == "move"])
+    assert lv.owner == {}                                                 # a typed intent claims nothing by itself
+    lv.claim(["dog"], "p1")
+    assert lv.typed("dog", "h2", {"intent": "NAVIGATE"}, "p2").startswith("page p2 does not own dog")
+    assert lv.typed("nope", "h3", {"intent": "X"}, "p1") == "no domain 'nope'"
+    assert lv.typed("dog", "h4", {"goal": 1}, "p1").startswith("j is an intent object")
+
+
+def test_a_typed_intent_over_the_wire(tmp_path):
+    import asyncio
+    from aiohttp.test_utils import TestClient, TestServer
+    lv, _, inner = _page_live(tmp_path)
+    app = S.make_app(lv, str(ROOT / "console"))
+    threading.Thread(target=lv.run, daemon=True).start()
+
+    async def go():
+        async with TestClient(TestServer(app)) as c:
+            a = await c.ws_connect("/ws")
+            await a.send_json({"ev": "hello", "since": 1e15, "claim": "dog"})
+            await a.send_json({"ev": "intent", "domain": "dog", "id": "h1", "j": {"intent": "NAVIGATE", "goal": {"type": "OBJECT", "description": "kitchen"}}})
+            for _ in range(200):
+                m = json.loads((await a.receive(timeout=10)).data)
+                if m["ev"] == "intent_ack":
+                    break
+            assert m == {"ev": "intent_ack", "t": m["t"], "id": "h1", "domain": "dog"}
+            await a.send_json({"ev": "intent", "domain": "dog", "id": "h2", "j": "HOLD"})
+            for _ in range(200):
+                m = json.loads((await a.receive(timeout=10)).data)
+                if m["ev"] == "intent_ack":
+                    break
+            assert m["id"] == "h2" and m["error"].startswith("j is an intent object")
+            await a.close()
+    try:
+        asyncio.run(go())
+    finally:
+        lv.stop.set()
