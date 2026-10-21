@@ -101,6 +101,21 @@ def test_payload_rides_with_the_command():
     assert r["kind"] == "read" and r["tool"] == "state" and "posture" in r["output"]
 
 
+def test_a_host_that_takes_the_payload_gets_it_before_the_event():
+    """console-nav s-b923ebfe: a host that actuates with the payload (the package a load
+    names, a run's count, the words a tell hands over) declares take_payload; the payload
+    of the command the firing rule consumed reaches it before on_event."""
+    from metis_agent.domain_agent import DomainAgent
+    ag = DomainAgent(dog)
+    seen = []
+    ag.host.inner.take_payload = lambda p: seen.append(("payload", dict(p)))
+    inner_on_event = ag.host.inner.on_event
+    ag.host.inner.on_event = lambda name, args: (seen.append(("event", name)), inner_on_event(name, args))
+    ag.handle({"id": "c1", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "TURN", "direction": "RIGHT", "angle_deg": 45}})
+    ag.handle({"clock": "beat"})
+    assert seen == [("payload", {"angle_deg": 45}), ("event", "turn[S=right]")]
+
+
 def test_event_ref_carries_the_outcome():
     from metis_agent.narrator import event_ref
     cmds = {"cmd_go", "cmd_turn"}

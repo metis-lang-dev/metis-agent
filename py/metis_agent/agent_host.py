@@ -120,6 +120,10 @@ class AgentHost:
                 if not self.inflight[atom]:
                     del self.inflight[atom]
                 self.acted.append({"beat": self.beat, "event": name, "id": q["id"], "payload": q["payload"]})
+                # a host that actuates with the payload (console-nav: the package a load names, a run's
+                # count, the words a tell hands over) takes it before the event
+                if hasattr(self.inner, "take_payload"):
+                    self.inner.take_payload(q["payload"])
                 break
         before = set(self.inner.due)
         self.inner.on_event(name, args)
