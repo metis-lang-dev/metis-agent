@@ -47,10 +47,27 @@ def corpus(path):
 NOT_DISPATCHED = {"CHITCHAT", "UNKNOWN", "TIME", "DATE"}
 
 
-def declared(domain_module):
-    """The predicates the program declares (`pred name…`): a mapped atom must be one."""
+def program_text(path):
+    """The program as the compiler reads it: each `include "x.llp".` line replaced by that
+    file's text, resolved beside the including file, transitively, each file once (a lifted
+    instance: metis-loop's ui.llp includes its base ui_domain.llp; console-nav s-b923ebfe)."""
     import re
-    return set(re.findall(r"^\s*pred\s+(\w+)", Path(domain_module["CATALOG"]).read_text(), re.M))
+    seen = set()
+
+    def splice(p):
+        p = Path(p).resolve()
+        if p in seen:
+            return ""
+        seen.add(p)
+        return re.sub(r'^\s*include\s+"([^"]+)"\s*\.\s*$', lambda m: splice(p.parent / m.group(1)),
+                      p.read_text(), flags=re.M)
+    return splice(path)
+
+
+def declared(domain_module):
+    """The predicates the program declares (`pred name…`), its includes too: a mapped atom must be one."""
+    import re
+    return set(re.findall(r"^\s*pred\s+(\w+)", program_text(domain_module["CATALOG"]), re.M))
 
 
 def in_program(atom, err, preds):

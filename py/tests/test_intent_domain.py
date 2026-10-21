@@ -21,3 +21,17 @@ def test_dog_is_data():
 def test_examples_map():
     recs = check_examples("dog")
     assert len(recs) == 40 and all(r["ok"] for r in recs), [r for r in recs if not r["ok"]]
+
+
+def test_a_lifted_instance_declares_its_bases_predicates(tmp_path):
+    """console-nav s-b923ebfe: a program whose rules and predicates are in an included base
+    (metis-loop's ui.llp includes ui_domain.llp) is read as the compiler reads it — includes
+    beside the includer, transitively, each once — so its command atoms are declared."""
+    from metis_agent.intent_check import declared, program_text
+    d = tmp_path / "domains" / "lamp"
+    (d / "base").mkdir(parents=True)
+    (d / "base" / "lamp_base.llp").write_text('pred lit : lamp.\npred cmd_on : lamp.\ninclude "more.llp".\n')
+    (d / "base" / "more.llp").write_text('pred cmd_off : lamp.\ninclude "lamp_base.llp".\n')
+    (d / "lamp.llp").write_text('catalog lamp 1.\ninclude "base/lamp_base.llp".\n#init lit 1\n')
+    assert "include" not in program_text(d / "lamp.llp")
+    assert declared({"CATALOG": d / "lamp.llp"}) >= {"lit", "cmd_on", "cmd_off"}
