@@ -34,8 +34,8 @@ from pathlib import Path
 
 def catalog():
     """The loop SDK's catalog (metis_loop_sdk.catalog): get, domains, index,
-    listing, root, … — the root ($METIS_CATALOG, else the sibling checkout)
-    and the loader are the SDK's."""
+    listing, root, … — the root ($METIS_CATALOG, else the cwd) and the
+    loader are the SDK's."""
     from metis_loop_sdk import catalog as c
     return c
 

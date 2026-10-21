@@ -511,3 +511,18 @@ def test_the_catalog_is_the_loop_sdks(tmp_path):
     page = (ROOT / "console/index.html").read_text()
     assert '<script src="sdk/catalog/catalog.js"></script>' in page and 'href="sdk/catalog/catalog.css"' in page
     assert "MetisCatalog.render(box, catalog.domains," in (ROOT / "console/console.js").read_text()
+
+
+def test_the_catalog_is_the_env_else_the_configs_root(tmp_path, monkeypatch):
+    """cwd-root s-ddac2cbf: the service serves $METIS_CATALOG, else its config's
+    catalog.root (relative to the config file, as Go's is to go/) — never a
+    sibling the SDK guesses; set as $METIS_CATALOG for the SDK and the agents."""
+    from metis_agent.service import catalog_root
+    (tmp_path / "py").mkdir()
+    cfg = tmp_path / "py" / "config.yaml"
+    monkeypatch.setenv("METIS_CATALOG", str(tmp_path / "mine"))
+    assert catalog_root({"catalog": {"root": "../cat"}}, cfg) == str(tmp_path / "mine")
+    monkeypatch.delenv("METIS_CATALOG")
+    assert catalog_root({"catalog": {"root": "../cat"}}, cfg) == str((tmp_path / "cat").resolve())
+    monkeypatch.delenv("METIS_CATALOG")
+    assert catalog_root({}, cfg) is None

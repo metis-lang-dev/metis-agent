@@ -2,6 +2,10 @@
 # the py backend of the console, the Go one's config.v3-live.yaml in its terms.
 # Paths are relative to py/.
 model: ../go/models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf
+# the catalog the service serves (as the Go backend's catalog.root): $METIS_CATALOG
+# overrides it; the loop SDK's own rule (cwd-root s-ddac2cbf) would be the cwd, py/
+catalog:
+    root: ../../metis-catalog
 # the person turn's intent pass: every served domain's intent material from its
 # manifest (intent.prompt + examples[template], intent.grammar; e2e-workflow step 4,
 # Go's 59854a2): one intent domain, its own turn and grammar; several, every J names

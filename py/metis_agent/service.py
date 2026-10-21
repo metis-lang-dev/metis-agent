@@ -1071,6 +1071,18 @@ def make_app(live, ui_dir, lib_dir=None):
     return app
 
 
+def catalog_root(cfg, path):
+    """The catalog this service serves: $METIS_CATALOG, else the config's
+    catalog.root (relative to the config file, as the Go backend's is to go/)
+    — set as $METIS_CATALOG for the loop SDK and the domain agents. Neither:
+    the SDK's own rule, the cwd (cwd-root s-ddac2cbf)."""
+    import os
+    r = (cfg.get("catalog") or {}).get("root")
+    if r and not os.environ.get("METIS_CATALOG"):
+        os.environ["METIS_CATALOG"] = str((Path(path).resolve().parent / r).resolve())
+    return os.environ.get("METIS_CATALOG")
+
+
 def load_config(path):
     import yaml
     return yaml.safe_load(Path(path).read_text())
@@ -1090,6 +1102,7 @@ def main():
     a = ap.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     cfg = load_config(a.config)
+    catalog_root(cfg, a.config)
     try:
         turn = build_turn(cfg)
     except ValueError as e:
