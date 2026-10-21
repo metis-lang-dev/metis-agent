@@ -252,6 +252,19 @@ def intent_of(name, template="gemma4"):
     return O.IntentDomain(name, d.manifest.get("display") or "the " + name, prompt, i["grammar"].read_text(), asks)
 
 
+def silent_of(name):
+    """A card's `silent` verbs (intent.yaml silent:): a typed intent of one is answered in
+    the journal only, never voiced — the page's own commands (push-to-talk's HOLD and
+    RELEASE: the agent does not talk over the person who just pressed the key)."""
+    try:
+        from .domains import catalog
+        spec = catalog().get(name).intent.get("spec")
+        import yaml
+        return {str(v).upper() for v in ((yaml.safe_load(spec.read_text()) or {}).get("silent") or [])} if spec else set()
+    except Exception:  # noqa: BLE001 — no catalog entry, no card: nothing is silent
+        return set()
+
+
 def intents_of(names, template="gemma4"):
     """The served domains with intent material, in the processes' order."""
     return [x for x in (intent_of(n, template) for n in names) if x is not None]
@@ -347,6 +360,7 @@ class Live:
         self.changed = {}
         self.ports_due = set()
         self.owner = {}             # a page host's domain -> the page (socket) that owns it
+        self.silent = set()         # the cids of typed intents whose replies are journaled, never voiced
         self.last_cat = ""
         self.in_turn, self.held = False, []
         self.narr_seq = 0
@@ -510,8 +524,14 @@ class Live:
         args = {k: v for k, v in j.items() if k not in ("intent", "domain")}
         self.n += 1
         cid = "c%d" % self.n
+        quiet = j["intent"].upper() in silent_of(d)
+        if quiet:                               # kept, not dropped at its result: the floor orders a dispatch's replies
+            self.silent.add(cid)
+            if len(self.silent) > 256:
+                self.silent.discard(min(self.silent, key=lambda c: int(c[1:])))
         self.journal.record({"kind": "dlg-dispatch", "cid": cid, "j": json.dumps({"intent": j["intent"], **args}),
-                             "domain": d, "by": "page", **({"req": iid} if iid else {}), **({"page": page} if page else {})})
+                             "domain": d, "by": "page", **({"req": iid} if iid else {}), **({"page": page} if page else {}),
+                             **({"silent": True} if quiet else {})})
         rs = self.serve_line({"id": cid, "domain": d, "verb": j["intent"], "args": args}, "intent")
         err = next((r.get("error") for r in rs if r.get("kind") == "error"), None)
         self.pend += [r for r in rs if r.get("kind") != "error"]
@@ -625,6 +645,12 @@ class Live:
             if r.record:
                 w["record"] = r.record
             w.update(extra.get(id(r), {}))
+            if r.id in self.silent:             # a silent typed intent's reply: journaled, never voiced
+                w["silent"] = True
+                self.journal.record(w)
+                add(self.pend)
+                self.pend = []
+                continue
             self.journal.record(w)
             try:
                 self.o.handle(inb, self.gbnf, self.stop_words)

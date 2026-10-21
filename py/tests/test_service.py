@@ -689,3 +689,46 @@ def test_a_typed_intent_over_the_wire(tmp_path):
         asyncio.run(go())
     finally:
         lv.stop.set()
+
+
+def test_a_silent_typed_intent_is_journaled_never_voiced(tmp_path, monkeypatch):
+    """console-nav: a card's silent verbs (intent.yaml silent: [HOLD, RELEASE]) — a typed
+    intent of one has its replies journaled (wakes marked silent) and never handed to the
+    orchestrator, so the agent does not talk over the person who pressed push-to-talk;
+    a typed intent of another verb is voiced as before."""
+    lv, frames, inner = _page_live(tmp_path)
+    monkeypatch.setattr(S, "silent_of", lambda name: {"NAVIGATE"} if name == "dog" else set())
+    handled = []
+    seen = lv.o.handle
+    lv.o.handle = lambda inb, *a: (handled.append(inb.reply.id), seen(inb, *a))[1]
+    assert lv.typed("dog", "h1", {"intent": "NAVIGATE", "goal": {"type": "OBJECT", "description": "kitchen"}}) is None
+    cid = recs(lv, "dlg-dispatch")[-1]["cid"]
+    assert recs(lv, "dlg-dispatch")[-1]["silent"] is True
+    for _ in range(3):
+        lv.tick()
+    wakes = [r for r in recs(lv, "dlg-wake") if r.get("cid") == cid]
+    assert wakes and all(w.get("silent") for w in wakes) and cid not in handled, (wakes, handled)
+    monkeypatch.setattr(S, "silent_of", lambda name: set())
+    assert lv.typed("dog", "h2", {"intent": "NAVIGATE", "goal": {"type": "OBJECT", "description": "kitchen"}}) is None
+    cid2 = recs(lv, "dlg-dispatch")[-1]["cid"]
+    for _ in range(3):
+        lv.tick()
+    assert cid2 in handled and "silent" not in recs(lv, "dlg-dispatch")[-1]
+
+
+def test_silent_of_reads_the_card(tmp_path, monkeypatch):
+    d = tmp_path / "domains" / "toy"
+    d.mkdir(parents=True)
+    (d / "intent.yaml").write_text("verbs: []\nsilent: [hold, RELEASE]\n")
+
+    class Dom:
+        intent = {"spec": d / "intent.yaml"}
+
+    class Cat:
+        def get(self, name):
+            if name != "toy":
+                raise KeyError(name)
+            return Dom()
+    import metis_agent.domains as D
+    monkeypatch.setattr(D, "catalog", lambda: Cat())
+    assert S.silent_of("toy") == {"HOLD", "RELEASE"} and S.silent_of("nope") == set()
