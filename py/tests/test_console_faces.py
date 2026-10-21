@@ -99,6 +99,21 @@ def test_a_page_hosts_effects_ride_the_trace_once():
     assert not [r for r in out if r.get("kind") == "trace"]
 
 
+def test_a_page_hosts_effects_reach_the_page_without_trace():
+    """Without --trace the effects are drained all the same, into a trace reply that
+    carries them alone; the host's list is empty after the line (no leak)."""
+    ag = agent()
+    ag.tracing = False
+    inner = getattr(ag.host, "inner", ag.host)
+    inner.effects = [{"ui": "focus", "widget": "kitchen"}]
+    out = run(ag, {"clock": "beat", "domain": "dog"})
+    tr = [r for r in out if r.get("kind") == "trace"]
+    assert len(tr) == 1 and tr[0]["effects"] == [{"ui": "focus", "widget": "kitchen"}] and inner.effects == []
+    assert set(tr[0]) == {"domain", "kind", "beat", "effects", "ref"} and out[-1].get("clock") == "beat"
+    out = run(ag, {"clock": "beat", "domain": "dog"})
+    assert not [r for r in out if r.get("kind") == "trace"]
+
+
 def _walk(case, extra=()):
     from metis_agent.domain_agent import DomainAgent
     ag = DomainAgent(dog, case=case)
