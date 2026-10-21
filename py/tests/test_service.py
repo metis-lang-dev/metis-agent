@@ -562,7 +562,13 @@ def test_a_page_host_domain_is_owned_by_one_page(tmp_path):
     assert lv.claim(["dog", "kitchen", "nope"], "p2") == ["dog"] and lv.owner == {"dog": "p2"}
     assert lv.world("dog", ["+open(kitchen)"], "p1").startswith("page p1 does not own dog")
     lv.release("p2")
-    assert lv.owner == {} and [r["verb"] for r in recs(lv, "dlg-page")] == ["claim", "release"]
+    assert lv.owner == {} and [(r["verb"], r["page"], r.get("by")) for r in recs(lv, "dlg-page")] == [
+        ("claim", "p1", "port"), ("claim", "p2", "hello"), ("release", "p2", None)]
+    frames.clear()
+    inner.effects.append({"ui": "focus", "widget": "kitchen"})          # owned by no page: carried out by none
+    lv.serve_line({"clock": "beat", "domain": "dog"}, "clock")
+    tr = [(f["rec"], page) for ev, f, page in frames if ev == "journal" and f["rec"].get("effects")]
+    assert tr and all(page == "" for _, page in tr) and lv.owner == {}
     lv.world("kitchen", [], "p9")                                         # not a page host: no owner taken
     assert "kitchen" not in lv.owner
 
@@ -611,6 +617,22 @@ def test_two_pages_on_the_wire_one_owns(tmp_path):
             ack = await until(b, lambda m: m["ev"] == "world_ack")
             assert "error" not in ack and lv.owner == {"dog": pb["page"]}
             await b.close()
+            # no page owns it: a trace's effects reach neither of two pages that claim nothing
+            c1, c2 = await c.ws_connect("/ws"), await c.ws_connect("/ws")
+            for w in (c1, c2):
+                await w.send_json({"ev": "hello", "since": 1e15})
+                await until(w, lambda m: m["ev"] == "page")
+            for _ in range(50):
+                if "dog" not in lv.owner:
+                    break
+                await asyncio.sleep(0.05)
+            inner.effects.append({"ui": "focus", "widget": "kitchen"})
+            is_tr = lambda m: m["ev"] == "journal" and m["rec"]["kind"] == "dlg-trace" and "effects" in [
+                k for r in lv.journal.recs if r["seq"] == m["rec"]["seq"] for k in r]
+            t1, t2 = await until(c1, is_tr), await until(c2, is_tr)
+            assert "effects" not in t1["rec"] and "effects" not in t2["rec"] and t1["rec"]["seq"] == t2["rec"]["seq"]
+            await c1.close()
+            await c2.close()
     try:
         asyncio.run(go())
     finally:

@@ -32,7 +32,8 @@ the page whose `hello` claims it, else the first to send it `world` lines; the n
 claim moves it, and the owner's socket closing frees it (`dlg-page` records). Its
 effects reach the owner alone: the owner's `journal` frame of a `dlg-trace` carries
 `effects`, every other page's copy of the same record does not; a `world` frame from
-another page is refused (`world_ack.error`: "page P does not own D: page Q does"). So
+another page is refused (`world_ack.error`: "page P does not own D: page Q does"). While no
+page owns it, no page gets its effects (they are in the journal's file only). So
 a second tab, or a reload's old socket, never carries out an effect or answers twice.
 
 Activate/deactivate in v1: the domain agents are fixed at start, so a
@@ -71,7 +72,7 @@ Every record: `kind`, `seq` (1…, the session's order), `t` (RFC 3339),
 | `dlg-restart` | `why` (`install <d>` · `reload <d>`), `n_ctx` (the new system turn's tokens), `intents` (the intent domains, in the turn's order), `catalog` — the system turn rebuilt and the dialog begun again on it, the harness's state kept |
 | `dlg-say` | `what` (`voice` · `template` · `ask` · `turn`), `text`, `src: {by: model \| harness \| rollback, gen?, wake, domain?, what, branch?}` — `gen` the `dlg-gen` that carries the line, `wake` the `dlg-wake` it answers, `branch` `outcome` for `""`. `turn` is a person turn's own line (the reads take it from its `dlg-gen` and skip this record) |
 | `dlg-world` | `domain`, `lines`, `page?`, `error?` |
-| `dlg-page` | `verb` (`claim` · `release`), `domain`, `page` — a page host's owner (py) |
+| `dlg-page` | `verb` (`claim` · `release`), `domain`, `page`, `by?` (a claim's: `hello` · `port`, the first world lines) — a page host's owner (py) |
 | `dlg-domain` | `verb` (`activate` · `deactivate` · `reload`), `domain`, `by` (`person` · `model`), `bindings?`, `key?` (reload), `installed?` (activate: built from its manifest now), `error?` |
 | `dlg-wire` | `proc`, `what` (`intent` · `tool` · `world` · `ports`), `ms`, `replies` — one per request; `what: clock` is a summary every 40 beats: `n`, `ms` (mean), `max_ms` |
 | `dlg-trace` | the domain agent's `--trace` reply as sent (`domain`, `beat`, `fired`, `narrated`, `consults`, `reads`, `world`, `more?`, `effects?`): the domain tab's REPL log; never an inbound. `effects` (py; console-nav): a page host's frames, in the order its rules fired them (metis-loop's ui host: `{ui: focus \| show \| hide \| numbers \| unnumber \| pick \| mode, …}`), drained from the host's `effects` list once each, on every line: without `--trace`, a trace reply with `effects` alone; the page that is the host carries them out and reports back with `world` |

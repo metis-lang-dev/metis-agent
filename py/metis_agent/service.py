@@ -456,7 +456,10 @@ class Live:
         out = []
         for r in rs:
             if r.get("kind") == "trace":
-                own = self.owner.get(r.get("domain")) if r.get("effects") else None
+                d = r.get("domain")
+                # a page host's effects to its owner; owned by no page yet, to none
+                # ("": no socket's id) — every page gets the record without them
+                own = self.owner.get(d, "") if r.get("effects") and self.page_host(d) else None
                 self.journal.record(dict(r, kind="dlg-trace"), page=own)
             else:
                 out.append(r)
@@ -808,7 +811,7 @@ class Live:
             if d in self.names and self.page_host(d):
                 if self.owner.get(d) != page:
                     self.owner[d] = page
-                    self.journal.record({"kind": "dlg-page", "verb": "claim", "domain": d, "page": page})
+                    self.journal.record({"kind": "dlg-page", "verb": "claim", "domain": d, "page": page, "by": "hello"})
                 got.append(d)
         return got
 
@@ -823,9 +826,12 @@ class Live:
         err = None
         if d not in self.names:
             err = "no domain %r" % d
-        elif page is not None and self.page_host(d) and self.owner.setdefault(d, page) != page:
+        elif page is not None and self.page_host(d) and self.owner.get(d, page) != page:
             err = "page %s does not own %s: page %s does (its hello claims it)" % (page, d, self.owner[d])
         else:
+            if page is not None and d not in self.owner and self.page_host(d):     # the first to report owns it
+                self.owner[d] = page
+                self.journal.record({"kind": "dlg-page", "verb": "claim", "domain": d, "page": page, "by": "port"})
             for r in self.serve_line({"world": list(lines), "domain": d}, "world"):
                 if r.get("kind") == "error" and err is None:
                     err = r.get("error")
