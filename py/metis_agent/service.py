@@ -36,6 +36,12 @@ ROOT = Path(__file__).resolve().parents[2]          # metis-agent
 KEEP_RECS = 20000
 
 
+def without_effects(rec):
+    """A journal record as a page that does not own its domain sees it: a
+    trace's `effects` (a page host's frames) left out."""
+    return {k: v for k, v in rec.items() if k != "effects"} if "effects" in rec else rec
+
+
 def _now_rfc():
     return datetime.now(timezone.utc).astimezone().isoformat()
 
@@ -58,7 +64,10 @@ class Journal:
         self.wake, self.gens, self.say = None, [], None
         self.clock_ms = []
 
-    def record(self, rec):
+    def record(self, rec, page=None):
+        """One record: to the file and the kept list whole; to the pages as
+        journal frames — a record carrying a page host's effects goes whole to
+        the page that owns the domain (`page`) and without them to the rest."""
         with self.lock:
             self.seq += 1
             rec.update({"seq": self.seq, "t": _now_rfc(), "id": "live", "rep": 0})
@@ -76,7 +85,10 @@ class Journal:
                 self.fh.flush()
             seq = self.seq
         if self.emit:
-            self.emit("journal", {"rec": rec})
+            if page is None:
+                self.emit("journal", {"rec": rec})
+            else:
+                self.emit("journal", {"rec": rec}, page=page)
         return seq
 
     def say_rec(self, what, text):
@@ -106,8 +118,10 @@ class Journal:
         return self.record({"kind": "dlg-say", "what": what, "text": text, "src": src})
 
     def since(self, seq):
+        """The records after seq, for a page's hello: a past effect is never
+        carried out again, so the replay carries none."""
         with self.lock:
-            return [r for r in self.recs if r["seq"] > seq]
+            return [without_effects(r) for r in self.recs if r["seq"] > seq]
 
     def wire(self, proc, kind, ms, replies=0):
         """A request's round trip (integration step 3's table): every intent,
@@ -271,7 +285,7 @@ class Live:
     console's verbs, a deferred consult's answer), the consult on a worker."""
 
     def __init__(self, cfg, llm, emit=None):
-        self.cfg, self.emit = cfg, emit or (lambda ev, f: None)
+        self.cfg, self.emit = cfg, emit or (lambda ev, f, **kw: None)
         v3 = cfg["v3"]
         self.journal = Journal(v3.get("journal") and str(ROOT / "py" / v3["journal"]), self.emit)
         dcfg = cfg["domains"]
@@ -332,6 +346,7 @@ class Live:
         self.auto_failed = {}
         self.changed = {}
         self.ports_due = set()
+        self.owner = {}             # a page host's domain -> the page (socket) that owns it
         self.last_cat = ""
         self.in_turn, self.held = False, []
         self.narr_seq = 0
@@ -441,7 +456,8 @@ class Live:
         out = []
         for r in rs:
             if r.get("kind") == "trace":
-                self.journal.record(dict(r, kind="dlg-trace"))
+                own = self.owner.get(r.get("domain")) if r.get("effects") else None
+                self.journal.record(dict(r, kind="dlg-trace"), page=own)
             else:
                 out.append(r)
         return out
@@ -772,16 +788,48 @@ class Live:
         except ValueError as e:
             log.info("[v3] ports %s: %s", d, e)
 
-    def world(self, d, lines):
+    # the pages that host a domain (console-nav P1): a domain whose host's
+    # events are frames for a page (its `effects` list) has one owning page —
+    # the one whose hello claims it, else the first to send it port lines. Its
+    # effects go to that page alone, and port lines from any other page are
+    # refused, so a second tab (or a reload's old socket) never carries out
+    # an effect or answers for the domain twice. Other domains take world
+    # lines from any page, as before.
+
+    def page_host(self, d):
+        ag = self.agents.agents.get(d) if hasattr(self.agents, "agents") else self.agents
+        h = getattr(ag, "host", None)
+        return isinstance(getattr(getattr(h, "inner", h), "effects", None), list)
+
+    def claim(self, domains, page):
+        """A page's hello claims the page host domains it names: it owns them now."""
+        got = []
+        for d in domains or []:
+            if d in self.names and self.page_host(d):
+                if self.owner.get(d) != page:
+                    self.owner[d] = page
+                    self.journal.record({"kind": "dlg-page", "verb": "claim", "domain": d, "page": page})
+                got.append(d)
+        return got
+
+    def release(self, page):
+        """A page's socket closed: the domains it owned are free (the next page to claim or report takes them)."""
+        for d in [d for d, p in self.owner.items() if p == page]:
+            del self.owner[d]
+            self.journal.record({"kind": "dlg-page", "verb": "release", "domain": d, "page": page})
+
+    def world(self, d, lines, page=None):
         d = d or self.intents_domain
         err = None
         if d not in self.names:
             err = "no domain %r" % d
+        elif page is not None and self.page_host(d) and self.owner.setdefault(d, page) != page:
+            err = "page %s does not own %s: page %s does (its hello claims it)" % (page, d, self.owner[d])
         else:
             for r in self.serve_line({"world": list(lines), "domain": d}, "world"):
                 if r.get("kind") == "error" and err is None:
                     err = r.get("error")
-        rec = {"kind": "dlg-world", "domain": d, "lines": list(lines)}
+        rec = {"kind": "dlg-world", "domain": d, "lines": list(lines), **({"page": page} if page is not None else {})}
         if err:
             rec["error"] = err
         else:
@@ -951,15 +999,21 @@ def make_app(live, ui_dir, lib_dir=None):
 
     from aiohttp import WSMsgType, web
     app = web.Application()
-    clients = set()
+    clients = {}                # page id -> its socket
     loop_box = {}
+    seq = [0]
 
-    def emit(ev, f):
+    def emit(ev, f, page=None):
+        """A frame to every page; with `page`, a journal record whole to that
+        page and without its effects to the rest (Journal.record)."""
         loop = loop_box.get("loop")
         if not loop:
             return
-        data = json.dumps(dict({"ev": ev, "t": _now_rfc()}, **f), ensure_ascii=False, default=str)
-        loop.call_soon_threadsafe(lambda: [asyncio.ensure_future(ws.send_str(data)) for ws in list(clients)])
+        frame = lambda g: json.dumps(dict({"ev": ev, "t": _now_rfc()}, **g), ensure_ascii=False, default=str)
+        data = frame(f)
+        other = data if page is None else frame(dict(f, rec=without_effects(f["rec"])))
+        loop.call_soon_threadsafe(lambda: [asyncio.ensure_future(ws.send_str(data if pid == page else other))
+                                           for pid, ws in list(clients.items())])
     live.emit = emit
     live.journal.emit = emit
 
@@ -973,7 +1027,9 @@ def make_app(live, ui_dir, lib_dir=None):
     async def ws_handler(request):
         sock = web.WebSocketResponse(heartbeat=30)
         await sock.prepare(request)
-        clients.add(sock)
+        seq[0] += 1
+        pid = "p%d" % seq[0]
+        clients[pid] = sock
         live.started.set()
 
         async def send(ev, f):
@@ -988,6 +1044,9 @@ def make_app(live, ui_dir, lib_dir=None):
                     continue
                 ev = m.get("ev")
                 if ev == "hello":
+                    claim = m.get("claim")
+                    claimed = await ask(live.claim, [claim] if isinstance(claim, str) else list(claim or []), pid)
+                    await send("page", {"page": pid, "owns": claimed})
                     await send("catalog", {"domains": await ask(live.catalog)})
                     for d in live.loaded:
                         if d in live.names and d not in live.quiet:
@@ -1019,7 +1078,7 @@ def make_app(live, ui_dir, lib_dir=None):
                 elif ev == "world":
                     d = m.get("domain") or m.get("mode") or ""
                     atoms = m.get("atoms") or str(m.get("text") or "").split()
-                    err = await ask(live.world, d, atoms)
+                    err = await ask(live.world, d, atoms, pid)
                     await send("world_ack", {"domain": d, "lines": atoms, **({"error": str(err)} if err else {})})
                 elif ev in ("activate", "deactivate"):
                     err = await ask(live.domain_verb, ev, m.get("domain") or "", m.get("bindings"), "person")
@@ -1036,14 +1095,15 @@ def make_app(live, ui_dir, lib_dir=None):
                 elif ev in ("heard", "cut"):
                     log.debug("%s %s", ev, m)
         finally:
-            clients.discard(sock)
+            clients.pop(pid, None)
+            await ask(live.release, pid)
         return sock
 
     async def on_startup(app):
         loop_box["loop"] = asyncio.get_running_loop()
 
     async def on_shutdown(app):              # the pages' sockets closed, so a stop does not wait on them
-        for sock in list(clients):
+        for sock in list(clients.values()):
             await sock.close(code=1001, message=b"server shutdown")
 
     async def revalidate(request, response):  # the page's files change under it (a git pull, an edit): revalidated every load

@@ -17,14 +17,23 @@ there is no talk mode: every `say_text` is a person turn.
 
 | ev | fields | does |
 |---|---|---|
-| `hello` | `since?` (journal seq, default 0) | answered to this page alone, in order: `catalog`, one `ports` per loaded domain a domain agent serves, then every journal record with `seq > since` as `journal` frames. Live `journal` frames may interleave with the replay: the page dedupes by `seq`. |
+| `hello` | `since?` (journal seq, default 0), `claim?` (a domain or a list: the page host domains this page owns) | answered to this page alone, in order: `page` (its id and what it owns), `catalog`, one `ports` per loaded domain a domain agent serves, then every journal record with `seq > since` as `journal` frames (without `effects`: a past effect is never carried out again). Live `journal` frames may interleave with the replay: the page dedupes by `seq`. |
 | `say_text` | `id`, `text`, `mode?` (ignored) | a person turn of the orchestrator (`dlg-wake{what: person}`); answered by `intent` |
-| `world` | `domain`, `atoms: [str]` (also `mode` = domain, `text` = space-separated atoms, the first shape) | do-lines on the domain's world, applied on its next tick; answered by `world_ack`; then `ports` again after that tick |
+| `world` | `domain`, `atoms: [str]` (also `mode` = domain, `text` = space-separated atoms, the first shape) | do-lines on the domain's world, applied on its next tick; answered by `world_ack`; then `ports` again after that tick. A page host's domain (below) takes them from its owning page only |
 | `ports` | `domain` | the domain's world ports now (a tab opened) |
 | `activate` · `deactivate` | `domain`, `bindings?` | the intent interface's domain verbs from the page; answered by `domain_ack`, then `catalog`. Activate of a catalog domain no domain agent serves installs it from its manifest (e2e-workflow step 4, hot-install): its agent (and its pair's) built at run time, its clock, its card and its name in the activate enum, its intent material; the system turn rebuilt and the dialog begun again on it (`dlg-restart`), the mirror's line "installed" |
 | `reload` | `domain` | the domain rebuilt from the files on disk (e2e-workflow step 3): its program recompiled, its `intent.yaml` and host re-read, activated again with the same bindings; the kitchen pair reloads together (`kitchen`; `kitchen_shared` alone is refused); answered by `reload_ack`. A failed compile leaves the old domain running. The dialog keeps its past; the mirror's line says "reloaded" and the domain's tasks in flight are dropped (the new runtime does not know them); a regenerated intent grammar is the one the next turn is held to |
 | `heard` | `id` (a narration's), `text` | the page voiced it, this much (as FRAMEWORK §5) |
 | `cut` | `id`, `heard` | barge-in on turn `id` (no effect on the orchestrator's dialog in v1) |
+
+A page host (py; console-nav P1): a domain whose host's events are frames for a
+page (its host has an `effects` list: metis-loop's ui host) is owned by one page —
+the page whose `hello` claims it, else the first to send it `world` lines; the next
+claim moves it, and the owner's socket closing frees it (`dlg-page` records). Its
+effects reach the owner alone: the owner's `journal` frame of a `dlg-trace` carries
+`effects`, every other page's copy of the same record does not; a `world` frame from
+another page is refused (`world_ack.error`: "page P does not own D: page Q does"). So
+a second tab, or a reload's old socket, never carries out an effect or answers twice.
 
 Activate/deactivate in v1: the domain agents are fixed at start, so a
 served domain is paused or resumed — deactivated, its clock is not stepped,
@@ -41,6 +50,7 @@ out; a catalog domain no agent serves is an error. The model's own
 | `journal` | `rec` | one journal record as written to the file (below) |
 | `catalog` | `domains: [{name, display, loaded, served, state, changed?, kind?, line?, has?, partner_of?}]` | on hello and on every change; the catalog's list (`metis_catalog.index()`: `kind` domain · catalog, the display `line`, what it `has`; a partner as kind `partner` with its `has` and `partner_of`, both backends) plus the served domains — the console's CATALOG dock lists these rows as the loop console does (one click opens: an active domain's tab, or activate) — the manifests are the source, the config selects: the orchestrator is offered the installed domains the config's `v3.catalog` names (each must have a manifest), and its system turn's cards and activate enum are those manifests' lines; `changed`: the domain's files differ on disk from what it was loaded with — one line, each changed file and its first changed line (`dog.llp: %% I sit down, nice and slow.`), cleared by a successful reload (the backend watches each served domain's directory: the program, `intent.yaml`, the host, the notch, `intent/`; polled every 2 s); `state`: `idle` · `task cN[; task cM]` · `surprise #N open: <difference>[; task cN]` · `inactive` · `not installed` · `stepped with its pair` |
 | `ports` | `domain`, `world` (bool: takes world lines), `pairs: [[needs, blocks]]`, `reports: {name: handle-kind \| null}`, `handles: {kind: [{id, display}]}`, `held: [atoms true on a pair side]`, `ref: {seq, beat}` | the domain agent's ports line as it answers it |
+| `page` | `page` (this socket's id), `owns: [domain]` | the answer to `hello`, first: what the page's claim got |
 | `world_ack` | `domain`, `lines`, `error?` | a `world` frame applied (on the next tick), or why not ("this domain's host takes no world lines") |
 | `domain_ack` | `verb`, `domain`, `error?` | an `activate` / `deactivate` |
 | `reload_ack` | `domain`, `ok`, `key?` (the new program key), `error?` (the compiler's finding: the old domain runs on) | a `reload` |
@@ -60,7 +70,8 @@ Every record: `kind`, `seq` (1…, the session's order), `t` (RFC 3339),
 | `dlg-dispatch` | `cid`, `j` (the intent sent to the domain), `domain` (where it went: the J's own `domain` with several intent domains, else the one), `wait_ms?` (in a person turn: from the words' arrival to this dispatch, before the send) |
 | `dlg-restart` | `why` (`install <d>` · `reload <d>`), `n_ctx` (the new system turn's tokens), `intents` (the intent domains, in the turn's order), `catalog` — the system turn rebuilt and the dialog begun again on it, the harness's state kept |
 | `dlg-say` | `what` (`voice` · `template` · `ask` · `turn`), `text`, `src: {by: model \| harness \| rollback, gen?, wake, domain?, what, branch?}` — `gen` the `dlg-gen` that carries the line, `wake` the `dlg-wake` it answers, `branch` `outcome` for `""`. `turn` is a person turn's own line (the reads take it from its `dlg-gen` and skip this record) |
-| `dlg-world` | `domain`, `lines`, `error?` |
+| `dlg-world` | `domain`, `lines`, `page?`, `error?` |
+| `dlg-page` | `verb` (`claim` · `release`), `domain`, `page` — a page host's owner (py) |
 | `dlg-domain` | `verb` (`activate` · `deactivate` · `reload`), `domain`, `by` (`person` · `model`), `bindings?`, `key?` (reload), `installed?` (activate: built from its manifest now), `error?` |
 | `dlg-wire` | `proc`, `what` (`intent` · `tool` · `world` · `ports`), `ms`, `replies` — one per request; `what: clock` is a summary every 40 beats: `n`, `ms` (mean), `max_ms` |
 | `dlg-trace` | the domain agent's `--trace` reply as sent (`domain`, `beat`, `fired`, `narrated`, `consults`, `reads`, `world`, `more?`, `effects?`): the domain tab's REPL log; never an inbound. `effects` (py; console-nav): a page host's frames, in the order its rules fired them (metis-loop's ui host: `{ui: focus \| show \| hide \| numbers \| unnumber \| pick \| mode, …}`), drained from the host's `effects` list once each, on every line: without `--trace`, a trace reply with `effects` alone; the page that is the host carries them out and reports back with `world` |

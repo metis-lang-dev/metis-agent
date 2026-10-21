@@ -526,3 +526,92 @@ def test_the_catalog_is_the_env_else_the_configs_root(tmp_path, monkeypatch):
     assert catalog_root({"catalog": {"root": "../cat"}}, cfg) == str((tmp_path / "cat").resolve())
     monkeypatch.delenv("METIS_CATALOG")
     assert catalog_root({}, cfg) is None
+
+
+def _page_live(tmp_path):
+    """The live config's agents with the dog's host made a page host (an
+    `effects` list, as metis-loop's ui host has), frames kept with their page."""
+    cfg = S.load_config(ROOT / "py/config.live.yaml")
+    cfg["v3"]["journal"] = str(tmp_path / "j.jsonl")
+    cfg["domains"].update(narrate=None, consult=False, records=None, watch={"dog": str(tmp_path / "dogdir")})
+    (tmp_path / "dogdir").mkdir()
+    (tmp_path / "dogdir/dog.llp").write_text("% a\n")
+    frames = []
+    lv = S.Live(cfg, FakeLLM(), emit=lambda ev, f, page=None: frames.append((ev, f, page)))
+    host = lv.agents.agents["dog"].host
+    inner = getattr(host, "inner", host)
+    inner.effects = []
+    return lv, frames, inner
+
+
+def test_a_page_host_domain_is_owned_by_one_page(tmp_path):
+    """console-nav P1: the first page to report owns a page host's domain; another
+    page's port lines are refused; its effects go whole to the owner only; a
+    claim moves it, a closed socket frees it. A domain without effects is open."""
+    lv, frames, inner = _page_live(tmp_path)
+    assert lv.page_host("dog") and not lv.page_host("kitchen")
+    assert lv.world("dog", ["-closed(kitchen)", "+open(kitchen)"], "p1") is None and lv.owner == {"dog": "p1"}
+    err = lv.world("dog", ["-open(kitchen)", "+closed(kitchen)"], "p2")
+    assert err.startswith("page p2 does not own dog: page p1 does")
+    assert recs(lv, "dlg-world")[-1]["error"] == err and recs(lv, "dlg-world")[-1]["page"] == "p2"
+    inner.effects.append({"ui": "focus", "widget": "kitchen"})
+    assert lv.world("dog", ["+open(kitchen)"], "p1") is None
+    tr = [(f["rec"], page) for ev, f, page in frames if ev == "journal" and f["rec"]["kind"] == "dlg-trace" and f["rec"].get("effects")]
+    assert tr and tr[-1][1] == "p1" and tr[-1][0]["effects"] == [{"ui": "focus", "widget": "kitchen"}]
+    assert all("effects" not in r for r in lv.journal.since(0))           # a hello's replay carries no past effect
+    assert lv.claim(["dog", "kitchen", "nope"], "p2") == ["dog"] and lv.owner == {"dog": "p2"}
+    assert lv.world("dog", ["+open(kitchen)"], "p1").startswith("page p1 does not own dog")
+    lv.release("p2")
+    assert lv.owner == {} and [r["verb"] for r in recs(lv, "dlg-page")] == ["claim", "release"]
+    lv.world("kitchen", [], "p9")                                         # not a page host: no owner taken
+    assert "kitchen" not in lv.owner
+
+
+def test_two_pages_on_the_wire_one_owns(tmp_path):
+    """The same over /ws with two sockets: the hello's claim, the owner's trace with
+    the effects and the other page's without, the other page's port line refused,
+    and the domain free again when the owner's socket closes."""
+    import asyncio
+    from aiohttp.test_utils import TestClient, TestServer
+    lv, _, inner = _page_live(tmp_path)
+    app = S.make_app(lv, str(ROOT / "console"))
+    threading.Thread(target=lv.run, daemon=True).start()
+
+    async def until(ws, pred, n=200):
+        for _ in range(n):
+            m = json.loads((await ws.receive(timeout=10)).data)
+            if pred(m):
+                return m
+        raise AssertionError("no such frame")
+
+    async def go():
+        async with TestClient(TestServer(app)) as c:
+            a, b = await c.ws_connect("/ws"), await c.ws_connect("/ws")
+            await a.send_json({"ev": "hello", "since": 1e15, "claim": "dog"})
+            pa = await until(a, lambda m: m["ev"] == "page")
+            await b.send_json({"ev": "hello", "since": 1e15})
+            pb = await until(b, lambda m: m["ev"] == "page")
+            assert pa["owns"] == ["dog"] and pb["owns"] == [] and pa["page"] != pb["page"]
+            inner.effects.append({"ui": "focus", "widget": "kitchen"})
+            await a.send_json({"ev": "world", "domain": "dog", "atoms": ["+open(kitchen)"]})
+            # the trace of the next line (the world line's or a clock beat's) drains the effect
+            ta = await until(a, lambda m: m["ev"] == "journal" and m["rec"].get("effects"))
+            tb = await until(b, lambda m: m["ev"] == "journal" and m["rec"]["seq"] == ta["rec"]["seq"])
+            assert ta["rec"]["effects"] == [{"ui": "focus", "widget": "kitchen"}] and "effects" not in tb["rec"]
+            assert tb["rec"]["kind"] == "dlg-trace"
+            await b.send_json({"ev": "world", "domain": "dog", "atoms": ["+open(kitchen)"]})
+            ack = await until(b, lambda m: m["ev"] == "world_ack")
+            assert ack["error"].startswith("page %s does not own dog" % pb["page"])
+            await a.close()
+            for _ in range(50):
+                if "dog" not in lv.owner:
+                    break
+                await asyncio.sleep(0.05)
+            await b.send_json({"ev": "world", "domain": "dog", "atoms": ["+open(kitchen)"]})
+            ack = await until(b, lambda m: m["ev"] == "world_ack")
+            assert "error" not in ack and lv.owner == {"dog": pb["page"]}
+            await b.close()
+    try:
+        asyncio.run(go())
+    finally:
+        lv.stop.set()
