@@ -900,13 +900,21 @@ class DomainAgent:
 
     def trace(self):
         """What the agent did since the last trace (fired rows, narrated
-        fragments, consults, reads, world lines): one trace reply, or None."""
+        fragments, consults, reads, world lines, the host's effects): one
+        trace reply, or None. A host whose events are frames for a page
+        (metis-loop's ui host: focus, show, numbers, pick) queues them on its
+        `effects` list; they are drained here, in order, so they reach the
+        page as the journal's dlg-trace (console-nav s-b923ebfe)."""
         f0, n0, c0 = self.cursor
         rows, nar, cons = self.repl.fired_rows[f0:], self.narrated[n0:], self.consults[c0:]
         self.cursor = (len(self.repl.fired_rows), len(self.narrated), len(self.consults))
         reads, worlds, self.reads, self.worlds = self.reads, self.worlds, [], []
         sunk, self.sunk = self.sunk, []
-        if not (rows or nar or cons or reads or worlds or sunk):
+        q = getattr(getattr(self.host, "inner", self.host), "effects", None)
+        effects = list(q) if isinstance(q, list) else []
+        if effects:
+            del q[:]
+        if not (rows or nar or cons or reads or worlds or sunk or effects):
             return None
         fired = []
         for i, (kind, stage, ev) in enumerate(rows[-40:], f0 + max(0, len(rows) - 40) + 1):
@@ -921,7 +929,8 @@ class DomainAgent:
         return reply(self.name, "trace", beat=self.beat_no(), fired=fired or None,
                      **({"more": len(rows) - 40} if len(rows) > 40 else {}),
                      narrated=narrated or None, consults=consults or None, reads=reads or None,
-                     world=worlds or None, records=sunk or None, ref={"seq": len(self.repl.fired), "beat": self.beat_no()})
+                     world=worlds or None, records=sunk or None, effects=effects or None,
+                     ref={"seq": len(self.repl.fired), "beat": self.beat_no()})
 
 
 def records_path(module, where, session):

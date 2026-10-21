@@ -63,7 +63,7 @@ Every record: `kind`, `seq` (1…, the session's order), `t` (RFC 3339),
 | `dlg-world` | `domain`, `lines`, `error?` |
 | `dlg-domain` | `verb` (`activate` · `deactivate` · `reload`), `domain`, `by` (`person` · `model`), `bindings?`, `key?` (reload), `installed?` (activate: built from its manifest now), `error?` |
 | `dlg-wire` | `proc`, `what` (`intent` · `tool` · `world` · `ports`), `ms`, `replies` — one per request; `what: clock` is a summary every 40 beats: `n`, `ms` (mean), `max_ms` |
-| `dlg-trace` | the domain agent's `--trace` reply as sent (`domain`, `beat`, `fired`, `narrated`, `consults`, `reads`, `world`, `more?`): the domain tab's REPL log; never an inbound |
+| `dlg-trace` | the domain agent's `--trace` reply as sent (`domain`, `beat`, `fired`, `narrated`, `consults`, `reads`, `world`, `more?`, `effects?`): the domain tab's REPL log; never an inbound. `effects` (py; console-nav): a page host's frames, in the order its rules fired them (metis-loop's ui host: `{ui: focus \| show \| hide \| numbers \| unnumber \| pick \| mode, …}`), drained from the host's `effects` list once each; the page that is the host carries them out and reports back with `world` |
 
 ## The domain agent's lines the backend uses (py, JSON lines)
 

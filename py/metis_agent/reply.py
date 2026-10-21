@@ -29,7 +29,8 @@ KINDS = {
     # the console's (agent-console, s-7f3d1088): never into the orchestrator's
     # inbox — the host's world ports, and what the agent did on a line
     "ports": ("world", "pairs", "reports", "handles", "held", "host"),
-    "trace": ("beat", "fired", "more", "narrated", "consults", "reads", "world", "records"),
+    # effects: the host's frames for a page, in order (a page host's `effects` list, console-nav)
+    "trace": ("beat", "fired", "more", "narrated", "consults", "reads", "world", "records", "effects"),
     # e2e-workflow step 3: a domain rebuilt from the files on disk (WIRE.md reload)
     "reloaded": ("key",),
     "added": ("key",),
