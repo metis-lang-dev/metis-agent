@@ -402,6 +402,8 @@ class Live:
         # the world page (alf-demo step 2, DEMO.md §4): the world's map file, served at /world/map.json and
         # named on every hello (world/map); the director's task chain and result lines (world/delta task)
         self.world_map = v3.get("world_map")
+        self.ask_now = None       # the director's open question: {question, options} (world/ask; alf-demo step 3b)
+        self.status = None        # what the agent wants from the person now (world/status)
         self.dir_held = []        # results of the director's domains held for its beats (release_held)
         self.task_view = {"chain": [], "results": []}
         self.jobs = queue.Queue()
@@ -549,7 +551,12 @@ class Live:
                 live.domain_verb("deactivate", dom, None, "director")
 
             def say(self, text, kind="line"):
-                live.on_say("ask" if kind == "ask" else "line", live.spoken(text))
+                if kind == "ask":
+                    q, opts = split_options(live.spoken(text))
+                    live.ask_now = {"question": q, "options": opts}
+                    live.on_say("ask", q)
+                else:
+                    live.on_say("line", live.spoken(text))
         return DirectorLoop(name, director_facts(text), m.group(1).split(), Ops())
 
     def director_step(self):
@@ -591,6 +598,7 @@ class Live:
             if d not in f["planner"]:
                 tv["chain"].append({"domain": d, "goal": goal, "result": None})
                 changed = True
+                self.set_status("working", "%s: %s" % (d, self.spoken(goal)), domain=d, goal=goal)
         src = b.get("from")
         if src and b.get("said_as_ask") and src in f["planner"]:
             tv["results"].append(self.spoken(b["said"], src))                    # the planner's refusal: a result line of the task card
@@ -612,6 +620,75 @@ class Live:
             changed = True
         if changed:
             self.emit("world/delta", view)
+        if asks:                                    # the question, with the answers the agent takes (world/ask)
+            ask = dict(self.ask_now or {"question": "", "options": list(STOP_OPTION)}, by=src or self.director.name)
+            if view.get("cornered"):
+                ask["cornered"] = view["cornered"]
+            self.emit("world/ask", ask)
+            stuck = kind_of_atom(b["arrival"]) == "stuck"
+            self.set_status("stuck" if stuck else "asking", ask["question"], options=ask["options"])
+        elif any(e.startswith("ended(") for e in b.get("effects") or ()):
+            if self.world_over():
+                self.set_status("over", "Done. The game is over: start a new game to give another task.", options=list(NEW_GAME_OPTION))
+            else:
+                self.set_status("done", "Done. Tell me another task.")
+
+    def set_status(self, state, text, **kw):
+        """What the agent wants from the person now (world/status; alf-demo step 3b): waiting (a task),
+        working (a domain on its goal), asking / stuck (the question and its answers), done, over (the
+        world's episode ended: a new task needs a new game)."""
+        self.status = dict({"state": state, "text": text}, **kw)
+        self.emit("world/status", self.status)
+
+    def new_game(self):
+        """The same game from its start (alf-demo step 3b F7, the architect's AlfHost.new_episode): every
+        served host that can restart its episode does (the shared world: the first truncates the
+        commands log), the planner is re-instanced with no tokens through the director's host, the
+        specialists put to sleep, the director reloaded (its instance's start: director_start) and its
+        loop's frames dropped; the status waits for a task. → the line said."""
+        if self.director is None:
+            return "There is no game here to start again."
+        name = self.director.name
+        ags = self.agents.agents if hasattr(self.agents, "agents") else {}
+        hosts = {n: getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None)) for n, ag in ags.items()}
+        restarted = [n for n, h in hosts.items() if callable(getattr(h, "new_episode", None))]
+        for n in restarted:
+            hosts[n].new_episode()
+        for d in sorted(self.director.facts["specialist"]):
+            if d in self.loaded and d not in self.off:
+                self.domain_verb("deactivate", d, None, "director")
+        dh = hosts.get(name)
+        for p in sorted(self.director.facts["planner"]):
+            if dh is not None and hasattr(dh, "instance") and dh.instance(p, None, {}):
+                self.reload(p, by="director")
+        self.reload(name, by="director")
+        from .director import Frames
+        self.director.queue, self.director.came, self.director.outcome = [], {}, None
+        self.director.frames = Frames(self.director.facts)
+        self.task_view, self.ask_now = {"chain": [], "results": []}, None
+        self.journal.record({"kind": "dlg-director", "director": name, "new_game": restarted})
+        line = "A new game: the same room from its start."
+        self.on_say("line", line)
+        self.set_status("waiting", self.waiting_text())
+        return line
+
+    def waiting_text(self):
+        """The waiting line: the world's own task when its map has one."""
+        task = ""
+        if self.world_map:
+            try:
+                task = (json.loads(Path(self.world_map).read_text()).get("task") or {}).get("text") or ""
+            except (OSError, ValueError):
+                task = ""
+        return "Tell me a task." + (" This game's task: %s" % task if task else "")
+
+    def world_over(self):
+        """The world's episode has ended (a served host says won or done): no task can act in it."""
+        for ag in (self.agents.agents.values() if hasattr(self.agents, "agents") else ()):
+            h = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+            if getattr(h, "won", False):
+                return True
+        return False
 
     def spoken(self, text, domain=None):
         """A line with the world's handles said as names (fridge1 → "fridge 1"), capitalized: the
@@ -679,6 +756,12 @@ class Live:
         if d in self.off:
             return self.not_active(d), True
         j.pop("intent", None)
+        if self.director is not None and verb != "STOP" and self.world_over():
+            # alf-demo step 3b F7: the world's episode ended (won); a new task would act in a finished game
+            line = "The game is over. Start a new game to give another task."
+            self.on_say("line", line)
+            self.set_status("over", line, options=list(NEW_GAME_OPTION))
+            return O.Reply({"domain": d, "kind": "error", "error": "the game is over", "text": line}), True
         if self.director is not None and self.director.outcome:
             was = self.director.reengage()                 # after an ask or the end: the person's words go on
             self.task_view = {"chain": [], "results": []}
@@ -869,6 +952,19 @@ class Live:
         self.journal.record(w)
         self.turn_at = at if at is not None else time.time()
         try:
+            if self.director is not None and text.strip().lower().rstrip(".!") in NEW_GAME_WORDS:
+                voice = self.new_game()
+                return '{"intent":"NEW_GAME"}', voice, self.journal.say_rec("turn", voice)
+            if O.keyword_stop(text, self.stop_words) and self.director is not None:
+                # alf-demo step 3b F5: the director's run stops — its queue dropped, its specialists put to sleep
+                self.director.queue.clear()
+                self.director.outcome = "ended(stop)"
+                for d in sorted(self.director.facts["specialist"]):
+                    if d in self.loaded and d not in self.off:
+                        self.domain_verb("deactivate", d, None, "director")
+                self.set_status("waiting", "Stopped. " + self.waiting_text())
+                voice = "Stopped."
+                return '{"intent":"STOP"}', voice, self.journal.say_rec("turn", voice)
             if O.keyword_stop(text, self.stop_words):
                 # to the domains whose tasks are in flight; none: "Nothing is running." (e2e step 4 ruling)
                 j, voice = self.o.stop(text)
@@ -1266,6 +1362,24 @@ def _plain(v):
 
 # ── the page backend (the console's ws wire) ──────────────────────────────────
 
+STOP_OPTION = ({"label": "stop", "say": "stop"},)
+NEW_GAME_OPTION = ({"label": "new game", "say": "new game"},)
+NEW_GAME_WORDS = ("new game", "start a new game", "start again", "new episode")
+
+
+def split_options(line):
+    """An asking line and its answers: `question | answer one | answer two` → (question, [{label,
+    say}]) — the world gives them on the asking rule's %% line, each a sentence the card takes; none
+    given, the stop words are the one answer (alf-demo step 3b)."""
+    parts = [p.strip() for p in (line or "").split(" | ")]
+    q, opts = parts[0], [p for p in parts[1:] if p]
+    return q, ([{"label": o, "say": o} for o in opts] or list(STOP_OPTION))
+
+
+def kind_of_atom(atom):
+    return atom.split("(", 1)[0].strip()
+
+
 def make_app(live, ui_dir, lib_dir=None):
     """aiohttp: /ws (the console's wire), /lib/ (fsttm-web's library: the
     fsttm_web package when installed, else lib_dir), /sdk/catalog/ (the loop
@@ -1325,6 +1439,10 @@ def make_app(live, ui_dir, lib_dir=None):
                     await send("catalog", {"domains": await ask(live.catalog)})
                     if getattr(live, "world_map", None):
                         await send("world/map", {"url": "world/map.json"})
+                    if getattr(live, "director", None) is not None:
+                        if live.status is None:
+                            live.status = {"state": "waiting", "text": live.waiting_text()}
+                        await send("world/status", live.status)
                     for d in live.loaded:
                         if d in live.names and d not in live.quiet:
                             try:
@@ -1333,6 +1451,8 @@ def make_app(live, ui_dir, lib_dir=None):
                                 pass
                     for r in live.journal.since(int(m.get("since") or 0)):
                         await send("journal", {"rec": r})
+                elif ev == "new_game":
+                    await send("new_game_ack", {"text": await ask(live.new_game)})
                 elif ev == "say_text":
                     text = str(m.get("text") or "").strip()
                     if not text:
