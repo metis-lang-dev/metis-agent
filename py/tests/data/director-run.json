@@ -1,0 +1,4432 @@
+{
+"source": "metis-worlds alfworld experiments/hier.py --director --n 20 (train, pick_and_place_simple, seed 1), 2026-10-22: won 20/20",
+"facts": [
+"specialist(nav)",
+"specialist(access)",
+"specialist(grasp)",
+"specialist(place)",
+"planner(task)",
+"handles(nav, goto)",
+"handles(access, open)",
+"handles(grasp, take)",
+"handles(place, put)",
+"handles(task, fetch)",
+"handles(task, reached)",
+"handles(task, accessible)",
+"handles(task, taken)",
+"handles(task, placed)",
+"handles(task, refused)",
+"result(reached)",
+"result(accessible)",
+"result(taken)",
+"result(placed)",
+"end(done)",
+"end(stuck)",
+"end(wrong_dest)",
+"end(wrong_object)",
+"detour(elsewhere, goto)",
+"escalate(elsewhere, refused)"
+],
+"games": [
+{
+"game": "pick_and_place_simple-Candle-None-Cabinet-428/trial_T20190907_024307_904810",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(candle1,cabinet1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(countertop1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(countertop1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(countertop1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(countertop1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(candle1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(candle1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(cabinet1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(cabinet1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(cabinet1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(cabinet1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(candle1,cabinet1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(candle1,cabinet1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(candle1,cabinet1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(countertop1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(countertop1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(countertop1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(countertop1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(candle1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(candle1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(cabinet1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(cabinet1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(cabinet1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(cabinet1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(candle1,cabinet1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(candle1,cabinet1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-SoapBottle-None-GarbageCan-417/trial_T20190909_120106_745160",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(soapbottle1,garbagecan1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(cabinet2)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(cabinet2)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(cabinet2)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(cabinet2)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(soapbottle1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(soapbottle1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(garbagecan1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(garbagecan1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(garbagecan1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(garbagecan1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(soapbottle1,garbagecan1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(soapbottle1,garbagecan1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(soapbottle1,garbagecan1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(cabinet2)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(cabinet2)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(cabinet2)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(cabinet2)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(soapbottle1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(soapbottle1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(garbagecan1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(garbagecan1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(garbagecan1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(garbagecan1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(soapbottle1,garbagecan1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(soapbottle1,garbagecan1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-Watch-None-DiningTable-326/trial_T20190912_074626_851427",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(watch1,diningtable1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(sidetable1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(sidetable1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(sidetable1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(sidetable1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(watch1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(watch1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(diningtable1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(diningtable1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(diningtable1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(diningtable1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(watch1,diningtable1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(watch1,diningtable1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(watch1,diningtable1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(sidetable1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(sidetable1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(sidetable1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(sidetable1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(watch1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(watch1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(diningtable1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(diningtable1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(diningtable1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(diningtable1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(watch1,diningtable1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(watch1,diningtable1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-Book-None-Sofa-202/trial_T20190907_043708_054006",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(book1,sofa1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(armchair1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(armchair1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(armchair1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(armchair1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(book1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(book1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(sofa1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(sofa1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(sofa1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(sofa1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(book1,sofa1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(book1,sofa1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(book1,sofa1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(armchair1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(armchair1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(armchair1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(armchair1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(book1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(book1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(sofa1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(sofa1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(sofa1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(sofa1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(book1,sofa1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(book1,sofa1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-CreditCard-None-Drawer-227/trial_T20190918_215541_739446",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(creditcard1,drawer1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(coffeetable1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(coffeetable1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(coffeetable1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(coffeetable1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(creditcard1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(creditcard1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(drawer1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(drawer1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(drawer1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(drawer1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(creditcard1,drawer1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(creditcard1,drawer1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(creditcard1,drawer1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(coffeetable1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(coffeetable1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(coffeetable1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(coffeetable1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(creditcard1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(creditcard1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(drawer1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(drawer1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(drawer1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(drawer1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(creditcard1,drawer1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(creditcard1,drawer1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-CD-None-Shelf-326/trial_T20190908_050350_303115",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(cd1,shelf1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(drawer1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(drawer1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(drawer1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(drawer1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(cd1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(cd1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(shelf1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(shelf1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(shelf1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(shelf1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(cd1,shelf1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(cd1,shelf1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(cd1,shelf1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(drawer1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(drawer1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(drawer1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(drawer1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(cd1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(cd1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(shelf1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(shelf1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(shelf1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(shelf1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(cd1,shelf1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(cd1,shelf1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-Pillow-None-Sofa-209/trial_T20190907_101259_128239",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(pillow1,sofa1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(armchair1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(armchair1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(armchair1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(armchair1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(pillow1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(pillow1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(sofa1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(sofa1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(sofa1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(sofa1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(pillow1,sofa1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(pillow1,sofa1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(pillow1,sofa1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(armchair1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(armchair1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(armchair1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(armchair1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(pillow1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(pillow1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(sofa1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(sofa1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(sofa1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(sofa1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(pillow1,sofa1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(pillow1,sofa1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-Watch-None-CoffeeTable-222/trial_T20190908_032408_369750",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(watch1,coffeetable1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(sidetable3)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(sidetable3)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(sidetable3)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(sidetable3)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(watch1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(watch1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(coffeetable1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(coffeetable1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(coffeetable1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(coffeetable1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(watch1,coffeetable1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(watch1,coffeetable1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(watch1,coffeetable1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(sidetable3)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(sidetable3)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(sidetable3)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(sidetable3)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(watch1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(watch1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(coffeetable1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(coffeetable1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(coffeetable1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(coffeetable1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(watch1,coffeetable1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(watch1,coffeetable1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-Pencil-None-Desk-307/trial_T20190909_075126_209289",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(pencil1,desk1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(sidetable1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(sidetable1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(sidetable1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(sidetable1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(pencil1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(pencil1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(desk1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(desk1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(desk1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(desk1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(pencil1,desk1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(pencil1,desk1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(pencil1,desk1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(sidetable1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(sidetable1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(sidetable1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(sidetable1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(pencil1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(pencil1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(desk1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(desk1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(desk1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(desk1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(pencil1,desk1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(pencil1,desk1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-PepperShaker-None-CounterTop-27/trial_T20190909_010836_535047",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(peppershaker1,countertop1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(diningtable1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(diningtable1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(diningtable1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(diningtable1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(peppershaker1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(peppershaker1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(countertop1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(countertop1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(countertop1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(countertop1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(peppershaker1,countertop1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(peppershaker1,countertop1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(peppershaker1,countertop1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(diningtable1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(diningtable1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(diningtable1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(diningtable1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(peppershaker1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(peppershaker1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(countertop1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(countertop1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(countertop1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(countertop1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(peppershaker1,countertop1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(peppershaker1,countertop1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-Statue-None-CoffeeTable-227/trial_T20190909_221208_261373",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(statue1,coffeetable1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(shelf2)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(shelf2)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(shelf2)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(shelf2)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(statue1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(statue1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(coffeetable1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(coffeetable1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(coffeetable1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(coffeetable1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(statue1,coffeetable1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(statue1,coffeetable1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(statue1,coffeetable1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(shelf2)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(shelf2)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(shelf2)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(shelf2)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(statue1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(statue1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(coffeetable1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(coffeetable1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(coffeetable1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(coffeetable1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(statue1,coffeetable1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(statue1,coffeetable1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-KeyChain-None-Sofa-229/trial_T20190908_123422_029531",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(keychain1,sofa1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(sidetable2)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(sidetable2)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(sidetable2)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(sidetable2)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(keychain1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(keychain1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(sofa1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(sofa1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(sofa1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(sofa1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(keychain1,sofa1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(keychain1,sofa1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(keychain1,sofa1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(sidetable2)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(sidetable2)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(sidetable2)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(sidetable2)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(keychain1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(keychain1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(sofa1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(sofa1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(sofa1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(sofa1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(keychain1,sofa1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(keychain1,sofa1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-CellPhone-None-Dresser-317/trial_T20190908_033503_132415",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(cellphone1,dresser1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(bed1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(bed1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(bed1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(bed1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(cellphone1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(cellphone1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(dresser1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(dresser1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(dresser1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(dresser1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(cellphone1,dresser1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(cellphone1,dresser1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(cellphone1,dresser1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(bed1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(bed1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(bed1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(bed1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(cellphone1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(cellphone1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(dresser1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(dresser1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(dresser1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(dresser1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(cellphone1,dresser1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(cellphone1,dresser1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-ButterKnife-None-Drawer-8/trial_T20190907_142645_859732",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(butterknife1,drawer1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(countertop1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(countertop1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(countertop1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(countertop1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(butterknife1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(butterknife1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(drawer1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(drawer1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(drawer1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(drawer1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(butterknife1,drawer1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(butterknife1,drawer1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(butterknife1,drawer1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(countertop1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(countertop1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(countertop1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(countertop1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(butterknife1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(butterknife1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(drawer1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(drawer1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(drawer1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(drawer1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(butterknife1,drawer1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(butterknife1,drawer1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-Pillow-None-ArmChair-225/trial_T20190908_104554_100496",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(pillow1,armchair1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(sofa1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(sofa1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(sofa1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(sofa1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(pillow1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(pillow1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(armchair1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(armchair1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(armchair1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(armchair1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(pillow1,armchair1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(pillow1,armchair1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(pillow1,armchair1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(sofa1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(sofa1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(sofa1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(sofa1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(pillow1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(pillow1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(armchair1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(armchair1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(armchair1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(armchair1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(pillow1,armchair1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(pillow1,armchair1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-Book-None-ArmChair-318/trial_T20190909_113023_560549",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(book1,armchair1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(desk1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(desk1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(desk1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(desk1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(book1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(book1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(armchair1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(armchair1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(armchair1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(armchair1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(book1,armchair1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(book1,armchair1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(book1,armchair1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(desk1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(desk1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(desk1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(desk1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(book1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(book1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(armchair1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(armchair1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(armchair1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(armchair1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(book1,armchair1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(book1,armchair1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-Laptop-None-Ottoman-203/trial_T20190908_110606_176017",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(laptop1,ottoman1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(diningtable1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(diningtable1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(diningtable1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(diningtable1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(laptop1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(laptop1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(ottoman1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(ottoman1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(ottoman1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(ottoman1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(laptop1,ottoman1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(laptop1,ottoman1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(laptop1,ottoman1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(diningtable1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(diningtable1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(diningtable1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(diningtable1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(laptop1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(laptop1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(ottoman1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(ottoman1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(ottoman1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(ottoman1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(laptop1,ottoman1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(laptop1,ottoman1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-Pen-None-Drawer-305/trial_T20190907_224053_726820",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(pen1,drawer1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(desk1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(desk1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(desk1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(desk1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(pen1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(pen1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(drawer1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(drawer1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(drawer1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(drawer1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(pen1,drawer1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(pen1,drawer1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(pen1,drawer1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(desk1)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(desk1)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(desk1)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(desk1)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(pen1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(pen1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(drawer1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(drawer1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(drawer1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(drawer1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(pen1,drawer1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(pen1,drawer1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-SprayBottle-None-Drawer-423/trial_T20190909_071924_418051",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(spraybottle1,drawer1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(countertop2)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(countertop2)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(countertop2)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(countertop2)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(spraybottle1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(spraybottle1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(drawer1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(drawer1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(drawer1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(drawer1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(spraybottle1,drawer1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(spraybottle1,drawer1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(spraybottle1,drawer1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(countertop2)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(countertop2)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(countertop2)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(countertop2)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(spraybottle1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(spraybottle1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(drawer1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(drawer1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(drawer1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(drawer1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(spraybottle1,drawer1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(spraybottle1,drawer1)"
+}
+]
+},
+{
+"game": "pick_and_place_simple-Watch-None-CoffeeTable-222/trial_T20190908_032421_426650",
+"won": true,
+"beats": [
+{
+"k": 0,
+"arrival": "fetch(watch1,coffeetable1)",
+"effects": [
+"forward(task,fetch)"
+]
+},
+{
+"k": 1,
+"arrival": "goto(sidetable2)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 2,
+"arrival": "reached(sidetable2)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 3,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 4,
+"arrival": "open(sidetable2)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 5,
+"arrival": "accessible(sidetable2)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 6,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 7,
+"arrival": "take(watch1)",
+"effects": [
+"forward(grasp,take)",
+"wake(grasp)"
+]
+},
+{
+"k": 8,
+"arrival": "taken(watch1)",
+"effects": [
+"forward(task,taken)"
+]
+},
+{
+"k": 9,
+"arrival": "idle(grasp)",
+"effects": [
+"sleep(grasp)"
+]
+},
+{
+"k": 10,
+"arrival": "goto(coffeetable1)",
+"effects": [
+"forward(nav,goto)",
+"wake(nav)"
+]
+},
+{
+"k": 11,
+"arrival": "reached(coffeetable1)",
+"effects": [
+"forward(task,reached)"
+]
+},
+{
+"k": 12,
+"arrival": "idle(nav)",
+"effects": [
+"sleep(nav)"
+]
+},
+{
+"k": 13,
+"arrival": "open(coffeetable1)",
+"effects": [
+"forward(access,open)",
+"wake(access)"
+]
+},
+{
+"k": 14,
+"arrival": "accessible(coffeetable1)",
+"effects": [
+"forward(task,accessible)"
+]
+},
+{
+"k": 15,
+"arrival": "idle(access)",
+"effects": [
+"sleep(access)"
+]
+},
+{
+"k": 16,
+"arrival": "put(watch1,coffeetable1)",
+"effects": [
+"forward(place,put)",
+"wake(place)"
+]
+},
+{
+"k": 17,
+"arrival": "placed(watch1,coffeetable1)",
+"effects": [
+"forward(task,placed)"
+]
+},
+{
+"k": 18,
+"arrival": "idle(place)",
+"effects": [
+"sleep(place)"
+]
+},
+{
+"k": 19,
+"arrival": "done",
+"effects": [
+"ask(done)",
+"ended(done)"
+]
+}
+],
+"goals": [
+{
+"k": 0,
+"spec": "task",
+"goal": "fetch(watch1,coffeetable1)"
+},
+{
+"k": 1,
+"spec": "nav",
+"goal": "goto(sidetable2)"
+},
+{
+"k": 2,
+"spec": "task",
+"goal": "reached(sidetable2)"
+},
+{
+"k": 4,
+"spec": "access",
+"goal": "open(sidetable2)"
+},
+{
+"k": 5,
+"spec": "task",
+"goal": "accessible(sidetable2)"
+},
+{
+"k": 7,
+"spec": "grasp",
+"goal": "take(watch1)"
+},
+{
+"k": 8,
+"spec": "task",
+"goal": "taken(watch1)"
+},
+{
+"k": 10,
+"spec": "nav",
+"goal": "goto(coffeetable1)"
+},
+{
+"k": 11,
+"spec": "task",
+"goal": "reached(coffeetable1)"
+},
+{
+"k": 13,
+"spec": "access",
+"goal": "open(coffeetable1)"
+},
+{
+"k": 14,
+"spec": "task",
+"goal": "accessible(coffeetable1)"
+},
+{
+"k": 16,
+"spec": "place",
+"goal": "put(watch1,coffeetable1)"
+},
+{
+"k": 17,
+"spec": "task",
+"goal": "placed(watch1,coffeetable1)"
+}
+]
+}
+]
+}
