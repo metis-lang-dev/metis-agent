@@ -106,7 +106,7 @@ type config struct {
 	// console's list by the catalog's loader
 	Catalog struct {
 		Root   string `yaml:"root"`
-		Python string `yaml:"python"` // an interpreter with the loop SDK (python -m metis_loop_sdk.catalog)
+		Python string `yaml:"python"` // an interpreter with metispy and the loop SDK (python -m metis.catalog, python -m metis_loop_sdk.web)
 		Intent string `yaml:"intent"` // the domain the intent pass maps for (dog): -loop v2's; -loop v3 maps for every served domain with intent material
 	} `yaml:"catalog"`
 }

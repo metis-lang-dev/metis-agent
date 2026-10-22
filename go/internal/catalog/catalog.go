@@ -4,10 +4,10 @@
 // manifest — display, line, voice, the intent spec and the generated files
 // at their fixed names, the extensions, the clock, the pair — natively and
 // by the loader's rules (the name is the directory's; an unknown key is
-// refused), and the console's list through the loop SDK's catalog CLI
-// (`python -m metis_loop_sdk.catalog list --consoles --json`: the loader's
-// rows, catalog-sdk s-bc1718e3), so both backends list the same domains by
-// the same rules.
+// refused), and the console's list through metispy's catalog CLI
+// (`python -m metis.catalog list --consoles --json`: the loader's rows,
+// catalog-sdk s-bc1718e3, metis-packages), so both backends list the same
+// domains by the same rules.
 package catalog
 
 import (
@@ -239,15 +239,16 @@ type Entry struct {
 	PartnerOf string `json:"partner_of,omitempty"`
 }
 
-// sdk runs the loop SDK's catalog CLI on python (an interpreter with
-// metis_loop_sdk installed) over the catalog root and returns its JSON.
-func sdk(python, root string, args ...string) ([]byte, error) {
+// py runs a module's CLI on python (an interpreter with metispy and the loop
+// SDK installed) over the catalog root and returns its JSON: metis.catalog
+// for the catalog (metis-packages), metis_loop_sdk.web for the widget.
+func py(python, module, root string, args ...string) ([]byte, error) {
 	if strings.Contains(python, "/") {
 		if abs, err := filepath.Abs(python); err == nil {
 			python = abs
 		}
 	}
-	argv := []string{"-m", "metis_loop_sdk.catalog"}
+	argv := []string{"-m", module}
 	if root != "" {
 		if abs, err := filepath.Abs(root); err == nil {
 			root = abs
@@ -258,24 +259,24 @@ func sdk(python, root string, args ...string) ([]byte, error) {
 	b, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("metis_loop_sdk.catalog %s: %v: %s", args[0], err, ee.Stderr)
+			return nil, fmt.Errorf("%s %s: %v: %s", module, args[0], err, ee.Stderr)
 		}
-		return nil, fmt.Errorf("metis_loop_sdk.catalog %s: %w", args[0], err)
+		return nil, fmt.Errorf("%s %s: %w", module, args[0], err)
 	}
 	return b, nil
 }
 
-// List is the consoles' list as the catalog's loader makes it, through the
-// loop SDK (py's service.catalog_list is the same call): the index's
-// domains, then each partner as its own row.
+// List is the consoles' list as the catalog's loader makes it, through
+// metispy's metis.catalog (py's service.catalog_list is the same call): the
+// index's domains, then each partner as its own row.
 func List(python, root string) ([]Entry, error) {
-	b, err := sdk(python, root, "list", "--consoles", "--json")
+	b, err := py(python, "metis.catalog", root, "list", "--consoles", "--json")
 	if err != nil {
 		return nil, err
 	}
 	var es []Entry
 	if err := json.Unmarshal(b, &es); err != nil {
-		return nil, fmt.Errorf("metis_loop_sdk.catalog list: %w", err)
+		return nil, fmt.Errorf("metis.catalog list: %w", err)
 	}
 	sort.SliceStable(es, func(i, j int) bool { return es[i].Kind == "domain" && es[j].Kind != "domain" })
 	return es, nil
@@ -285,7 +286,7 @@ func List(python, root string) ([]Entry, error) {
 // catalog.css), which the console serves at /sdk/catalog/ — the same files
 // the py backend and the metis-loop console serve.
 func WidgetDir(python string) (string, error) {
-	b, err := sdk(python, "", "widget")
+	b, err := py(python, "metis_loop_sdk.web", "", "widget")
 	if err != nil {
 		return "", err
 	}
@@ -293,7 +294,7 @@ func WidgetDir(python string) (string, error) {
 		Dir string `json:"dir"`
 	}
 	if err := json.Unmarshal(b, &w); err != nil || w.Dir == "" {
-		return "", fmt.Errorf("metis_loop_sdk.catalog widget: %v %q", err, b)
+		return "", fmt.Errorf("metis_loop_sdk.web widget: %v %q", err, b)
 	}
 	return w.Dir, nil
 }
