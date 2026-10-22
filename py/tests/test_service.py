@@ -405,6 +405,30 @@ def test_installing_an_intent_domain_joins_its_words(tmp_path, monkeypatch):
     assert r["why"] == "install pet" and r["intents"] == ["dog", "pet"] and lv.o.cfg.intent_domains == ["dog", "pet"]
 
 
+def test_serve_active_keeps_only_the_active_cards_in_the_turn(tmp_path, monkeypatch):
+    """alf-hierarchy step 3 (DIRECTOR.md decision 4; F3 of step 2: eleven hot installs grew the turn
+    from 5k to 15k tokens): v3.serve: active — the person turn serves the active domains' cards
+    only; a deactivated card leaves the turn, an activated one joins it (dlg-restart names them)."""
+    monkeypatch.setenv("METIS_CATALOG", str(_pet_catalog(tmp_path)))
+    cfg = S.load_config(ROOT / "py/config.live.yaml")
+    cfg["v3"]["journal"] = str(tmp_path / "j.jsonl")
+    cfg["v3"]["serve"] = "active"
+    cfg["v3"]["loaded"] = ["dog"]
+    cfg["domains"].update(names=["dog", "pet", "kitchen", "kitchen_shared"], narrate=None, consult=False, records=None)
+    lv = S.Live(cfg, FakeLLM())
+    assert [x.name for x in lv.intents] == ["dog", "pet"]                  # both installed
+    assert lv.ocfg.intent_domains == ["dog"] and "## Several domains" not in lv.prompt      # one served
+    assert lv.domain_verb("activate", "pet", None, "person") is None
+    assert lv.ocfg.intent_domains == ["dog", "pet"] and lv.gbnf.startswith("root ::= dog-root | pet-root\n")
+    assert recs(lv, "dlg-restart")[-1]["why"] == "activate pet"
+    assert lv.domain_verb("deactivate", "dog", None, "person") is None
+    assert lv.ocfg.intent_domains == ["pet"] and recs(lv, "dlg-restart")[-1]["intents"] == ["pet"]
+    assert "dog-root" not in lv.gbnf
+    import pytest
+    with pytest.raises(ValueError, match="serve"):
+        S.Live(dict(cfg, v3=dict(cfg["v3"], serve="some")), FakeLLM())
+
+
 def test_the_generic_agents_host_forwards_the_sensor_face():
     """A data domain's AgentHost passes the catalog host's observe through
     (the watch reads the env through it): without it a generic agent could

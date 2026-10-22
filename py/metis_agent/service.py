@@ -342,13 +342,21 @@ class Live:
         # made of it; two or more: every J names its domain
         self.template = cfg.get("template", "gemma4")
         self.intents = intents_of(self.names, self.template)
-        self.gbnf = build_grammar(cfg, self.intents)
+        # which cards the person turn serves (alf-hierarchy step 3, DIRECTOR.md decision 4): "all"
+        # installed (as before), or "active": only the domains active now (a director and the
+        # attended specialist), the turn rebuilt on every activate/deactivate — a deactivated card
+        # leaves the turn, so N installs never add up in the context
+        self.serve = str(v3.get("serve", "all"))
+        if self.serve not in ("all", "active"):
+            raise ValueError("v3.serve: all | active, not %r" % self.serve)
+        self.loaded, self.off = list(v3["loaded"]), set()
+        self.gbnf = build_grammar(cfg, self.served())
         self.stop_words = list(cfg.get("stop_words") or ["stop", "halt", "freeze", "quiet"])
-        self.prompt = build_turn(cfg, self.intents)
+        self.prompt = build_turn(cfg, self.served())
         self.prompt_files = list(v3["prompt"])
         self.nctx = int(v3.get("n_ctx", 16384))
         self.ol = llm.sibling(self.nctx)
-        self.catalog_names, self.loaded = list(v3["catalog"]), list(v3["loaded"])
+        self.catalog_names = list(v3["catalog"])
         self.display = dict(v3.get("display") or {})
         self.lines = dict(v3.get("lines") or {})
         try:                                        # the catalog's list (the console's CATALOG dock)
@@ -358,9 +366,9 @@ class Live:
         except Exception as e:  # noqa: BLE001 — no loader: the system turn's catalog stands in
             log.warning("[console] the catalog's list: %s", e)
             self.listed = []
-        self.intents_domain = (self.intents[0].name if self.intents     # the J's domain when it names none
+        self.intents_domain = (self.served()[0].name if self.served()     # the J's domain when it names none
                                else next((n for n in self.loaded if n in self.names), ""))
-        self.off, self.pend, self.n = set(), [], 0
+        self.pend, self.n = [], 0
         # every served domain's directory from its manifest (human-loop step 1;
         # a partner reloads with its lead); domains.watch overrides a directory
         self.watch = manifest_dirs(n for n in self.names if n not in self.quiet)
@@ -382,7 +390,7 @@ class Live:
         self.ocfg = O.V3Config(self.catalog_names, self.loaded, self.display, ask_check=True, again_pick=True,
                                escalate_template=True, mirror=True, rollback=True,
                                on_gen=self.on_gen, on_say=self.on_say, defer=self.defer,
-                               intent_domains=[x.name for x in self.intents], asks=O.asks_of(self.intents),
+                               intent_domains=[x.name for x in self.served()], asks=O.asks_of(self.served()),
                                line_voice=[n for n in self.names if line_voiced(n)])
         self.restart()
         self.jobs = queue.Queue()
@@ -435,16 +443,24 @@ class Live:
         self.o = O.Orch(self.ocfg, self.ol, self)
         self.o.n_past = n
 
+    def served(self):
+        """The intent domains the person turn serves: every installed one (serve: all), or the
+        active ones only (serve: active — in `loaded` and not off)."""
+        if self.serve == "all":
+            return list(self.intents)
+        return [x for x in self.intents if x.name in self.loaded and x.name not in self.off]
+
     def reprime(self, why):
         """The system turn built again (the catalog, the active domains) and
         the dialog started over on it, the harness's state kept (Go's
         v3install.go reprime); journalled as dlg-restart."""
-        turn = build_turn(self.cfg, self.intents, self.ocfg.catalog, self.ocfg.loaded)
-        if self.intents:
-            self.gbnf = O.intent_grammar(self.intents)
-        names = [x.name for x in self.intents]
-        self.ocfg.intent_domains, self.ocfg.asks = names, O.asks_of(self.intents)
-        if self.intents:
+        served = self.served()
+        turn = build_turn(self.cfg, served, self.ocfg.catalog, self.ocfg.loaded)
+        if served:
+            self.gbnf = O.intent_grammar(served)
+        names = [x.name for x in served]
+        self.ocfg.intent_domains, self.ocfg.asks = names, O.asks_of(served)
+        if served:
             self.intents_domain = names[0]
         if turn == self.prompt:
             self.o.cfg.intent_domains, self.o.cfg.asks = names, self.ocfg.asks
@@ -805,6 +821,8 @@ class Live:
                 rec["installed"] = True
                 self.o.m.last[dom] = "installed"
                 self.reprime("install " + dom)      # its card, its name in the enum: the system turn again
+            elif self.serve == "active" and any(x.name == dom for x in self.intents):
+                self.reprime("%s %s" % (verb, dom))   # the served cards changed: a deactivated card leaves the turn
         if err:
             rec["error"] = err
         self.journal.record(rec)
