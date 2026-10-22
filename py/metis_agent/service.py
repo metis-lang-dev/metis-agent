@@ -402,6 +402,7 @@ class Live:
         # the world page (alf-demo step 2, DEMO.md §4): the world's map file, served at /world/map.json and
         # named on every hello (world/map); the director's task chain and result lines (world/delta task)
         self.world_map = v3.get("world_map")
+        self.dir_held = []        # results of the director's domains held for its beats (release_held)
         self.task_view = {"chain": [], "results": []}
         self.jobs = queue.Queue()
         self.started = threading.Event()
@@ -563,6 +564,19 @@ class Live:
             self.world_beat(i, b)
         self.world_frames()
 
+    def release_held(self, k):
+        """The results held for the director (handle_due): dropped when its beats since `k` took an
+        arrival from that domain (its lines speak for it), else voiced as any reply is."""
+        held, self.dir_held = self.dir_held, []
+        froms = {b.get("from") for b in (self.director.log[k:] if self.director is not None else [])}
+        for inb in held:
+            if inb.reply.domain in froms:
+                continue
+            try:
+                self.o.handle(inb, self.gbnf, self.stop_words)
+            except Exception as e:  # noqa: BLE001
+                log.exception("[v3] handle: %s", e)
+
     def world_beat(self, i, b):
         """The world page's view of one director beat (alf-demo step 2): world/hierarchy (the arrival,
         its effects, the director's state atoms); a specialist's result closes its chain entry and its
@@ -579,17 +593,17 @@ class Live:
                 changed = True
         src = b.get("from")
         if src and b.get("said_as_ask") and src in f["planner"]:
-            tv["results"].append(self.spoken(b["said"]))                         # the planner's refusal: a result line of the task card
+            tv["results"].append(self.spoken(b["said"], src))                    # the planner's refusal: a result line of the task card
             changed = True
         if src and src not in f["planner"] and not b["arrival"].startswith("idle("):
             entry = next((c for c in reversed(tv["chain"]) if c["domain"] == src and c["result"] is None), None)
             if entry is not None:
                 entry["result"] = b["arrival"]
             if b.get("said") and not b.get("said_as_ask"):         # an asking arrival's line is the ask's (said once)
-                tv["results"].append(self.spoken(b["said"]))
-                self.on_say("line", self.spoken(b["said"]))
+                tv["results"].append(self.spoken(b["said"], src))
+                self.on_say("line", self.spoken(b["said"], src))
             elif b.get("said"):
-                tv["results"].append(self.spoken(b["said"]))
+                tv["results"].append(self.spoken(b["said"], src))
             changed = True
         view = {"task": {"chain": [dict(c) for c in tv["chain"]], "results": list(tv["results"])}}
         asks = any(e.startswith("ask(") for e in b.get("effects") or ())       # the director asks (with its end, or alone)
@@ -599,18 +613,23 @@ class Live:
         if changed:
             self.emit("world/delta", view)
 
-    def spoken(self, text):
-        """A line with the world's handles said as names (fridge1 → "fridge 1"): the first served host
-        with a `speak(text)` face (the world's own words), else the line as it is."""
-        for ag in (self.agents.agents.values() if hasattr(self.agents, "agents") else ()):
+    def spoken(self, text, domain=None):
+        """A line with the world's handles said as names (fridge1 → "fridge 1"), capitalized: the
+        source domain's host's `speak(text)` face (nina's N8), else the first served host's, else the
+        line as it is."""
+        ags = self.agents.agents if hasattr(self.agents, "agents") else {}
+        order = ([ags[domain]] if domain in ags else []) + [a for n, a in ags.items() if n != domain]
+        out = text
+        for ag in order:
             h = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
             sp = getattr(h, "speak", None)
             if callable(sp):
                 try:
-                    return sp(text) or text
+                    out = sp(text) or text
                 except Exception:  # noqa: BLE001 — a host's words never stop a line
-                    return text
-        return text
+                    out = text
+                break
+        return out[:1].upper() + out[1:]                      # nina's N6: a line that starts with a handle
 
     def world_frames(self):
         """Every served domain's host frames (a host's `frames()` face: the world page's world/*
@@ -781,7 +800,9 @@ class Live:
                 if dom not in self.quiet and dom not in self.off:
                     due.append(r)
         self.handle_due(self.beat, due)
+        k = len(self.director.log) if self.director is not None else 0
         self.director_step()
+        self.release_held(k)
         self.world_frames()                    # the hosts' world/* frames of this tick (alf-demo step 2)
         self.auto_reload()
         self.push_catalog()
@@ -817,7 +838,13 @@ class Live:
             w.update(extra.get(id(r), {}))
             if (self.director is not None and r.kind == "result" and r.domain in self.director.domains
                     and r.id not in self.silent):
-                self.silent.add(r.id)           # the director speaks for its domains' results (its lines, its ask)
+                # the director speaks for its domains' results (its lines, its ask): held until its beats of this tick
+                # ran; voiced after all when they produced nothing from that domain (nina's N7: never silence)
+                self.journal.record(dict(w, held="director"))
+                self.dir_held.append(inb)
+                add(self.pend)
+                self.pend = []
+                continue
             if r.id in self.silent:             # a silent typed intent's reply: journaled, never voiced
                 w["silent"] = True
                 self.journal.record(w)

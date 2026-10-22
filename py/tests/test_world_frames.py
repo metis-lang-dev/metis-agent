@@ -18,7 +18,7 @@ def stand_in(outcome=None, hosts=None):
         agents[name] = SimpleNamespace(host=SimpleNamespace(inner=h))
     lv = SimpleNamespace(director=director, agents=SimpleNamespace(agents=agents), task_view={"chain": [], "results": []},
                          emit=lambda ev, f: frames.append((ev, f)), on_say=lambda kind, line: said.append((kind, line)))
-    lv.spoken = lambda text: S.Live.spoken(lv, text)
+    lv.spoken = lambda text, domain=None: S.Live.spoken(lv, text, domain)
     return lv, frames, said
 
 
@@ -62,6 +62,19 @@ def test_a_planners_refusal_that_asks_is_a_result_line_said_once():
                               "from": "task", "said": "Fridge 1 is not where this task wants tomato 1.", "said_as_ask": True})
     view = [f for ev, f in frames if ev == "world/delta"][-1]
     assert view["cornered"] == "fridge1" and view["task"]["results"] == ["Fridge 1 is not where this task wants tomato 1."]
+
+
+def test_a_held_result_is_voiced_when_the_director_took_nothing_from_it():
+    """nina's N7: a director domain's result is held for the director's beats; voiced after all when
+    they took no arrival from that domain (a refusal the director never answers is never silence)."""
+    voiced = []
+    lv, frames, said = stand_in()
+    lv.director.log = [{"arrival": "goto(r)", "from": "task"}]
+    lv.o = SimpleNamespace(handle=lambda inb, g, sw: voiced.append(inb.reply.domain))
+    lv.gbnf, lv.stop_words = "", []
+    lv.dir_held = [SimpleNamespace(reply=SimpleNamespace(domain="task")), SimpleNamespace(reply=SimpleNamespace(domain="nav"))]
+    S.Live.release_held(lv, 0)
+    assert voiced == ["nav"] and lv.dir_held == []
     assert said == []                                       # the director's say carries it, as the ask
 
 
@@ -70,3 +83,6 @@ def test_a_line_is_said_in_the_worlds_words():
     lv, frames, said = stand_in(hosts={"nav": SimpleNamespace(speak=lambda t: t.replace("fridge1", "fridge 1"))})
     S.Live.world_beat(lv, 0, {"arrival": "reached(fridge1)", "effects": [], "goals": [], "from": "nav", "said": "I am at fridge1."})
     assert said == [("line", "I am at fridge 1.")]
+    lv2, _, said2 = stand_in(hosts={"nav": SimpleNamespace(speak=lambda t: t.replace("fridge1", "fridge 1"))})
+    S.Live.world_beat(lv2, 0, {"arrival": "reached(fridge1)", "effects": [], "goals": [], "from": "nav", "said": "fridge1 is here."})
+    assert said2 == [("line", "Fridge 1 is here.")]                                  # nina's N6: capitalized
