@@ -142,7 +142,7 @@ def corridor(tmp_path, monkeypatch):
         (d / "corridor_host.py").write_text(HOST)
         monkeypatch.setenv("METIS_CATALOG", str(tmp_path))
         sys.modules.pop("metis_agent.domains.corridor", None)
-        sys.modules.pop("corridor_host", None)
+        sys.modules.pop("metis_host.corridor", None)          # intent_domain.host_key
         return d
     return make
 
