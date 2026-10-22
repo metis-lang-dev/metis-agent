@@ -252,6 +252,16 @@ def intent_of(name, template="gemma4"):
     return O.IntentDomain(name, d.manifest.get("display") or "the " + name, prompt, i["grammar"].read_text(), asks)
 
 
+def line_voiced(name):
+    """A domain whose manifest says `voice: line`: its results are spoken as the fired rule's %%
+    line, never re-voiced by the model (console-nav step 2 F4: a page host, the REPL)."""
+    try:
+        from .domains import catalog
+        return catalog().get(name).manifest.get("voice") == "line"
+    except Exception:  # noqa: BLE001 — no catalog entry: the default voicing
+        return False
+
+
 def silent_of(name):
     """A card's `silent` verbs (intent.yaml silent:): a typed intent of one is answered in
     the journal only, never voiced — the page's own commands (push-to-talk's HOLD and
@@ -372,7 +382,8 @@ class Live:
         self.ocfg = O.V3Config(self.catalog_names, self.loaded, self.display, ask_check=True, again_pick=True,
                                escalate_template=True, mirror=True, rollback=True,
                                on_gen=self.on_gen, on_say=self.on_say, defer=self.defer,
-                               intent_domains=[x.name for x in self.intents], asks=O.asks_of(self.intents))
+                               intent_domains=[x.name for x in self.intents], asks=O.asks_of(self.intents),
+                               line_voice=[n for n in self.names if line_voiced(n)])
         self.restart()
         self.jobs = queue.Queue()
         self.started = threading.Event()
@@ -393,7 +404,7 @@ class Live:
     def on_say(self, kind, line):
         say = self.journal.say_rec(kind, line)
         s = line.strip()
-        if kind != "template" and O.unspeakable_line(s):
+        if kind not in ("template", "line") and O.unspeakable_line(s):
             log.info("[v3] %s line %r not spoken (unspeakable)", kind, line)
             return
         self.narr_seq += 1
@@ -751,6 +762,8 @@ class Live:
             self.ocfg.catalog.append(dom)
         self.display.setdefault(dom, d.display)
         self.ocfg.display.setdefault(dom, d.display)
+        if line_voiced(dom):
+            self.ocfg.line_voice.add(dom)
         log.info("[v3] installed %s (%s) from its manifest", dom, ", ".join(group))
         return None
 

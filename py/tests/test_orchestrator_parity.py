@@ -117,6 +117,26 @@ def test_an_unsettled_beat_speaks_once_until_activation():
     assert o.quiescence_spoken(u)
 
 
+def test_a_line_voiced_domains_result_is_spoken_as_its_line():
+    """console-nav step 2 F4 (the architect's ruling): a domain whose manifest says voice: line has
+    its result spoken as the fired rule's %% line, with no generation; another domain's result is
+    voiced by the model as before."""
+    for line_voice, want_gen in ((("dog",), False), ((), True)):
+        says = []
+        rec = Rec(["I did a thing."])
+        o = O.Orch(O.V3Config(CATALOG, LOADED, DISPLAY, mirror=True, line_voice=line_voice,
+                              on_say=lambda k, l: says.append((k, l))), rec, Domains([]))
+        go = O.Call(j='{"intent":"NAVIGATE","goal":{"type":"OBJECT","description":"door"}}')
+        o.by_id["c1"] = go
+        o.m.see(O.Reply({"domain": "dog", "kind": "result", "id": "c1", "status": "accepted"}), go)
+        line = "The plan is up in the APPLY dialog; applying it is your click."
+        o.handle(O.Inbound(reply=O.Reply({"domain": "dog", "kind": "result", "id": "c1", "status": "done", "text": line})), "", [])
+        gens = [l for l in rec.log if l.startswith("gen")]
+        assert bool(gens) == want_gen, rec.log
+        if not want_gen:
+            assert says == [("line", line)] and any(O.SPEAK_CUE + " " + line in x for x in rec.log)
+
+
 def test_the_repl_api_is_metispys(monkeypatch):
     """repl-tools step 2: the REPL API's declarations are rendered from the
     installed metispy's metis.lang.repl_api, never from a copy here — a

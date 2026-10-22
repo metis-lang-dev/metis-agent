@@ -1036,8 +1036,11 @@ def unspeakable_line(t):
 class V3Config:
     def __init__(self, catalog=(), loaded=(), display=None, ask_check=False, again_pick=False,
                  escalate_template=False, mirror=False, rollback=False, sample_moves=False,
-                 on_gen=None, on_say=None, defer=None, intent_domains=(), asks=None):
+                 on_gen=None, on_say=None, defer=None, intent_domains=(), asks=None, line_voice=()):
         self.catalog, self.loaded, self.display = list(catalog), list(loaded), dict(display or {})
+        # the domains whose results are spoken as the fired rule's %% line, never re-voiced by the
+        # model (manifest voice: line — a page host or the REPL: console-nav step 2 F4)
+        self.line_voice = set(line_voice)
         # the served domains with intent material; two or more: every J names
         # its domain, an alternative a domain offers is named for it
         self.intent_domains = list(intent_domains)
@@ -1474,6 +1477,13 @@ class Orch:
             self.cfg.on_gen = hook
         return out.get("text", ""), out.get("mark", 0)
 
+    def speak_as_is(self, line):
+        """The rule's %% line, spoken as it is (manifest voice: line): no model pass, so a result
+        keeps its meaning ("applying it is your click" is never "I have completed applying")."""
+        self.w(SPEAK_CUE + " " + line)
+        self.say("line", line)
+        self.end()
+
     def speak(self):
         self.w(SPEAK_CUE)
         line = self.speak_line(self.br)
@@ -1853,6 +1863,8 @@ class Orch:
             br = self.reply(r)
             if br in ("alts", "none", "answer", "again", "cancelask"):
                 self.move()
+            elif r.domain in self.cfg.line_voice and r.text:
+                self.speak_as_is(r.text)
             else:
                 self.speak()
             return True
