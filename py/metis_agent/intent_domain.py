@@ -25,8 +25,11 @@ def catalog_domains():
     return catalog.root() / "domains"
 
 
-def _host_module(d, name, fresh=False):
-    p = d / ("%s_host.py" % name)
+def _host_module(d, name, fresh=False, file=None):
+    """The domain's host module: the manifest's `host:` file (`mh_host.py:make` names mh_host.py),
+    else <name>_host.py; keyed by the domain's name, so packages that share a host file's name
+    (every MiniHack level's mh_host.py) stay apart."""
+    p = d / (file or ("%s_host.py" % name))
     if not p.exists():
         return None
     key = "%s_host" % name
@@ -96,14 +99,15 @@ def reports(c, host):
     return dict(out, **{w: None for w in getattr(host, "WAITS", ("lost", "timeout"))})
 
 
-def build(name, display=None, voice="", root=None, module=None, fresh=False, dir=None):
+def build(name, display=None, voice="", root=None, module=None, fresh=False, dir=None, host=None):
     """The domain module's namespace for `name` (module: the importable path
     whose `make` the kernel attaches as the plugin; root: a domains/
     directory, default the catalog's)."""
     d = Path(dir) if dir else Path(root or catalog_domains()) / name    # the domain's directory (the manifest's)
     f = d / "intent.yaml"
     spec = (yaml.safe_load(f.read_text()) or {}) if f.exists() else {}     # none: a host with no verbs
-    host = _host_module(d, name, fresh)
+    hf = str(host).split(":")[0] if host else ""             # the manifest's host: a file.py:factory (a module path is not a file)
+    host = _host_module(d, name, fresh, file=hf if hf.endswith(".py") else None)
     c = card(spec)
     commands = {r["atom"].split("(")[0] for r in c["rows"]}
     rep = reports(c, host) if host else {}

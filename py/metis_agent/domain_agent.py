@@ -268,6 +268,8 @@ class DomainAgent:
         # (manifest key `records`); None = off (--records turns it on)
         self.sink, self.session = None, None
         self.sunk = []             # the lines sunk since the last trace
+        # act without a rule (actor.py: the manifest's `actor: {max_steps, task}`): set by Process.make
+        self.actor = None
         # --trace (the console's REPL log): what each line made the agent do
         self.tracing = False
         self.cursor = (0, 0, 0)    # fired_rows, narrated, consults already traced
@@ -404,10 +406,35 @@ class DomainAgent:
             self.scored = self.score_beat(start, s0, diffs)
             if self.scored is not None and hasattr(getattr(self.host, "inner", self.host), "action_of"):
                 self.scored["outcomes"] = outcomes
+        acted, took = self.act_untaken() if self.actor is not None else ([], [])
         late, gone = self.replier.untaken(self.repl.counts, self.beat_no())
-        for atom in gone:
+        for atom in took + gone:
             self.host.retract(atom)
-        return out + late
+        out += acted + late
+        if self.actor is not None and not self.replier.pending:
+            out += self.actor.next()            # the step journaled; the next intent typed, or the episode's end
+        return out
+
+    def act_untaken(self):
+        """Act without a rule (actor.py): a command no rule took, in a package whose manifest
+        says `actor: {…}`, goes to the host's act(atom) face: the world steps and the
+        command is answered done (or refused, when the world did not take it), not failed. A
+        host without the face leaves it to untaken (failed, as before). → (replies, the atoms)."""
+        out, took = [], []
+        for atom, ids in list(self.replier.pending.items()):
+            if self.repl.counts.get(atom, 0) <= 0:
+                continue
+            res = self.actor.acted(atom)
+            if res is None:
+                continue
+            ok = bool(res.get("acted", True))
+            for iid, _ in ids:
+                out.append(reply(self.name, "result", id=iid, status="done" if ok else "refused",
+                                 reason=None if ok else "the world did not take it", ref={"beat": self.beat_no()},
+                                 text=str(res.get("message") or ("Done." if ok else "The world did not take it."))))
+            del self.replier.pending[atom]
+            took.append(atom)
+        return out, took
 
     def scoring_fire(self, outcomes):
         """The Repl's _fire for a scored beat: each sampled event the host
@@ -1164,6 +1191,15 @@ class Process:
         if self.records:
             ag.session = self.state.setdefault("session", self.session_id or time.strftime("%Y%m%d-%H%M%S"))
             ag.sink = records_path(m, self.records, ag.session)
+        acts = (getattr(getattr(m, "MANIFEST", None), "manifest", None) or {}).get("actor")
+        if isinstance(acts, dict) and acts.get("acts", True):
+            # act without a rule (actor.py): the model types the next intent from the card each quiet beat;
+            # its journal beside the package's records (agent-<session>.jsonl), one per episode
+            if self.llm is None:
+                raise ValueError("domain %s: actor: {…} needs a model (--model, or the service's)" % m.NAME)
+            from .actor import Actor
+            ag.session = ag.session or self.state.setdefault("session", self.session_id or time.strftime("%Y%m%d-%H%M%S"))
+            ag.actor = Actor(ag, self.llm, acts, m.MANIFEST.dir, journal=m.MANIFEST.records / ("agent-%s.jsonl" % ag.session))
         return ag
 
     def add(self, names):
@@ -1270,7 +1306,8 @@ def main():
                     help="the consultant's seat (default: gemma4 when --narrate); template: the harness "
                          "answers every consult from the host's words, the cards' moves and the mirror, "
                          "no model call (the device's consult, RUNTIME-PARITY row 26)")
-    ap.add_argument("--model", default="", help="the GGUF (default: E2B Q4 under go/models)")
+    ap.add_argument("--model", default="", help="the GGUF (default: E2B Q4 under go/models); given, the model is loaded "
+                    "(a package whose manifest has actor: {max_steps, task} acts with it)")
     ap.add_argument("--missing-seat", action="store_true", help="a computed missing goes to the seat too "
                     "(default: the harness answers it with no model call, DESIGN 98530fd)")
     ap.add_argument("--case", default=None, choices=["hosted", "replay", "live"],
@@ -1288,7 +1325,7 @@ def main():
                     "the fired rows, narrated fragments, consults, reads and world lines it caused")
     a = ap.parse_args()
     llm = None
-    if a.narrate or a.consult == "gemma4":
+    if a.narrate or a.consult == "gemma4" or a.model:     # --model: a domain that acts (actor: {…}) needs it too
         from pathlib import Path
         from .llm import LLM
         model = a.model or str(Path(__file__).resolve().parents[2] / "go/models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf")

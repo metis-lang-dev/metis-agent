@@ -66,7 +66,7 @@ class _Loader(importlib.abc.Loader):
             from ..intent_domain import build
             mod.__file__ = str(d.dir / "domain.yaml")
             mod.__dict__.update(build(d.name, display=d.display, voice=d.manifest.get("voice", ""), dir=d.dir,
-                                      module=mod.__name__, fresh=self.fresh))
+                                      module=mod.__name__, fresh=self.fresh, host=d.manifest.get("host")))
         elif d.serves():
             from ..intent_domain import bare
             mod.__file__ = str(d.dir / "domain.yaml")

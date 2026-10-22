@@ -88,3 +88,26 @@ Every record: `kind`, `seq` (1…, the session's order), `t` (RFC 3339),
 with `--trace`, a `{kind: trace, …}` reply before each line's ack or clock
 line. A backend whose domain agents run in its own process calls the same
 functions; the frames above are what the page sees either way.
+
+## Act without a rule (py; world-minihack step 2a, `metis_agent/actor.py`)
+
+A package whose program has no rule for the state it is in (a world before its domain is
+extracted: LEARNING.md, "agent first, domain after") acts when its manifest says
+`actor: {max_steps: N, task: "…"}` (metispy's manifest key; `acts: false` turns it off) and the
+domain agent has a model. Each beat the program leaves quiet with nothing pending, the model types
+ONE intent from the package's own card: the card's prompt and grammar, given the host's
+`describe()` of what it perceives (else its reading's atoms), the task line, and the last action
+with whether the world took it. The intent is mapped as a person's is; no rule takes its command,
+so the domain agent hands it to the host's `act(atom)` face (`{acted, message, events, reward,
+done, won}`). The command is answered `done` (or `refused` when `acted` is false) instead of
+"no rule took the command". A host without `act` is not acted for. The episode ends at the
+world's end (won, done) or at `max_steps` (the cap).
+
+The journal: one JSONL per episode, `<the package's records>/agent-<session>.jsonl`, plain JSON
+lines appended as they happen:
+
+- per step: `{kind: step, step, beat, reading (the atoms), text (what the model was given), events,
+  j (the intent), words (its spoken line), command (the atom, or the mapper's error), result
+  (act's answer), ms}`;
+- last: `{kind: episode, domain, session, steps, end (won | done | cap | error), won, refusals,
+  intents (the verbs' counts), cost: 0, world? (the host's ports)}`.
