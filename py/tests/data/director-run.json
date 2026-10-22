@@ -184,69 +184,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(candle1,cabinet1)"
+"goal": "fetch(candle1,cabinet1)",
+"result": [
+"goto(countertop1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(countertop1)"
+"goal": "goto(countertop1)",
+"result": [
+"reached(countertop1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(countertop1)"
+"goal": "reached(countertop1)",
+"result": [
+"open(countertop1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(countertop1)"
+"goal": "open(countertop1)",
+"result": [
+"accessible(countertop1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(countertop1)"
+"goal": "accessible(countertop1)",
+"result": [
+"take(candle1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(candle1)"
+"goal": "take(candle1)",
+"result": [
+"taken(candle1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(candle1)"
+"goal": "taken(candle1)",
+"result": [
+"goto(cabinet1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(cabinet1)"
+"goal": "goto(cabinet1)",
+"result": [
+"reached(cabinet1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(cabinet1)"
+"goal": "reached(cabinet1)",
+"result": [
+"open(cabinet1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(cabinet1)"
+"goal": "open(cabinet1)",
+"result": [
+"accessible(cabinet1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(cabinet1)"
+"goal": "accessible(cabinet1)",
+"result": [
+"put(candle1,cabinet1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(candle1,cabinet1)"
+"goal": "put(candle1,cabinet1)",
+"result": [
+"placed(candle1,cabinet1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(candle1,cabinet1)"
-}
+"goal": "placed(candle1,cabinet1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-SoapBottle-None-GarbageCan-417/trial_T20190909_120106_745160",
@@ -404,69 +444,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(soapbottle1,garbagecan1)"
+"goal": "fetch(soapbottle1,garbagecan1)",
+"result": [
+"goto(cabinet2)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(cabinet2)"
+"goal": "goto(cabinet2)",
+"result": [
+"reached(cabinet2)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(cabinet2)"
+"goal": "reached(cabinet2)",
+"result": [
+"open(cabinet2)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(cabinet2)"
+"goal": "open(cabinet2)",
+"result": [
+"accessible(cabinet2)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(cabinet2)"
+"goal": "accessible(cabinet2)",
+"result": [
+"take(soapbottle1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(soapbottle1)"
+"goal": "take(soapbottle1)",
+"result": [
+"taken(soapbottle1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(soapbottle1)"
+"goal": "taken(soapbottle1)",
+"result": [
+"goto(garbagecan1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(garbagecan1)"
+"goal": "goto(garbagecan1)",
+"result": [
+"reached(garbagecan1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(garbagecan1)"
+"goal": "reached(garbagecan1)",
+"result": [
+"open(garbagecan1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(garbagecan1)"
+"goal": "open(garbagecan1)",
+"result": [
+"accessible(garbagecan1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(garbagecan1)"
+"goal": "accessible(garbagecan1)",
+"result": [
+"put(soapbottle1,garbagecan1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(soapbottle1,garbagecan1)"
+"goal": "put(soapbottle1,garbagecan1)",
+"result": [
+"placed(soapbottle1,garbagecan1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(soapbottle1,garbagecan1)"
-}
+"goal": "placed(soapbottle1,garbagecan1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-Watch-None-DiningTable-326/trial_T20190912_074626_851427",
@@ -624,69 +704,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(watch1,diningtable1)"
+"goal": "fetch(watch1,diningtable1)",
+"result": [
+"goto(sidetable1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(sidetable1)"
+"goal": "goto(sidetable1)",
+"result": [
+"reached(sidetable1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(sidetable1)"
+"goal": "reached(sidetable1)",
+"result": [
+"open(sidetable1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(sidetable1)"
+"goal": "open(sidetable1)",
+"result": [
+"accessible(sidetable1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(sidetable1)"
+"goal": "accessible(sidetable1)",
+"result": [
+"take(watch1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(watch1)"
+"goal": "take(watch1)",
+"result": [
+"taken(watch1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(watch1)"
+"goal": "taken(watch1)",
+"result": [
+"goto(diningtable1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(diningtable1)"
+"goal": "goto(diningtable1)",
+"result": [
+"reached(diningtable1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(diningtable1)"
+"goal": "reached(diningtable1)",
+"result": [
+"open(diningtable1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(diningtable1)"
+"goal": "open(diningtable1)",
+"result": [
+"accessible(diningtable1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(diningtable1)"
+"goal": "accessible(diningtable1)",
+"result": [
+"put(watch1,diningtable1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(watch1,diningtable1)"
+"goal": "put(watch1,diningtable1)",
+"result": [
+"placed(watch1,diningtable1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(watch1,diningtable1)"
-}
+"goal": "placed(watch1,diningtable1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-Book-None-Sofa-202/trial_T20190907_043708_054006",
@@ -844,69 +964,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(book1,sofa1)"
+"goal": "fetch(book1,sofa1)",
+"result": [
+"goto(armchair1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(armchair1)"
+"goal": "goto(armchair1)",
+"result": [
+"reached(armchair1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(armchair1)"
+"goal": "reached(armchair1)",
+"result": [
+"open(armchair1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(armchair1)"
+"goal": "open(armchair1)",
+"result": [
+"accessible(armchair1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(armchair1)"
+"goal": "accessible(armchair1)",
+"result": [
+"take(book1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(book1)"
+"goal": "take(book1)",
+"result": [
+"taken(book1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(book1)"
+"goal": "taken(book1)",
+"result": [
+"goto(sofa1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(sofa1)"
+"goal": "goto(sofa1)",
+"result": [
+"reached(sofa1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(sofa1)"
+"goal": "reached(sofa1)",
+"result": [
+"open(sofa1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(sofa1)"
+"goal": "open(sofa1)",
+"result": [
+"accessible(sofa1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(sofa1)"
+"goal": "accessible(sofa1)",
+"result": [
+"put(book1,sofa1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(book1,sofa1)"
+"goal": "put(book1,sofa1)",
+"result": [
+"placed(book1,sofa1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(book1,sofa1)"
-}
+"goal": "placed(book1,sofa1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-CreditCard-None-Drawer-227/trial_T20190918_215541_739446",
@@ -1064,69 +1224,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(creditcard1,drawer1)"
+"goal": "fetch(creditcard1,drawer1)",
+"result": [
+"goto(coffeetable1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(coffeetable1)"
+"goal": "goto(coffeetable1)",
+"result": [
+"reached(coffeetable1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(coffeetable1)"
+"goal": "reached(coffeetable1)",
+"result": [
+"open(coffeetable1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(coffeetable1)"
+"goal": "open(coffeetable1)",
+"result": [
+"accessible(coffeetable1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(coffeetable1)"
+"goal": "accessible(coffeetable1)",
+"result": [
+"take(creditcard1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(creditcard1)"
+"goal": "take(creditcard1)",
+"result": [
+"taken(creditcard1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(creditcard1)"
+"goal": "taken(creditcard1)",
+"result": [
+"goto(drawer1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(drawer1)"
+"goal": "goto(drawer1)",
+"result": [
+"reached(drawer1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(drawer1)"
+"goal": "reached(drawer1)",
+"result": [
+"open(drawer1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(drawer1)"
+"goal": "open(drawer1)",
+"result": [
+"accessible(drawer1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(drawer1)"
+"goal": "accessible(drawer1)",
+"result": [
+"put(creditcard1,drawer1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(creditcard1,drawer1)"
+"goal": "put(creditcard1,drawer1)",
+"result": [
+"placed(creditcard1,drawer1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(creditcard1,drawer1)"
-}
+"goal": "placed(creditcard1,drawer1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-CD-None-Shelf-326/trial_T20190908_050350_303115",
@@ -1284,69 +1484,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(cd1,shelf1)"
+"goal": "fetch(cd1,shelf1)",
+"result": [
+"goto(drawer1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(drawer1)"
+"goal": "goto(drawer1)",
+"result": [
+"reached(drawer1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(drawer1)"
+"goal": "reached(drawer1)",
+"result": [
+"open(drawer1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(drawer1)"
+"goal": "open(drawer1)",
+"result": [
+"accessible(drawer1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(drawer1)"
+"goal": "accessible(drawer1)",
+"result": [
+"take(cd1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(cd1)"
+"goal": "take(cd1)",
+"result": [
+"taken(cd1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(cd1)"
+"goal": "taken(cd1)",
+"result": [
+"goto(shelf1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(shelf1)"
+"goal": "goto(shelf1)",
+"result": [
+"reached(shelf1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(shelf1)"
+"goal": "reached(shelf1)",
+"result": [
+"open(shelf1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(shelf1)"
+"goal": "open(shelf1)",
+"result": [
+"accessible(shelf1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(shelf1)"
+"goal": "accessible(shelf1)",
+"result": [
+"put(cd1,shelf1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(cd1,shelf1)"
+"goal": "put(cd1,shelf1)",
+"result": [
+"placed(cd1,shelf1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(cd1,shelf1)"
-}
+"goal": "placed(cd1,shelf1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-Pillow-None-Sofa-209/trial_T20190907_101259_128239",
@@ -1504,69 +1744,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(pillow1,sofa1)"
+"goal": "fetch(pillow1,sofa1)",
+"result": [
+"goto(armchair1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(armchair1)"
+"goal": "goto(armchair1)",
+"result": [
+"reached(armchair1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(armchair1)"
+"goal": "reached(armchair1)",
+"result": [
+"open(armchair1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(armchair1)"
+"goal": "open(armchair1)",
+"result": [
+"accessible(armchair1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(armchair1)"
+"goal": "accessible(armchair1)",
+"result": [
+"take(pillow1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(pillow1)"
+"goal": "take(pillow1)",
+"result": [
+"taken(pillow1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(pillow1)"
+"goal": "taken(pillow1)",
+"result": [
+"goto(sofa1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(sofa1)"
+"goal": "goto(sofa1)",
+"result": [
+"reached(sofa1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(sofa1)"
+"goal": "reached(sofa1)",
+"result": [
+"open(sofa1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(sofa1)"
+"goal": "open(sofa1)",
+"result": [
+"accessible(sofa1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(sofa1)"
+"goal": "accessible(sofa1)",
+"result": [
+"put(pillow1,sofa1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(pillow1,sofa1)"
+"goal": "put(pillow1,sofa1)",
+"result": [
+"placed(pillow1,sofa1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(pillow1,sofa1)"
-}
+"goal": "placed(pillow1,sofa1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-Watch-None-CoffeeTable-222/trial_T20190908_032408_369750",
@@ -1724,69 +2004,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(watch1,coffeetable1)"
+"goal": "fetch(watch1,coffeetable1)",
+"result": [
+"goto(sidetable3)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(sidetable3)"
+"goal": "goto(sidetable3)",
+"result": [
+"reached(sidetable3)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(sidetable3)"
+"goal": "reached(sidetable3)",
+"result": [
+"open(sidetable3)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(sidetable3)"
+"goal": "open(sidetable3)",
+"result": [
+"accessible(sidetable3)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(sidetable3)"
+"goal": "accessible(sidetable3)",
+"result": [
+"take(watch1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(watch1)"
+"goal": "take(watch1)",
+"result": [
+"taken(watch1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(watch1)"
+"goal": "taken(watch1)",
+"result": [
+"goto(coffeetable1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(coffeetable1)"
+"goal": "goto(coffeetable1)",
+"result": [
+"reached(coffeetable1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(coffeetable1)"
+"goal": "reached(coffeetable1)",
+"result": [
+"open(coffeetable1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(coffeetable1)"
+"goal": "open(coffeetable1)",
+"result": [
+"accessible(coffeetable1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(coffeetable1)"
+"goal": "accessible(coffeetable1)",
+"result": [
+"put(watch1,coffeetable1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(watch1,coffeetable1)"
+"goal": "put(watch1,coffeetable1)",
+"result": [
+"placed(watch1,coffeetable1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(watch1,coffeetable1)"
-}
+"goal": "placed(watch1,coffeetable1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-Pencil-None-Desk-307/trial_T20190909_075126_209289",
@@ -1944,69 +2264,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(pencil1,desk1)"
+"goal": "fetch(pencil1,desk1)",
+"result": [
+"goto(sidetable1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(sidetable1)"
+"goal": "goto(sidetable1)",
+"result": [
+"reached(sidetable1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(sidetable1)"
+"goal": "reached(sidetable1)",
+"result": [
+"open(sidetable1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(sidetable1)"
+"goal": "open(sidetable1)",
+"result": [
+"accessible(sidetable1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(sidetable1)"
+"goal": "accessible(sidetable1)",
+"result": [
+"take(pencil1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(pencil1)"
+"goal": "take(pencil1)",
+"result": [
+"taken(pencil1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(pencil1)"
+"goal": "taken(pencil1)",
+"result": [
+"goto(desk1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(desk1)"
+"goal": "goto(desk1)",
+"result": [
+"reached(desk1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(desk1)"
+"goal": "reached(desk1)",
+"result": [
+"open(desk1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(desk1)"
+"goal": "open(desk1)",
+"result": [
+"accessible(desk1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(desk1)"
+"goal": "accessible(desk1)",
+"result": [
+"put(pencil1,desk1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(pencil1,desk1)"
+"goal": "put(pencil1,desk1)",
+"result": [
+"placed(pencil1,desk1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(pencil1,desk1)"
-}
+"goal": "placed(pencil1,desk1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-PepperShaker-None-CounterTop-27/trial_T20190909_010836_535047",
@@ -2164,69 +2524,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(peppershaker1,countertop1)"
+"goal": "fetch(peppershaker1,countertop1)",
+"result": [
+"goto(diningtable1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(diningtable1)"
+"goal": "goto(diningtable1)",
+"result": [
+"reached(diningtable1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(diningtable1)"
+"goal": "reached(diningtable1)",
+"result": [
+"open(diningtable1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(diningtable1)"
+"goal": "open(diningtable1)",
+"result": [
+"accessible(diningtable1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(diningtable1)"
+"goal": "accessible(diningtable1)",
+"result": [
+"take(peppershaker1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(peppershaker1)"
+"goal": "take(peppershaker1)",
+"result": [
+"taken(peppershaker1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(peppershaker1)"
+"goal": "taken(peppershaker1)",
+"result": [
+"goto(countertop1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(countertop1)"
+"goal": "goto(countertop1)",
+"result": [
+"reached(countertop1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(countertop1)"
+"goal": "reached(countertop1)",
+"result": [
+"open(countertop1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(countertop1)"
+"goal": "open(countertop1)",
+"result": [
+"accessible(countertop1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(countertop1)"
+"goal": "accessible(countertop1)",
+"result": [
+"put(peppershaker1,countertop1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(peppershaker1,countertop1)"
+"goal": "put(peppershaker1,countertop1)",
+"result": [
+"placed(peppershaker1,countertop1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(peppershaker1,countertop1)"
-}
+"goal": "placed(peppershaker1,countertop1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-Statue-None-CoffeeTable-227/trial_T20190909_221208_261373",
@@ -2384,69 +2784,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(statue1,coffeetable1)"
+"goal": "fetch(statue1,coffeetable1)",
+"result": [
+"goto(shelf2)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(shelf2)"
+"goal": "goto(shelf2)",
+"result": [
+"reached(shelf2)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(shelf2)"
+"goal": "reached(shelf2)",
+"result": [
+"open(shelf2)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(shelf2)"
+"goal": "open(shelf2)",
+"result": [
+"accessible(shelf2)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(shelf2)"
+"goal": "accessible(shelf2)",
+"result": [
+"take(statue1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(statue1)"
+"goal": "take(statue1)",
+"result": [
+"taken(statue1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(statue1)"
+"goal": "taken(statue1)",
+"result": [
+"goto(coffeetable1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(coffeetable1)"
+"goal": "goto(coffeetable1)",
+"result": [
+"reached(coffeetable1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(coffeetable1)"
+"goal": "reached(coffeetable1)",
+"result": [
+"open(coffeetable1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(coffeetable1)"
+"goal": "open(coffeetable1)",
+"result": [
+"accessible(coffeetable1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(coffeetable1)"
+"goal": "accessible(coffeetable1)",
+"result": [
+"put(statue1,coffeetable1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(statue1,coffeetable1)"
+"goal": "put(statue1,coffeetable1)",
+"result": [
+"placed(statue1,coffeetable1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(statue1,coffeetable1)"
-}
+"goal": "placed(statue1,coffeetable1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-KeyChain-None-Sofa-229/trial_T20190908_123422_029531",
@@ -2604,69 +3044,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(keychain1,sofa1)"
+"goal": "fetch(keychain1,sofa1)",
+"result": [
+"goto(sidetable2)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(sidetable2)"
+"goal": "goto(sidetable2)",
+"result": [
+"reached(sidetable2)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(sidetable2)"
+"goal": "reached(sidetable2)",
+"result": [
+"open(sidetable2)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(sidetable2)"
+"goal": "open(sidetable2)",
+"result": [
+"accessible(sidetable2)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(sidetable2)"
+"goal": "accessible(sidetable2)",
+"result": [
+"take(keychain1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(keychain1)"
+"goal": "take(keychain1)",
+"result": [
+"taken(keychain1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(keychain1)"
+"goal": "taken(keychain1)",
+"result": [
+"goto(sofa1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(sofa1)"
+"goal": "goto(sofa1)",
+"result": [
+"reached(sofa1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(sofa1)"
+"goal": "reached(sofa1)",
+"result": [
+"open(sofa1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(sofa1)"
+"goal": "open(sofa1)",
+"result": [
+"accessible(sofa1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(sofa1)"
+"goal": "accessible(sofa1)",
+"result": [
+"put(keychain1,sofa1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(keychain1,sofa1)"
+"goal": "put(keychain1,sofa1)",
+"result": [
+"placed(keychain1,sofa1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(keychain1,sofa1)"
-}
+"goal": "placed(keychain1,sofa1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-CellPhone-None-Dresser-317/trial_T20190908_033503_132415",
@@ -2824,69 +3304,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(cellphone1,dresser1)"
+"goal": "fetch(cellphone1,dresser1)",
+"result": [
+"goto(bed1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(bed1)"
+"goal": "goto(bed1)",
+"result": [
+"reached(bed1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(bed1)"
+"goal": "reached(bed1)",
+"result": [
+"open(bed1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(bed1)"
+"goal": "open(bed1)",
+"result": [
+"accessible(bed1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(bed1)"
+"goal": "accessible(bed1)",
+"result": [
+"take(cellphone1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(cellphone1)"
+"goal": "take(cellphone1)",
+"result": [
+"taken(cellphone1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(cellphone1)"
+"goal": "taken(cellphone1)",
+"result": [
+"goto(dresser1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(dresser1)"
+"goal": "goto(dresser1)",
+"result": [
+"reached(dresser1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(dresser1)"
+"goal": "reached(dresser1)",
+"result": [
+"open(dresser1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(dresser1)"
+"goal": "open(dresser1)",
+"result": [
+"accessible(dresser1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(dresser1)"
+"goal": "accessible(dresser1)",
+"result": [
+"put(cellphone1,dresser1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(cellphone1,dresser1)"
+"goal": "put(cellphone1,dresser1)",
+"result": [
+"placed(cellphone1,dresser1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(cellphone1,dresser1)"
-}
+"goal": "placed(cellphone1,dresser1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-ButterKnife-None-Drawer-8/trial_T20190907_142645_859732",
@@ -3044,69 +3564,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(butterknife1,drawer1)"
+"goal": "fetch(butterknife1,drawer1)",
+"result": [
+"goto(countertop1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(countertop1)"
+"goal": "goto(countertop1)",
+"result": [
+"reached(countertop1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(countertop1)"
+"goal": "reached(countertop1)",
+"result": [
+"open(countertop1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(countertop1)"
+"goal": "open(countertop1)",
+"result": [
+"accessible(countertop1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(countertop1)"
+"goal": "accessible(countertop1)",
+"result": [
+"take(butterknife1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(butterknife1)"
+"goal": "take(butterknife1)",
+"result": [
+"taken(butterknife1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(butterknife1)"
+"goal": "taken(butterknife1)",
+"result": [
+"goto(drawer1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(drawer1)"
+"goal": "goto(drawer1)",
+"result": [
+"reached(drawer1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(drawer1)"
+"goal": "reached(drawer1)",
+"result": [
+"open(drawer1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(drawer1)"
+"goal": "open(drawer1)",
+"result": [
+"accessible(drawer1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(drawer1)"
+"goal": "accessible(drawer1)",
+"result": [
+"put(butterknife1,drawer1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(butterknife1,drawer1)"
+"goal": "put(butterknife1,drawer1)",
+"result": [
+"placed(butterknife1,drawer1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(butterknife1,drawer1)"
-}
+"goal": "placed(butterknife1,drawer1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-Pillow-None-ArmChair-225/trial_T20190908_104554_100496",
@@ -3264,69 +3824,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(pillow1,armchair1)"
+"goal": "fetch(pillow1,armchair1)",
+"result": [
+"goto(sofa1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(sofa1)"
+"goal": "goto(sofa1)",
+"result": [
+"reached(sofa1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(sofa1)"
+"goal": "reached(sofa1)",
+"result": [
+"open(sofa1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(sofa1)"
+"goal": "open(sofa1)",
+"result": [
+"accessible(sofa1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(sofa1)"
+"goal": "accessible(sofa1)",
+"result": [
+"take(pillow1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(pillow1)"
+"goal": "take(pillow1)",
+"result": [
+"taken(pillow1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(pillow1)"
+"goal": "taken(pillow1)",
+"result": [
+"goto(armchair1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(armchair1)"
+"goal": "goto(armchair1)",
+"result": [
+"reached(armchair1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(armchair1)"
+"goal": "reached(armchair1)",
+"result": [
+"open(armchair1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(armchair1)"
+"goal": "open(armchair1)",
+"result": [
+"accessible(armchair1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(armchair1)"
+"goal": "accessible(armchair1)",
+"result": [
+"put(pillow1,armchair1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(pillow1,armchair1)"
+"goal": "put(pillow1,armchair1)",
+"result": [
+"placed(pillow1,armchair1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(pillow1,armchair1)"
-}
+"goal": "placed(pillow1,armchair1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-Book-None-ArmChair-318/trial_T20190909_113023_560549",
@@ -3484,69 +4084,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(book1,armchair1)"
+"goal": "fetch(book1,armchair1)",
+"result": [
+"goto(desk1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(desk1)"
+"goal": "goto(desk1)",
+"result": [
+"reached(desk1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(desk1)"
+"goal": "reached(desk1)",
+"result": [
+"open(desk1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(desk1)"
+"goal": "open(desk1)",
+"result": [
+"accessible(desk1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(desk1)"
+"goal": "accessible(desk1)",
+"result": [
+"take(book1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(book1)"
+"goal": "take(book1)",
+"result": [
+"taken(book1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(book1)"
+"goal": "taken(book1)",
+"result": [
+"goto(armchair1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(armchair1)"
+"goal": "goto(armchair1)",
+"result": [
+"reached(armchair1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(armchair1)"
+"goal": "reached(armchair1)",
+"result": [
+"open(armchair1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(armchair1)"
+"goal": "open(armchair1)",
+"result": [
+"accessible(armchair1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(armchair1)"
+"goal": "accessible(armchair1)",
+"result": [
+"put(book1,armchair1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(book1,armchair1)"
+"goal": "put(book1,armchair1)",
+"result": [
+"placed(book1,armchair1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(book1,armchair1)"
-}
+"goal": "placed(book1,armchair1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-Laptop-None-Ottoman-203/trial_T20190908_110606_176017",
@@ -3704,69 +4344,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(laptop1,ottoman1)"
+"goal": "fetch(laptop1,ottoman1)",
+"result": [
+"goto(diningtable1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(diningtable1)"
+"goal": "goto(diningtable1)",
+"result": [
+"reached(diningtable1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(diningtable1)"
+"goal": "reached(diningtable1)",
+"result": [
+"open(diningtable1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(diningtable1)"
+"goal": "open(diningtable1)",
+"result": [
+"accessible(diningtable1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(diningtable1)"
+"goal": "accessible(diningtable1)",
+"result": [
+"take(laptop1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(laptop1)"
+"goal": "take(laptop1)",
+"result": [
+"taken(laptop1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(laptop1)"
+"goal": "taken(laptop1)",
+"result": [
+"goto(ottoman1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(ottoman1)"
+"goal": "goto(ottoman1)",
+"result": [
+"reached(ottoman1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(ottoman1)"
+"goal": "reached(ottoman1)",
+"result": [
+"open(ottoman1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(ottoman1)"
+"goal": "open(ottoman1)",
+"result": [
+"accessible(ottoman1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(ottoman1)"
+"goal": "accessible(ottoman1)",
+"result": [
+"put(laptop1,ottoman1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(laptop1,ottoman1)"
+"goal": "put(laptop1,ottoman1)",
+"result": [
+"placed(laptop1,ottoman1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(laptop1,ottoman1)"
-}
+"goal": "placed(laptop1,ottoman1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-Pen-None-Drawer-305/trial_T20190907_224053_726820",
@@ -3924,69 +4604,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(pen1,drawer1)"
+"goal": "fetch(pen1,drawer1)",
+"result": [
+"goto(desk1)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(desk1)"
+"goal": "goto(desk1)",
+"result": [
+"reached(desk1)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(desk1)"
+"goal": "reached(desk1)",
+"result": [
+"open(desk1)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(desk1)"
+"goal": "open(desk1)",
+"result": [
+"accessible(desk1)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(desk1)"
+"goal": "accessible(desk1)",
+"result": [
+"take(pen1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(pen1)"
+"goal": "take(pen1)",
+"result": [
+"taken(pen1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(pen1)"
+"goal": "taken(pen1)",
+"result": [
+"goto(drawer1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(drawer1)"
+"goal": "goto(drawer1)",
+"result": [
+"reached(drawer1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(drawer1)"
+"goal": "reached(drawer1)",
+"result": [
+"open(drawer1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(drawer1)"
+"goal": "open(drawer1)",
+"result": [
+"accessible(drawer1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(drawer1)"
+"goal": "accessible(drawer1)",
+"result": [
+"put(pen1,drawer1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(pen1,drawer1)"
+"goal": "put(pen1,drawer1)",
+"result": [
+"placed(pen1,drawer1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(pen1,drawer1)"
-}
+"goal": "placed(pen1,drawer1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-SprayBottle-None-Drawer-423/trial_T20190909_071924_418051",
@@ -4144,69 +4864,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(spraybottle1,drawer1)"
+"goal": "fetch(spraybottle1,drawer1)",
+"result": [
+"goto(countertop2)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(countertop2)"
+"goal": "goto(countertop2)",
+"result": [
+"reached(countertop2)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(countertop2)"
+"goal": "reached(countertop2)",
+"result": [
+"open(countertop2)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(countertop2)"
+"goal": "open(countertop2)",
+"result": [
+"accessible(countertop2)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(countertop2)"
+"goal": "accessible(countertop2)",
+"result": [
+"take(spraybottle1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(spraybottle1)"
+"goal": "take(spraybottle1)",
+"result": [
+"taken(spraybottle1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(spraybottle1)"
+"goal": "taken(spraybottle1)",
+"result": [
+"goto(drawer1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(drawer1)"
+"goal": "goto(drawer1)",
+"result": [
+"reached(drawer1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(drawer1)"
+"goal": "reached(drawer1)",
+"result": [
+"open(drawer1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(drawer1)"
+"goal": "open(drawer1)",
+"result": [
+"accessible(drawer1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(drawer1)"
+"goal": "accessible(drawer1)",
+"result": [
+"put(spraybottle1,drawer1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(spraybottle1,drawer1)"
+"goal": "put(spraybottle1,drawer1)",
+"result": [
+"placed(spraybottle1,drawer1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(spraybottle1,drawer1)"
-}
+"goal": "placed(spraybottle1,drawer1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 },
 {
 "game": "pick_and_place_simple-Watch-None-CoffeeTable-222/trial_T20190908_032421_426650",
@@ -4364,69 +5124,109 @@
 {
 "k": 0,
 "spec": "task",
-"goal": "fetch(watch1,coffeetable1)"
+"goal": "fetch(watch1,coffeetable1)",
+"result": [
+"goto(sidetable2)"
+]
 },
 {
 "k": 1,
 "spec": "nav",
-"goal": "goto(sidetable2)"
+"goal": "goto(sidetable2)",
+"result": [
+"reached(sidetable2)"
+]
 },
 {
 "k": 2,
 "spec": "task",
-"goal": "reached(sidetable2)"
+"goal": "reached(sidetable2)",
+"result": [
+"open(sidetable2)"
+]
 },
 {
 "k": 4,
 "spec": "access",
-"goal": "open(sidetable2)"
+"goal": "open(sidetable2)",
+"result": [
+"accessible(sidetable2)"
+]
 },
 {
 "k": 5,
 "spec": "task",
-"goal": "accessible(sidetable2)"
+"goal": "accessible(sidetable2)",
+"result": [
+"take(watch1)"
+]
 },
 {
 "k": 7,
 "spec": "grasp",
-"goal": "take(watch1)"
+"goal": "take(watch1)",
+"result": [
+"taken(watch1)"
+]
 },
 {
 "k": 8,
 "spec": "task",
-"goal": "taken(watch1)"
+"goal": "taken(watch1)",
+"result": [
+"goto(coffeetable1)"
+]
 },
 {
 "k": 10,
 "spec": "nav",
-"goal": "goto(coffeetable1)"
+"goal": "goto(coffeetable1)",
+"result": [
+"reached(coffeetable1)"
+]
 },
 {
 "k": 11,
 "spec": "task",
-"goal": "reached(coffeetable1)"
+"goal": "reached(coffeetable1)",
+"result": [
+"open(coffeetable1)"
+]
 },
 {
 "k": 13,
 "spec": "access",
-"goal": "open(coffeetable1)"
+"goal": "open(coffeetable1)",
+"result": [
+"accessible(coffeetable1)"
+]
 },
 {
 "k": 14,
 "spec": "task",
-"goal": "accessible(coffeetable1)"
+"goal": "accessible(coffeetable1)",
+"result": [
+"put(watch1,coffeetable1)"
+]
 },
 {
 "k": 16,
 "spec": "place",
-"goal": "put(watch1,coffeetable1)"
+"goal": "put(watch1,coffeetable1)",
+"result": [
+"placed(watch1,coffeetable1)"
+]
 },
 {
 "k": 17,
 "spec": "task",
-"goal": "placed(watch1,coffeetable1)"
-}
+"goal": "placed(watch1,coffeetable1)",
+"result": [
+"done"
 ]
+}
+],
+"outcome": "done"
 }
 ]
 }

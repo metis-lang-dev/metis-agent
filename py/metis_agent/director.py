@@ -12,9 +12,10 @@ this module keeps, from the atoms that arrived.
         goal = f.goal("nav", "goto")          # "goto(countertop1)"
 
 The goal of forward(D, K), for the atom that just arrived (its kind K1):
-  - a RENAME of the director's facts: detour(K1, K) or escalate(K1, K) → K with the arrival's
-    arguments (elsewhere(R) detours as goto(R) to the navigator, escalates as refused(R) to the
-    planner);
+  - a RENAME, the instance's facts: rename(K1, K, G) → G with the arrival's arguments (the
+    architect's ruling: rename(elsewhere, goto, goto), rename(elsewhere, refused, refused) — an
+    elsewhere(R) detours as goto(R) to the navigator, escalates as refused(R) to the planner);
+    an instance without rename/3 has the same table in its detour(K1, K) / escalate(K1, K);
   - else, to the planner: the last atom of kind K (a result it takes, its own goal kind);
   - else, the arrival itself when it is of kind K (a sub-goal the planner put out);
   - else, a frame KEPT for (D, K): the goal D was working on before a detour, resumed when the
@@ -25,7 +26,7 @@ renames and the roles are the instance's facts.
 """
 import re
 
-ROLE_FACTS = ("handles", "planner", "specialist", "result", "end", "detour", "escalate", "nohandler")
+ROLE_FACTS = ("handles", "planner", "specialist", "result", "end", "detour", "escalate", "nohandler", "rename")
 OUT = ("wake", "sleep", "forward", "ask", "ended")
 
 
@@ -46,11 +47,13 @@ def director_facts(source):
     else:
         atoms = [a.rstrip(".") for a in source]
     f = {"handles": set(), "planner": set(), "specialist": set(), "result": set(), "end": set(),
-         "nohandler": set(), "detour": {}, "escalate": {}}
+         "nohandler": set(), "detour": {}, "escalate": {}, "rename": {}}
     for a in atoms:
         k, xs = kind_of(a), args_of(a)
         if k == "handles":
             f["handles"].add((xs[0], xs[1]))
+        elif k == "rename":
+            f["rename"][(xs[0], xs[1])] = xs[2]
         elif k in ("detour", "escalate"):
             f[k][xs[0]] = xs[1]
         elif k in f:
@@ -89,7 +92,9 @@ class Frames:
         a = self.arrival or ""
         k1 = kind_of(a)
         f = self.facts
-        if f["detour"].get(k1) == k or f["escalate"].get(k1) == k:
+        if (k1, k) in f["rename"]:
+            g = "%s(%s)" % (f["rename"][(k1, k)], ",".join(args_of(a)))
+        elif f["detour"].get(k1) == k or f["escalate"].get(k1) == k:      # the same table, read from the director's roles
             g = "%s(%s)" % (k, ",".join(args_of(a)))
         elif d in f["planner"]:
             g = self.last.get(k)
@@ -102,3 +107,68 @@ class Frames:
         if d not in f["planner"] and g is not None:
             self.kept[(d, k)] = g
         return g
+
+
+class DirectorLoop:
+    """The director in the agent: the atoms the served domains produce become ARRIVALS, each is one
+    director beat, and its effects are the agent's own verbs. `ops` is the agent (the service, or a
+    test's fake):
+
+      ops.beat(name, lines)        the director's world lines in, one beat: → its trace records
+      ops.instance(d, goal)        the director's host re-instances d for the goal (the world's
+                                   gen_hier into d's installed directory) and the agent reloads d
+      ops.activate(d) / ops.deactivate(d)
+      ops.say(text)                a line spoken as it is (an ask, the end)
+
+    `kinds` are the arrival kinds (the director instance's `kind` type): an atom of one, produced by
+    a rule of the planner or a specialist, arrives; a specialist's result is followed by idle(D)."""
+
+    def __init__(self, name, facts, kinds, ops):
+        self.name, self.facts, self.kinds, self.ops = name, facts, set(kinds), ops
+        self.frames = Frames(facts)
+        self.domains = facts["specialist"] | facts["planner"]
+        self.queue, self.log, self.outcome = [], [], None
+
+    def arrive(self, atom):
+        """An atom from outside the domains' rules (the person's goal, a seed)."""
+        self.queue.append(atom)
+
+    def produced(self, domain, trace):
+        """A served domain's trace record: the atoms its rules produced of the director's kinds."""
+        if domain == self.name or domain not in self.domains:
+            return
+        out = [a for row in trace.get("fired") or [] for a in row.get("produce") or [] if kind_of(a) in self.kinds]
+        self.queue += out
+        if out and domain not in self.facts["planner"]:
+            self.queue.append("idle(%s)" % domain)
+
+    def step(self):
+        """Every arrival queued, one director beat each, its effects applied; → the beats run."""
+        n = 0
+        while self.queue and self.outcome is None:
+            atom = self.queue.pop(0)
+            line = self.frames.arrive(atom)
+            outs, said = [], []
+            for r in self.ops.beat(self.name, [line]) or []:
+                for row in r.get("fired") or []:
+                    outs += [a for a in row.get("produce") or [] if kind_of(a) in OUT]
+                    if row.get("line") and any(kind_of(a) in ("ask", "ended") for a in row.get("produce") or []):
+                        said.append(row["line"])
+            beat = {"arrival": atom, "line": line, "effects": outs, "goals": []}
+            for verb, args in effects(outs):
+                if verb == "forward":
+                    d, k = args
+                    goal = self.frames.goal(d, k)
+                    beat["goals"].append([d, goal])
+                    self.ops.instance(d, goal)
+                elif verb == "wake":
+                    self.ops.activate(args[0])
+                elif verb == "sleep":
+                    self.ops.deactivate(args[0])
+                elif verb in ("ask", "ended"):
+                    self.outcome = "%s(%s)" % (verb, ",".join(args))
+            for text in said:
+                self.ops.say(text)
+            self.log.append(beat)
+            n += 1
+        return n

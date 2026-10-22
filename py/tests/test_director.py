@@ -47,3 +47,42 @@ def test_the_detour_and_the_escalation_rename_from_the_facts():
     assert f.goal("task", "refused") == "refused(fridge1)"               # escalate(elsewhere, refused)
     assert effects(["wake(nav)", "seen(goto)", "forward(nav,goto)", "ended(done)"]) == [
         ("wake", ("nav",)), ("forward", ("nav", "goto")), ("ended", ("done",))]
+
+
+def test_the_loop_replays_the_recorded_run():
+    """DirectorLoop over fakes of the agent: the director's beat answers with the recorded effects
+    of that arrival; a forward re-instances the domain, which then produces the recorded results of
+    that activation. The loop queues the same arrivals in the same order, sends the same goals and
+    ends where the run ended (the director's end line spoken)."""
+    from metis_agent.director import DirectorLoop
+    kinds = sorted({b["arrival"].split("(")[0] for g in RUN["games"] for b in g["beats"]} - {"idle"})
+    for g in RUN["games"]:
+        beats, acts, verbs = list(g["beats"]), list(g["goals"]), []
+
+        class Ops:
+            def beat(self, name, lines):
+                b = beats.pop(0)
+                end = any(e.startswith("ended(") for e in b["effects"])
+                return [{"fired": [{"kind": "clause", "produce": b["effects"], "line": "The task is done." if end else None}]}]
+
+            def instance(self, d, goal):
+                a = acts.pop(0)
+                verbs.append(("instance", d, goal))
+                loop.produced(d, {"fired": [{"kind": "clause", "produce": a["result"]}]})   # the domain's run
+
+            def activate(self, d):
+                verbs.append(("activate", d))
+
+            def deactivate(self, d):
+                verbs.append(("deactivate", d))
+
+            def say(self, text):
+                verbs.append(("say", text))
+        loop = DirectorLoop("director", FACTS, kinds, Ops())
+        loop.arrive(g["beats"][0]["arrival"])
+        loop.step()
+        assert [b["arrival"] for b in loop.log] == [b["arrival"] for b in g["beats"]], g["game"]
+        assert [(d, goal) for b in loop.log for d, goal in b["goals"]] == [(a["spec"], a["goal"]) for a in g["goals"]]
+        assert loop.outcome == "ended(done)" and g["outcome"] == "done" and verbs[-1] == ("say", "The task is done.")
+        woke = [v[1] for v in verbs if v[0] == "activate"]
+        assert woke == [a["spec"] for a in g["goals"] if a["spec"] != "task"]      # each specialist woken for its goal
