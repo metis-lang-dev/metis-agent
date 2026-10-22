@@ -530,7 +530,7 @@ class Live:
                 ag = live.agents.agents.get(name) if hasattr(live.agents, "agents") else None
                 host = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
                 target = live.agents.agents.get(dom) if hasattr(live.agents, "agents") else None
-                tokens = dict(target.repl.counts) if target is not None else {}
+                tokens = {a: n for a, n in target.repl.counts.items() if n > 0} if target is not None else {}   # what D holds now
                 if host is None or not hasattr(host, "instance"):
                     raise RuntimeError("director %s: its host has no instance(d, goal, tokens)" % name)
                 if host.instance(dom, goal, tokens):

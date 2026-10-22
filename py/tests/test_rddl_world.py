@@ -137,7 +137,7 @@ def test_a_wrong_rate_scores_lower_on_the_same_seeds(tmp_path, monkeypatch):
     h.write_text(h.read_text().replace("else _p(host, c2)", "else 5 * _p(host, c2)"))
     monkeypatch.setenv("METIS_CATALOG", str(tmp_path))
     monkeypatch.setenv("METIS_RDDL_PY", GYM_PY)
-    for m in [m for m in sys.modules if m.startswith("nav_host") or m.startswith("metis_agent.domains.nav")]:
+    for m in [m for m in sys.modules if m.startswith("metis_host.nav") or m.startswith("metis_agent.domains.nav")]:
         monkeypatch.delitem(sys.modules, m)                 # the host module as the scratch catalog has it
     assert _mean_outcome_log(scored()) < true - 0.1
 

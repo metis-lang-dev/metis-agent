@@ -63,7 +63,7 @@ def _scratch(tmp_path, monkeypatch, world, edit):
     f.write_text(edit(f.read_text()))
     monkeypatch.setenv("METIS_CATALOG", str(tmp_path))
     monkeypatch.setenv("METIS_RDDL_PY", GYM_PY)
-    for m in [m for m in sys.modules if m.startswith(("%s_host" % world, "metis_agent.domains." + world))]:
+    for m in [m for m in sys.modules if m.startswith(("metis_host.%s" % world, "metis_agent.domains." + world))]:
         del sys.modules[m]
 
 

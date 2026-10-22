@@ -137,7 +137,8 @@ class DirectorLoop:
         """A served domain's trace record: the atoms its rules produced of the director's kinds."""
         if domain == self.name or domain not in self.domains:
             return
-        out = [a for row in trace.get("fired") or [] for a in row.get("produce") or [] if kind_of(a) in self.kinds]
+        out = [a for row in trace.get("fired") or [] if row.get("kind") != "exo"      # put in from outside (the person's
+               for a in row.get("produce") or [] if kind_of(a) in self.kinds]       # intent, the world's sync): no rule's
         self.queue += out
         if out and domain not in self.facts["planner"]:
             self.queue.append("idle(%s)" % domain)

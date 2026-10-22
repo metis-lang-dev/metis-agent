@@ -25,14 +25,20 @@ def catalog_domains():
     return catalog.root() / "domains"
 
 
+def host_key(name):
+    """The sys.modules key of a domain's host shim: never a world module's own name (the domain
+    `director`'s shim imports the world's director_host; under that key it would import itself)."""
+    return "metis_host.%s" % name
+
+
 def _host_module(d, name, fresh=False, file=None):
     """The domain's host module: the manifest's `host:` file (`mh_host.py:make` names mh_host.py),
-    else <name>_host.py; keyed by the domain's name, so packages that share a host file's name
-    (every MiniHack level's mh_host.py) stay apart."""
+    else <name>_host.py; keyed by the domain's name (host_key), so packages that share a host file's
+    name (every MiniHack level's mh_host.py) stay apart."""
     p = d / (file or ("%s_host.py" % name))
     if not p.exists():
         return None
-    key = "%s_host" % name
+    key = host_key(name)
     if fresh:
         sys.modules.pop(key, None)                  # reload: the host re-read from disk
     if key not in sys.modules:

@@ -86,3 +86,13 @@ def test_the_loop_replays_the_recorded_run():
         assert loop.outcome == "ended(done)" and g["outcome"] == "done" and verbs[-1] == ("say", "The task is done.")
         woke = [v[1] for v in verbs if v[0] == "activate"]
         assert woke == [a["spec"] for a in g["goals"] if a["spec"] != "task"]      # each specialist woken for its goal
+
+
+def test_an_atom_put_in_from_outside_does_not_arrive():
+    """The person's FETCH enters the attended task as an exo row: the task already has it; only what
+    a rule produces arrives (else the director re-instances the task and its start runs twice)."""
+    from metis_agent.director import DirectorLoop
+    loop = DirectorLoop("director", FACTS, ["fetch", "goto"], None)
+    loop.produced("task", {"fired": [{"kind": "exo", "produce": ["fetch(candle1,cabinet1)"]},
+                                     {"kind": "clause", "produce": ["start", "goto(countertop1)"]}]})
+    assert loop.queue == ["goto(countertop1)"]

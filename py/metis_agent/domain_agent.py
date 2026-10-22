@@ -1266,7 +1266,8 @@ class Process:
             for n in group:
                 name = "metis_agent.domains." + n
                 saved[name] = sys.modules.get(name)
-                host = "%s_host" % n
+                from .intent_domain import host_key
+                host = host_key(n)
                 saved[host] = sys.modules.get(host)
                 fresh[n] = domains.load(n, fresh=True)           # the manifest, the agent module, intent.yaml and the host re-read
             if pair:
