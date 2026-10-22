@@ -143,10 +143,13 @@ class DirectorLoop:
         if out and domain not in self.facts["planner"]:
             self.queue.append("idle(%s)" % domain)
 
-    def step(self):
-        """Every arrival queued, one director beat each, its effects applied; → the beats run."""
-        n = 0
-        while self.queue and self.outcome is None:
+    MAX_BEATS = 64            # per step (one agent tick): a director whose rules cycle cannot spin inside a tick
+
+    def step(self, limit=None):
+        """The queued arrivals, one director beat each, its effects applied — at most `limit`
+        (MAX_BEATS) in one step, the rest carried to the next; → the beats run."""
+        n, limit = 0, self.MAX_BEATS if limit is None else limit
+        while self.queue and self.outcome is None and n < limit:
             atom = self.queue.pop(0)
             line = self.frames.arrive(atom)
             outs, said = [], []

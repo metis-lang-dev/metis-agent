@@ -96,3 +96,17 @@ def test_an_atom_put_in_from_outside_does_not_arrive():
     loop.produced("task", {"fired": [{"kind": "exo", "produce": ["fetch(candle1,cabinet1)"]},
                                      {"kind": "clause", "produce": ["start", "goto(countertop1)"]}]})
     assert loop.queue == ["goto(countertop1)"]
+
+
+def test_a_step_runs_at_most_its_limit_and_carries_the_rest():
+    """nina's N1: the arrivals past the step's limit wait for the next step (the next tick)."""
+    from metis_agent.director import DirectorLoop
+
+    class Ops:
+        def beat(self, name, lines):
+            return []
+    loop = DirectorLoop("director", FACTS, ["goto"], Ops())
+    for i in range(5):
+        loop.arrive("goto(r%d)" % i)
+    assert loop.step(limit=2) == 2 and len(loop.queue) == 3
+    assert loop.step() == 3 and loop.queue == []
