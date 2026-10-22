@@ -639,6 +639,30 @@ def test_two_pages_on_the_wire_one_owns(tmp_path):
         lv.stop.set()
 
 
+def test_an_activates_bindings_reach_the_host(tmp_path):
+    """console-nav step 2: activate{domain, bindings} hands the bindings to a host with
+    take_bindings(bindings) (metis-loop's repl host attaches to the page's session); a page host's
+    domain takes them from its owner only; the last bindings bind the host again after a
+    reload; a host without bind takes nothing, and the activation stands."""
+    lv, frames, inner = _page_live(tmp_path)
+    got = []
+    inner.take_bindings = got.append
+    assert lv.domain_verb("activate", "dog", {"session": "w1", "token": "t"}, "person", "p1") is None
+    assert got == [{"session": "w1", "token": "t"}] and recs(lv, "dlg-domain")[-1]["bindings"] == {"session": "w1", "token": "t"}
+    lv.claim(["dog"], "p1")
+    err = lv.domain_verb("activate", "dog", {"session": "w2"}, "person", "p2")
+    assert err.startswith("page p2 does not own dog") and got == [{"session": "w1", "token": "t"}]
+    assert lv.domain_verb("activate", "dog", {"session": "w2"}, "person", "p1") is None and got[-1] == {"session": "w2"}
+    assert lv.domain_verb("activate", "dog", None, "model") is None and len(got) == 2      # no bindings: no bind
+    key, err = lv.reload("dog")
+    assert err is None
+    host = lv.agents.agents["dog"].host
+    new = getattr(host, "inner", host)
+    assert new is not inner and not hasattr(new, "take_bindings") and got == [{"session": "w1", "token": "t"}, {"session": "w2"}]
+    assert lv.domain_verb("activate", "kitchen", {"session": "w3"}, "person", "p1") is None   # no take_bindings on its host: nothing taken
+    assert "kitchen" in lv.loaded and lv.bindings["kitchen"] == {"session": "w3"}
+
+
 def test_a_typed_intent_is_dispatched_without_the_model(tmp_path):
     """console-nav item 20: intent{domain, id, j} dispatches the J to the domain as the
     orchestrator would, no model pass (no dlg-gen); its result wakes the orchestrator on the

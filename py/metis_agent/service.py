@@ -360,6 +360,7 @@ class Live:
         self.changed = {}
         self.ports_due = set()
         self.owner = {}             # a page host's domain -> the page (socket) that owns it
+        self.bindings = {}          # a domain -> the last activate's bindings (its host's again after a reload)
         self.silent = set()         # the cids of typed intents whose replies are journaled, never voiced
         self.last_cat = ""
         self.in_turn, self.held = False, []
@@ -749,7 +750,7 @@ class Live:
         log.info("[v3] installed %s (%s) from its manifest", dom, ", ".join(group))
         return None
 
-    def domain_verb(self, verb, dom, bindings, by):
+    def domain_verb(self, verb, dom, bindings, by, page=None):
         rec = {"kind": "dlg-domain", "verb": verb, "domain": dom, "by": by}
         if bindings is not None:
             rec["bindings"] = bindings
@@ -764,7 +765,14 @@ class Live:
             err = "no domain agent serves %s" % dom
         elif dom in self.quiet:
             err = "%s is stepped with its pair, not on its own" % dom
+        elif bindings is not None and page is not None and self.page_host(dom) and self.owner.get(dom, page) != page:
+            err = "page %s does not own %s: page %s does (its hello claims it)" % (page, dom, self.owner[dom])
         else:
+            if verb == "activate" and isinstance(bindings, dict):     # the host's (take_bindings), kept for a reload
+                self.bindings[dom] = dict(bindings)
+                for r in self.serve_line({"bind": dict(bindings), "domain": dom}, "bind"):
+                    if r.get("kind") == "error" and err is None:
+                        err = r.get("error")
             self.loaded = [d for d in self.loaded if d != dom] + ([dom] if verb == "activate" else [])
             (self.off.discard if verb == "activate" else self.off.add)(dom)
             self.ocfg.loaded = self.loaded
@@ -915,6 +923,8 @@ class Live:
         else:
             rec["key"] = key
             self.o.reloaded(d)
+            if d in self.bindings:                  # the new host gets the domain's bindings again
+                self.serve_line({"bind": dict(self.bindings[d]), "domain": d}, "bind")
             if d in self.watch:
                 self.base[d], self.changed[d] = before, ""
             self.reload_intents(d)
@@ -1140,7 +1150,7 @@ def make_app(live, ui_dir, lib_dir=None):
                     err = await ask(live.typed, m.get("domain") or "", m.get("id"), m.get("j"), pid)
                     await send("intent_ack", {"id": m.get("id"), "domain": m.get("domain"), **({"error": str(err)} if err else {})})
                 elif ev in ("activate", "deactivate"):
-                    err = await ask(live.domain_verb, ev, m.get("domain") or "", m.get("bindings"), "person")
+                    err = await ask(live.domain_verb, ev, m.get("domain") or "", m.get("bindings"), "person", pid)
                     await send("domain_ack", {"verb": ev, "domain": m.get("domain"), **({"error": str(err)} if err else {})})
                 elif ev == "ports":
                     try:
