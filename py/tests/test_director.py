@@ -136,3 +136,24 @@ def test_a_beat_names_its_source_and_line_and_an_ask_is_said_as_an_ask():
     loop.step()
     assert loop.outcome == "ask(refused)" and said == [("I cannot put it there. Where then?", "ask")]
     assert loop.reengage() == "ask(refused)" and loop.outcome is None
+
+
+def test_an_ask_says_the_arrivals_own_line():
+    """nina's alf-demo step-2 R1: the planner's refusal arrives with its rule's line; the director
+    asks; the person hears the refusal's words, not the director's generic end."""
+    from metis_agent.director import DirectorLoop
+    said = []
+
+    class Ops:
+        def beat(self, name, lines):
+            return [{"fired": [{"kind": "clause", "produce": ["ended(wrong_dest)", "ask(wrong_dest)"],
+                                "line": "wrong dest: the episode is over without the task done. I ask."}]}]
+
+        def say(self, text, kind="line"):
+            said.append((text, kind))
+    loop = DirectorLoop("director", FACTS, ["wrong_dest"], Ops())
+    loop.produced("task", {"fired": [{"kind": "clause", "produce": ["wrong_dest(fridge1)"],
+                                      "line": "Fridge 1 is not where this task wants tomato 1: I stop and ask."}]})
+    loop.step()
+    assert said == [("Fridge 1 is not where this task wants tomato 1: I stop and ask.", "ask")]
+    assert loop.log[0]["said_as_ask"] and loop.log[0]["from"] == "task"

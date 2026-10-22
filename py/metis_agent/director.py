@@ -176,6 +176,11 @@ class DirectorLoop:
             beat = {"arrival": atom, "line": line, "effects": outs, "goals": []}
             if src:
                 beat["from"], beat["said"] = src, src_line
+            if src_line and any(k == "ask" for _, k in said):
+                # an ask says what cornered it: the arrival's own line (the task's refusal: "fridge 1 is not where…"),
+                # the director's generic line only when the arrival has none (nina's alf-demo step-2 R1)
+                said = [(src_line, "ask") if k == "ask" else (t, k) for t, k in said]
+                beat["said_as_ask"] = True
             for verb, args in effects(outs):
                 if verb == "forward":
                     d, k = args

@@ -548,7 +548,7 @@ class Live:
                 live.domain_verb("deactivate", dom, None, "director")
 
             def say(self, text, kind="line"):
-                live.on_say("ask" if kind == "ask" else "line", text)
+                live.on_say("ask" if kind == "ask" else "line", live.spoken(text))
         return DirectorLoop(name, director_facts(text), m.group(1).split(), Ops())
 
     def director_step(self):
@@ -578,13 +578,18 @@ class Live:
                 tv["chain"].append({"domain": d, "goal": goal, "result": None})
                 changed = True
         src = b.get("from")
+        if src and b.get("said_as_ask") and src in f["planner"]:
+            tv["results"].append(self.spoken(b["said"]))                         # the planner's refusal: a result line of the task card
+            changed = True
         if src and src not in f["planner"] and not b["arrival"].startswith("idle("):
             entry = next((c for c in reversed(tv["chain"]) if c["domain"] == src and c["result"] is None), None)
             if entry is not None:
                 entry["result"] = b["arrival"]
-            if b.get("said"):
-                tv["results"].append(b["said"])
-                self.on_say("line", b["said"])
+            if b.get("said") and not b.get("said_as_ask"):         # an asking arrival's line is the ask's (said once)
+                tv["results"].append(self.spoken(b["said"]))
+                self.on_say("line", self.spoken(b["said"]))
+            elif b.get("said"):
+                tv["results"].append(self.spoken(b["said"]))
             changed = True
         view = {"task": {"chain": [dict(c) for c in tv["chain"]], "results": list(tv["results"])}}
         asks = any(e.startswith("ask(") for e in b.get("effects") or ())       # the director asks (with its end, or alone)
@@ -593,6 +598,19 @@ class Live:
             changed = True
         if changed:
             self.emit("world/delta", view)
+
+    def spoken(self, text):
+        """A line with the world's handles said as names (fridge1 → "fridge 1"): the first served host
+        with a `speak(text)` face (the world's own words), else the line as it is."""
+        for ag in (self.agents.agents.values() if hasattr(self.agents, "agents") else ()):
+            h = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+            sp = getattr(h, "speak", None)
+            if callable(sp):
+                try:
+                    return sp(text) or text
+                except Exception:  # noqa: BLE001 — a host's words never stop a line
+                    return text
+        return text
 
     def world_frames(self):
         """Every served domain's host frames (a host's `frames()` face: the world page's world/*
@@ -797,6 +815,9 @@ class Live:
             if r.record:
                 w["record"] = r.record
             w.update(extra.get(id(r), {}))
+            if (self.director is not None and r.kind == "result" and r.domain in self.director.domains
+                    and r.id not in self.silent):
+                self.silent.add(r.id)           # the director speaks for its domains' results (its lines, its ask)
             if r.id in self.silent:             # a silent typed intent's reply: journaled, never voiced
                 w["silent"] = True
                 self.journal.record(w)
