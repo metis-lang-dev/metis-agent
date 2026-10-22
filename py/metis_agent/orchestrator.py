@@ -1480,6 +1480,7 @@ class Orch:
     def speak_as_is(self, line):
         """The rule's %% line, spoken as it is (manifest voice: line): no model pass, so a result
         keeps its meaning ("applying it is your click" is never "I have completed applying")."""
+        line = line[:1].upper() + line[1:]     # a line that starts with its {W} ("editor is not on the page now.")
         self.w(SPEAK_CUE + " " + line)
         self.say("line", line)
         self.end()

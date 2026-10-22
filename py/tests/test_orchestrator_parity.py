@@ -129,12 +129,13 @@ def test_a_line_voiced_domains_result_is_spoken_as_its_line():
         go = O.Call(j='{"intent":"NAVIGATE","goal":{"type":"OBJECT","description":"door"}}')
         o.by_id["c1"] = go
         o.m.see(O.Reply({"domain": "dog", "kind": "result", "id": "c1", "status": "accepted"}), go)
-        line = "The plan is up in the APPLY dialog; applying it is your click."
+        line = "the plan is up in the APPLY dialog; applying it is your click."
         o.handle(O.Inbound(reply=O.Reply({"domain": "dog", "kind": "result", "id": "c1", "status": "done", "text": line})), "", [])
         gens = [l for l in rec.log if l.startswith("gen")]
         assert bool(gens) == want_gen, rec.log
         if not want_gen:
-            assert says == [("line", line)] and any(O.SPEAK_CUE + " " + line in x for x in rec.log)
+            said = "The" + line[3:]                                          # its first letter capitalized
+            assert says == [("line", said)] and any(O.SPEAK_CUE + " " + said in x for x in rec.log)
 
 
 def test_the_repl_api_is_metispys(monkeypatch):
