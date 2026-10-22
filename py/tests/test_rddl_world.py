@@ -16,7 +16,7 @@ from metis_agent.domain_agent import Process, serve
 
 def _gym():
     """The interpreter with pyRDDLGym the catalog's host would run, or None."""
-    from metis_loop_sdk import catalog
+    from metis import catalog
     sys.path.insert(0, str(catalog.root() / "tools"))
     try:
         import rddl_host
@@ -73,7 +73,7 @@ def test_twenty_seeded_episodes_are_deterministic_and_end_at_the_horizon():
 
 
 def test_a_planted_wrong_rule_surprises(tmp_path, monkeypatch):
-    from metis_loop_sdk import catalog
+    from metis import catalog
     root = catalog.root()
     shutil.copytree(root / "tools", tmp_path / "tools", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(root / "domains/nav", tmp_path / "domains/nav", ignore=shutil.ignore_patterns("build", "records"))
@@ -128,7 +128,7 @@ def test_a_scored_beat_says_the_programs_probability_of_what_the_world_answered(
 
 def test_a_wrong_rate_scores_lower_on_the_same_seeds(tmp_path, monkeypatch):
     """die ×5, every rule kept: nothing is impossible, the outcomes are less likely (the statistical surprise)."""
-    from metis_loop_sdk import catalog
+    from metis import catalog
     root = catalog.root()
     true = _mean_outcome_log(scored())
     shutil.copytree(root / "tools", tmp_path / "tools", ignore=shutil.ignore_patterns("__pycache__"))

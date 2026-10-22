@@ -25,10 +25,10 @@ GGUF = Path(__file__).resolve().parents[2] / "go/models/gemma4/gemma-4-E2B-it-Q4
 
 
 def generator(root=None):
-    """metis-catalog's tools/intents.py, through the loop SDK, reading the
+    """The intents generator (metis.intents, through metis.catalog), reading the
     catalog whose domains/ directory is `root` (a scratch domains/ root,
     e.g. the loop console's proposal check, uses the real generator)."""
-    from metis_loop_sdk import catalog
+    from metis import catalog
     return catalog.generator(Path(root).parent if root else None)
 
 

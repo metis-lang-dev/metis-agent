@@ -12,8 +12,8 @@ import pytest
 # cwd, py/ here): $METIS_CATALOG, else the installed metis-catalog's own (its
 # checkout installed -e, or the wheel's); a test on a scratch copy sets its own
 if not os.environ.get("METIS_CATALOG"):
-    import metis_catalog
-    _own = Path(metis_catalog.__file__).resolve().parent
+    from metis.catalog.manifests import data_dir      # metispy's: the installed catalog's data, unimported
+    _own = data_dir()
     os.environ["METIS_CATALOG"] = str(_own if (_own / "domains").is_dir() else _own.parent)
 
 

@@ -86,8 +86,9 @@ class Kernel:
         # the kernel's dot file names an llm endpoint for `narrate`; the
         # specialist is the model, so no second one is ever called (below)
         os.environ.setdefault("METIS_CONFIG", "")
-        from metis.lang.repl import Repl
-        self.repl = Repl(catalog, seed=seed)
+        from metis import repl
+        self.session = repl.open(catalog, seed=seed)    # metis.repl: one REPL API (metis-packages)
+        self.repl = self.session.shell
         self.intro = self.repl.intro
 
     def run(self, verb, arg=""):

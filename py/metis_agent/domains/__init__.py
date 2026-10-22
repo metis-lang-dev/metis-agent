@@ -1,7 +1,7 @@
 """The domain modules, from the catalog (domain-catalog s-2a2bc758 step 2):
 no domain file lives in metis-agent. A domain's module is built from its
-manifest, metis-catalog domains/<…>/domain.yaml, read through the loop SDK
-(metis_loop_sdk.catalog: the one access to the catalog):
+manifest, metis-catalog domains/<…>/domain.yaml, read through metispy's
+catalog (metis.catalog: the one access to the catalog):
 
   agent: agent.py[:variant]   the catalog's domain-agent module, executed
                               as metis_agent.domains.<name> (the variant's
@@ -33,10 +33,10 @@ from pathlib import Path
 
 
 def catalog():
-    """The loop SDK's catalog (metis_loop_sdk.catalog): get, domains, index,
-    listing, root, … — the root ($METIS_CATALOG, else the cwd) and the
-    loader are the SDK's."""
-    from metis_loop_sdk import catalog as c
+    """metispy's catalog (metis.catalog, metis-packages): get, domains, index,
+    listing, root, … — the root ($METIS_CATALOG, else the installed
+    catalog's data, else the cwd) and the loader are metispy's."""
+    from metis import catalog as c
     return c
 
 

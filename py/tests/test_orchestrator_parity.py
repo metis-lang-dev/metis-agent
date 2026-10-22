@@ -140,15 +140,15 @@ def test_a_line_voiced_domains_result_is_spoken_as_its_line():
 
 def test_the_repl_api_is_metispys(monkeypatch):
     """repl-tools step 2: the REPL API's declarations are rendered from the
-    installed metispy's metis.lang.repl_api, never from a copy here — a
-    change there is a change in the orchestrator's turn."""
-    import metis.lang.repl_api as published
+    installed metispy's (metis.repl.Repl.tools(), metis-packages), never from a
+    copy here — a change there is a change in the orchestrator's turn."""
+    from metis.repl import Repl
     from metis_agent import orchestrator as O
     before = O.api_declarations(["dog"], ["dog"])
     assert "why an atom holds or not, in the domain" in before
-    api = published.repl_api()
+    api = Repl.tools()
     next(v for v in api if v["name"] == "why")["description"] = "why, said differently"
-    monkeypatch.setattr(published, "repl_api", lambda: api)
+    monkeypatch.setattr(Repl, "tools", staticmethod(lambda: api))
     after = O.api_declarations(["dog"], ["dog"])
     assert "why, said differently" in after and "why an atom holds or not" not in after
     assert [v[0] for v in O.repl_api(["dog"], ["dog"])] == [v["name"] for v in api]

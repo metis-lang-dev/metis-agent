@@ -55,7 +55,7 @@ def test_gol_is_read_once_per_pass_and_measured_to_the_horizon():
 
 
 def _scratch(tmp_path, monkeypatch, world, edit):
-    from metis_loop_sdk import catalog
+    from metis import catalog
     root = catalog.root()
     shutil.copytree(root / "tools", tmp_path / "tools", ignore=shutil.ignore_patterns("__pycache__"))
     shutil.copytree(root / "domains" / world, tmp_path / "domains" / world, ignore=shutil.ignore_patterns("build", "records"))

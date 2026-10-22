@@ -132,7 +132,7 @@ def test_the_catalog_frame_lists_the_sdks_listing(tmp_path):
     """domain-catalog step 3: the CATALOG dock lists the loop console's rows
     (the loop SDK's catalog.index() domains: line, has, kind; a partner as its own
     row), each with its state here — as Go's catalog frame does."""
-    from metis_loop_sdk import catalog
+    from metis import catalog
     lv, _ = live(tmp_path)
     cat = lv.catalog()
     index = [e["name"] for e in catalog.index() if e["kind"] == "domain"]
@@ -164,7 +164,7 @@ def test_the_system_turn_is_built_from_the_manifests():
     assert O.installed_cards(base, [n for n, _ in rows], dict(rows)) == base
     cfg = S.load_config(ROOT / "py/config.live.yaml")
     turn = S.build_turn(cfg)
-    from metis_loop_sdk import catalog
+    from metis import catalog
     assert "Cards:\n- kitchen: %s\n\nExamples:" % catalog.get("kitchen").line in turn
     assert "- nav:" not in turn[turn.index("## Domains"):]
     cfg["v3"]["catalog"] = ["kitchen", "nowhere"]
@@ -206,7 +206,7 @@ def test_activate_installs_a_manifest_domain_at_runtime(tmp_path):
     ticks, its card and enum entry join the system turn, the dialog starts
     over with the mirror kept (its line "installed"), the row goes active.
     A name with no manifest, and a partner on its own, are refused."""
-    from metis_loop_sdk import catalog
+    from metis import catalog
     lv, frames = live(tmp_path)
     lv.o.m.last["dog"] = "sat down"
     assert "wgc" not in lv.names and "- wgc:" not in lv.prompt
@@ -283,7 +283,7 @@ def test_every_served_domain_is_watched_with_its_reload_policy(tmp_path):
     manifests' (a partner reloads with its lead); each row carries its
     reload policy — propose by default, the config's override over the
     manifest's."""
-    from metis_loop_sdk import catalog
+    from metis import catalog
     cfg = S.load_config(ROOT / "py/config.live.yaml")
     assert "watch" not in cfg["domains"]
     lv, _ = live(tmp_path)
@@ -359,7 +359,7 @@ def test_one_intent_domain_is_its_own_turn_and_grammar():
     """Ruling (2)'s parity bar: one intent domain — the turn opens with its
     material as it stands and the grammar is its own file (byte-identical to
     Go's -print-turn / -print-grammar on the live configs: 18468 B, 6179 B)."""
-    from metis_loop_sdk import catalog
+    from metis import catalog
     cfg = S.load_config(ROOT / "py/config.live.yaml")
     ds = S.intents_of(cfg["domains"]["names"])
     assert [x.name for x in ds] == ["dog"]
@@ -502,12 +502,13 @@ def test_the_catalog_is_the_loop_sdks(tmp_path):
     catalog.listing() (Go's catalog.List calls the same, through the SDK's
     CLI), and the page's CATALOG widget is served from the installed SDK at
     /sdk/catalog/."""
-    from metis_loop_sdk import catalog
+    from metis import catalog
+    from metis_loop_sdk import web
     assert S.catalog_list() == catalog.listing()
     lv, _ = live(tmp_path)
     app = S.make_app(lv, str(ROOT / "console"))
     got = {r.canonical: r.get_info().get("directory") for r in app.router.resources()}
-    assert Path(got["/sdk/catalog"]) == catalog.WIDGET_DIR
+    assert Path(got["/sdk/catalog"]) == web.WIDGET_DIR
     page = (ROOT / "console/index.html").read_text()
     assert '<script src="sdk/catalog/catalog.js"></script>' in page and 'href="sdk/catalog/catalog.css"' in page
     assert "MetisCatalog.render(box, catalog.domains," in (ROOT / "console/console.js").read_text()

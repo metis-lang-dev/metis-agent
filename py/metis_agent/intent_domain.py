@@ -20,8 +20,8 @@ from .agent_host import AgentHost
 
 
 def catalog_domains():
-    """The catalog's domains/ directory (the loop SDK's root)."""
-    from metis_loop_sdk import catalog
+    """The catalog's domains/ directory (metis.catalog's root)."""
+    from metis import catalog
     return catalog.root() / "domains"
 
 

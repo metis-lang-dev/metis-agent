@@ -25,7 +25,7 @@ SELECTED = {
 
 
 def _gym():
-    from metis_loop_sdk import catalog
+    from metis import catalog
     sys.path.insert(0, str(catalog.root() / "tools"))
     try:
         import rddl_host

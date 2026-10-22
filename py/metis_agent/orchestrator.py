@@ -557,7 +557,7 @@ def words(ident):
 
 
 # the REPL API, declared — from metispy, where the REPL lives (repl-tools
-# s-0c6879a1 step 2): metis.lang.repl_api is the one source; nothing here
+# s-0c6879a1 step 2): metis.repl.Repl.tools() is the one source; nothing here
 # restates a verb, a description or a parameter
 
 def repl_api(catalog, loaded):
@@ -565,10 +565,10 @@ def repl_api(catalog, loaded):
     alt_call take them: (name, description, [{name, type, desc, enum}],
     required); a parameter's enum_from fills its enum — "loaded" from the
     domains served, "catalog" from the domains activate can attach."""
-    from metis.lang.repl_api import repl_api as published
+    from metis.repl import Repl
     fill = {"loaded": list(loaded), "catalog": list(catalog)}
     out = []
-    for v in published():
+    for v in Repl.tools():
         ps = v.get("parameters") or {}
         params = [{"name": k, "type": p["type"], "desc": p.get("description", ""),
                    "enum": list(fill[p["enum_from"]]) if p.get("enum_from") else list(p.get("enum") or [])}

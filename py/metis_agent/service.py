@@ -26,7 +26,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
-from metis_loop_sdk.catalog import snapshot
+from metis.catalog import snapshot
 
 from . import orchestrator as O
 from .domain_agent import Process, serve
@@ -141,8 +141,8 @@ class Journal:
 
 # ── watched domain directories (v3reload.go) ──────────────────────────────────
 
-# snapshot(d): what a reload takes, by content — the loop SDK's
-# stale detection (metis_loop_sdk.catalog; v3reload.go keeps the rule natively)
+# snapshot(d): what a reload takes, by content — metis.catalog's
+# stale detection (v3reload.go keeps the rule natively)
 
 
 def summary(base, now):
@@ -1213,7 +1213,7 @@ def make_app(live, ui_dir, lib_dir=None):
             app.router.add_static("/lib/", lib_dir)
 
     # the CATALOG widget, the loop SDK's (MetisCatalog: the list both consoles show)
-    from metis_loop_sdk.catalog import WIDGET_DIR, WIDGET_URL
+    from metis_loop_sdk.web import WIDGET_DIR, WIDGET_URL     # the loop SDK's own (0.1.12): the catalog is metis.catalog
     app.router.add_static(WIDGET_URL, WIDGET_DIR)
 
     async def index(request):
