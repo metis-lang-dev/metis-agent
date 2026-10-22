@@ -1,0 +1,55 @@
+"""The world page's frames from the service (alf-demo step 2, metis-worlds alfworld/docs/DEMO.md §4–§5):
+a director beat as world/hierarchy, the task card's chain and result lines as world/delta task, an ask's
+cornered place, and every served host's own world/* frames (a host's frames() face), on a stand-in for
+the service (the two methods read only these attributes)."""
+from types import SimpleNamespace
+
+from metis_agent import service as S
+from metis_agent.director import director_facts
+
+FACTS = director_facts(["planner(task).", "specialist(nav).", "handles(nav, goto).", "result(reached).", "end(wrong_dest)."])
+
+
+def stand_in(outcome=None, hosts=None):
+    frames, said = [], []
+    director = SimpleNamespace(name="director", facts=FACTS, outcome=outcome)
+    agents = {"director": SimpleNamespace(repl=SimpleNamespace(counts={"active(task)": 1, "inactive(nav)": 1, "gone": 0}))}
+    for name, h in (hosts or {}).items():
+        agents[name] = SimpleNamespace(host=SimpleNamespace(inner=h))
+    lv = SimpleNamespace(director=director, agents=SimpleNamespace(agents=agents), task_view={"chain": [], "results": []},
+                         emit=lambda ev, f: frames.append((ev, f)), on_say=lambda kind, line: said.append((kind, line)))
+    return lv, frames, said
+
+
+def test_a_beat_is_world_hierarchy_and_the_chain_follows_the_results():
+    lv, frames, said = stand_in()
+    S.Live.world_beat(lv, 0, {"arrival": "goto(fridge1)", "effects": ["wake(nav)", "forward(nav,goto)"], "goals": [["nav", "goto(fridge1)"]]})
+    S.Live.world_beat(lv, 1, {"arrival": "reached(fridge1)", "effects": ["forward(task,reached)"], "goals": [],
+                              "from": "nav", "said": "I am at the fridge."})
+    S.Live.world_beat(lv, 2, {"arrival": "idle(nav)", "effects": ["sleep(nav)"], "goals": [], "from": "nav"})
+    hier = [f for ev, f in frames if ev == "world/hierarchy"]
+    assert [h["beat"] for h in hier] == [0, 1, 2] and hier[0]["state"] == ["active(task)", "inactive(nav)"]
+    views = [f["task"] for ev, f in frames if ev == "world/delta"]
+    assert views[-1] == {"chain": [{"domain": "nav", "goal": "goto(fridge1)", "result": "reached(fridge1)"}],
+                         "results": ["I am at the fridge."]}
+    assert said == [("line", "I am at the fridge.")] and len(views) == 2          # the idle beat changes nothing
+
+
+def test_an_ask_names_its_cornered_place():
+    lv, frames, _ = stand_in(outcome="ended(wrong_dest)")
+    S.Live.world_beat(lv, 0, {"arrival": "wrong_dest(fridge1)", "effects": ["ended(wrong_dest)", "ask(wrong_dest)"], "goals": []})
+    assert [f.get("cornered") for ev, f in frames if ev == "world/delta"] == ["fridge1"]
+
+
+def test_every_hosts_world_frames_are_sent_with_their_domain():
+    class Host:
+        def __init__(self):
+            self.q = [{"ev": "world/delta", "agent": {"at": "fridge1"}}, {"ev": "not-world", "x": 1}]
+
+        def frames(self):
+            out, self.q = self.q, []
+            return out
+    lv, frames, _ = stand_in(hosts={"nav": Host(), "task": SimpleNamespace()})
+    S.Live.world_frames(lv)
+    S.Live.world_frames(lv)
+    assert frames == [("world/delta", {"agent": {"at": "fridge1"}, "domain": "nav"})]

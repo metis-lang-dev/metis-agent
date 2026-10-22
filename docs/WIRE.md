@@ -58,6 +58,9 @@ out; a catalog domain no agent serves is an error. The model's own
 | `domain_ack` | `verb`, `domain`, `error?` | an `activate` / `deactivate` |
 | `reload_ack` | `domain`, `ok`, `key?` (the new program key), `error?` (the compiler's finding: the old domain runs on) | a `reload` |
 | `error` | `id`, `error` | a turn failed |
+| `world/map` | `url` (`world/map.json`, relative to the page) | on hello when `v3.world_map` names a map file (served at `/world/map.json`): the world page's map (alf-demo step 2; metis-worlds alfworld/docs/DEMO.md §3) |
+| `world/hierarchy` | `beat`, `arrival`, `effects`, `state` (the director's atoms after the beat) | every director beat (`v3.director`), beside its `dlg-director` record: the page's hierarchy pane |
+| `world/delta` | a host's own frame (`agent?`, `entities?`, …) and `domain` — or `task: {chain: [{domain, goal, result}], results: [line]}`, `cornered?` | a served host's `frames()` face, drained every tick (a world command's change: the map's delta, the world's schema); and the director's view of the task card: each forward to a specialist a chain entry, its result closing it, its rule's line said (`narration` kind `v3-line`); an `ask(K)` names the place it is cornered at (the arrival's first argument), its line said as `v3-ask` |
 
 ## The journal (`dlg-*` records)
 
@@ -77,6 +80,7 @@ Every record: `kind`, `seq` (1…, the session's order), `t` (RFC 3339),
 | `dlg-page` | `verb` (`claim` · `release`), `domain`, `page`, `by?` (a claim's: `hello` · `port`, the first world lines) — a page host's owner (py) |
 | `dlg-domain` | `verb` (`activate` · `deactivate` · `reload`), `domain`, `by` (`person` · `model` · `director`), `bindings?` (`token` as `…`), `key?` (reload), `installed?` (activate: built from its manifest now), `error?` |
 | `dlg-director` | `director`, `arrival` (the atom a domain's rule produced, or `idle(D)`), `line` (the director's world line: `+seen(K)` / `+idle(D)`), `effects` (its out atoms: `wake(D)`, `sleep(D)`, `forward(D, K)`, `ask(K)`, `ended(K)`), `goals` ([D, the goal atom] a forward sent: `metis_agent.director`'s frames), `outcome?` (`ended(K)` / `ask(K)`) | one director beat (alf-hierarchy step 3; `v3.director` names the director domain; DIRECTOR.md): wake/sleep are `dlg-domain` with `by: director`, a forward re-instances D through the director host's `instance(D, goal, tokens)` and reloads D |
+| `dlg-director` (re-engaged) | `director`, `reengaged` (the outcome it had: `ask(K)` / `ended(K)`) | the person's next intent after an ask or the end: the director listens again (the task card took the words) |
 | `dlg-wire` | `proc`, `what` (`intent` · `tool` · `world` · `ports`), `ms`, `replies` — one per request; `what: clock` is a summary every 40 beats: `n`, `ms` (mean), `max_ms` |
 | `dlg-trace` | the domain agent's `--trace` reply as sent (`domain`, `beat`, `fired`, `narrated`, `consults`, `reads`, `world`, `more?`, `effects?`): the domain tab's REPL log; never an inbound. `effects` (py; console-nav): a page host's frames, in the order its rules fired them (metis-loop's ui host: `{ui: focus \| show \| hide \| numbers \| unnumber \| pick \| mode, …}`), drained from the host's `effects` list once each, on every line: without `--trace`, a trace reply with `effects` alone; the page that is the host carries them out and reports back with `world` |
 

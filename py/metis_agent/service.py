@@ -399,6 +399,10 @@ class Live:
         self.director, self._dir_traces = None, None
         if v3.get("director"):
             self.director = self.director_loop(str(v3["director"]))
+        # the world page (alf-demo step 2, DEMO.md §4): the world's map file, served at /world/map.json and
+        # named on every hello (world/map); the director's task chain and result lines (world/delta task)
+        self.world_map = v3.get("world_map")
+        self.task_view = {"chain": [], "results": []}
         self.jobs = queue.Queue()
         self.started = threading.Event()
         self.stop = threading.Event()
@@ -418,7 +422,7 @@ class Live:
     def on_say(self, kind, line):
         say = self.journal.say_rec(kind, line)
         s = line.strip()
-        if kind not in ("template", "line") and O.unspeakable_line(s):
+        if kind not in ("template", "line", "ask") and O.unspeakable_line(s):
             log.info("[v3] %s line %r not spoken (unspeakable)", kind, line)
             return
         self.narr_seq += 1
@@ -534,6 +538,7 @@ class Live:
                 if host is None or not hasattr(host, "instance"):
                     raise RuntimeError("director %s: its host has no instance(d, goal, tokens)" % name)
                 if host.instance(dom, goal, tokens):
+                    live.world_frames()             # the old instance's frames first: the reload replaces its host
                     live.reload(dom, by="director")
 
             def activate(self, dom):
@@ -542,8 +547,8 @@ class Live:
             def deactivate(self, dom):
                 live.domain_verb("deactivate", dom, None, "director")
 
-            def say(self, text):
-                live.on_say("line", text)
+            def say(self, text, kind="line"):
+                live.on_say("ask" if kind == "ask" else "line", text)
         return DirectorLoop(name, director_facts(text), m.group(1).split(), Ops())
 
     def director_step(self):
@@ -552,9 +557,56 @@ class Live:
             return
         k = len(self.director.log)
         self.director.step()
-        for b in self.director.log[k:]:
+        for i, b in enumerate(self.director.log[k:], k):
             self.journal.record(dict(b, kind="dlg-director", director=self.director.name,
                                      **({"outcome": self.director.outcome} if self.director.outcome else {})))
+            self.world_beat(i, b)
+        self.world_frames()
+
+    def world_beat(self, i, b):
+        """The world page's view of one director beat (alf-demo step 2): world/hierarchy (the arrival,
+        its effects, the director's state atoms); a specialist's result closes its chain entry and its
+        rule's line is said; the task card's chain and lines as world/delta task; an ask names the
+        place it is cornered at (the arrival's first argument)."""
+        f = self.director.facts
+        ag = self.agents.agents.get(self.director.name) if hasattr(self.agents, "agents") else None
+        state = sorted(a for a, n in (ag.repl.counts.items() if ag is not None else ()) if n > 0)
+        self.emit("world/hierarchy", {"beat": i, "arrival": b["arrival"], "effects": b["effects"], "state": state})
+        tv, changed = self.task_view, False
+        for d, goal in b.get("goals") or []:
+            if d not in f["planner"]:
+                tv["chain"].append({"domain": d, "goal": goal, "result": None})
+                changed = True
+        src = b.get("from")
+        if src and src not in f["planner"] and not b["arrival"].startswith("idle("):
+            entry = next((c for c in reversed(tv["chain"]) if c["domain"] == src and c["result"] is None), None)
+            if entry is not None:
+                entry["result"] = b["arrival"]
+            if b.get("said"):
+                tv["results"].append(b["said"])
+                self.on_say("line", b["said"])
+            changed = True
+        view = {"task": {"chain": [dict(c) for c in tv["chain"]], "results": list(tv["results"])}}
+        asks = any(e.startswith("ask(") for e in b.get("effects") or ())       # the director asks (with its end, or alone)
+        if asks and "(" in b["arrival"]:
+            view["cornered"] = b["arrival"][b["arrival"].index("(") + 1:b["arrival"].rindex(")")].split(",")[0].strip()
+            changed = True
+        if changed:
+            self.emit("world/delta", view)
+
+    def world_frames(self):
+        """Every served domain's host frames (a host's `frames()` face: the world page's world/*
+        frames, e.g. world/delta per command), sent on the wire as they are."""
+        for name, ag in (self.agents.agents.items() if hasattr(self.agents, "agents") else ()):
+            h = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+            fr = getattr(h, "frames", None)
+            if not callable(fr):
+                continue
+            for f in fr() or ():
+                f = dict(f)
+                ev = str(f.pop("ev", "world/delta"))
+                if ev.startswith("world/"):
+                    self.emit(ev, dict(f, domain=name))
 
     def sift(self, rs):
         out = []
@@ -590,6 +642,10 @@ class Live:
         if d in self.off:
             return self.not_active(d), True
         j.pop("intent", None)
+        if self.director is not None and self.director.outcome:
+            was = self.director.reengage()                 # after an ask or the end: the person's words go on
+            self.task_view = {"chain": [], "results": []}
+            self.journal.record({"kind": "dlg-director", "director": self.director.name, "reengaged": was})
         self.n += 1
         cid = "c%d" % self.n
         rec = {"kind": "dlg-dispatch", "cid": cid, "j": c.text(), "domain": d}
@@ -708,6 +764,7 @@ class Live:
                     due.append(r)
         self.handle_due(self.beat, due)
         self.director_step()
+        self.world_frames()                    # the hosts' world/* frames of this tick (alf-demo step 2)
         self.auto_reload()
         self.push_catalog()
         again, self.ports_due = self.ports_due, set()
@@ -1218,6 +1275,8 @@ def make_app(live, ui_dir, lib_dir=None):
                     claimed = await ask(live.claim, [claim] if isinstance(claim, str) else list(claim or []), pid)
                     await send("page", {"page": pid, "owns": claimed})
                     await send("catalog", {"domains": await ask(live.catalog)})
+                    if getattr(live, "world_map", None):
+                        await send("world/map", {"url": "world/map.json"})
                     for d in live.loaded:
                         if d in live.names and d not in live.quiet:
                             try:
@@ -1296,6 +1355,11 @@ def make_app(live, ui_dir, lib_dir=None):
     # the CATALOG widget, the loop SDK's (MetisCatalog: the list both consoles show)
     from metis_loop_sdk.web import WIDGET_DIR, WIDGET_URL     # the loop SDK's own (0.1.12): the catalog is metis.catalog
     app.router.add_static(WIDGET_URL, WIDGET_DIR)
+
+    if getattr(live, "world_map", None):
+        async def world_map(request):
+            return web.FileResponse(Path(live.world_map), headers={"Cache-Control": "no-store"})
+        app.router.add_get("/world/map.json", world_map)
 
     async def index(request):
         return web.FileResponse(Path(ui_dir) / "index.html", headers={"Cache-Control": "no-store"})

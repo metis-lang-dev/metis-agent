@@ -118,7 +118,7 @@ class DirectorLoop:
       ops.instance(d, goal)        the director's host re-instances d for the goal (the world's
                                    gen_hier into d's installed directory) and the agent reloads d
       ops.activate(d) / ops.deactivate(d)
-      ops.say(text)                a line spoken as it is (an ask, the end)
+      ops.say(text, kind)          a line spoken as it is: kind ask (the band asks it) or line (the end)
 
     `kinds` are the arrival kinds (the director instance's `kind` type): an atom of one, produced by
     a rule of the planner or a specialist, arrives; a specialist's result is followed by idle(D)."""
@@ -128,17 +128,30 @@ class DirectorLoop:
         self.frames = Frames(facts)
         self.domains = facts["specialist"] | facts["planner"]
         self.queue, self.log, self.outcome = [], [], None
+        self.came = {}            # arrival atom -> (the domain that produced it, its rule's line)
 
     def arrive(self, atom):
         """An atom from outside the domains' rules (the person's goal, a seed)."""
         self.queue.append(atom)
 
+    def reengage(self):
+        """After an ask or the end, the person's next intent: the director listens again (the
+        task card took the words; its rules' sub-goals arrive as before)."""
+        was, self.outcome = self.outcome, None
+        return was
+
     def produced(self, domain, trace):
         """A served domain's trace record: the atoms its rules produced of the director's kinds."""
         if domain == self.name or domain not in self.domains:
             return
-        out = [a for row in trace.get("fired") or [] if row.get("kind") != "exo"      # put in from outside (the person's
-               for a in row.get("produce") or [] if kind_of(a) in self.kinds]       # intent, the world's sync): no rule's
+        out = []
+        for row in trace.get("fired") or []:
+            if row.get("kind") == "exo":          # put in from outside (the person's intent, the world's sync): no rule's
+                continue
+            for a in row.get("produce") or []:
+                if kind_of(a) in self.kinds:
+                    out.append(a)
+                    self.came[a] = (domain, row.get("line"))      # where it came from, and the rule's own line (alf-demo)
         self.queue += out
         if out and domain not in self.facts["planner"]:
             self.queue.append("idle(%s)" % domain)
@@ -156,9 +169,13 @@ class DirectorLoop:
             for r in self.ops.beat(self.name, [line]) or []:
                 for row in r.get("fired") or []:
                     outs += [a for a in row.get("produce") or [] if kind_of(a) in OUT]
-                    if row.get("line") and any(kind_of(a) in ("ask", "ended") for a in row.get("produce") or []):
-                        said.append(row["line"])
+                    kinds = {kind_of(a) for a in row.get("produce") or []}
+                    if row.get("line") and kinds & {"ask", "ended"}:
+                        said.append((row["line"], "ask" if "ask" in kinds else "line"))
+            src, src_line = self.came.pop(atom, (None, None))
             beat = {"arrival": atom, "line": line, "effects": outs, "goals": []}
+            if src:
+                beat["from"], beat["said"] = src, src_line
             for verb, args in effects(outs):
                 if verb == "forward":
                     d, k = args
@@ -171,8 +188,8 @@ class DirectorLoop:
                     self.ops.deactivate(args[0])
                 elif verb in ("ask", "ended"):
                     self.outcome = "%s(%s)" % (verb, ",".join(args))
-            for text in said:
-                self.ops.say(text)
+            for text, kind in said:
+                self.ops.say(text, kind)
             self.log.append(beat)
             n += 1
         return n

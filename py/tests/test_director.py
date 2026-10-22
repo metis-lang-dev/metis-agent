@@ -76,7 +76,7 @@ def test_the_loop_replays_the_recorded_run():
             def deactivate(self, d):
                 verbs.append(("deactivate", d))
 
-            def say(self, text):
+            def say(self, text, kind=None):
                 verbs.append(("say", text))
         loop = DirectorLoop("director", FACTS, kinds, Ops())
         loop.arrive(g["beats"][0]["arrival"])
@@ -110,3 +110,29 @@ def test_a_step_runs_at_most_its_limit_and_carries_the_rest():
         loop.arrive("goto(r%d)" % i)
     assert loop.step(limit=2) == 2 and len(loop.queue) == 3
     assert loop.step() == 3 and loop.queue == []
+
+
+def test_a_beat_names_its_source_and_line_and_an_ask_is_said_as_an_ask():
+    """alf-demo step 2: each arrival keeps the domain that produced it and its rule's line (the
+    world page's chain and result lines); the director's ask is said as an ask (the band asks it);
+    the person's next intent re-engages the director."""
+    from metis_agent.director import DirectorLoop
+    said = []
+
+    class Ops:
+        def beat(self, name, lines):
+            if lines[0].startswith("+seen(refused"):
+                return [{"fired": [{"kind": "clause", "produce": ["ask(refused)"], "line": "I cannot put it there. Where then?"}]}]
+            return []
+
+        def say(self, text, kind="line"):
+            said.append((text, kind))
+    loop = DirectorLoop("director", FACTS, ["reached", "refused"], Ops())
+    loop.produced("nav", {"fired": [{"kind": "clause", "produce": ["reached(fridge1)"], "line": "I am at the fridge."}]})
+    loop.step()
+    assert loop.log[0]["from"] == "nav" and loop.log[0]["said"] == "I am at the fridge."
+    assert loop.log[1]["arrival"] == "idle(nav)" and "from" not in loop.log[1]
+    loop.produced("task", {"fired": [{"kind": "clause", "produce": ["refused(fridge1)"], "line": None}]})
+    loop.step()
+    assert loop.outcome == "ask(refused)" and said == [("I cannot put it there. Where then?", "ask")]
+    assert loop.reengage() == "ask(refused)" and loop.outcome is None
