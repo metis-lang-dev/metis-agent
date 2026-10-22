@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import queue
+import re
 import threading
 import time
 from datetime import datetime, timezone
@@ -393,6 +394,11 @@ class Live:
                                intent_domains=[x.name for x in self.served()], asks=O.asks_of(self.served()),
                                line_voice=[n for n in self.names if line_voiced(n)])
         self.restart()
+        # the director (alf-hierarchy step 3, DIRECTOR.md): v3.director names the domain whose rules
+        # route the others; the atoms they produce of its kinds arrive, one director beat each
+        self.director, self._dir_traces = None, None
+        if v3.get("director"):
+            self.director = self.director_loop(str(v3["director"]))
         self.jobs = queue.Queue()
         self.started = threading.Event()
         self.stop = threading.Event()
@@ -498,11 +504,67 @@ class Live:
         self.journal.wire("agents", kind, (time.perf_counter() - t0) * 1000, len(rs))
         return self.sift(rs)
 
+    def director_loop(self, name):
+        """The DirectorLoop over this agent: the director's roles and kinds from its instance (the
+        program's facts and its `kind` type)."""
+        from .director import DirectorLoop, director_facts
+        from .domains import catalog
+        d = catalog().get(name)
+        text = Path(d.program).read_text()
+        m = re.search(r"^type\s+kind\s*\{([^}]*)\}", text, re.M)
+        if not m:
+            raise ValueError("director %s: its instance declares no `type kind {…}` (the arrival kinds)" % name)
+        live = self
+
+        class Ops:
+            def beat(self, dom, lines):
+                live._dir_traces = []
+                try:
+                    live.serve_line({"world": list(lines), "domain": dom}, "world")
+                    live.serve_line({"clock": "beat", "domain": dom}, "clock")
+                    return live._dir_traces
+                finally:
+                    live._dir_traces = None
+
+            def instance(self, dom, goal):
+                ag = live.agents.agents.get(name) if hasattr(live.agents, "agents") else None
+                host = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+                target = live.agents.agents.get(dom) if hasattr(live.agents, "agents") else None
+                tokens = dict(target.repl.counts) if target is not None else {}
+                if host is None or not hasattr(host, "instance"):
+                    raise RuntimeError("director %s: its host has no instance(d, goal, tokens)" % name)
+                if host.instance(dom, goal, tokens):
+                    live.reload(dom, by="director")
+
+            def activate(self, dom):
+                live.domain_verb("activate", dom, None, "director")
+
+            def deactivate(self, dom):
+                live.domain_verb("deactivate", dom, None, "director")
+
+            def say(self, text):
+                live.on_say("line", text)
+        return DirectorLoop(name, director_facts(text), m.group(1).split(), Ops())
+
+    def director_step(self):
+        """The arrivals the last beat queued, each one director beat (journaled as dlg-director)."""
+        if self.director is None or not self.director.queue:
+            return
+        k = len(self.director.log)
+        self.director.step()
+        for b in self.director.log[k:]:
+            self.journal.record(dict(b, kind="dlg-director", director=self.director.name,
+                                     **({"outcome": self.director.outcome} if self.director.outcome else {})))
+
     def sift(self, rs):
         out = []
         for r in rs:
             if r.get("kind") == "trace":
                 d = r.get("domain")
+                if self.director is not None:
+                    if d == self.director.name and self._dir_traces is not None:
+                        self._dir_traces.append(r)
+                    self.director.produced(d, r)
                 # a page host's effects to its owner; owned by no page yet, to none
                 # ("": no socket's id) — every page gets the record without them
                 own = self.owner.get(d, "") if r.get("effects") and self.page_host(d) else None
@@ -645,6 +707,7 @@ class Live:
                 if dom not in self.quiet and dom not in self.off:
                     due.append(r)
         self.handle_due(self.beat, due)
+        self.director_step()
         self.auto_reload()
         self.push_catalog()
         again, self.ports_due = self.ports_due, set()
