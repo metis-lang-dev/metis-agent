@@ -647,20 +647,27 @@ def test_an_activates_bindings_reach_the_host(tmp_path):
     lv, frames, inner = _page_live(tmp_path)
     got = []
     inner.take_bindings = got.append
-    assert lv.domain_verb("activate", "dog", {"session": "w1", "token": "t"}, "person", "p1") is None
-    assert got == [{"session": "w1", "token": "t"}] and recs(lv, "dlg-domain")[-1]["bindings"] == {"session": "w1", "token": "t"}
+    assert lv.domain_verb("activate", "dog", {"session": "w1", "token": "s3cr3t-tok"}, "person", "p1") is None
+    assert got == [{"session": "w1", "token": "s3cr3t-tok"}] and recs(lv, "dlg-domain")[-1]["bindings"] == {"session": "w1", "token": "…"}
+    assert "s3cr3t-tok" not in json.dumps([f for ev, f, page in frames])           # the token reaches no page
     lv.claim(["dog"], "p1")
     err = lv.domain_verb("activate", "dog", {"session": "w2"}, "person", "p2")
-    assert err.startswith("page p2 does not own dog") and got == [{"session": "w1", "token": "t"}]
+    assert err.startswith("page p2 does not own dog") and got == [{"session": "w1", "token": "s3cr3t-tok"}]
     assert lv.domain_verb("activate", "dog", {"session": "w2"}, "person", "p1") is None and got[-1] == {"session": "w2"}
     assert lv.domain_verb("activate", "dog", None, "model") is None and len(got) == 2      # no bindings: no bind
     key, err = lv.reload("dog")
     assert err is None
     host = lv.agents.agents["dog"].host
     new = getattr(host, "inner", host)
-    assert new is not inner and not hasattr(new, "take_bindings") and got == [{"session": "w1", "token": "t"}, {"session": "w2"}]
+    assert new is not inner and not hasattr(new, "take_bindings") and got == [{"session": "w1", "token": "s3cr3t-tok"}, {"session": "w2"}]
     assert lv.domain_verb("activate", "kitchen", {"session": "w3"}, "person", "p1") is None   # no take_bindings on its host: nothing taken
     assert "kitchen" in lv.loaded and lv.bindings["kitchen"] == {"session": "w3"}
+    def refuse(b):
+        raise ValueError("no such session")
+    new.take_bindings = refuse                                              # a host that refuses its bindings
+    lv.domain_verb("deactivate", "dog", None, "person", "p1")
+    err = lv.domain_verb("activate", "dog", {"session": "w9"}, "person", "p1")
+    assert err == "no such session" and "dog" not in lv.loaded and lv.bindings["dog"] == {"session": "w2"}
 
 
 def test_a_typed_intent_is_dispatched_without_the_model(tmp_path):

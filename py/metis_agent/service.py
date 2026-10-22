@@ -292,6 +292,10 @@ def build_grammar(cfg, intents):
 
 # ── the live loop (v3procs.go) ────────────────────────────────────────────────
 
+# an activate's bindings that are secrets: given to the host, never journaled (console-nav R1)
+SECRET_BINDINGS = ("token",)
+
+
 class Live:
     """The orchestrator and the domain agents of one process, driven by one
     agent thread (jobs: the clock's ticks, person turns, world lines, the
@@ -750,10 +754,19 @@ class Live:
         log.info("[v3] installed %s (%s) from its manifest", dom, ", ".join(group))
         return None
 
+    def bind(self, dom, bindings):
+        """The activate's bindings to the domain's host (take_bindings); kept whole for a reload. → an error or None."""
+        for r in self.serve_line({"bind": dict(bindings), "domain": dom}, "bind"):
+            if r.get("kind") == "error":
+                return r.get("error")
+        self.bindings[dom] = dict(bindings)
+        return None
+
     def domain_verb(self, verb, dom, bindings, by, page=None):
         rec = {"kind": "dlg-domain", "verb": verb, "domain": dom, "by": by}
-        if bindings is not None:
-            rec["bindings"] = bindings
+        if bindings is not None:            # journaled and sent to every page: never a secret (the console's token)
+            rec["bindings"] = {k: ("…" if k in SECRET_BINDINGS else v) for k, v in bindings.items()} \
+                if isinstance(bindings, dict) else bindings
         err = None
         installed = False
         if verb == "activate" and dom not in self.names:      # hot-install from the manifest
@@ -767,12 +780,9 @@ class Live:
             err = "%s is stepped with its pair, not on its own" % dom
         elif bindings is not None and page is not None and self.page_host(dom) and self.owner.get(dom, page) != page:
             err = "page %s does not own %s: page %s does (its hello claims it)" % (page, dom, self.owner[dom])
+        elif verb == "activate" and isinstance(bindings, dict) and (err := self.bind(dom, bindings)):
+            pass                            # the host refused its bindings: the activation does not happen
         else:
-            if verb == "activate" and isinstance(bindings, dict):     # the host's (take_bindings), kept for a reload
-                self.bindings[dom] = dict(bindings)
-                for r in self.serve_line({"bind": dict(bindings), "domain": dom}, "bind"):
-                    if r.get("kind") == "error" and err is None:
-                        err = r.get("error")
             self.loaded = [d for d in self.loaded if d != dom] + ([dom] if verb == "activate" else [])
             (self.off.discard if verb == "activate" else self.off.add)(dom)
             self.ocfg.loaded = self.loaded
