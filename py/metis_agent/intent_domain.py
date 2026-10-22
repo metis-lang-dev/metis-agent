@@ -106,15 +106,18 @@ def build(name, display=None, voice="", root=None, module=None, fresh=False, dir
     d = Path(dir) if dir else Path(root or catalog_domains()) / name    # the domain's directory (the manifest's)
     f = d / "intent.yaml"
     spec = (yaml.safe_load(f.read_text()) or {}) if f.exists() else {}     # none: a host with no verbs
-    hf = str(host).split(":")[0] if host else ""             # the manifest's host: a file.py:factory (a module path is not a file)
+    hf, _, factory = (str(host) if host else "").partition(":")   # the manifest's host: file.py:factory (a module path is not a file)
+    factory = factory if hf.endswith(".py") and factory else "make"
     host = _host_module(d, name, fresh, file=hf if hf.endswith(".py") else None)
+    if host is not None and not callable(getattr(host, factory, None)):
+        raise ValueError("domain %s: its host has no %s() (the manifest's host: %s)" % (name, factory, hf or "<name>_host.py"))
     c = card(spec)
     commands = {r["atom"].split("(")[0] for r in c["rows"]}
     rep = reports(c, host) if host else {}
     waits = tuple("+" + w for w in getattr(host, "WAITS", ("timeout", "lost")))
 
     def make(case):
-        return AgentHost(host.make(case), commands, enders=spec.get("enders") or (), reports=rep, waits=waits)
+        return AgentHost(getattr(host, factory)(case), commands, enders=spec.get("enders") or (), reports=rep, waits=waits)
 
     ns = dict(NAME=name, DISPLAY=display or name, VOICE=voice, CATALOG=d / ("%s.llp" % name),
               CARD=c, OUTCOMES=dict(spec.get("outcomes") or {}), alternatives=alternatives_of(spec),

@@ -200,3 +200,17 @@ def test_without_the_manifest_key_nothing_acts(corridor):
     out = ag.handle({"clock": "beat"}) + ag.handle({"clock": "beat"})
     assert any(r.get("status") == "failed" and r.get("id") == "p1" for r in out)          # no rule took it: failed, as before
     assert ag.host.inner.acts == []
+
+
+def test_the_manifests_host_factory_is_the_one_called(corridor):
+    """opus's 2a review N3: host: file.py:factory calls that factory, and a missing one is refused in words."""
+    d = corridor()
+    (d / "corridor_host.py").write_text((d / "corridor_host.py").read_text().replace("def make(case=None):", "def create(case=None):"))
+    (d / "domain.yaml").write_text((d / "domain.yaml").read_text().replace("host: corridor_host.py:make", "host: corridor_host.py:create"))
+    ag, _ = run(StubLLM([{"intent": "MOVE", "direction": "E"}] * 3))
+    assert ag.host.inner.won
+    (d / "domain.yaml").write_text((d / "domain.yaml").read_text().replace(":create", ":build"))
+    import importlib
+    sys.modules.pop("metis_agent.domains.corridor", None)
+    with pytest.raises(ValueError, match=r"its host has no build\(\)"):
+        importlib.import_module("metis_agent.domains.corridor")
