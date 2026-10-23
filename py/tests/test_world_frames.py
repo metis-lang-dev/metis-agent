@@ -22,6 +22,7 @@ def stand_in(outcome=None, hosts=None):
     lv.ask_now, lv.status = None, None
     lv.set_status = lambda state, text, **kw: S.Live.set_status(lv, state, text, **kw)
     lv.world_over = lambda: S.Live.world_over(lv)
+    lv.goal_said = lambda goal, domain: S.Live.goal_said(lv, goal, domain)
     return lv, frames, said
 
 
@@ -102,7 +103,7 @@ def test_an_asking_line_carries_its_answers():
 def test_the_status_follows_the_director_and_the_ask_is_a_frame():
     lv, frames, said = stand_in()
     S.Live.world_beat(lv, 0, {"arrival": "goto(fridge1)", "effects": ["wake(nav)", "forward(nav,goto)"], "goals": [["nav", "goto(fridge1)"]]})
-    assert lv.status["state"] == "working" and lv.status["domain"] == "nav"
+    assert lv.status["state"] == "working" and lv.status["domain"] == "nav" and lv.status["text"] == "nav: Goto(fridge1)"
     lv.ask_now = {"question": "Fridge 1 is not where this task wants tomato 1.", "options": [{"label": "stop", "say": "stop"}]}
     S.Live.world_beat(lv, 1, {"arrival": "wrong_dest(fridge1)", "effects": ["ended(wrong_dest)", "ask(wrong_dest)"], "goals": [], "from": "task"})
     ask = [f for ev, f in frames if ev == "world/ask"][-1]
@@ -116,3 +117,12 @@ def test_a_won_world_is_over():
     lv, frames, _ = stand_in(hosts={"task": SimpleNamespace(won=True)})
     S.Live.world_beat(lv, 0, {"arrival": "placed", "effects": ["ended(placed)"], "goals": []})
     assert lv.status["state"] == "over" and "new game" in lv.status["text"]
+
+
+def test_a_goal_is_said_in_the_worlds_words():
+    """nina's 3b wire note: the working status says the goal as the host words it."""
+    lv, _, _ = stand_in(hosts={"nav": SimpleNamespace(goal_text=lambda g: "going to fridge 1" if g == "goto(fridge1)" else None)})
+    S.Live.world_beat(lv, 0, {"arrival": "goto(fridge1)", "effects": ["wake(nav)", "forward(nav,goto)"], "goals": [["nav", "goto(fridge1)"]]})
+    assert lv.status["text"] == "Going to fridge 1" and lv.status["goal"] == "goto(fridge1)"
+    S.Live.world_beat(lv, 1, {"arrival": "goto(cab1)", "effects": [], "goals": [["nav", "goto(cab1)"]]})
+    assert lv.status["text"] == "nav: Goto(cab1)"                     # no words for it: the goal as it is

@@ -598,7 +598,7 @@ class Live:
             if d not in f["planner"]:
                 tv["chain"].append({"domain": d, "goal": goal, "result": None})
                 changed = True
-                self.set_status("working", "%s: %s" % (d, self.spoken(goal)), domain=d, goal=goal)
+                self.set_status("working", self.goal_said(goal, d), domain=d, goal=goal)
         src = b.get("from")
         if src and b.get("said_as_ask") and src in f["planner"]:
             tv["results"].append(self.spoken(b["said"], src))                    # the planner's refusal: a result line of the task card
@@ -707,6 +707,24 @@ class Live:
                     out = text
                 break
         return out[:1].upper() + out[1:]                      # nina's N6: a line that starts with a handle
+
+    def goal_said(self, goal, domain):
+        """A domain's goal as the person reads it ("going to countertop 3"): the domain's host's
+        `goal_text(goal)` face (nina's 3b wire note), else the domain and the goal with its handles said."""
+        ags = self.agents.agents if hasattr(self.agents, "agents") else {}
+        order = ([ags[domain]] if domain in ags else []) + [a for n, a in ags.items() if n != domain]
+        for ag in order:
+            h = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+            gt = getattr(h, "goal_text", None)
+            if callable(gt):
+                try:
+                    out = gt(goal)
+                except Exception:  # noqa: BLE001 — a host's words never stop a status
+                    out = None
+                if out:
+                    return out[:1].upper() + out[1:]
+                break
+        return "%s: %s" % (domain, self.spoken(goal))
 
     def world_frames(self):
         """Every served domain's host frames (a host's `frames()` face: the world page's world/*
