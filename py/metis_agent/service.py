@@ -711,6 +711,26 @@ class Live:
         state = sorted(a for a, n in (ag.repl.counts.items() if ag is not None else ()) if n > 0)
         self.emit("world/hierarchy", {"beat": beat, "arrival": None, "effects": [], "state": state})
 
+    def card(self):
+        """The world's card (the map file's `card`: title, about, asks …), or None."""
+        if not self.world_map:
+            return None
+        try:
+            return json.loads(Path(self.world_map).read_text()).get("card") or None
+        except (OSError, ValueError):
+            return None
+
+    def card_line(self):
+        """One line from the card: its first about line, then two asks for example (the task's own and
+        one of another kind), or "" without a card."""
+        c = self.card() or {}
+        about = (c.get("about") or [""])[0]
+        asks = [a.get("say") for a in c.get("asks") or () if isinstance(a, dict) and a.get("say")]
+        if not about and not asks:
+            return ""
+        ex = [asks[0]] + ([asks[2]] if len(asks) > 2 else asks[1:2])
+        return (about + " " if about else "") + ("Ask me, for example: %s." % " or ".join('"%s"' % x for x in ex) if ex else "")
+
     def waiting_text(self):
         """The waiting line: the world's own task when its map has one."""
         task = ""
@@ -1036,6 +1056,15 @@ class Live:
             finally:
                 self.in_turn = False
             voice_s = voice.strip()
+            verb = ""
+            try:
+                verb = (json.loads(j) or {}).get("intent", "") if j else ""
+            except (ValueError, AttributeError):
+                verb = ""
+            if verb in ("UNKNOWN", "CHITCHAT") and self.card_line():
+                # alf-demo 3b (the user's "put the pencil in microwave" → "unknown", nothing to go on): what
+                # this world is and what to ask, from the map's card, said instead; the status is left as it is
+                voice_s = voice = self.card_line()
             for n in self.held:
                 if n["sentence"] == voice_s:
                     n["kind"] = "v3-turn"
@@ -1516,6 +1545,9 @@ def make_app(live, ui_dir, lib_dir=None):
                         if live.status is None:
                             live.status = {"state": "waiting", "text": live.waiting_text()}
                         await send("world/status", live.status)
+                        line = live.card_line()
+                        if line:                     # what this world is and what to ask (the card), after the waiting line
+                            await send("narration", {"kind": "v3-card", "sentence": line})
                         ag = live.agents.agents.get(live.director.name) if hasattr(live.agents, "agents") else None
                         state = sorted(a for a, n in (ag.repl.counts.items() if ag is not None else ()) if n > 0)
                         await send("world/hierarchy", {"beat": -1, "arrival": None, "effects": [], "state": state})

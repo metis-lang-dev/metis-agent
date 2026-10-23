@@ -135,3 +135,18 @@ def test_a_specialists_result_hands_the_status_to_the_planner():
     S.Live.world_beat(lv, 1, {"arrival": "reached(fridge1)", "effects": ["forward(task,reached)"], "goals": [], "from": "nav",
                               "said": "I am at the fridge."})
     assert lv.status["state"] == "working" and lv.status["text"] == "Choosing the next step" and lv.status["domain"] == "task"
+
+
+def test_the_card_says_what_this_world_is_and_what_to_ask(tmp_path):
+    """alf-demo 3b (the user's "put the pencil in microwave" → unknown, nothing to go on): one line from
+    the map's card — its first about line, then two asks for example; nothing without a card."""
+    import json
+    lv, _, _ = stand_in()
+    lv.world_map = str(tmp_path / "world-map.json")
+    lv.card = lambda: S.Live.card(lv)
+    asks = [{"say": "put a tomato in the microwave"}, {"say": "put the tomato in the microwave"},
+            {"say": "put the apple on the countertop"}, {"say": "stop"}]
+    (tmp_path / "world-map.json").write_text(json.dumps({"card": {"about": ["A kitchen.", "More."], "asks": asks}}))
+    assert S.Live.card_line(lv) == 'A kitchen. Ask me, for example: "put a tomato in the microwave" or "put the apple on the countertop".'
+    (tmp_path / "world-map.json").write_text(json.dumps({"task": {}}))
+    assert S.Live.card_line(lv) == ""
