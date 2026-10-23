@@ -337,7 +337,10 @@ class Live:
         uses_model = bool(dcfg.get("narrate")) or seat is not None      # else the agents run without the model
         self.proc = Process(self.names, narrate=dcfg.get("narrate"), llm=llm if uses_model else None, seat=seat,
                             trace=dcfg.get("trace", True), records=dcfg.get("records"), session=dcfg.get("session"))
+        log.info("[v3] loading the domains (%d): their programs and hosts — this can take a while", len(self.names))
+        t_build = time.time()
         self.agents = self.proc.build(int(dcfg.get("seed", 1)), dcfg.get("case", "live"))
+        log.info("[v3] domains loaded in %.1fs", time.time() - t_build)
         # the intent material of every served domain that has it (e2e-workflow
         # step 4): the system turn opens with it, the person turn's grammar is
         # made of it; two or more: every J names its domain
