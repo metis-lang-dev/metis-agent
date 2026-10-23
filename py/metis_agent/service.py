@@ -607,6 +607,10 @@ class Live:
             entry = next((c for c in reversed(tv["chain"]) if c["domain"] == src and c["result"] is None), None)
             if entry is not None:
                 entry["result"] = b["arrival"]
+                if (self.status or {}).get("state") == "working" and (self.status or {}).get("domain") == src:
+                    # nina's W3: the specialist is done with its goal; the planner chooses the next step
+                    planner = sorted(f["planner"])[0] if f["planner"] else None
+                    self.set_status("working", "Choosing the next step", domain=planner)
             if b.get("said") and not b.get("said_as_ask"):         # an asking arrival's line is the ask's (said once)
                 tv["results"].append(self.spoken(b["said"], src))
                 self.on_say("line", self.spoken(b["said"], src))
@@ -629,7 +633,7 @@ class Live:
             self.set_status("stuck" if stuck else "asking", ask["question"], options=ask["options"])
         elif any(e.startswith("ended(") for e in b.get("effects") or ()):
             if self.world_over():
-                self.set_status("over", "Done. The game is over: start a new game to give another task.", options=list(NEW_GAME_OPTION))
+                self.set_status("over", "The game is over: start a new game to give another task.", options=list(NEW_GAME_OPTION))
             else:
                 self.set_status("done", "Done. Tell me another task.")
 
@@ -640,24 +644,44 @@ class Live:
         self.status = dict({"state": state, "text": text}, **kw)
         self.emit("world/status", self.status)
 
-    def new_game(self):
+    def new_game(self, say=True):
         """The same game from its start (alf-demo step 3b F7, the architect's AlfHost.new_episode): every
         served host that can restart its episode does (the shared world: the first truncates the
-        commands log), the planner is re-instanced with no tokens through the director's host, the
-        specialists put to sleep, the director reloaded (its instance's start: director_start) and its
-        loop's frames dropped; the status waits for a task. → the line said."""
+        commands log), then the hierarchy at its start (reset_hierarchy) and the map named again (nina's
+        W1); the status waits for a task. `say`: the line said as narration too (the page's new-game
+        event; a turn's reply carries it itself, nina's W2). → the line."""
         if self.director is None:
             return "There is no game here to start again."
-        name = self.director.name
-        ags = self.agents.agents if hasattr(self.agents, "agents") else {}
-        hosts = {n: getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None)) for n, ag in ags.items()}
+        hosts = self.served_hosts()
         restarted = [n for n, h in hosts.items() if callable(getattr(h, "new_episode", None))]
         for n in restarted:
             hosts[n].new_episode()
+        self.reset_hierarchy()
+        self.journal.record({"kind": "dlg-director", "director": self.director.name, "new_game": restarted})
+        if self.world_map:
+            self.emit("world/map", {"url": "world/map.json"})
+        line = "A new game: the same room from its start."
+        if say:
+            self.on_say("line", line)
+        self.set_status("waiting", self.waiting_text())
+        return line
+
+    def served_hosts(self):
+        ags = self.agents.agents if hasattr(self.agents, "agents") else {}
+        return {n: getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None)) for n, ag in ags.items()}
+
+    def reset_hierarchy(self):
+        """The hierarchy at its start over the world as it is (a new game; a stop: the alf-demo 3b user
+        test — a stop that only put the specialists to sleep left the director's state saying they
+        were awake, and the next task's goal went to a sleeping domain): the specialists put to sleep,
+        the planner re-instanced with no tokens through the director's host, the director reloaded
+        (its instance's start) and its loop's frames dropped, the task view and the ask cleared, the
+        director's state on the wire (world/hierarchy)."""
+        name = self.director.name
         for d in sorted(self.director.facts["specialist"]):
             if d in self.loaded and d not in self.off:
                 self.domain_verb("deactivate", d, None, "director")
-        dh = hosts.get(name)
+        dh = self.served_hosts().get(name)
         for p in sorted(self.director.facts["planner"]):
             if dh is not None and hasattr(dh, "instance") and dh.instance(p, None, {}):
                 self.reload(p, by="director")
@@ -666,11 +690,16 @@ class Live:
         self.director.queue, self.director.came, self.director.outcome = [], {}, None
         self.director.frames = Frames(self.director.facts)
         self.task_view, self.ask_now = {"chain": [], "results": []}, None
-        self.journal.record({"kind": "dlg-director", "director": name, "new_game": restarted})
-        line = "A new game: the same room from its start."
-        self.on_say("line", line)
-        self.set_status("waiting", self.waiting_text())
-        return line
+        self.emit_hierarchy()
+
+    def emit_hierarchy(self, beat=-1):
+        """The director's state atoms alone (world/hierarchy with no arrival): on hello and after a reset
+        (nina's W4), so the page's pane shows every domain as the director has it."""
+        if self.director is None:
+            return
+        ag = self.agents.agents.get(self.director.name) if hasattr(self.agents, "agents") else None
+        state = sorted(a for a, n in (ag.repl.counts.items() if ag is not None else ()) if n > 0)
+        self.emit("world/hierarchy", {"beat": beat, "arrival": None, "effects": [], "state": state})
 
     def waiting_text(self):
         """The waiting line: the world's own task when its map has one."""
@@ -971,15 +1000,13 @@ class Live:
         self.turn_at = at if at is not None else time.time()
         try:
             if self.director is not None and text.strip().lower().rstrip(".!") in NEW_GAME_WORDS:
-                voice = self.new_game()
+                voice = self.new_game(say=False)
                 return '{"intent":"NEW_GAME"}', voice, self.journal.say_rec("turn", voice)
             if O.keyword_stop(text, self.stop_words) and self.director is not None:
-                # alf-demo step 3b F5: the director's run stops — its queue dropped, its specialists put to sleep
-                self.director.queue.clear()
+                # alf-demo step 3b F5: the director's run stops — the hierarchy at its start, the world as it is
+                self.reset_hierarchy()
                 self.director.outcome = "ended(stop)"
-                for d in sorted(self.director.facts["specialist"]):
-                    if d in self.loaded and d not in self.off:
-                        self.domain_verb("deactivate", d, None, "director")
+                self.journal.record({"kind": "dlg-director", "director": self.director.name, "stopped": True})
                 self.set_status("waiting", "Stopped. " + self.waiting_text())
                 voice = "Stopped."
                 return '{"intent":"STOP"}', voice, self.journal.say_rec("turn", voice)
@@ -1461,6 +1488,9 @@ def make_app(live, ui_dir, lib_dir=None):
                         if live.status is None:
                             live.status = {"state": "waiting", "text": live.waiting_text()}
                         await send("world/status", live.status)
+                        ag = live.agents.agents.get(live.director.name) if hasattr(live.agents, "agents") else None
+                        state = sorted(a for a, n in (ag.repl.counts.items() if ag is not None else ()) if n > 0)
+                        await send("world/hierarchy", {"beat": -1, "arrival": None, "effects": [], "state": state})
                     for d in live.loaded:
                         if d in live.names and d not in live.quiet:
                             try:

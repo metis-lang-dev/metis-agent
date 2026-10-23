@@ -126,3 +126,12 @@ def test_a_goal_is_said_in_the_worlds_words():
     assert lv.status["text"] == "Going to fridge 1" and lv.status["goal"] == "goto(fridge1)"
     S.Live.world_beat(lv, 1, {"arrival": "goto(cab1)", "effects": [], "goals": [["nav", "goto(cab1)"]]})
     assert lv.status["text"] == "nav: Goto(cab1)"                     # no words for it: the goal as it is
+
+
+def test_a_specialists_result_hands_the_status_to_the_planner():
+    """nina's W3: the working status does not stay on a specialist's goal once its result is in."""
+    lv, _, _ = stand_in()
+    S.Live.world_beat(lv, 0, {"arrival": "goto(fridge1)", "effects": ["wake(nav)", "forward(nav,goto)"], "goals": [["nav", "goto(fridge1)"]]})
+    S.Live.world_beat(lv, 1, {"arrival": "reached(fridge1)", "effects": ["forward(task,reached)"], "goals": [], "from": "nav",
+                              "said": "I am at the fridge."})
+    assert lv.status["state"] == "working" and lv.status["text"] == "Choosing the next step" and lv.status["domain"] == "task"
