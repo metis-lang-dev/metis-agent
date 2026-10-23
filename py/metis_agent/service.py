@@ -543,6 +543,13 @@ class Live:
                 tokens = {a: n for a, n in target.repl.counts.items() if n > 0} if target is not None else {}   # what D holds now
                 if host is None or not hasattr(host, "instance"):
                     raise RuntimeError("director %s: its host has no instance(d, goal, tokens)" % name)
+                deliver = getattr(host, "deliver", None)
+                if callable(deliver) and dom in live.director.facts["planner"] and target is not None:
+                    # the live planner takes its next activation as one row (the host's deliver: what a new
+                    # instance would start it at), no reload — else it is re-instanced and reloaded as before
+                    lines = deliver(dom, goal, tokens)
+                    if lines is not None and live.take(dom, lines, by="director"):
+                        return
                 if host.instance(dom, goal, tokens):
                     live.world_frames()             # the old instance's frames first: the reload replaces its host
                     live.reload(dom, by="director")
@@ -935,6 +942,9 @@ class Live:
         self.handle_due(self.beat, due)
         k = len(self.director.log) if self.director is not None else 0
         self.director_step()
+        # the director stepped: its forwards and wakes act at the next beat, run at once (alf-demo 3b
+        # timing: a 13-step task waited 13 ticks of tick_ms, 3.9 s of a 1.3 s turn's work)
+        self.eager = self.director is not None and len(self.director.log) > k and self.director.outcome is None
         self.release_held(k)
         self.world_frames()                    # the hosts' world/* frames of this tick (alf-demo step 2)
         self.auto_reload()
@@ -1254,6 +1264,19 @@ class Live:
         self.journal.record(rec)
         return err
 
+    def take(self, d, lines, by="director"):
+        """A live domain's session takes do-lines as one row (DomainAgent.take): its next activation
+        without a reload. → True when taken; a failure is journaled and the caller reloads instead."""
+        rec = {"kind": "dlg-domain", "verb": "take", "domain": d, "by": by, "lines": len(lines)}
+        rs = self.serve_line({"take": list(lines), "domain": d}, "take")
+        err = next((r.get("error") for r in rs if r.get("kind") == "error"), None)
+        if err is None and not any(r.get("kind") == "taken" and r.get("domain") == d for r in rs):
+            err = "%s: the domain agent did not take the lines (no taken reply)" % d
+        if err:
+            rec["error"] = err
+        self.journal.record(rec)
+        return err is None
+
     def reload(self, d, by="person"):
         """reload(domain): the domain agent recompiles; a failure leaves the
         old one running. The mirror says reloaded (Orch.reloaded)."""
@@ -1372,6 +1395,8 @@ class Live:
             if next_tick is not None and now >= next_tick:
                 next_tick += tick
                 self.run_job(("tick",))
+                if getattr(self, "eager", False):         # the director moved: the next beat now, jobs first
+                    next_tick = time.time()
             if next_watch is not None and now >= next_watch:
                 next_watch = now + 2.0
                 self.run_job(("watch",))

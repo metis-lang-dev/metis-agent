@@ -52,6 +52,11 @@ harness lines like the clock, not part of either interface):
       {"clock": "ready", "domain", "beat": 0}.
     {"world": ["-closed(kitchen)", "+open(kitchen)"], "id"?}: do-lines on
       the host's next tick, as the script's world changes are.
+    {"take": ["-goto(r1) 1", "+reached(r1) 1"], "id"?}: do-lines applied
+      to the session now, as one exo row (a director's planner taking its
+      next activation without a reload), after the host's refresh() when it
+      has one (its view of a world other hosts step); answered
+      {"kind": "taken", "n"}.
     {"clock": "beat", "score": true}: the beat, scored (rddl-worlds
       s-242c7c3f, the agentic loop's domain_episodes): its clock line also
       carries `score` {likelihood, steps, kind, mismatch, counts} — the
@@ -872,6 +877,8 @@ class DomainAgent:
             return self.intent(msg)
         if "world" in msg:
             return self.world(msg)
+        if "take" in msg:
+            return self.take(msg)
         if "bind" in msg:
             return self.bind(msg)
         if "ports" in msg:
@@ -907,6 +914,30 @@ class DomainAgent:
         if hasattr(inner, "sync"):
             self.sync_world(inner)
         return []
+
+    def take(self, msg):
+        """{"take": [do-lines]}: the session's next activation without a reload (alf-demo 3b timing: a
+        director's planner took six reloads of 0.2 s a task) — the lines (the director host's
+        deliver: its put-out results retracted, the goal in, its world facts synced) applied as ONE
+        exo row, as sync_world applies a host's sync; the watch checkpointed there and revived."""
+        lines = [l for l in (msg["take"] if isinstance(msg["take"], list) else [msg["take"]]) if str(l).strip()]
+        plugin = self.repl.plugin
+        if plugin is None:
+            return [reply(self.name, "error", id=msg.get("id"), error="take: this session has no env to take lines through")]
+        inner = getattr(self.host, "inner", self.host)
+        if hasattr(inner, "refresh"):
+            inner.refresh()                    # the host reads the world as it stands now (another host stepped it)
+        old = plugin.__dict__.get("tick", None)
+        plugin.tick = lambda counts: list(lines)
+        try:
+            self.repl._tick(quiet_rows=False)
+        finally:
+            if old is None:
+                del plugin.tick
+            else:
+                plugin.tick = old
+        self.watch._checkpoint()
+        return [reply(self.name, "taken", id=msg.get("id"), n=len(lines))]
 
     def sync_world(self, inner):
         """A host that applied the world lines itself (an RDDL world's gym):
@@ -1010,7 +1041,7 @@ def records_path(module, where, session):
 
 def kind_of(msg):
     """The ack's kind for a non-clock line."""
-    for k, name in (("reset", "reset"), ("reload", "reload"), ("add", "add"), ("verb", "intent"), ("tool", "tool"), ("world", "world"),
+    for k, name in (("reset", "reset"), ("reload", "reload"), ("add", "add"), ("verb", "intent"), ("tool", "tool"), ("world", "world"), ("take", "take"),
                     ("bind", "bind"), ("ports", "ports")):
         if k in msg:
             return name

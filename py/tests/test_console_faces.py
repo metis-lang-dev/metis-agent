@@ -325,3 +325,16 @@ def test_a_scored_beat_without_actions_is_the_beats_likelihood():
         a, r = serve(a, {"clock": "beat", "score": True}, p.build, p.reload, p.add_line)
         s = r[-1]["score"]
         assert set(s) == {"likelihood", "steps", "kind", "mismatch", "counts"} and 0 <= s["likelihood"] <= 1
+
+
+def test_a_live_session_takes_do_lines_as_one_row():
+    """take (alf-demo 3b timing): a director's planner takes its next activation as one exo row,
+    no reload — the session's counts move by the lines, its program and its host stay."""
+    ag = agent()
+    run(ag, {"clock": "beat", "domain": "dog"})
+    key, host = ag.repl.key, ag.host
+    out = run(ag, {"take": ["-closed(kitchen) 1", "+open(kitchen) 1"], "domain": "dog", "id": "t1"})
+    taken = next(r for r in out if r.get("kind") == "taken")
+    assert taken["n"] == 2 and taken["id"] == "t1" and out[-1] == {"ack": "take", "id": "t1"}
+    assert ag.repl.counts.get("open(kitchen)") == 1 and not ag.repl.counts.get("closed(kitchen)")
+    assert ag.repl.key == key and ag.host is host and ag.repl.fired_how[-1]["how"] == "exo"

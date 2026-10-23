@@ -33,6 +33,7 @@ KINDS = {
     "trace": ("beat", "fired", "more", "narrated", "consults", "reads", "world", "records", "effects"),
     # e2e-workflow step 3: a domain rebuilt from the files on disk (WIRE.md reload)
     "reloaded": ("key",),
+    "taken": ("id", "n"),                    # a live session took do-lines as one row (take; alf-demo 3b timing)
     "added": ("key",),
 }
 
