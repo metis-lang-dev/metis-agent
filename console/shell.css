@@ -36,6 +36,9 @@ html,body{height:100%;margin:0;background:var(--bg);color:var(--fg)}
 body{font:12.5px/1.45 var(--mono);display:flex;flex-direction:column;overflow:hidden}
 button,input{font:inherit;color:inherit}
 a{color:var(--cyan)}
+/* scrollbars: narrow, in the shell's colours (the standard properties; Chrome 121+, Firefox) */
+:root{scrollbar-color:var(--faint) transparent}
+*{scrollbar-width:thin}
 #band{border-bottom:1px solid var(--line);padding:6px 12px;background:var(--panel);flex:none}
 #band .l{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline;min-height:19px}
 #band b{color:var(--dim);font-weight:normal;margin-right:5px;font-size:11px;letter-spacing:.04em}
