@@ -283,3 +283,33 @@ def test_a_delivering_host_activates_any_domain_without_a_reload():
     did.clear()
     S.Live.activation(lv, "director", "old", "goto(x)")
     assert did == [("deliver", "old", {}), ("instance", "old"), ("reload", "old")]
+
+
+def test_no_world_frame_carries_a_role():
+    """The compiled vocabulary never reaches the page: over a role host every world/* frame of a task —
+    the beat's arrival, the chain, the status, the ask and its cornered place — says the world's things;
+    the program's own atom rides only in a `role` field the page shows nowhere by default."""
+    import json
+    import re
+    room = {"p1": "fridge1", "dest": "microwave1", "target": "tomato1"}
+
+    class Host:
+        def in_room(self, atom):
+            n, _, rest = atom.partition("(")
+            return "%s(%s)" % (n, ",".join(room.get(a, a) for a in rest.rstrip(")").split(","))) if rest else atom
+
+        def speak(self, text):
+            return re.sub(r"\b(p1|dest|target)\b", lambda m: room[m.group(0)], text)
+    lv, frames, said = stand_in(hosts={"nav": Host()})
+    S.Live.world_beat(lv, 0, {"arrival": "goto(p1)", "effects": ["forward(nav,goto)"], "goals": [("nav", "goto(p1)")], "from": "task"})
+    S.Live.world_beat(lv, 1, {"arrival": "reached(p1)", "effects": [], "from": "nav", "said": "p1 is right here."})
+    S.Live.world_beat(lv, 2, {"arrival": "wrong_dest(p1)", "effects": ["ask(wrong_dest)"], "from": "nav"})
+    roles = re.compile(r"\b(p\d+|dest|target|other|lhere|ldest|l\d+)\b")
+    hier = [f for ev, f in frames if ev == "world/hierarchy"]
+    assert [f["arrival"] for f in hier] == ["goto(fridge1)", "reached(fridge1)", "wrong_dest(fridge1)"]
+    assert [f["role"] for f in hier] == ["goto(p1)", "reached(p1)", "wrong_dest(p1)"]
+    for ev, f in frames:
+        if ev.startswith("world/"):
+            shown = json.dumps({k: v for k, v in f.items() if k != "role"})
+            assert not roles.search(shown), (ev, shown)
+    assert all(not roles.search(line) for _, line in said)

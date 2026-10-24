@@ -578,7 +578,11 @@ class Live:
         f = self.director.facts
         ag = self.agents.agents.get(self.director.name) if hasattr(self.agents, "agents") else None
         state = sorted(a for a, n in (ag.repl.counts.items() if ag is not None else ()) if n > 0)
-        self.emit("world/hierarchy", {"beat": i, "arrival": b["arrival"], "effects": b["effects"], "state": state})
+        arrival = self.in_room(b["arrival"], b.get("from"))
+        # the page shows the world's things, never the compiled roles; the program's own atom rides in `role`
+        # (semantic-map s-d4270bed: the architect's rule for every world/* frame)
+        self.emit("world/hierarchy", {"beat": i, "arrival": arrival, "effects": b["effects"], "state": state,
+                                      **({"role": b["arrival"]} if arrival != b["arrival"] else {})})
         tv, changed = self.task_view, False
         for d, goal in b.get("goals") or []:
             if d not in f["planner"]:
