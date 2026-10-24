@@ -1063,21 +1063,38 @@ class Live:
                 verb = (json.loads(j) or {}).get("intent", "") if j else ""
             except (ValueError, AttributeError):
                 verb = ""
+            folded = set()                      # held narrations said inside this turn's voice
+            card = self.card_line() if verb == "HELP" else ""
             if self.director is not None and verb != "STOP" and self.world_over():
                 # alf-demo 3c: in a finished game every utterance gets the over line, words that set no
                 # task included (the user's run: the card line heard back as "Alf World the", every 3.2 s)
-                voice_s = voice = OVER_LINE
+                voice_s = voice = (card + " " if card else "") + OVER_LINE
+                folded = {OVER_LINE}
                 if (self.status or {}).get("state") != "over":
                     self.set_status("over", OVER_LINE, options=list(NEW_GAME_OPTION))
+            elif card:
+                # alf-demo 3c O2 (the architect's ruling): "what can you do?" under --nav is a page's HELP — the
+                # world's card line leads, the page's help after it, in the turn's one voice (its result line
+                # is said in the turn here, not after it); the status is left as it is
+                n0 = len(self.held)
+                self.in_turn = True
+                try:
+                    self.handle_due(-1, [])
+                finally:
+                    self.in_turn = False
+                lines = [n["sentence"] for n in self.held[n0:] if n["kind"] == "v3-line" and n["sentence"]]
+                voice_s = voice = " ".join([card] + lines)
+                folded = set(lines)
             elif verb in ("UNKNOWN", "CHITCHAT") and self.card_line():
                 # alf-demo 3b (the user's "put the pencil in microwave" → "unknown", nothing to go on): what
                 # this world is and what to ask, from the map's card, said instead; the status is left as it is
                 voice_s = voice = self.card_line()
             held = self.repeat_held(voice_s, prev, prev_at) if voice_s else None
+            own = lambda n: n["sentence"] == voice_s or n["sentence"] in folded   # noqa: E731
             shown = any(n["sentence"] == voice_s for n in self.held)   # the answer is a held narration too
             for n in self.held:
-                if n["sentence"] == voice_s:
-                    if held == "all":
+                if own(n):
+                    if held == "all" or (held and n["sentence"] != voice_s):   # held: one row, the whole answer
                         continue
                     # the turn's own line (its intent frame voices it; WIRE.md); held: a row the page does not voice
                     n["kind"], n["form"] = ("v3-held", "R") if held else ("v3-turn", n["form"])

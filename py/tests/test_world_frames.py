@@ -217,3 +217,26 @@ def test_the_repeat_guard_holds_a_turn_line_that_was_also_a_narration(monkeypatc
     S.Live.utterance(lv, "put the tomato in the microwave")
     forms = [(f["kind"], f["form"]) for ev, f in frames if ev == "narration"]
     assert forms == [("v3-turn", "N"), ("v3-held", "R")]
+
+
+def test_a_pages_help_is_led_by_the_worlds_card_line(monkeypatch):
+    """alf-demo 3c O2 (the architect's ruling): under --nav "what can you do?" is world_ui's HELP; the
+    world's card line leads and the page's help follows, in the turn's one voice (its result line, said
+    in the turn, is the turn's own: v3-turn); in a won game the card line, then the over line; no card:
+    the help as it was; the status is left as it is."""
+    help_line = "You are in the map. From here you can say: go to <widget>, help."
+    lv, frames = turn_stand_in(('{"domain":"world_ui","intent":"HELP"}', "I am ready to assist you."), card="A kitchen. Ask me.")
+
+    def handle_due(beat, due):
+        if not lv.served:
+            lv.served = True
+            n = {"id": "n5", "kind": "v3-line", "form": "N", "sentence": help_line}
+            (lv.held.append(n) if lv.in_turn else frames.append(("narration", n)))
+    lv.served, lv.in_turn, lv.handle_due = False, False, handle_due
+    j, voice, say = S.Live.utterance(lv, "what can you do?")
+    assert voice == "A kitchen. Ask me. " + help_line and say and lv.status is None
+    assert [(f["kind"], f["sentence"]) for ev, f in frames if ev == "narration"] == [("v3-turn", help_line)]
+    lv, frames = turn_stand_in(('{"domain":"world_ui","intent":"HELP"}', S.OVER_LINE), won=True, card="A kitchen. Ask me.")
+    assert S.Live.utterance(lv, "what can I ask?")[1] == "A kitchen. Ask me. " + S.OVER_LINE
+    lv, frames = turn_stand_in(('{"domain":"world_ui","intent":"HELP"}', "I am ready to assist you."))
+    assert S.Live.utterance(lv, "help")[1] == "I am ready to assist you."
