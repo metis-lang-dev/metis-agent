@@ -288,7 +288,7 @@ def test_a_delivering_host_activates_any_domain_without_a_reload():
 def test_no_world_frame_carries_a_role():
     """The compiled vocabulary never reaches the page: over a role host every world/* frame of a task —
     the beat's arrival, the chain, the status, the ask and its cornered place — says the world's things;
-    the program's own atom rides only in a `role` field the page shows nowhere by default."""
+    the program's own atom is the journal's (dlg-director), never a page frame's, not even in a side field."""
     import json
     import re
     room = {"p1": "fridge1", "dest": "microwave1", "target": "tomato1"}
@@ -307,9 +307,9 @@ def test_no_world_frame_carries_a_role():
     roles = re.compile(r"\b(p\d+|dest|target|other|lhere|ldest|l\d+)\b")
     hier = [f for ev, f in frames if ev == "world/hierarchy"]
     assert [f["arrival"] for f in hier] == ["goto(fridge1)", "reached(fridge1)", "wrong_dest(fridge1)"]
-    assert [f["role"] for f in hier] == ["goto(p1)", "reached(p1)", "wrong_dest(p1)"]
+    assert not any("role" in f for f in hier)
     for ev, f in frames:
         if ev.startswith("world/"):
-            shown = json.dumps({k: v for k, v in f.items() if k != "role"})
+            shown = json.dumps(f)
             assert not roles.search(shown), (ev, shown)
     assert all(not roles.search(line) for _, line in said)
