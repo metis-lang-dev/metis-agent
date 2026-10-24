@@ -791,6 +791,32 @@ subject starts (the gating list):
    artifact rather than a catalog object (to be confirmed when G-A is
    picked up).
 
+## Decision 2026-10-24 (user): one voice paradigm
+
+The person's voice has one target: the dialog with the agent and the
+game it supervises. There is no second voice target. The web page stays
+a web page, driven by keyboard and mouse, and it converts its own
+elements INTO the chat: an ask's answers are chips that say their text
+as typing it would, the status line's chips do the same, the world
+card's lines are what the agent answers with. Voice OUTPUT of page text
+stays (the narrator reads a selection, fsttm-web).
+
+What went (voice-nav-removal s-90621b2c): the voice UI navigation built
+under console-nav s-b923ebfe — a second LLP domain (world_ui / ui) on
+the same model, its director level, the page hosts and `--nav` mode in
+this service, the panel's channel quasimode (the long key that redirected
+words from the page to the game), the loop console's TALK dock and REPL
+intent domain. Why: two paradigms on one model and one director mixed
+the 30-year web UI into the voice UX this project builds, and every
+hack that bridged them (the redirect key, the ownership table, the
+300 ms tick that leaked history) was a cost of the mixture, not of
+either side.
+
+What stays from console-nav: the panel as one reusable component
+(dialog-panel s-277c33e3, fsttm-web), the typed-intent frame as a
+driver's tool (alfworld's hier_agent), the formalization brain untouched.
+A voice on the formalization agent, if ever, is its own subject.
+
 ## Roadmap 2026-10-11 (user)
 
 The C++ runtime is the **metis kernel with its IR interpreter**; a

@@ -226,6 +226,18 @@ fsttm-web/
 Acceptance of the pass: the node tests unchanged (83 fixtures, the 22-row
 event table), the page on llama-server behaves as at d796cca.
 
+### 6a. One voice paradigm (user, 2026-10-24)
+
+fsttm-web carries ONE channel, the backend: the dialog with the agent.
+The panel's second channel (side, flip, hold; the push-to-talk redirect)
+served voice UI navigation and went with it (voice-nav-removal
+s-90621b2c, D2). A page that embeds the panel converts its own elements
+into the chat (ask chips, status chips) rather than giving the voice a
+second target; the narrator reads page text aloud, the reverse direction.
+The backchannel (chat/ctl/event/state, fsttm_web.chat) is the host's
+text way into the same one channel. Decision text: DESIGN.md,
+"Decision 2026-10-24".
+
 ## 7. Iterations (on demand; one subject, nina implements, architect reviews)
 
 1. **Package fsttm-web** per §6. No behaviour change.
