@@ -912,6 +912,20 @@ class DomainAgent:
             self.sync_world(inner)
         return []
 
+    def refresh_card(self):
+        """The card re-read from the domain's directory (intent.yaml) and the mapper rebuilt on it, the
+        session standing: a host whose world grew a name (semantic-map step 3: a thing the map sees for
+        the first time; the host rewrote the card) — the person can name it now, no reload."""
+        import yaml
+        from .intent_domain import card, handle_names
+        f = Path(self.mod.CATALOG).parent / "intent.yaml"
+        spec = yaml.safe_load(f.read_text()) or {}
+        c = card(spec)
+        self.mod.CARD, self.mod.INTENT = c, spec
+        self.handle_names.clear()                      # the same dict the display names read (in place)
+        self.handle_names.update(handle_names(c))
+        self.mapper = Mapper(c)
+
     def take(self, msg):
         """{"take": [do-lines]}: the session's next activation without a reload (alf-demo 3b timing: a
         director's planner took six reloads of 0.2 s a task) — the lines (the director host's

@@ -794,6 +794,18 @@ class Live:
                 if ev.startswith("world/"):
                     self.emit(ev, dict(f, domain=name))
 
+    def card_changes(self):
+        """A host whose card grew (its `card_changed()` face: semantic-map step 3, a thing the map saw for
+        the first time, the card rewritten from the map): the agent's mapper re-reads it and the person
+        turn's material is rebuilt (reload_intents) — the session stands, no reload."""
+        for name, ag in (self.agents.agents.items() if hasattr(self.agents, "agents") else ()):
+            h = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+            f = getattr(h, "card_changed", None)
+            if callable(f) and f():
+                ag.refresh_card()
+                self.journal.record({"kind": "dlg-card", "domain": name, "why": "the host's card grew"})
+                self.reload_intents(name)
+
     def sift(self, rs):
         out = []
         for r in rs:
@@ -952,6 +964,7 @@ class Live:
         self.eager = self.director is not None and len(self.director.log) > k and self.director.outcome is None
         self.release_held(k)
         self.world_frames()                    # the hosts' world/* frames of this tick (alf-demo step 2)
+        self.card_changes()
         self.auto_reload()
         self.push_catalog()
         again, self.ports_due = self.ports_due, set()

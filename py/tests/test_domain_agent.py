@@ -401,3 +401,36 @@ def test_a_host_over_roles_says_the_intent_in_its_programs_terms():
     assert [r.get("status") for r in out if r.get("kind") == "result"] == ["done"]
     assert ag.host.acted[0]["event"] == "turn[S=left]" and ag.host.acted[0]["id"] == "c1"
     assert ag.log[-1]["atom"] == asked[0].replace("right", "left") and ag.log[-1]["said"] == asked[0]
+
+
+def test_a_card_that_grew_is_read_again_without_a_reload(tmp_path, monkeypatch):
+    """semantic-map step 3: a host whose world grew a name rewrites its card; the service's tick asks its
+    `card_changed()` face, the agent re-reads intent.yaml (refresh_card: the card, the mapper, the display
+    names) and the person turn's material is rebuilt (reload_intents) — the session is the same object, a
+    dlg-card row in the journal."""
+    import shutil
+    import types
+
+    import yaml
+    from metis_agent.domain_agent import DomainAgent
+    from metis_agent.service import Live
+    shutil.copytree(Path(dog.CATALOG).parent, tmp_path / "dog")
+    from metis_agent import intent_domain
+    mod = types.SimpleNamespace(**intent_domain.build("dog", dir=tmp_path / "dog"))
+    ag = DomainAgent(mod)
+    repl, mapper = ag.repl, ag.mapper
+    f = tmp_path / "dog" / "intent.yaml"
+    spec = yaml.safe_load(f.read_text())
+    slot = next(s for s, v in (spec.get("values") or {}).items() if isinstance(v, dict) and v)
+    spec["values"][slot] = dict(spec["values"][slot], NEWTHING="newthing")
+    f.write_text(yaml.safe_dump(spec, sort_keys=False))
+    grew = [True]
+    ag.host.inner.card_changed = lambda: grew.pop() if grew else False
+    rows, reloaded = [], []
+    live = types.SimpleNamespace(agents=types.SimpleNamespace(agents={"dog": ag}),
+                                 journal=types.SimpleNamespace(record=rows.append), reload_intents=reloaded.append)
+    Live.card_changes(live)
+    assert ag.repl is repl and ag.mapper is not mapper and ag.mod.INTENT["values"][slot]["NEWTHING"] == "newthing"
+    assert rows == [{"kind": "dlg-card", "domain": "dog", "why": "the host's card grew"}] and reloaded == ["dog"]
+    Live.card_changes(live)                                        # once: nothing grew since
+    assert len(rows) == 1 and reloaded == ["dog"]
