@@ -114,9 +114,9 @@ def test_the_person_wins_the_demo_through_the_page_from_the_host(tmp_path):
             kinds = {f["kind"] for f in chat.frames[m:] if f["ev"] == "event"}
             assert {"final", "llm", "fsttm"} <= kinds and "frame" not in kinds, kinds   # the dialog's events; never the frames
 
-            # alf-demo 3c (a): after the win, words that set no task get the over line, said once
+            # alf-demo 3c (a): after the win, an errand gets the over line, said once (small talk keeps its own reply)
             m = chat.mark()
-            await chat.user("what can you do?", id="q2")
+            await chat.user("go to the fridge", id="q2")
             await chat.expect(ev="chat", who="user", host_id="q2", since=m, timeout=30)
             over = await chat.expect(lambda f: "game is over" in f["text"].lower(), ev="chat", who="system", since=m, timeout=60)
             await asyncio.sleep(2.0)

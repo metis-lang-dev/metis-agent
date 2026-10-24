@@ -164,14 +164,25 @@ def turn_stand_in(answer, won=False, card=""):
     return lv, frames
 
 
-def test_a_finished_game_answers_every_utterance_with_the_over_line():
-    """alf-demo 3c (a): after the win, words that set no task get the over line too — not the card line."""
+def test_a_finished_game_answers_an_errand_with_the_over_line():
+    """alf-demo 3c (a): after the win, an errand it cannot do gets the over line too — not the card line."""
     lv, frames = turn_stand_in(('{"intent":"UNKNOWN"}', "I don't know what you mean."), won=True, card="A kitchen.")
-    j, voice, say = S.Live.utterance(lv, "Alf World the")
+    j, voice, say = S.Live.utterance(lv, "go to the fridge")
     assert voice == S.OVER_LINE and say and lv.status["state"] == "over"
     assert lv.status["options"] == list(S.NEW_GAME_OPTION)
+    lv, _ = turn_stand_in(('{"intent":"UNKNOWN"}', "x"), won=False, card="A kitchen.")
+    assert S.Live.utterance(lv, "go to the fridge")[1] == "A kitchen."   # a game in play: the card line as before
+
+
+def test_small_talk_is_talk_and_leaves_the_game_alone():
+    """The user (2026-10-24): small talk is not an errand — "okay, I understood" over her line is talk. The
+    model's own reply stands, in a finished game and in one in play: no over line, no card line, no status."""
+    lv, _ = turn_stand_in(('{"intent":"CHITCHAT"}', "Good."), won=True, card="A kitchen.")
+    before = dict(lv.status or {})
+    j, voice, say = S.Live.utterance(lv, "okay I understood")
+    assert voice == "Good." and (lv.status or {}) == before
     lv, _ = turn_stand_in(('{"intent":"CHITCHAT"}', "Hello."), won=False, card="A kitchen.")
-    assert S.Live.utterance(lv, "hello")[1] == "A kitchen."          # a game in play: the card line as before
+    assert S.Live.utterance(lv, "hello")[1] == "Hello."
 
 
 def test_a_line_said_again_too_soon_is_shown_not_spoken(monkeypatch):

@@ -1014,14 +1014,20 @@ class Live:
             except (ValueError, AttributeError):
                 verb = ""
             folded = set()                      # held narrations said inside this turn's voice
-            if self.director is not None and verb != "STOP" and self.world_over():
-                # alf-demo 3c: in a finished game every utterance gets the over line, words that set no
-                # task included (the user's run: the card line heard back as "Alf World the", every 3.2 s)
+            if verb == "CHITCHAT":
+                # small talk is talk, not an errand (the user, 2026-10-24: "the user should be able to chit-chat
+                # the model without interrupting the game; not every utterance should become an intent"): the
+                # model's own reply stands, and nothing of the game changes — no over line, no card line, no
+                # status, whatever runs goes on
+                pass
+            elif self.director is not None and verb != "STOP" and self.world_over():
+                # alf-demo 3c: in a finished game an errand gets the over line (one it cannot do included);
+                # small talk does not (above)
                 voice_s = voice = OVER_LINE
                 folded = {OVER_LINE}
                 if (self.status or {}).get("state") != "over":
                     self.set_status("over", OVER_LINE, options=list(NEW_GAME_OPTION))
-            elif verb in ("UNKNOWN", "CHITCHAT") and self.card_line():
+            elif verb == "UNKNOWN" and self.card_line():
                 # alf-demo 3b (the user's "put the pencil in microwave" → "unknown", nothing to go on): what
                 # this world is and what to ask, from the map's card, said instead; the status is left as it is
                 voice_s = voice = self.card_line()
