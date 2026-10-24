@@ -70,7 +70,8 @@ main{flex:1;display:flex;min-height:0}
 .dock.open{flex:1 1 0;min-height:90px}.dock.collapsed{flex:none}
 .dock>header{display:flex;align-items:center;gap:6px;padding:3px 10px;background:#161b22;cursor:pointer;user-select:none;
   color:var(--dim);font-size:11px;letter-spacing:.06em;flex:none}
-.dock>header .tw{width:1em;color:var(--fg)}.dock>header .tt{flex:1;color:var(--fg)}
+.dock>header .tw{width:1em;color:var(--fg)}.dock>header .tw:empty{display:none}
+#right.nofold .dock>header{cursor:default}.dock>header .tt{flex:1;color:var(--fg)}
 .dock>header .x{background:none;border:none;color:var(--dim);cursor:pointer;font:inherit;padding:0 2px}
 .dock>header .x:hover{color:var(--fg)}
 .dock.collapsed>.dbody{display:none}

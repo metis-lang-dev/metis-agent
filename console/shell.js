@@ -27,10 +27,11 @@
   };
   const $ = s => document.querySelector(s);
 
-  function docks({ names, key, defaults = {}, store: st = store, onChange = null }) {
+  function docks({ names, key, defaults = {}, store: st = store, onChange = null, fold = true }) {
     const state = st.get(key, defaults) || {};
+    if (!fold) $("#right")?.classList.add("nofold");
     const els = () => names.map(d => [d, $("#dock-" + d)]).filter(([, el]) => el);
-    const isOpen = d => !!(state[d] && state[d].shown && state[d].open);
+    const isOpen = d => !!(state[d] && state[d].shown && (state[d].open || !fold));
     function apply() {
       let any = false;
       // a dock opened without a size of its own takes the others' mean: sizes are flex-grow weights
@@ -39,14 +40,14 @@
       for (const [d, el] of els()) {
         const s = state[d] || { shown: false, open: true };
         el.hidden = !s.shown;
-        el.classList.toggle("open", !!(s.shown && s.open));
-        el.classList.toggle("collapsed", !!(s.shown && !s.open));
+        el.classList.toggle("open", isOpen(d));
+        el.classList.toggle("collapsed", !!s.shown && !isOpen(d));
         el.style.flex = isOpen(d) ? `${s.size > 0 ? s.size : mean || 1} 1 0` : "";
         const g = grip(d, el);
         g.hidden = !(isOpen(d) && above);        // a grip only between two open docks
         if (isOpen(d)) above = true;
         const tw = el.querySelector(".tw");
-        if (tw) tw.textContent = s.open ? "▾" : "▸";
+        if (tw) tw.textContent = !fold ? "" : s.open ? "▾" : "▸";
         const b = document.querySelector(`[data-strip="${d}"]`);
         if (b) b.setAttribute("aria-pressed", !!s.shown);
         any = any || !!s.shown;
@@ -97,12 +98,13 @@
       if (!names.includes(d)) return;
       if (e.target.closest(".x")) { set(d, { shown: false }); return; }
       if (e.target.closest("button,input,select,a,label")) return;    // a control in the header is its own
+      if (!fold) return;                                              // tools: the strip shows and hides them
       set(d, { open: !(state[d] && state[d].open) });
     }));
     document.querySelectorAll("[data-strip]").forEach(b => b.addEventListener("click", () => {
       const d = b.dataset.strip, s = state[d] || {};
       if (!names.includes(d)) return;
-      if (s.shown && s.open) set(d, { shown: false }); else set(d, { shown: true, open: true });
+      if (isOpen(d)) set(d, { shown: false }); else set(d, { shown: true, open: true });
     }));
     return { state, set, apply };
   }
