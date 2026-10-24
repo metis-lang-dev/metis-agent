@@ -1546,6 +1546,11 @@ def make_app(live, ui_dir, lib_dir=None):
     from aiohttp import WSMsgType, web
     app = web.Application()
     clients = {}                # page id -> its socket
+    try:                        # the panel's host backchannel (fsttm-web's Relay; dialog-panel s-277c33e3): a program on
+        from fsttm_web.chat import Relay      # the host types as the person to a page and reads its rows, events, state
+        relay = Relay()
+    except ImportError:         # an fsttm_web without it: no /host
+        relay = None
     loop_box = {}
     seq = [0]
 
@@ -1577,6 +1582,8 @@ def make_app(live, ui_dir, lib_dir=None):
         pid = "p%d" % seq[0]
         clients[pid] = sock
         live.started.set()
+        if relay is not None:
+            relay.add_page(sock.send_json)
 
         async def send(ev, f):
             await sock.send_str(json.dumps(dict({"ev": ev, "t": _now_rfc()}, **f), ensure_ascii=False, default=str))
@@ -1587,6 +1594,8 @@ def make_app(live, ui_dir, lib_dir=None):
                 try:
                     m = json.loads(msg.data)
                 except ValueError:
+                    continue
+                if relay is not None and await relay.from_page(m):    # the page's chat/event/state: the host's
                     continue
                 ev = m.get("ev")
                 if ev == "hello":
@@ -1659,6 +1668,8 @@ def make_app(live, ui_dir, lib_dir=None):
                     log.debug("%s %s", ev, m)
         finally:
             clients.pop(pid, None)
+            if relay is not None:
+                relay.drop_page(sock.send_json)
             await ask(live.release, pid)
         return sock
 
@@ -1676,6 +1687,9 @@ def make_app(live, ui_dir, lib_dir=None):
     app.on_shutdown.append(on_shutdown)
     app.on_response_prepare.append(revalidate)
     app.router.add_get("/ws", ws_handler)
+    if relay is not None:       # before the page's catch-all static route
+        from fsttm_web.aiohttp import host_route
+        host_route(app, relay)
     try:
         from fsttm_web.aiohttp import mount
         mount(app, page=False)

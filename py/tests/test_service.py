@@ -664,6 +664,52 @@ def test_two_pages_on_the_wire_one_owns(tmp_path):
         lv.stop.set()
 
 
+def test_a_host_drives_a_page_through_the_relay(tmp_path):
+    """dialog-panel s-277c33e3 step 3: the panel's backchannel on the service — a host at /host
+    (fsttm_web.chat.Chat.connect) types to the page opened last (chat, ctl), and hears every page's
+    chat / event / state; those frames are the host's, never the service's (no turn, no reply)."""
+    import asyncio
+    from aiohttp.test_utils import TestClient, TestServer
+    lv, _ = live(tmp_path)
+    app = S.make_app(lv, str(ROOT / "console"))
+    threading.Thread(target=lv.run, daemon=True).start()
+
+    async def until(ws, pred, n=200):
+        for _ in range(n):
+            m = json.loads((await ws.receive(timeout=10)).data)
+            if pred(m):
+                return m
+        raise AssertionError("no such frame")
+
+    async def go():
+        async with TestClient(TestServer(app)) as c:
+            host = await c.ws_connect("/host")
+            await host.send_json({"ev": "chat", "who": "user", "text": "hello"})
+            assert (await until(host, lambda m: m["ev"] == "error"))["error"].startswith("no page")
+            page = await c.ws_connect("/ws")
+            await page.send_json({"ev": "hello", "since": 1e15})
+            await until(page, lambda m: m["ev"] == "page")
+            await host.send_json({"ev": "chat", "who": "user", "text": "where is the dog", "id": "h1"})
+            await host.send_json({"ev": "ctl", "barge_in": "energy"})
+            got = await until(page, lambda m: m["ev"] == "chat")
+            assert got == {"ev": "chat", "who": "user", "text": "where is the dog", "id": "h1"}
+            assert (await until(page, lambda m: m["ev"] == "ctl")) == {"ev": "ctl", "barge_in": "energy"}
+            n = len(lv.journal.recs)
+            row = {"ev": "chat", "who": "user", "text": "where is the dog", "row": 1, "id": "t1", "via": "host", "tags": [], "host_id": "h1"}
+            await page.send_json(row)
+            await page.send_json({"ev": "state", "floor": "FREEs", "barge_in": "energy"})
+            assert await until(host, lambda m: m["ev"] == "chat") == row
+            assert (await until(host, lambda m: m["ev"] == "state"))["barge_in"] == "energy"
+            await asyncio.sleep(0.2)
+            assert not [r for r in lv.journal.recs[n:] if r["kind"] in ("dlg-wake", "dlg-dispatch")]   # not a turn
+            await page.close()
+            await host.close()
+    try:
+        asyncio.run(go())
+    finally:
+        lv.stop.set()
+
+
 def test_an_activates_bindings_reach_the_host(tmp_path):
     """console-nav step 2: activate{domain, bindings} hands the bindings to a host with
     take_bindings(bindings) (metis-loop's repl host attaches to the page's session); a page host's
