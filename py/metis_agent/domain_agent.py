@@ -320,13 +320,20 @@ class DomainAgent:
             self.log.append({"id": iid, "verb": msg.get("verb"), "args": msg.get("args"), "error": NO_INTENTS})
             return [reply(self.name, "error", id=iid, error=NO_INTENTS)]
         m = self.mapper.map(msg)
+        atom = m.atom if isinstance(m, Mapped) else None
+        inner = getattr(self.host, "inner", self.host)
+        if atom is not None and hasattr(inner, "intent_atom"):
+            # a program over roles (semantic-map s-d4270bed: the ALFWorld specialists): the card speaks the
+            # world's things, the host says the atom in its program's roles (a fetch re-projects its map) —
+            # before the queue and the replier, which both match the atom the program consumes
+            atom = inner.intent_atom(atom)
         self.log.append({"id": iid, "verb": msg.get("verb"), "args": msg.get("args"),
-                         **({"atom": m.atom, "act": m.act, "dropped": m.dropped} if isinstance(m, Mapped)
-                            else {"error": m.error})})
+                         **({"atom": atom, "act": m.act, "dropped": m.dropped, **({"said": m.atom} if atom != m.atom else {})}
+                            if isinstance(m, Mapped) else {"error": m.error})})
         if not isinstance(m, Mapped):
             return [reply(self.name, "error", id=iid, error="mapper: " + m.error)]
-        self.host.submit(iid, m.atom, m.dropped)
-        self.replier.submitted(iid, m.atom, m.act)
+        self.host.submit(iid, atom, m.dropped)
+        self.replier.submitted(iid, atom, m.act)
         return [reply(self.name, "result", id=iid, status="accepted", ref={"beat": self.beat_no()},
                       text="Accepted.")]
 

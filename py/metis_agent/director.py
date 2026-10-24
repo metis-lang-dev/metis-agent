@@ -115,8 +115,8 @@ class DirectorLoop:
     test's fake):
 
       ops.beat(name, lines)        the director's world lines in, one beat: → its trace records
-      ops.instance(d, goal)        the director's host re-instances d for the goal (the world's
-                                   gen_hier into d's installed directory) and the agent reloads d
+      ops.instance(d, goal)        d's next activation for the goal: the director host's deliver taken
+                                   on d's live session (Live.activation), else d re-instanced and reloaded
       ops.activate(d) / ops.deactivate(d)
       ops.say(text, kind)          a line spoken as it is: kind ask (the band asks it) or line (the end)
 

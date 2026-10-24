@@ -506,22 +506,7 @@ class Live:
                     live._dir_traces = None
 
             def instance(self, dom, goal):
-                ag = live.agents.agents.get(name) if hasattr(live.agents, "agents") else None
-                host = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
-                target = live.agents.agents.get(dom) if hasattr(live.agents, "agents") else None
-                tokens = {a: n for a, n in target.repl.counts.items() if n > 0} if target is not None else {}   # what D holds now
-                if host is None or not hasattr(host, "instance"):
-                    raise RuntimeError("director %s: its host has no instance(d, goal, tokens)" % name)
-                deliver = getattr(host, "deliver", None)
-                if callable(deliver) and dom in live.director.facts["planner"] and target is not None:
-                    # the live planner takes its next activation as one row (the host's deliver: what a new
-                    # instance would start it at), no reload — else it is re-instanced and reloaded as before
-                    lines = deliver(dom, goal, tokens)
-                    if lines is not None and live.take(dom, lines, by="director"):
-                        return
-                if host.instance(dom, goal, tokens):
-                    live.world_frames()             # the old instance's frames first: the reload replaces its host
-                    live.reload(dom, by="director")
+                live.activation(name, dom, goal)
 
             def activate(self, dom):
                 live.domain_verb("activate", dom, "director")
@@ -537,6 +522,28 @@ class Live:
                 else:
                     live.on_say("line", live.spoken(text))
         return DirectorLoop(name, director_facts(text), m.group(1).split(), Ops())
+
+    def activation(self, name, dom, goal):
+        """The director NAME's forward of GOAL to DOM: its host's deliver(dom, goal, tokens) as one row on
+        the live session (no reload: the planner, alf-demo 3b; every specialist compiled once over roles,
+        semantic-map s-d4270bed), else its instance(dom, goal, tokens) written and DOM reloaded."""
+        ag = self.agents.agents.get(name) if hasattr(self.agents, "agents") else None
+        host = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+        target = self.agents.agents.get(dom) if hasattr(self.agents, "agents") else None
+        tokens = {a: n for a, n in target.repl.counts.items() if n > 0} if target is not None else {}   # what D holds now
+        if host is None or not hasattr(host, "instance"):
+            raise RuntimeError("director %s: its host has no instance(d, goal, tokens)" % name)
+        deliver = getattr(host, "deliver", None)
+        if callable(deliver) and target is not None:
+            # the live domain takes its next activation as one row (the host's deliver: what a new
+            # instance would start it at), no reload — a host that returns None re-instances and the
+            # domain is reloaded as before
+            lines = deliver(dom, goal, tokens)
+            if lines is not None and self.take(dom, lines, by="director"):
+                return
+        if host.instance(dom, goal, tokens):
+            self.world_frames()             # the old instance's frames first: the reload replaces its host
+            self.reload(dom, by="director")
 
     def director_step(self):
         """The arrivals the last beat queued, each one director beat (journaled as dlg-director)."""
@@ -575,9 +582,9 @@ class Live:
         tv, changed = self.task_view, False
         for d, goal in b.get("goals") or []:
             if d not in f["planner"]:
-                tv["chain"].append({"domain": d, "goal": goal, "result": None})
+                tv["chain"].append({"domain": d, "goal": self.in_room(goal, d), "result": None})
                 changed = True
-                self.set_status("working", self.goal_said(goal, d), domain=d, goal=goal)
+                self.set_status("working", self.goal_said(goal, d), domain=d, goal=self.in_room(goal, d))
         src = b.get("from")
         if src and b.get("said_as_ask") and src in f["planner"]:
             tv["results"].append(self.spoken(b["said"], src))                    # the planner's refusal: a result line of the task card
@@ -585,7 +592,7 @@ class Live:
         if src and src not in f["planner"] and not b["arrival"].startswith("idle("):
             entry = next((c for c in reversed(tv["chain"]) if c["domain"] == src and c["result"] is None), None)
             if entry is not None:
-                entry["result"] = b["arrival"]
+                entry["result"] = self.in_room(b["arrival"], src)
                 if (self.status or {}).get("state") == "working" and (self.status or {}).get("domain") == src:
                     # nina's W3: the specialist is done with its goal; the planner chooses the next step
                     planner = sorted(f["planner"])[0] if f["planner"] else None
@@ -599,7 +606,8 @@ class Live:
         view = {"task": {"chain": [dict(c) for c in tv["chain"]], "results": list(tv["results"])}}
         asks = any(e.startswith("ask(") for e in b.get("effects") or ())       # the director asks (with its end, or alone)
         if asks and "(" in b["arrival"]:
-            view["cornered"] = b["arrival"][b["arrival"].index("(") + 1:b["arrival"].rindex(")")].split(",")[0].strip()
+            at = self.in_room(b["arrival"], src)
+            view["cornered"] = at[at.index("(") + 1:at.rindex(")")].split(",")[0].strip()
             changed = True
         if changed:
             self.emit("world/delta", view)
@@ -735,6 +743,22 @@ class Live:
                     out = text
                 break
         return out[:1].upper() + out[1:]                      # nina's N6: a line that starts with a handle
+
+    def in_room(self, atom, domain=None):
+        """An atom with the program's roles as the world's things (goto(p1) → goto(countertop3)): the source
+        domain's host's `in_room(atom)` face (semantic-map s-d4270bed: the specialists speak roles, the page
+        shows the room), else the first served host's, else the atom as it is."""
+        ags = self.agents.agents if hasattr(self.agents, "agents") else {}
+        order = ([ags[domain]] if domain in ags else []) + [a for n, a in ags.items() if n != domain]
+        for ag in order:
+            h = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+            f = getattr(h, "in_room", None)
+            if callable(f):
+                try:
+                    return f(atom) or atom
+                except Exception:  # noqa: BLE001 — a host's words never stop a frame
+                    return atom
+        return atom
 
     def goal_said(self, goal, domain):
         """A domain's goal as the person reads it ("going to countertop 3"): the domain's host's

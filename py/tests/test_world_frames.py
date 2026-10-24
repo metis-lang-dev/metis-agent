@@ -23,6 +23,7 @@ def stand_in(outcome=None, hosts=None):
     lv.set_status = lambda state, text, **kw: S.Live.set_status(lv, state, text, **kw)
     lv.world_over = lambda: S.Live.world_over(lv)
     lv.goal_said = lambda goal, domain: S.Live.goal_said(lv, goal, domain)
+    lv.in_room = lambda atom, domain=None: S.Live.in_room(lv, atom, domain)
     return lv, frames, said
 
 
@@ -229,3 +230,56 @@ def test_the_repeat_guard_holds_a_turn_line_that_was_also_a_narration(monkeypatc
     forms = [(f["kind"], f["form"]) for ev, f in frames if ev == "narration"]
     assert forms == [("v3-turn", "N"), ("v3-held", "R")]
 
+
+
+def test_a_role_hosts_chain_and_cornered_place_are_the_rooms():
+    """semantic-map s-d4270bed: a specialist over roles puts out goto(p1) / reached(p1); its host's
+    in_room face says them as the world's things, so the page's chain, the status's goal and the place
+    an ask is cornered at are the room's (goto(fridge1)), never a role."""
+    room = {"p1": "fridge1", "dest": "microwave1"}
+
+    class Host:
+        def in_room(self, atom):
+            n, _, rest = atom.partition("(")
+            return "%s(%s)" % (n, ",".join(room.get(a, a) for a in rest.rstrip(")").split(","))) if rest else atom
+
+        def goal_text(self, goal):
+            return "going to " + self.in_room(goal)[5:-1] if goal.startswith("goto(") else None
+    lv, frames, _ = stand_in(hosts={"nav": Host()})
+    S.Live.world_beat(lv, 0, {"arrival": "seen(goto)", "effects": ["forward(nav,goto)"], "goals": [("nav", "goto(p1)")]})
+    assert lv.task_view["chain"] == [{"domain": "nav", "goal": "goto(fridge1)", "result": None}]
+    assert lv.status["goal"] == "goto(fridge1)" and lv.status["text"] == "Going to fridge1"
+    S.Live.world_beat(lv, 1, {"arrival": "reached(p1)", "effects": [], "from": "nav"})
+    assert lv.task_view["chain"][0]["result"] == "reached(fridge1)"
+    S.Live.world_beat(lv, 2, {"arrival": "wrong_dest(p1)", "effects": ["ask(wrong_dest)"], "from": "nav"})
+    ask = [f for ev, f in frames if ev == "world/ask"][-1]
+    assert ask["cornered"] == "fridge1"
+
+
+def test_a_delivering_host_activates_any_domain_without_a_reload():
+    """semantic-map s-d4270bed: the director's forward to ANY domain (a specialist, not only the
+    planner) is the host's deliver as one row on the live session — no instance written, no reload;
+    a host that cannot deliver (None) re-instances and the domain is reloaded, the fallback."""
+    did = []
+
+    class DirectorHost:
+        def deliver(self, d, goal, tokens):
+            did.append(("deliver", d, dict(tokens)))
+            return None if d == "old" else ["-reached(dest) 1", "+%s 1" % goal]
+
+        def instance(self, d, goal, tokens):
+            did.append(("instance", d))
+            return True
+    lv, _, _ = stand_in()
+    ags = lv.agents.agents
+    ags["director"].host = SimpleNamespace(inner=DirectorHost())
+    ags["nav"] = SimpleNamespace(repl=SimpleNamespace(counts={"reached(dest)": 1, "at(lhere)": 1, "gone": 0}))
+    ags["old"] = SimpleNamespace(repl=SimpleNamespace(counts={}))
+    lv.take = lambda d, lines, by="director": did.append(("take", d, list(lines))) or True
+    lv.reload = lambda d, by="person": did.append(("reload", d))
+    lv.world_frames = lambda: None
+    S.Live.activation(lv, "director", "nav", "goto(p1)")
+    assert did == [("deliver", "nav", {"reached(dest)": 1, "at(lhere)": 1}), ("take", "nav", ["-reached(dest) 1", "+goto(p1) 1"])]
+    did.clear()
+    S.Live.activation(lv, "director", "old", "goto(x)")
+    assert did == [("deliver", "old", {}), ("instance", "old"), ("reload", "old")]

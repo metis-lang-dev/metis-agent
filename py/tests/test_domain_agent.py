@@ -386,3 +386,18 @@ def test_the_watch_keeps_a_bounded_history(monkeypatch):
         r._tick(quiet_rows=False)
     assert len(r.fired) == 12 and r.fired.off == 7 and len(r.fired.items) == 5 and len(r._envs.items) == 6
     assert r.counts.get("battery_ok") == 1 and not r.counts.get("battery_low")     # the state is the whole run's
+
+def test_a_host_over_roles_says_the_intent_in_its_programs_terms():
+    """semantic-map s-d4270bed: the card speaks the world's things; a host whose program speaks roles
+    declares intent_atom, and the mapper's atom passes through it before the queue and the replier —
+    the rule that consumes the translated atom answers the person's command."""
+    from metis_agent.domain_agent import DomainAgent
+    ag = DomainAgent(dog)
+    asked = []
+    ag.host.inner.intent_atom = lambda atom: asked.append(atom) or atom.replace("right", "left")
+    ag.handle({"id": "c1", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "TURN", "direction": "RIGHT", "angle_deg": 45}})
+    out = ag.handle({"clock": "beat"})
+    assert asked and "right" in asked[0]
+    assert [r.get("status") for r in out if r.get("kind") == "result"] == ["done"]
+    assert ag.host.acted[0]["event"] == "turn[S=left]" and ag.host.acted[0]["id"] == "c1"
+    assert ag.log[-1]["atom"] == asked[0].replace("right", "left") and ag.log[-1]["said"] == asked[0]
