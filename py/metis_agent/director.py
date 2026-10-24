@@ -129,6 +129,7 @@ class DirectorLoop:
         self.domains = facts["specialist"] | facts["planner"]
         self.queue, self.log, self.outcome = [], [], None
         self.came = {}            # arrival atom -> (the domain that produced it, its rule's line)
+        self.replans = []         # (planner, its rule's line): a result taken, no goal sent — said (semantic-map step 3)
 
     def arrive(self, atom):
         """An atom from outside the domains' rules (the person's goal, a seed)."""
@@ -148,6 +149,13 @@ class DirectorLoop:
         for row in trace.get("fired") or []:
             if row.get("kind") == "exo":          # put in from outside (the person's intent, the world's sync): no rule's
                 continue
+            if domain in self.facts["planner"] and row.get("line") \
+                    and {kind_of(a) for a in row.get("consume") or []} & self.facts["result"] \
+                    and not {kind_of(a) for a in row.get("produce") or []} & self.kinds:
+                # the planner took a specialist's result (the director's `result` kinds) and sent no goal: it
+                # re-plans (the target not where it looked) — the one voice says why it moves on, its rule's own
+                # line (semantic-map step 3, the architect)
+                self.replans.append((domain, row["line"]))
             for a in row.get("produce") or []:
                 if kind_of(a) in self.kinds:
                     out.append(a)

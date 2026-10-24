@@ -547,6 +547,8 @@ class Live:
 
     def director_step(self):
         """The arrivals the last beat queued, each one director beat (journaled as dlg-director)."""
+        if self.director is not None and self.director.replans:
+            self.say_replans()
         if self.director is None or not self.director.queue:
             return
         k = len(self.director.log)
@@ -556,6 +558,18 @@ class Live:
                                      **({"outcome": self.director.outcome} if self.director.outcome else {})))
             self.world_beat(i, b)
         self.world_frames()
+
+    def say_replans(self):
+        """The planner re-planned on a result (the director's `replans`: its rule took a specialist's result
+        and sent no goal — semantic-map step 3, the target not where it looked): its rule's line is said as
+        a result line of the task card (v3-line, the host's words: the room's things), one per re-plan."""
+        replans, self.director.replans = self.director.replans, []
+        for src, line in replans:
+            text = self.spoken(line, src)
+            self.task_view["results"].append(text)
+            self.emit("world/delta", {"task": {"chain": [dict(c) for c in self.task_view["chain"]],
+                                               "results": list(self.task_view["results"])}})
+            self.on_say("line", text)
 
     def release_held(self, k):
         """The results held for the director (handle_due): dropped when its beats since `k` took an

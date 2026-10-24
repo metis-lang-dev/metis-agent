@@ -157,3 +157,20 @@ def test_an_ask_says_the_arrivals_own_line():
     loop.step()
     assert said == [("Fridge 1 is not where this task wants tomato 1: I stop and ask.", "ask")]
     assert loop.log[0]["said_as_ask"] and loop.log[0]["from"] == "task"
+
+
+def test_a_planner_that_takes_a_result_and_sends_no_goal_replans_aloud():
+    """semantic-map step 3 (the architect: the one voice says why the robot moves on): the planner's
+    rule that consumed a specialist's result (a `result` kind) and produced no director kind re-plans —
+    its own line is queued to be said; a rule that sends a goal, or one that took the person's fetch (no
+    result), is not."""
+    from metis_agent.director import DirectorLoop
+    assert "reached" in FACTS["result"] and "fetch" not in FACTS["result"]
+    loop = DirectorLoop("director", FACTS, ["fetch", "goto", "open", "reached", "accessible"], None)
+    loop.produced("task", {"fired": [
+        {"kind": "clause", "consume": ["fetch(target,dest)"], "produce": ["start", "to(dest)", "want(target)"], "line": "I'll fetch target to dest."},
+        {"kind": "clause", "consume": ["reached(p1)", "want(target)"], "produce": ["start", "want(target)"], "line": "target is not in p1: I look elsewhere."},
+        {"kind": "clause", "consume": ["reached(p2)", "want(target)"], "produce": ["open(p2)", "want(target)"], "line": "At p2: I need it open."}]})
+    assert loop.replans == [("task", "target is not in p1: I look elsewhere.")] and loop.queue == ["open(p2)"]
+    loop.produced("nav", {"fired": [{"kind": "clause", "consume": ["goto(p1)"], "produce": ["reached(p1)"], "line": "I go to p1."}]})
+    assert len(loop.replans) == 1                                      # a specialist's rule is no re-plan
