@@ -186,7 +186,7 @@ def test_a_line_said_again_too_soon_is_shown_not_spoken(monkeypatch):
     j, voice, say = S.Live.utterance(lv, "Alf World the")
     assert voice == "" and say == 0
     rows = [f for ev, f in frames if ev == "narration"]
-    assert [(r["sentence"], r["form"]) for r in rows] == [("A kitchen. Ask me.", "R")]
+    assert [(r["sentence"], r["kind"], r["form"]) for r in rows] == [("A kitchen. Ask me.", "v3-held", "R")]
     held = [r for r in lv.journal.recs if r["kind"] == "dlg-say-held"]
     assert held[-1]["held"] == "row" and held[-1]["text"] == "A kitchen. Ask me."
     clock[0] += 3.2                                     # the third: no row, no voice
@@ -199,7 +199,8 @@ def test_a_line_said_again_too_soon_is_shown_not_spoken(monkeypatch):
 
 def test_the_repeat_guard_holds_a_turn_line_that_was_also_a_narration(monkeypatch):
     """A turn whose answer is a narration said in the same turn (the over line of a task in a finished
-    game): the narration takes the guard's form, R when shown, dropped when held altogether."""
+    game): the narration is the turn's own (v3-turn: its intent frame voices it), a row the page does not
+    voice when held (v3-held, form R), dropped when held altogether."""
     clock = [1000.0]
     monkeypatch.setattr(S.time, "time", lambda: clock[0])
     lv, frames = turn_stand_in(('{"intent":"FETCH"}', S.OVER_LINE), won=True)
@@ -215,4 +216,4 @@ def test_the_repeat_guard_holds_a_turn_line_that_was_also_a_narration(monkeypatc
     clock[0] += 5
     S.Live.utterance(lv, "put the tomato in the microwave")
     forms = [(f["kind"], f["form"]) for ev, f in frames if ev == "narration"]
-    assert forms == [("v3-turn", "N"), ("v3-turn", "R")]
+    assert forms == [("v3-turn", "N"), ("v3-held", "R")]

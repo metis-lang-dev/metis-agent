@@ -1079,20 +1079,19 @@ class Live:
                 if n["sentence"] == voice_s:
                     if held == "all":
                         continue
-                    n["kind"] = "v3-turn"
-                    if held:
-                        n["form"] = "R"
+                    # the turn's own line (its intent frame voices it; WIRE.md); held: a row the page does not voice
+                    n["kind"], n["form"] = ("v3-held", "R") if held else ("v3-turn", n["form"])
                 self.emit("narration", n)
             self.held = []
             last = self.journal.say
             say = 0
             if held:
                 # alf-demo 3c: said again too soon — not spoken (no echo loop outlives its first repeat);
-                # shown as a row (a narration the page does not voice, form R) unless held altogether
+                # shown as a row (narration v3-held, form R: the page does not voice it) unless held altogether
                 self.journal.record({"kind": "dlg-say-held", "text": voice_s, "held": held})
                 if held == "row" and not shown:
                     self.narr_seq += 1
-                    self.emit("narration", {"id": "n%d" % self.narr_seq, "path": "", "kind": "v3-turn", "form": "R",
+                    self.emit("narration", {"id": "n%d" % self.narr_seq, "path": "", "kind": "v3-held", "form": "R",
                                             "line": "", "sentence": voice_s, "say": 0})
                 voice_s = voice = ""
             elif voice_s and (last is None or last.get("text") != voice or last["seq"] < (self.journal.wake or {}).get("seq", 0)):
