@@ -121,7 +121,7 @@ def test_world_reload_and_the_watcher(tmp_path):
     assert (r["verb"], r["domain"], r["key"]) == ("reload", "dog", key)
     _, err = lv.reload("kitchen_shared")
     assert err and "pair" in err                                           # the pair reloads as one, from the kitchen
-    assert lv.domain_verb("deactivate", "kitchen", None, "person") is None and "kitchen" in lv.off
+    assert lv.domain_verb("deactivate", "kitchen", "person") is None and "kitchen" in lv.off
     assert {e["name"]: e for e in lv.catalog()}["kitchen"]["state"] == "inactive"
     cat = {e["name"]: e for e in lv.catalog()}
     assert cat["wildfire"]["state"] == "not installed" and cat["wildfire"]["kind"] == "domain"
@@ -210,7 +210,7 @@ def test_activate_installs_a_manifest_domain_at_runtime(tmp_path):
     lv, frames = live(tmp_path)
     lv.o.m.last["dog"] = "sat down"
     assert "wgc" not in lv.names and "- wgc:" not in lv.prompt
-    assert lv.domain_verb("activate", "wgc", None, "person") is None
+    assert lv.domain_verb("activate", "wgc", "person") is None
     assert "wgc" in lv.names and "wgc" in lv.loaded and "wgc" in lv.agents.agents
     assert "- wgc: %s" % catalog.get("wgc").line in lv.prompt and '<|"|>wgc<|"|>' in lv.prompt   # the card and the enum
     assert lv.o.m.last == {"dog": "sat down", "wgc": "installed"}                           # the mirror kept
@@ -224,8 +224,8 @@ def test_activate_installs_a_manifest_domain_at_runtime(tmp_path):
     for _ in range(3):
         lv.tick()
     assert 0 < len(lv.agents.agents["wgc"].repl.fired) - fired <= 3 * 200                  # its own day, bounded per beat
-    assert "no domain 'nowhere' in the catalog" in lv.domain_verb("activate", "nowhere", None, "person")
-    assert lv.domain_verb("deactivate", "wgc", None, "person") is None and "wgc" in lv.off
+    assert "no domain 'nowhere' in the catalog" in lv.domain_verb("activate", "nowhere", "person")
+    assert lv.domain_verb("deactivate", "wgc", "person") is None and "wgc" in lv.off
 
 
 def test_a_hostless_manifest_domain_runs_its_own_day(tmp_path, monkeypatch):
@@ -273,7 +273,7 @@ def test_a_domain_made_after_the_start_is_listed_and_installed(tmp_path, monkeyp
     row = {e["name"]: e for e in lv.catalog()}["plant"]
     assert row["state"] == "not installed" and row["kind"] == "domain"
     assert any(ev == "catalog" and "plant" in {e["name"] for e in f["domains"]} for ev, f in frames)
-    assert lv.domain_verb("activate", "plant", None, "person") is None
+    assert lv.domain_verb("activate", "plant", "person") is None
     assert {e["name"]: e for e in lv.catalog()}["plant"]["loaded"] and "- plant: a plant: it drinks, it wilts" in lv.prompt
     lv.tick()
 
@@ -399,7 +399,7 @@ def test_installing_an_intent_domain_joins_its_words(tmp_path, monkeypatch):
     monkeypatch.setenv("METIS_CATALOG", str(_pet_catalog(tmp_path)))
     lv, _ = live(tmp_path)
     assert [x.name for x in lv.intents] == ["dog"] and not lv.gbnf.startswith("root ::= dog-root")
-    assert lv.domain_verb("activate", "pet", None, "person") is None
+    assert lv.domain_verb("activate", "pet", "person") is None
     assert [x.name for x in lv.intents] == ["dog", "pet"] and lv.gbnf.startswith("root ::= dog-root | pet-root\n")
     r = recs(lv, "dlg-restart")[-1]
     assert r["why"] == "install pet" and r["intents"] == ["dog", "pet"] and lv.o.cfg.intent_domains == ["dog", "pet"]
@@ -418,10 +418,10 @@ def test_serve_active_keeps_only_the_active_cards_in_the_turn(tmp_path, monkeypa
     lv = S.Live(cfg, FakeLLM())
     assert [x.name for x in lv.intents] == ["dog", "pet"]                  # both installed
     assert lv.ocfg.intent_domains == ["dog"] and "## Several domains" not in lv.prompt      # one served
-    assert lv.domain_verb("activate", "pet", None, "person") is None
+    assert lv.domain_verb("activate", "pet", "person") is None
     assert lv.ocfg.intent_domains == ["dog", "pet"] and lv.gbnf.startswith("root ::= dog-root | pet-root\n")
     assert recs(lv, "dlg-restart")[-1]["why"] == "activate pet"
-    assert lv.domain_verb("deactivate", "dog", None, "person") is None
+    assert lv.domain_verb("deactivate", "dog", "person") is None
     assert lv.ocfg.intent_domains == ["pet"] and recs(lv, "dlg-restart")[-1]["intents"] == ["pet"]
     assert "dog-root" not in lv.gbnf
     import pytest
@@ -610,34 +610,6 @@ def test_a_host_drives_a_page_through_the_relay(tmp_path):
         asyncio.run(go())
     finally:
         lv.stop.set()
-
-
-def test_an_activates_bindings_reach_the_host(tmp_path):
-    """console-nav step 2: activate{domain, bindings} hands the bindings to a host with
-    take_bindings(bindings) (metis-loop's repl host attached to the page's session so); the last
-    bindings bind the host again after a reload; a host without bind takes nothing, and the
-    activation stands."""
-    lv, frames, inner = _page_live(tmp_path)
-    got = []
-    inner.take_bindings = got.append
-    assert lv.domain_verb("activate", "dog", {"session": "w1", "token": "s3cr3t-tok"}, "person", "p1") is None
-    assert got == [{"session": "w1", "token": "s3cr3t-tok"}] and recs(lv, "dlg-domain")[-1]["bindings"] == {"session": "w1", "token": "…"}
-    assert "s3cr3t-tok" not in json.dumps([f for ev, f, page in frames])           # the token reaches no page
-    assert lv.domain_verb("activate", "dog", {"session": "w2"}, "person", "p1") is None and got[-1] == {"session": "w2"}
-    assert lv.domain_verb("activate", "dog", None, "model") is None and len(got) == 2      # no bindings: no bind
-    key, err = lv.reload("dog")
-    assert err is None
-    host = lv.agents.agents["dog"].host
-    new = getattr(host, "inner", host)
-    assert new is not inner and not hasattr(new, "take_bindings") and got == [{"session": "w1", "token": "s3cr3t-tok"}, {"session": "w2"}]
-    assert lv.domain_verb("activate", "kitchen", {"session": "w3"}, "person", "p1") is None   # no take_bindings on its host: nothing taken
-    assert "kitchen" in lv.loaded and lv.bindings["kitchen"] == {"session": "w3"}
-    def refuse(b):
-        raise ValueError("no such session")
-    new.take_bindings = refuse                                              # a host that refuses its bindings
-    lv.domain_verb("deactivate", "dog", None, "person", "p1")
-    err = lv.domain_verb("activate", "dog", {"session": "w9"}, "person", "p1")
-    assert err == "no such session" and "dog" not in lv.loaded and lv.bindings["dog"] == {"session": "w2"}
 
 
 def test_a_typed_intent_is_dispatched_without_the_model(tmp_path):

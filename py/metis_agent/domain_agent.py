@@ -879,26 +879,9 @@ class DomainAgent:
             return self.world(msg)
         if "take" in msg:
             return self.take(msg)
-        if "bind" in msg:
-            return self.bind(msg)
         if "ports" in msg:
             return self.ports(msg)
         return [reply(self.name, "error", id=msg.get("id"), error="neither an intent, a tool call, a world line nor the clock")]
-
-    # ── the activation's bindings (WIRE.md activate{domain, bindings}) ──
-    def bind(self, msg):
-        """The page's bindings for this domain (its session, its token): to a host with
-        take_bindings(bindings), as take_payload takes an intent's slots (the loop console's
-        repl host attaches to the page's session); a host without it takes nothing, as before
-        (the bindings are the dlg-domain record's)."""
-        inner = getattr(self.host, "inner", self.host)
-        if not hasattr(inner, "take_bindings") or not isinstance(msg["bind"], dict):
-            return []
-        try:
-            inner.take_bindings(dict(msg["bind"]))
-        except ValueError as e:
-            return [reply(self.name, "error", id=msg.get("id"), error=str(e))]
-        return []
 
     # ── the replay face: the world's changes from the driver ──
     def world(self, msg):
@@ -1021,7 +1004,7 @@ def records_path(module, where, session):
 def kind_of(msg):
     """The ack's kind for a non-clock line."""
     for k, name in (("reset", "reset"), ("reload", "reload"), ("add", "add"), ("verb", "intent"), ("tool", "tool"), ("world", "world"), ("take", "take"),
-                    ("bind", "bind"), ("ports", "ports")):
+                    ("ports", "ports")):
         if k in msg:
             return name
     return "error"
