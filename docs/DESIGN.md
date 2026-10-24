@@ -814,7 +814,8 @@ either side.
 
 What stays from console-nav: the panel as one reusable component
 (dialog-panel s-277c33e3, fsttm-web), the typed-intent frame as a
-driver's tool (alfworld's hier_agent), the formalization brain untouched.
+driver's tool (a tested wire face with no world caller today: alfworld's
+hier_agent was removed in its cleanup, 2026-10-25), the formalization brain untouched.
 A voice on the formalization agent, if ever, is its own subject.
 
 ## Roadmap 2026-10-11 (user)

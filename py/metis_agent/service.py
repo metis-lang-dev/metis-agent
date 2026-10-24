@@ -849,7 +849,8 @@ class Live:
     def typed(self, d, iid, j, page=None):
         """A typed intent from a page (WIRE.md intent{domain, id, j}): the J dispatched to
         the domain as the orchestrator would, with no model pass — a page's or a driver's own
-        command (alfworld experiments/hier_agent.py drives the specialists so). Its replies
+        command (a tested wire face; no world drives it today: alfworld's hand-switch replay
+        that did was removed in its cleanup, 2026-10-25). Its replies
         go where a dispatch's do: the orchestrator's inbox on the next beat (the results, their
         words). → an error or None."""
         if d not in self.names:
