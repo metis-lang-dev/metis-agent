@@ -65,7 +65,7 @@ main{flex:1;display:flex;min-height:0}
   font:11px var(--mono);letter-spacing:.06em;padding:10px 4px;cursor:pointer}
 #strip button[aria-pressed="true"]{color:var(--fg);border-left-color:var(--cyan);background:#11161d}
 #strip button:hover{color:var(--fg)}
-.dock{display:flex;flex-direction:column;min-height:0;border-bottom:1px solid var(--line)}
+.dock{display:flex;flex-direction:column;min-height:0;border-bottom:1px solid var(--line);position:relative}
 .dock[hidden]{display:none!important}
 .dock.open{flex:1 1 0;min-height:90px}.dock.collapsed{flex:none}
 .dock>header{display:flex;align-items:center;gap:6px;padding:3px 10px;background:#161b22;cursor:pointer;user-select:none;
@@ -74,6 +74,9 @@ main{flex:1;display:flex;min-height:0}
 .dock>header .x{background:none;border:none;color:var(--dim);cursor:pointer;font:inherit;padding:0 2px}
 .dock>header .x:hover{color:var(--fg)}
 .dock.collapsed>.dbody{display:none}
+/* the grip between two open docks (shell.js): the lower one's top edge, dragged to resize */
+.dock>.dgrip{position:absolute;left:0;right:0;top:-3px;height:7px;cursor:row-resize;z-index:3;touch-action:none}
+.dock>.dgrip:hover,.dock>.dgrip.drag{background:linear-gradient(transparent 2px,var(--cyan) 2px,var(--cyan) 4px,transparent 4px)}
 .dbody{flex:1;min-height:0;overflow:auto;padding:6px 10px 8px}
 .wrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:2px 0 6px}
 .ph{color:var(--dim);font-size:11px;letter-spacing:.06em;margin:0 0 6px}
