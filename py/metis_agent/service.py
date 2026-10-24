@@ -37,12 +37,6 @@ ROOT = Path(__file__).resolve().parents[2]          # metis-agent
 KEEP_RECS = 20000
 
 
-def without_effects(rec):
-    """A journal record as a page that does not own its domain sees it: a
-    trace's `effects` (a page host's frames) left out."""
-    return {k: v for k, v in rec.items() if k != "effects"} if "effects" in rec else rec
-
-
 def _now_rfc():
     return datetime.now(timezone.utc).astimezone().isoformat()
 
@@ -65,10 +59,8 @@ class Journal:
         self.wake, self.gens, self.say, self.say_at = None, [], None, None
         self.clock_ms = []
 
-    def record(self, rec, page=None):
-        """One record: to the file and the kept list whole; to the pages as
-        journal frames — a record carrying a page host's effects goes whole to
-        the page that owns the domain (`page`) and without them to the rest."""
+    def record(self, rec):
+        """One record: to the file, the kept list, and the pages as journal frames."""
         with self.lock:
             self.seq += 1
             rec.update({"seq": self.seq, "t": _now_rfc(), "id": "live", "rep": 0})
@@ -86,10 +78,7 @@ class Journal:
                 self.fh.flush()
             seq = self.seq
         if self.emit:
-            if page is None:
-                self.emit("journal", {"rec": rec})
-            else:
-                self.emit("journal", {"rec": rec}, page=page)
+            self.emit("journal", {"rec": rec})
         return seq
 
     def say_rec(self, what, text):
@@ -119,10 +108,9 @@ class Journal:
         return self.record({"kind": "dlg-say", "what": what, "text": text, "src": src})
 
     def since(self, seq):
-        """The records after seq, for a page's hello: a past effect is never
-        carried out again, so the replay carries none."""
+        """The records after seq, for a page's hello."""
         with self.lock:
-            return [without_effects(r) for r in self.recs if r["seq"] > seq]
+            return [r for r in self.recs if r["seq"] > seq]
 
     def wire(self, proc, kind, ms, replies=0):
         """A request's round trip (integration step 3's table): every intent,
@@ -255,25 +243,12 @@ def intent_of(name, template="gemma4"):
 
 def line_voiced(name):
     """A domain whose manifest says `voice: line`: its results are spoken as the fired rule's %%
-    line, never re-voiced by the model (console-nav step 2 F4: a page host, the REPL)."""
+    line, never re-voiced by the model (console-nav step 2 F4; the director's manifest)."""
     try:
         from .domains import catalog
         return catalog().get(name).manifest.get("voice") == "line"
     except Exception:  # noqa: BLE001 — no catalog entry: the default voicing
         return False
-
-
-def silent_of(name):
-    """A card's `silent` verbs (intent.yaml silent:): a typed intent of one is answered in
-    the journal only, never voiced — the page's own commands (push-to-talk's HOLD and
-    RELEASE: the agent does not talk over the person who just pressed the key)."""
-    try:
-        from .domains import catalog
-        spec = catalog().get(name).intent.get("spec")
-        import yaml
-        return {str(v).upper() for v in ((yaml.safe_load(spec.read_text()) or {}).get("silent") or [])} if spec else set()
-    except Exception:  # noqa: BLE001 — no catalog entry, no card: nothing is silent
-        return set()
 
 
 def intents_of(names, template="gemma4"):
@@ -385,9 +360,7 @@ class Live:
         self.auto_failed = {}
         self.changed = {}
         self.ports_due = set()
-        self.owner = {}             # a page host's domain -> the page (socket) that owns it
         self.bindings = {}          # a domain -> the last activate's bindings (its host's again after a reload)
-        self.silent = set()         # the cids of typed intents whose replies are journaled, never voiced
         self.last_cat = ""
         self.in_turn, self.held = False, []
         self.narr_seq = 0
@@ -809,10 +782,7 @@ class Live:
                     if d == self.director.name and self._dir_traces is not None:
                         self._dir_traces.append(r)
                     self.director.produced(d, r)
-                # a page host's effects to its owner; owned by no page yet, to none
-                # ("": no socket's id) — every page gets the record without them
-                own = self.owner.get(d, "") if r.get("effects") and self.page_host(d) else None
-                self.journal.record(dict(r, kind="dlg-trace"), page=own)
+                self.journal.record(dict(r, kind="dlg-trace"))
             else:
                 out.append(r)
         return out
@@ -857,29 +827,21 @@ class Live:
 
     def typed(self, d, iid, j, page=None):
         """A typed intent from a page (WIRE.md intent{domain, id, j}): the J dispatched to
-        the domain as the orchestrator would, with no model pass — a page's own command (the
-        dialog panel's push-to-talk: cmd_hold on press, cmd_release on release). Its replies
+        the domain as the orchestrator would, with no model pass — a page's or a driver's own
+        command (alfworld experiments/hier_agent.py drives the specialists so). Its replies
         go where a dispatch's do: the orchestrator's inbox on the next beat (the results, their
-        words). A page host's domain takes them from its owning page only. → an error or None."""
+        words). → an error or None."""
         if d not in self.names:
             return "no domain %r" % d
         if d in self.off:
             return "%s is not active" % d
-        if page is not None and self.page_host(d) and self.owner.get(d, page) != page:
-            return "page %s does not own %s: page %s does (its hello claims it)" % (page, d, self.owner[d])
         if not isinstance(j, dict) or not isinstance(j.get("intent"), str) or not j["intent"]:
             return "j is an intent object: {intent: VERB, …its slots}"
         args = {k: v for k, v in j.items() if k not in ("intent", "domain")}
         self.n += 1
         cid = "c%d" % self.n
-        quiet = j["intent"].upper() in silent_of(d)
-        if quiet:                               # kept, not dropped at its result: the floor orders a dispatch's replies
-            self.silent.add(cid)
-            if len(self.silent) > 256:
-                self.silent.discard(min(self.silent, key=lambda c: int(c[1:])))
         self.journal.record({"kind": "dlg-dispatch", "cid": cid, "j": json.dumps({"intent": j["intent"], **args}),
-                             "domain": d, "by": "page", **({"req": iid} if iid else {}), **({"page": page} if page else {}),
-                             **({"silent": True} if quiet else {})})
+                             "domain": d, "by": "page", **({"req": iid} if iid else {}), **({"page": page} if page else {})})
         rs = self.serve_line({"id": cid, "domain": d, "verb": j["intent"], "args": args}, "intent")
         err = next((r.get("error") for r in rs if r.get("kind") == "error"), None)
         self.pend += [r for r in rs if r.get("kind") != "error"]
@@ -1000,18 +962,11 @@ class Live:
             if r.record:
                 w["record"] = r.record
             w.update(extra.get(id(r), {}))
-            if (self.director is not None and r.kind == "result" and r.domain in self.director.domains
-                    and r.id not in self.silent):
+            if self.director is not None and r.kind == "result" and r.domain in self.director.domains:
                 # the director speaks for its domains' results (its lines, its ask): held until its beats of this tick
                 # ran; voiced after all when they produced nothing from that domain (nina's N7: never silence)
                 self.journal.record(dict(w, held="director"))
                 self.dir_held.append(inb)
-                add(self.pend)
-                self.pend = []
-                continue
-            if r.id in self.silent:             # a silent typed intent's reply: journaled, never voiced
-                w["silent"] = True
-                self.journal.record(w)
                 add(self.pend)
                 self.pend = []
                 continue
@@ -1064,27 +1019,13 @@ class Live:
             except (ValueError, AttributeError):
                 verb = ""
             folded = set()                      # held narrations said inside this turn's voice
-            card = self.card_line() if verb == "HELP" else ""
             if self.director is not None and verb != "STOP" and self.world_over():
                 # alf-demo 3c: in a finished game every utterance gets the over line, words that set no
                 # task included (the user's run: the card line heard back as "Alf World the", every 3.2 s)
-                voice_s = voice = (card + " " if card else "") + OVER_LINE
+                voice_s = voice = OVER_LINE
                 folded = {OVER_LINE}
                 if (self.status or {}).get("state") != "over":
                     self.set_status("over", OVER_LINE, options=list(NEW_GAME_OPTION))
-            elif card:
-                # alf-demo 3c O2 (the architect's ruling): "what can you do?" under --nav is a page's HELP — the
-                # world's card line leads, the page's help after it, in the turn's one voice (its result line
-                # is said in the turn here, not after it); the status is left as it is
-                n0 = len(self.held)
-                self.in_turn = True
-                try:
-                    self.handle_due(-1, [])
-                finally:
-                    self.in_turn = False
-                lines = [n["sentence"] for n in self.held[n0:] if n["kind"] == "v3-line" and n["sentence"]]
-                voice_s = voice = " ".join([card] + lines)
-                folded = set(lines)
             elif verb in ("UNKNOWN", "CHITCHAT") and self.card_line():
                 # alf-demo 3b (the user's "put the pencil in microwave" → "unknown", nothing to go on): what
                 # this world is and what to ask, from the map's card, said instead; the status is left as it is
@@ -1211,8 +1152,6 @@ class Live:
             err = "no domain agent serves %s" % dom
         elif dom in self.quiet:
             err = "%s is stepped with its pair, not on its own" % dom
-        elif bindings is not None and page is not None and self.page_host(dom) and self.owner.get(dom, page) != page:
-            err = "page %s does not own %s: page %s does (its hello claims it)" % (page, dom, self.owner[dom])
         elif verb == "activate" and isinstance(bindings, dict) and (err := self.bind(dom, bindings)):
             pass                            # the host refused its bindings: the activation does not happen
         else:
@@ -1294,47 +1233,12 @@ class Live:
         except ValueError as e:
             log.info("[v3] ports %s: %s", d, e)
 
-    # the pages that host a domain (console-nav P1): a domain whose host's
-    # events are frames for a page (its `effects` list) has one owning page —
-    # the one whose hello claims it, else the first to send it port lines. Its
-    # effects go to that page alone, and port lines from any other page are
-    # refused, so a second tab (or a reload's old socket) never carries out
-    # an effect or answers for the domain twice. Other domains take world
-    # lines from any page, as before.
-
-    def page_host(self, d):
-        ag = self.agents.agents.get(d) if hasattr(self.agents, "agents") else self.agents
-        h = getattr(ag, "host", None)
-        return isinstance(getattr(getattr(h, "inner", h), "effects", None), list)
-
-    def claim(self, domains, page):
-        """A page's hello claims the page host domains it names: it owns them now."""
-        got = []
-        for d in domains or []:
-            if d in self.names and self.page_host(d):
-                if self.owner.get(d) != page:
-                    self.owner[d] = page
-                    self.journal.record({"kind": "dlg-page", "verb": "claim", "domain": d, "page": page, "by": "hello"})
-                got.append(d)
-        return got
-
-    def release(self, page):
-        """A page's socket closed: the domains it owned are free (the next page to claim or report takes them)."""
-        for d in [d for d, p in self.owner.items() if p == page]:
-            del self.owner[d]
-            self.journal.record({"kind": "dlg-page", "verb": "release", "domain": d, "page": page})
-
     def world(self, d, lines, page=None):
         d = d or self.intents_domain
         err = None
         if d not in self.names:
             err = "no domain %r" % d
-        elif page is not None and self.page_host(d) and self.owner.get(d, page) != page:
-            err = "page %s does not own %s: page %s does (its hello claims it)" % (page, d, self.owner[d])
         else:
-            if page is not None and d not in self.owner and self.page_host(d):     # the first to report owns it
-                self.owner[d] = page
-                self.journal.record({"kind": "dlg-page", "verb": "claim", "domain": d, "page": page, "by": "port"})
             for r in self.serve_line({"world": list(lines), "domain": d}, "world"):
                 if r.get("kind") == "error" and err is None:
                     err = r.get("error")
@@ -1554,17 +1458,14 @@ def make_app(live, ui_dir, lib_dir=None):
     loop_box = {}
     seq = [0]
 
-    def emit(ev, f, page=None):
-        """A frame to every page; with `page`, a journal record whole to that
-        page and without its effects to the rest (Journal.record)."""
+    def emit(ev, f):
+        """A frame to every page."""
         loop = loop_box.get("loop")
         if not loop:
             return
-        frame = lambda g: json.dumps(dict({"ev": ev, "t": _now_rfc()}, **g), ensure_ascii=False, default=str)
-        data = frame(f)
-        other = data if page is None else frame(dict(f, rec=without_effects(f["rec"])))
-        loop.call_soon_threadsafe(lambda: [asyncio.ensure_future(ws.send_str(data if pid == page else other))
-                                           for pid, ws in list(clients.items())])
+        data = json.dumps(dict({"ev": ev, "t": _now_rfc()}, **f), ensure_ascii=False, default=str)
+        loop.call_soon_threadsafe(lambda: [asyncio.ensure_future(ws.send_str(data))
+                                           for ws in list(clients.values())])
     live.emit = emit
     live.journal.emit = emit
 
@@ -1598,10 +1499,7 @@ def make_app(live, ui_dir, lib_dir=None):
                 if relay is not None and await relay.from_page(m):    # the page's chat/event/state: the host's
                     continue
                 ev = m.get("ev")
-                if ev == "hello":
-                    claim = m.get("claim")
-                    claimed = await ask(live.claim, [claim] if isinstance(claim, str) else list(claim or []), pid)
-                    await send("page", {"page": pid, "owns": claimed})
+                if ev == "hello":           # an old page's claim (console-nav's page hosts) is ignored
                     await send("catalog", {"domains": await ask(live.catalog)})
                     if getattr(live, "world_map", None):
                         await send("world/map", {"url": "world/map.json"})
@@ -1670,7 +1568,6 @@ def make_app(live, ui_dir, lib_dir=None):
             clients.pop(pid, None)
             if relay is not None:
                 relay.drop_page(sock.send_json)
-            await ask(live.release, pid)
         return sock
 
     async def on_startup(app):

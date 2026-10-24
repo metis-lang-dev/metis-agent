@@ -975,18 +975,13 @@ class DomainAgent:
 
     def trace(self):
         """What the agent did since the last trace (fired rows, narrated
-        fragments, consults, reads, world lines, the host's effects): one
-        trace reply, or None. A host whose events are frames for a page
-        (metis-loop's ui host: focus, show, numbers, pick) queues them on its
-        `effects` list; they are drained here, in order, so they reach the
-        page as the journal's dlg-trace (console-nav s-b923ebfe)."""
+        fragments, consults, reads, world lines): one trace reply, or None."""
         f0, n0, c0 = self.cursor
         rows, nar, cons = self.repl.fired_rows[f0:], self.narrated[n0:], self.consults[c0:]
         self.cursor = (len(self.repl.fired_rows), len(self.narrated), len(self.consults))
         reads, worlds, self.reads, self.worlds = self.reads, self.worlds, [], []
         sunk, self.sunk = self.sunk, []
-        effects = self.drain_effects()
-        if not (rows or nar or cons or reads or worlds or sunk or effects):
+        if not (rows or nar or cons or reads or worlds or sunk):
             return None
         fired = []
         for i, (kind, stage, ev) in enumerate(rows[-40:], f0 + max(0, len(rows) - 40) + 1):
@@ -1001,25 +996,9 @@ class DomainAgent:
         return reply(self.name, "trace", beat=self.beat_no(), fired=fired or None,
                      **({"more": len(rows) - 40} if len(rows) > 40 else {}),
                      narrated=narrated or None, consults=consults or None, reads=reads or None,
-                     world=worlds or None, records=sunk or None, effects=effects or None,
+                     world=worlds or None, records=sunk or None,
                      ref={"seq": len(self.repl.fired), "beat": self.beat_no()})
 
-
-    def drain_effects(self):
-        """The host's frames for a page since the last line, in order, the list emptied
-        (a page host's `effects`; another host's attribute of that name is not a list)."""
-        q = getattr(getattr(self.host, "inner", self.host), "effects", None)
-        effects = list(q) if isinstance(q, list) else []
-        if effects:
-            del q[:]
-        return effects
-
-    def effects_trace(self):
-        """Without --trace, a page host's effects still reach the page: a trace reply
-        with the effects alone (the page carries them out either way), or None."""
-        effects = self.drain_effects()
-        return reply(self.name, "trace", beat=self.beat_no(), effects=effects,
-                     ref={"seq": len(self.repl.fired), "beat": self.beat_no()}) if effects else None
 
 
 def records_path(module, where, session):
@@ -1149,9 +1128,9 @@ def serve(agent, msg, rebuild, reload=None, add=None):
             out = agent.handle(msg)
         except Exception as e:     # the agent itself failed: an error reply, the process lives
             out = [reply(agent.name, "error", id=msg.get("id"), error="%s: %s" % (type(e).__name__, e))]
-    if "reset" not in msg and "reload" not in msg and "add" not in msg:   # --trace: what the line made each agent do, before its ack (or clock line); without it, a page host's effects alone
+    if "reset" not in msg and "reload" not in msg and "add" not in msg:   # --trace: what the line made each agent do, before its ack (or clock line)
         ags = agent.agents.values() if isinstance(agent, Domains) else [agent]
-        ts = [t for t in (a.trace() if a.tracing else a.effects_trace() for a in ags) if t]
+        ts = [t for t in (a.trace() for a in ags if a.tracing) if t]
         if ts:
             out = (out[:-1] + ts + out[-1:]) if "clock" in msg and out else out + ts
     if "clock" not in msg:

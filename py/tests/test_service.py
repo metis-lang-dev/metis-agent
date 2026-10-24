@@ -554,114 +554,16 @@ def test_the_catalog_is_the_env_else_the_configs_root(tmp_path, monkeypatch):
 
 
 def _page_live(tmp_path):
-    """The live config's agents with the dog's host made a page host (an
-    `effects` list, as metis-loop's ui host has), frames kept with their page."""
+    """The live config's agents, the dog's host at hand, the frames kept."""
     cfg = S.load_config(ROOT / "py/config.live.yaml")
     cfg["v3"]["journal"] = str(tmp_path / "j.jsonl")
     cfg["domains"].update(narrate=None, consult=False, records=None, watch={"dog": str(tmp_path / "dogdir")})
     (tmp_path / "dogdir").mkdir()
     (tmp_path / "dogdir/dog.llp").write_text("% a\n")
     frames = []
-    lv = S.Live(cfg, FakeLLM(), emit=lambda ev, f, page=None: frames.append((ev, f, page)))
+    lv = S.Live(cfg, FakeLLM(), emit=lambda ev, f: frames.append((ev, f, None)))
     host = lv.agents.agents["dog"].host
-    inner = getattr(host, "inner", host)
-    inner.effects = []
-    return lv, frames, inner
-
-
-def test_a_page_host_domain_is_owned_by_one_page(tmp_path):
-    """console-nav P1: the first page to report owns a page host's domain; another
-    page's port lines are refused; its effects go whole to the owner only; a
-    claim moves it, a closed socket frees it. A domain without effects is open."""
-    lv, frames, inner = _page_live(tmp_path)
-    assert lv.page_host("dog") and not lv.page_host("kitchen")
-    assert lv.world("dog", ["-closed(kitchen)", "+open(kitchen)"], "p1") is None and lv.owner == {"dog": "p1"}
-    err = lv.world("dog", ["-open(kitchen)", "+closed(kitchen)"], "p2")
-    assert err.startswith("page p2 does not own dog: page p1 does")
-    assert recs(lv, "dlg-world")[-1]["error"] == err and recs(lv, "dlg-world")[-1]["page"] == "p2"
-    inner.effects.append({"ui": "focus", "widget": "kitchen"})
-    assert lv.world("dog", ["+open(kitchen)"], "p1") is None
-    tr = [(f["rec"], page) for ev, f, page in frames if ev == "journal" and f["rec"]["kind"] == "dlg-trace" and f["rec"].get("effects")]
-    assert tr and tr[-1][1] == "p1" and tr[-1][0]["effects"] == [{"ui": "focus", "widget": "kitchen"}]
-    assert all("effects" not in r for r in lv.journal.since(0))           # a hello's replay carries no past effect
-    assert lv.claim(["dog", "kitchen", "nope"], "p2") == ["dog"] and lv.owner == {"dog": "p2"}
-    assert lv.world("dog", ["+open(kitchen)"], "p1").startswith("page p1 does not own dog")
-    lv.release("p2")
-    assert lv.owner == {} and [(r["verb"], r["page"], r.get("by")) for r in recs(lv, "dlg-page")] == [
-        ("claim", "p1", "port"), ("claim", "p2", "hello"), ("release", "p2", None)]
-    frames.clear()
-    inner.effects.append({"ui": "focus", "widget": "kitchen"})          # owned by no page: carried out by none
-    lv.serve_line({"clock": "beat", "domain": "dog"}, "clock")
-    tr = [(f["rec"], page) for ev, f, page in frames if ev == "journal" and f["rec"].get("effects")]
-    assert tr and all(page == "" for _, page in tr) and lv.owner == {}
-    lv.world("kitchen", [], "p9")                                         # not a page host: no owner taken
-    assert "kitchen" not in lv.owner
-
-
-def test_two_pages_on_the_wire_one_owns(tmp_path):
-    """The same over /ws with two sockets: the hello's claim, the owner's trace with
-    the effects and the other page's without, the other page's port line refused,
-    and the domain free again when the owner's socket closes."""
-    import asyncio
-    from aiohttp.test_utils import TestClient, TestServer
-    lv, _, inner = _page_live(tmp_path)
-    app = S.make_app(lv, str(ROOT / "console"))
-    threading.Thread(target=lv.run, daemon=True).start()
-
-    async def until(ws, pred, n=200):
-        for _ in range(n):
-            m = json.loads((await ws.receive(timeout=10)).data)
-            if pred(m):
-                return m
-        raise AssertionError("no such frame")
-
-    async def go():
-        async with TestClient(TestServer(app)) as c:
-            a, b = await c.ws_connect("/ws"), await c.ws_connect("/ws")
-            await a.send_json({"ev": "hello", "since": 1e15, "claim": "dog"})
-            pa = await until(a, lambda m: m["ev"] == "page")
-            await b.send_json({"ev": "hello", "since": 1e15})
-            pb = await until(b, lambda m: m["ev"] == "page")
-            assert pa["owns"] == ["dog"] and pb["owns"] == [] and pa["page"] != pb["page"]
-            inner.effects.append({"ui": "focus", "widget": "kitchen"})
-            await a.send_json({"ev": "world", "domain": "dog", "atoms": ["+open(kitchen)"]})
-            # the trace of the next line (the world line's or a clock beat's) drains the effect
-            ta = await until(a, lambda m: m["ev"] == "journal" and m["rec"].get("effects"))
-            tb = await until(b, lambda m: m["ev"] == "journal" and m["rec"]["seq"] == ta["rec"]["seq"])
-            assert ta["rec"]["effects"] == [{"ui": "focus", "widget": "kitchen"}] and "effects" not in tb["rec"]
-            assert tb["rec"]["kind"] == "dlg-trace"
-            await b.send_json({"ev": "world", "domain": "dog", "atoms": ["+open(kitchen)"]})
-            ack = await until(b, lambda m: m["ev"] == "world_ack")
-            assert ack["error"].startswith("page %s does not own dog" % pb["page"])
-            await a.close()
-            for _ in range(50):
-                if "dog" not in lv.owner:
-                    break
-                await asyncio.sleep(0.05)
-            await b.send_json({"ev": "world", "domain": "dog", "atoms": ["+open(kitchen)"]})
-            ack = await until(b, lambda m: m["ev"] == "world_ack")
-            assert "error" not in ack and lv.owner == {"dog": pb["page"]}
-            await b.close()
-            # no page owns it: a trace's effects reach neither of two pages that claim nothing
-            c1, c2 = await c.ws_connect("/ws"), await c.ws_connect("/ws")
-            for w in (c1, c2):
-                await w.send_json({"ev": "hello", "since": 1e15})
-                await until(w, lambda m: m["ev"] == "page")
-            for _ in range(50):
-                if "dog" not in lv.owner:
-                    break
-                await asyncio.sleep(0.05)
-            inner.effects.append({"ui": "focus", "widget": "kitchen"})
-            is_tr = lambda m: m["ev"] == "journal" and m["rec"]["kind"] == "dlg-trace" and "effects" in [
-                k for r in lv.journal.recs if r["seq"] == m["rec"]["seq"] for k in r]
-            t1, t2 = await until(c1, is_tr), await until(c2, is_tr)
-            assert "effects" not in t1["rec"] and "effects" not in t2["rec"] and t1["rec"]["seq"] == t2["rec"]["seq"]
-            await c1.close()
-            await c2.close()
-    try:
-        asyncio.run(go())
-    finally:
-        lv.stop.set()
+    return lv, frames, getattr(host, "inner", host)
 
 
 def test_a_host_drives_a_page_through_the_relay(tmp_path):
@@ -688,7 +590,7 @@ def test_a_host_drives_a_page_through_the_relay(tmp_path):
             assert (await until(host, lambda m: m["ev"] == "error"))["error"].startswith("no page")
             page = await c.ws_connect("/ws")
             await page.send_json({"ev": "hello", "since": 1e15})
-            await until(page, lambda m: m["ev"] == "page")
+            await until(page, lambda m: m["ev"] == "catalog")
             await host.send_json({"ev": "chat", "who": "user", "text": "where is the dog", "id": "h1"})
             await host.send_json({"ev": "ctl", "barge_in": "energy"})
             got = await until(page, lambda m: m["ev"] == "chat")
@@ -712,18 +614,15 @@ def test_a_host_drives_a_page_through_the_relay(tmp_path):
 
 def test_an_activates_bindings_reach_the_host(tmp_path):
     """console-nav step 2: activate{domain, bindings} hands the bindings to a host with
-    take_bindings(bindings) (metis-loop's repl host attaches to the page's session); a page host's
-    domain takes them from its owner only; the last bindings bind the host again after a
-    reload; a host without bind takes nothing, and the activation stands."""
+    take_bindings(bindings) (metis-loop's repl host attached to the page's session so); the last
+    bindings bind the host again after a reload; a host without bind takes nothing, and the
+    activation stands."""
     lv, frames, inner = _page_live(tmp_path)
     got = []
     inner.take_bindings = got.append
     assert lv.domain_verb("activate", "dog", {"session": "w1", "token": "s3cr3t-tok"}, "person", "p1") is None
     assert got == [{"session": "w1", "token": "s3cr3t-tok"}] and recs(lv, "dlg-domain")[-1]["bindings"] == {"session": "w1", "token": "…"}
     assert "s3cr3t-tok" not in json.dumps([f for ev, f, page in frames])           # the token reaches no page
-    lv.claim(["dog"], "p1")
-    err = lv.domain_verb("activate", "dog", {"session": "w2"}, "person", "p2")
-    assert err.startswith("page p2 does not own dog") and got == [{"session": "w1", "token": "s3cr3t-tok"}]
     assert lv.domain_verb("activate", "dog", {"session": "w2"}, "person", "p1") is None and got[-1] == {"session": "w2"}
     assert lv.domain_verb("activate", "dog", None, "model") is None and len(got) == 2      # no bindings: no bind
     key, err = lv.reload("dog")
@@ -744,7 +643,7 @@ def test_an_activates_bindings_reach_the_host(tmp_path):
 def test_a_typed_intent_is_dispatched_without_the_model(tmp_path):
     """console-nav item 20: intent{domain, id, j} dispatches the J to the domain as the
     orchestrator would, no model pass (no dlg-gen); its result wakes the orchestrator on the
-    next beat; a page host's domain takes it from its owner only; a bad J says what it needs."""
+    next beat; a bad J says what it needs."""
     lv, frames, inner = _page_live(tmp_path)
     gens = len(recs(lv, "dlg-gen"))
     assert lv.typed("dog", "h1", {"intent": "NAVIGATE", "goal": {"type": "OBJECT", "description": "kitchen"}}, "p1") is None
@@ -756,9 +655,6 @@ def test_a_typed_intent_is_dispatched_without_the_model(tmp_path):
     wakes = [r for r in recs(lv, "dlg-wake") if r.get("cid") == d["cid"]]
     assert wakes and wakes[0]["what"].startswith("result"), wakes
     assert len([g for g in recs(lv, "dlg-gen") if g.get("label") == "move"]) == len([g for g in recs(lv, "dlg-gen")[:gens] if g.get("label") == "move"])
-    assert lv.owner == {}                                                 # a typed intent claims nothing by itself
-    lv.claim(["dog"], "p1")
-    assert lv.typed("dog", "h2", {"intent": "NAVIGATE"}, "p2").startswith("page p2 does not own dog")
     assert lv.typed("nope", "h3", {"intent": "X"}, "p1") == "no domain 'nope'"
     assert lv.typed("dog", "h4", {"goal": 1}, "p1").startswith("j is an intent object")
 
@@ -792,45 +688,3 @@ def test_a_typed_intent_over_the_wire(tmp_path):
     finally:
         lv.stop.set()
 
-
-def test_a_silent_typed_intent_is_journaled_never_voiced(tmp_path, monkeypatch):
-    """console-nav: a card's silent verbs (intent.yaml silent: [HOLD, RELEASE]) — a typed
-    intent of one has its replies journaled (wakes marked silent) and never handed to the
-    orchestrator, so the agent does not talk over the person who pressed push-to-talk;
-    a typed intent of another verb is voiced as before."""
-    lv, frames, inner = _page_live(tmp_path)
-    monkeypatch.setattr(S, "silent_of", lambda name: {"NAVIGATE"} if name == "dog" else set())
-    handled = []
-    seen = lv.o.handle
-    lv.o.handle = lambda inb, *a: (handled.append(inb.reply.id), seen(inb, *a))[1]
-    assert lv.typed("dog", "h1", {"intent": "NAVIGATE", "goal": {"type": "OBJECT", "description": "kitchen"}}) is None
-    cid = recs(lv, "dlg-dispatch")[-1]["cid"]
-    assert recs(lv, "dlg-dispatch")[-1]["silent"] is True
-    for _ in range(3):
-        lv.tick()
-    wakes = [r for r in recs(lv, "dlg-wake") if r.get("cid") == cid]
-    assert wakes and all(w.get("silent") for w in wakes) and cid not in handled, (wakes, handled)
-    monkeypatch.setattr(S, "silent_of", lambda name: set())
-    assert lv.typed("dog", "h2", {"intent": "NAVIGATE", "goal": {"type": "OBJECT", "description": "kitchen"}}) is None
-    cid2 = recs(lv, "dlg-dispatch")[-1]["cid"]
-    for _ in range(3):
-        lv.tick()
-    assert cid2 in handled and "silent" not in recs(lv, "dlg-dispatch")[-1]
-
-
-def test_silent_of_reads_the_card(tmp_path, monkeypatch):
-    d = tmp_path / "domains" / "toy"
-    d.mkdir(parents=True)
-    (d / "intent.yaml").write_text("verbs: []\nsilent: [hold, RELEASE]\n")
-
-    class Dom:
-        intent = {"spec": d / "intent.yaml"}
-
-    class Cat:
-        def get(self, name):
-            if name != "toy":
-                raise KeyError(name)
-            return Dom()
-    import metis_agent.domains as D
-    monkeypatch.setattr(D, "catalog", lambda: Cat())
-    assert S.silent_of("toy") == {"HOLD", "RELEASE"} and S.silent_of("nope") == set()

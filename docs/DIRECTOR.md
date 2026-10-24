@@ -14,9 +14,9 @@ application, and we need the solution."
 - The kitchen PAIR (`pair`, `partner_of` in domain.yaml) steps two domains inside one
   clock — a fixed coupling, not a choice.
 - E12, the routing corpus: a small model routing words to a domain by itself was a NO-GO.
-- console-nav's navigator (`ui_domain.llp`) is, without saying so, a domain whose port
-  activates other domains: a pick in the agent console's catalog list sends `activate` on
-  the wire; "focus in the REPL's widgets activates the REPL's card" is routing by RULE.
+- console-nav's navigator (`ui_domain.llp`, removed with the voice navigation:
+  voice-nav-removal s-90621b2c) was, without saying so, a domain whose port activated other
+  domains: "focus in the REPL's widgets activates the REPL's card" was routing by RULE.
 
 So the pieces exist and the symbolic answer was never written down: the routing that the
 small model cannot do is a DOMAIN's job — rules over the observed context, with the model
@@ -97,9 +97,10 @@ under a building's), through the same ports.
   kitchen, dog) placed in ALFWorld's rooms by `context/2`, the room entered as the
   context, the person's words routed. The loop's learning world and the director's testbed
   are one world.
-- **The agent console**: the catalog list's pick (console-nav's ui instance) becomes the
-  director's `switch` — the navigator asks the director, the director activates — so the
-  ui-nav domain and the director share one activation port and the recursion is explicit.
+- **Not the page.** The user (2026-10-24): one voice paradigm, the dialog with the agent and
+  the game. The web UI stays web — its elements convert INTO the chat (the world card's ask
+  chips, the status line's answers) — and no director level navigates a page by voice; the
+  ui-nav domain this section once placed beside the director is removed.
 
 ## What to decide before building
 

@@ -69,51 +69,6 @@ def test_no_trace_without_the_flag_or_news():
     assert not [r for r in out if r.get("kind") == "trace"]
 
 
-def test_a_page_hosts_effects_ride_the_trace_once():
-    """A host whose events are frames for a page queues them on `effects`
-    (console-nav: metis-loop's ui host); the trace drains them, in order."""
-    ag = agent()
-    inner = getattr(ag.host, "inner", ag.host)
-    inner.effects = []
-    seen = inner.on_event
-
-    def on_event(name, args):
-        inner.effects.append({"ui": "event", "name": name.split("[")[0]})
-        return seen(name, args)
-    inner.on_event = on_event
-    run(ag, {"clock": "beat", "domain": "dog"})
-    run(ag, {"id": "c1", "domain": "dog", "verb": "NAVIGATE", "args": {"goal": {"type": "OBJECT", "description": "kitchen"}}})
-    out = run(ag, {"clock": "beat", "domain": "dog"})
-    tr = next(r for r in out if r.get("kind") == "trace")
-    fired = [f["event"].split("[")[0] for f in tr["fired"] if f["kind"] != "exo"]
-    names = [e["name"] for e in tr["effects"]]
-    assert names == [n for n in fired if n in names]                  # in the order the rules fired
-    assert "go_closed" in names and inner.effects == []
-    inner.effects.append({"ui": "focus", "widget": "kitchen"})        # queued outside a beat: the next line's trace
-    out = run(ag, {"ports": {}, "domain": "dog"})
-    assert next(r for r in out if r.get("kind") == "trace")["effects"] == [{"ui": "focus", "widget": "kitchen"}]
-    out = run(ag, {"ports": {}, "domain": "dog"})                     # drained: nothing new, no trace
-    assert not [r for r in out if r.get("kind") == "trace"]
-    inner.effects = "not a list"                                      # another host's attribute of that name: ignored
-    out = run(ag, {"ports": {}, "domain": "dog"})
-    assert not [r for r in out if r.get("kind") == "trace"]
-
-
-def test_a_page_hosts_effects_reach_the_page_without_trace():
-    """Without --trace the effects are drained all the same, into a trace reply that
-    carries them alone; the host's list is empty after the line (no leak)."""
-    ag = agent()
-    ag.tracing = False
-    inner = getattr(ag.host, "inner", ag.host)
-    inner.effects = [{"ui": "focus", "widget": "kitchen"}]
-    out = run(ag, {"clock": "beat", "domain": "dog"})
-    tr = [r for r in out if r.get("kind") == "trace"]
-    assert len(tr) == 1 and tr[0]["effects"] == [{"ui": "focus", "widget": "kitchen"}] and inner.effects == []
-    assert set(tr[0]) == {"domain", "kind", "beat", "effects", "ref"} and out[-1].get("clock") == "beat"
-    out = run(ag, {"clock": "beat", "domain": "dog"})
-    assert not [r for r in out if r.get("kind") == "trace"]
-
-
 def _walk(case, extra=()):
     from metis_agent.domain_agent import DomainAgent
     ag = DomainAgent(dog, case=case)
