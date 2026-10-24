@@ -150,3 +150,69 @@ def test_the_card_says_what_this_world_is_and_what_to_ask(tmp_path):
     assert S.Live.card_line(lv) == 'A kitchen. Ask me, for example: "put a tomato in the microwave" or "put the apple on the countertop".'
     (tmp_path / "world-map.json").write_text(json.dumps({"task": {}}))
     assert S.Live.card_line(lv) == ""
+
+
+def turn_stand_in(answer, won=False, card=""):
+    """A stand-in for a person's turn: the model answers every utterance with `answer` (J, voice)."""
+    lv, frames, said = stand_in(hosts={"task": SimpleNamespace(won=won)})
+    lv.journal = S.Journal(emit=lambda ev, f, page=None: None)
+    lv.o = SimpleNamespace(turn=lambda text, gbnf: answer)
+    lv.gbnf, lv.stop_words, lv.held, lv.narr_seq, lv.answers = None, ["stop"], [], 0, []
+    lv.room = lv.handle_due = lv.push_catalog = lambda *a: None
+    lv.card_line = lambda: card
+    lv.repeat_held = lambda *a, **kw: S.Live.repeat_held(lv, *a, **kw)
+    return lv, frames
+
+
+def test_a_finished_game_answers_every_utterance_with_the_over_line():
+    """alf-demo 3c (a): after the win, words that set no task get the over line too — not the card line."""
+    lv, frames = turn_stand_in(('{"intent":"UNKNOWN"}', "I don't know what you mean."), won=True, card="A kitchen.")
+    j, voice, say = S.Live.utterance(lv, "Alf World the")
+    assert voice == S.OVER_LINE and say and lv.status["state"] == "over"
+    assert lv.status["options"] == list(S.NEW_GAME_OPTION)
+    lv, _ = turn_stand_in(('{"intent":"CHITCHAT"}', "Hello."), won=False, card="A kitchen.")
+    assert S.Live.utterance(lv, "hello")[1] == "A kitchen."          # a game in play: the card line as before
+
+
+def test_a_line_said_again_too_soon_is_shown_not_spoken(monkeypatch):
+    """alf-demo 3c (b): the same answer within 20 s of the last say is a row (narration form R) with no
+    voice and a dlg-say-held record, whatever woke it; the third within 60 s is held altogether; once
+    the windows pass it is spoken again."""
+    clock = [1000.0]
+    monkeypatch.setattr(S.time, "time", lambda: clock[0])
+    lv, frames = turn_stand_in(('{"intent":"UNKNOWN"}', "x"), card="A kitchen. Ask me.")
+    assert S.Live.utterance(lv, "what can you do")[1] == "A kitchen. Ask me."
+    clock[0] += 3.2                                     # the echo of the card line, heard back
+    j, voice, say = S.Live.utterance(lv, "Alf World the")
+    assert voice == "" and say == 0
+    rows = [f for ev, f in frames if ev == "narration"]
+    assert [(r["sentence"], r["form"]) for r in rows] == [("A kitchen. Ask me.", "R")]
+    held = [r for r in lv.journal.recs if r["kind"] == "dlg-say-held"]
+    assert held[-1]["held"] == "row" and held[-1]["text"] == "A kitchen. Ask me."
+    clock[0] += 3.2                                     # the third: no row, no voice
+    assert S.Live.utterance(lv, "Alf World")[1] == ""
+    assert len([f for ev, f in frames if ev == "narration"]) == 1
+    assert [r for r in lv.journal.recs if r["kind"] == "dlg-say-held"][-1]["held"] == "all"
+    clock[0] += 61                                      # past both windows: said again
+    assert S.Live.utterance(lv, "what can you do")[1] == "A kitchen. Ask me."
+
+
+def test_the_repeat_guard_holds_a_turn_line_that_was_also_a_narration(monkeypatch):
+    """A turn whose answer is a narration said in the same turn (the over line of a task in a finished
+    game): the narration takes the guard's form, R when shown, dropped when held altogether."""
+    clock = [1000.0]
+    monkeypatch.setattr(S.time, "time", lambda: clock[0])
+    lv, frames = turn_stand_in(('{"intent":"FETCH"}', S.OVER_LINE), won=True)
+
+    def turn(text, gbnf):
+        lv.held.append({"id": "n9", "kind": "v3-line", "form": "N", "sentence": S.OVER_LINE})
+        lv.journal.say_rec("line", S.OVER_LINE)
+        return '{"intent":"FETCH"}', S.OVER_LINE
+    lv.o.turn = turn
+    assert S.Live.utterance(lv, "put the tomato in the microwave")[1] == S.OVER_LINE
+    clock[0] += 5
+    assert S.Live.utterance(lv, "put the tomato in the microwave")[1] == ""
+    clock[0] += 5
+    S.Live.utterance(lv, "put the tomato in the microwave")
+    forms = [(f["kind"], f["form"]) for ev, f in frames if ev == "narration"]
+    assert forms == [("v3-turn", "N"), ("v3-turn", "R")]

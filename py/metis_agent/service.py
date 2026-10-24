@@ -62,7 +62,7 @@ class Journal:
             os.replace(path, path[:-len(".jsonl")] + "-" + stamp + ".jsonl")
         self.fh = open(path, "w") if path else None
         self.emit = emit
-        self.wake, self.gens, self.say = None, [], None
+        self.wake, self.gens, self.say, self.say_at = None, [], None, None
         self.clock_ms = []
 
     def record(self, rec, page=None):
@@ -78,7 +78,7 @@ class Journal:
             elif k == "dlg-gen":
                 self.gens.append(rec)
             elif k == "dlg-say":
-                self.say = rec
+                self.say, self.say_at = rec, time.time()
             self.recs.append(rec)
             del self.recs[:-KEEP_RECS]
             if self.fh:
@@ -407,6 +407,7 @@ class Live:
         self.world_map = v3.get("world_map")
         self.ask_now = None       # the director's open question: {question, options} (world/ask; alf-demo step 3b)
         self.status = None        # what the agent wants from the person now (world/status)
+        self.answers = []         # the turns' answers, (text, time): the spoken-repeat guard (alf-demo 3c)
         self.dir_held = []        # results of the director's domains held for its beats (release_held)
         self.task_view = {"chain": [], "results": []}
         self.jobs = queue.Queue()
@@ -643,7 +644,7 @@ class Live:
             self.set_status("stuck" if stuck else "asking", ask["question"], options=ask["options"])
         elif any(e.startswith("ended(") for e in b.get("effects") or ()):
             if self.world_over():
-                self.set_status("over", "The game is over: start a new game to give another task.", options=list(NEW_GAME_OPTION))
+                self.set_status("over", OVER_LINE, options=list(NEW_GAME_OPTION))
             else:
                 self.set_status("done", "Done. Tell me another task.")
 
@@ -835,7 +836,7 @@ class Live:
         j.pop("intent", None)
         if self.director is not None and verb != "STOP" and self.world_over():
             # alf-demo step 3b F7: the world's episode ended (won); a new task would act in a finished game
-            line = "The game is over. Start a new game to give another task."
+            line = OVER_LINE
             self.on_say("line", line)
             self.set_status("over", line, options=list(NEW_GAME_OPTION))
             return O.Reply({"domain": d, "kind": "error", "error": "the game is over", "text": line}), True
@@ -1031,6 +1032,7 @@ class Live:
             w["wait_ms"] = int((time.time() - at) * 1000)
         self.journal.record(w)
         self.turn_at = at if at is not None else time.time()
+        prev, prev_at = self.journal.say, self.journal.say_at     # the last say before this turn's own
         try:
             if self.director is not None and text.strip().lower().rstrip(".!") in NEW_GAME_WORDS:
                 voice = self.new_game(say=False)
@@ -1061,18 +1063,39 @@ class Live:
                 verb = (json.loads(j) or {}).get("intent", "") if j else ""
             except (ValueError, AttributeError):
                 verb = ""
-            if verb in ("UNKNOWN", "CHITCHAT") and self.card_line():
+            if self.director is not None and verb != "STOP" and self.world_over():
+                # alf-demo 3c: in a finished game every utterance gets the over line, words that set no
+                # task included (the user's run: the card line heard back as "Alf World the", every 3.2 s)
+                voice_s = voice = OVER_LINE
+                if (self.status or {}).get("state") != "over":
+                    self.set_status("over", OVER_LINE, options=list(NEW_GAME_OPTION))
+            elif verb in ("UNKNOWN", "CHITCHAT") and self.card_line():
                 # alf-demo 3b (the user's "put the pencil in microwave" → "unknown", nothing to go on): what
                 # this world is and what to ask, from the map's card, said instead; the status is left as it is
                 voice_s = voice = self.card_line()
+            held = self.repeat_held(voice_s, prev, prev_at) if voice_s else None
+            shown = any(n["sentence"] == voice_s for n in self.held)   # the answer is a held narration too
             for n in self.held:
                 if n["sentence"] == voice_s:
+                    if held == "all":
+                        continue
                     n["kind"] = "v3-turn"
+                    if held:
+                        n["form"] = "R"
                 self.emit("narration", n)
             self.held = []
             last = self.journal.say
             say = 0
-            if voice_s and (last is None or last.get("text") != voice or last["seq"] < (self.journal.wake or {}).get("seq", 0)):
+            if held:
+                # alf-demo 3c: said again too soon — not spoken (no echo loop outlives its first repeat);
+                # shown as a row (a narration the page does not voice, form R) unless held altogether
+                self.journal.record({"kind": "dlg-say-held", "text": voice_s, "held": held})
+                if held == "row" and not shown:
+                    self.narr_seq += 1
+                    self.emit("narration", {"id": "n%d" % self.narr_seq, "path": "", "kind": "v3-turn", "form": "R",
+                                            "line": "", "sentence": voice_s, "say": 0})
+                voice_s = voice = ""
+            elif voice_s and (last is None or last.get("text") != voice or last["seq"] < (self.journal.wake or {}).get("seq", 0)):
                 say = self.journal.say_rec("turn", voice)
             elif last is not None and voice_s:
                 say = last["seq"]
@@ -1081,6 +1104,20 @@ class Live:
             return j, voice_s, say
         finally:
             self.turn_at = None
+
+    def repeat_held(self, text, prev, prev_at, now=None):
+        """The spoken-repeat guard (alf-demo 3c), independent of wakes: a turn's answer equal to the last
+        say within REPEAT_ROW_S → "row" (shown, not spoken); the third equal answer within REPEAT_ALL_S →
+        "all" (held altogether); else None. Every answer is counted, held or not."""
+        now = time.time() if now is None else now
+        self.answers = [(x, t) for x, t in self.answers if now - t <= REPEAT_ALL_S]
+        n = sum(1 for x, _ in self.answers if x == text)
+        self.answers.append((text, now))
+        if n >= 2:
+            return "all"
+        if prev is not None and prev_at is not None and str(prev.get("text") or "").strip() == text and now - prev_at <= REPEAT_ROW_S:
+            return "row"
+        return None
 
     # the console's verbs (v3console.go, v3reload.go, the world)
 
@@ -1466,6 +1503,8 @@ def _plain(v):
 
 STOP_OPTION = ({"label": "stop", "say": "stop"},)
 NEW_GAME_OPTION = ({"label": "new game", "say": "new game"},)
+OVER_LINE = "The game is over: start a new game to give another task."
+REPEAT_ROW_S, REPEAT_ALL_S = 20.0, 60.0        # the spoken-repeat guard's windows (alf-demo 3c)
 NEW_GAME_WORDS = ("new game", "start a new game", "start again", "new episode")
 
 
