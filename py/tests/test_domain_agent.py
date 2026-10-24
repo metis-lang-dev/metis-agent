@@ -371,3 +371,18 @@ def test_a_beat_that_settles_is_not_capped():
     for _ in range(6):
         out += ag.handle({"clock": "beat"})
     assert ag.beat_no() == 6 and not any("unsettled" in r for r in out)
+
+
+def test_the_watch_keeps_a_bounded_history(monkeypatch):
+    """watch-history s-e061fad2: the agent's REPL keeps the last HISTORY rows (metispy's window), the
+    positions absolute; however many rows a long run fires, no more than that are stored."""
+    from metis_agent.domain_agent import DomainAgent
+    assert DomainAgent(dog).repl.history == DomainAgent.HISTORY
+    monkeypatch.setattr(DomainAgent, "HISTORY", 5)
+    ag = DomainAgent(dog)
+    r = ag.repl
+    for i in range(12):                     # the world's lines, one exo row a tick
+        ag.host.world(["-battery_ok", "+battery_low"] if i % 2 == 0 else ["-battery_low", "+battery_ok"])
+        r._tick(quiet_rows=False)
+    assert len(r.fired) == 12 and r.fired.off == 7 and len(r.fired.items) == 5 and len(r._envs.items) == 6
+    assert r.counts.get("battery_ok") == 1 and not r.counts.get("battery_low")     # the state is the whole run's

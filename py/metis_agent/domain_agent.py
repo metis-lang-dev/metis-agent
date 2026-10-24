@@ -182,7 +182,12 @@ class DomainAgent:
         self.mod = module
         self.name = module.NAME
         plugin = getattr(module, "PLUGIN", None)
-        self.repl = Repl(str(module.CATALOG), seed=seed, plugin=plugin, host=bool(plugin))
+        # the watch runs as long as the service: its REPL keeps the last HISTORY rows (watch-history
+        # s-e061fad2: metispy's bounded window; positions stay absolute, older ones answer
+        # "history kept"); the manifest's clock {history: N} sets it, 0 = unbounded
+        clock0 = getattr(getattr(module, "MANIFEST", None), "clock", None) or {}
+        history = int(clock0.get("history", self.HISTORY))
+        self.repl = Repl(str(module.CATALOG), seed=seed, plugin=plugin, host=bool(plugin), history=history or None)
         self.extensions = list(getattr(module, "EXTENSIONS", None) or [])
         apply_extensions(self.repl, self.extensions)        # the served program: the program plus its extensions
         self.host = self.repl.plugin
@@ -346,6 +351,8 @@ class DomainAgent:
     # The beat stops there and says so: a quiescence that names the rules that
     # kept firing (unsettled); the clock does not advance until it settles
     BEAT_STEPS = 200
+    # the fired rows a domain's REPL keeps (watch-history): a 300 ms beat's passes for minutes
+    HISTORY = 2000
 
     # a lockstep or followed world's pricing tier (the manifest's clock:
     # {exact_states, samples} override): the exact filter while its cumulative
