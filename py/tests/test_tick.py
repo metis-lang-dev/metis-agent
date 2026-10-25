@@ -61,7 +61,8 @@ def live(monkeypatch):
     lv = object.__new__(service.Live)
     lv.journal, lv.beat, lv.tick_all = Journal(), 5, True
     lv._tick_rows, lv._last_status, lv.holder = {}, None, None
-    lv._seen_rows, lv._last_beat, lv._why, lv._grant_q = {}, {}, {}, []
+    lv._seen_rows, lv._last_beat, lv._why, lv._grant_q, lv._granted = {}, {}, {}, [], set()
+    lv._cancel_q, lv._stop = [], None
     lv.agents = types.SimpleNamespace(agents={"nav": Agent(reading={"at(lhere)": 1}, counts={"at(lhere)": 1}),
                                               "task": Agent(), "director": Agent(counts={"top(a3)": 1})})
     lv.director = types.SimpleNamespace(name="director", domains={"nav", "task"})
@@ -271,3 +272,50 @@ def test_a_host_that_latches_itself(live):
     assert calls == ["latch"] and "reading" not in inner.__dict__     # its own latch, not the agent's snapshot
     live.unlatch()
     assert calls == ["latch", "unlatch"]
+
+
+def test_a_grant_after_the_beats_wakes_the_member_at_the_next_tick(live):
+    """Step 3c (v8 §13.2 (c)): a grant (or revoke) taken after the tick's beats is a change for the next tick — a
+    member whose only new fact is its grant beat once with nothing to do and then never again (the stop stall)."""
+    seen(live, "nav")
+    assert live.wake_why("nav") == "none"
+    live.grant("nav", "motion", True)
+    assert live.taken[-1] == ("nav", ["+tick__grant(nav,motion) 1"]) and live.wake_why("nav") == "change"
+    live._granted.discard("nav")                                      # its beat (tick() discards it after)
+    assert live.wake_why("nav") == "none"
+    live.agents.agents["nav"].repl.counts["tick__grant(nav,motion)"] = 1
+    live.grant("nav", "motion", False)                               # a revoke too
+    assert live.wake_why("nav") == "change"
+
+
+def test_the_directors_cancel_is_relayed_as_any_out(live):
+    """Step 3c (v8 §13.2, the rulings on the draft): the director's tick__cancel(D) is relayed into D's session like any
+    director out to a member in — the agent reads no member state to decide; queued from the director's own beat."""
+    nav = live.agents.agents["nav"]
+    for counts in ({"busy": 1, "goto(p1)": 1}, {"idle": 1}):
+        nav.repl.counts = dict(counts)
+        live.cancel("nav")
+        assert live.taken[-1] == ("nav", ["+tick__cancel(nav) 1"]) and "nav" in live._granted
+    live.director = types.SimpleNamespace(name="director", domains={"nav", "task"}, facts={"specialist": {"nav"}},
+                                          produced=lambda d, r: None)
+    live._dir_traces, live.off, live._cancel_q = None, set(), []
+    live.sift([{"kind": "trace", "domain": "director",
+                "fired": [{"kind": "clause", "event": "stop_cancel", "produce": ["tick__cancel(nav)", "offpath(nav)"]}]}])
+    assert live._cancel_q == ["nav"]
+
+
+def test_tick_stop_holds_one_tick(live):
+    """tick__stop: asserted for the stop's tick, the director's state on the wire after its beats, retracted at the
+    next tick before its beats."""
+    live.director = types.SimpleNamespace(name="director")
+    shown = []
+    live.emit_hierarchy = lambda beat=-1: shown.append(beat)
+    worlds = []
+    live.serve_line = lambda msg, kind, held=False: worlds.append((msg["domain"], list(msg["world"]))) or []
+    live._stop = "asserted"
+    live.stop_tick(False)
+    assert live._stop == "asserted" and worlds == []               # the stop's tick, before its beats: nothing yet
+    live.stop_tick(True)
+    assert live._stop == "beaten" and shown == [-1]
+    live.stop_tick(False)
+    assert live._stop is None and worlds == [("director", ["-tick__stop"])]

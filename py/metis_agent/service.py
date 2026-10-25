@@ -329,6 +329,9 @@ class Live:
         self._tick_rows, self._last_status, self.holder = {}, None, None
         self._seen_rows, self._last_beat, self._why = {}, {}, {}
         self._grant_q = []                     # the director's own beats' grants, applied after the tick's beats
+        self._granted = set()                  # members given a grant, revoke or cancel since their last beat (3c)
+        self._cancel_q = []                    # the director's own beats' cancels, applied after the tick's beats
+        self._stop = None                      # tick__stop's one tick: asserted, beaten, retracted (3c)
         if self.serve not in ("all", "active"):
             raise ValueError("v3.serve: all | active, not %r" % self.serve)
         self.loaded, self.off = list(v3["loaded"]), set()
@@ -526,6 +529,9 @@ class Live:
             def grant(self, dom, res, on):
                 live.grant(dom, res, on)
 
+            def cancel(self, dom):
+                live.cancel(dom)
+
             def say(self, text, kind="line"):
                 if kind == "ask":
                     q, opts = split_options(live.spoken(text))
@@ -560,6 +566,18 @@ class Live:
     # ── the tick (specialist-tree s-404d001f step 2, the v3 ruling; metis-lang spec/15 §4 form S) ──
     STATUSES = ("running", "success", "failure", "idle")
 
+    def cancel(self, dom):
+        """The director's tick__cancel(DOM) (its stop_cancel, on the agent's tick__stop; step 3c, spec/15 amendment
+        7), relayed into DOM's session like any director out to a member in: DOM drops its own goal (its generated
+        cancel rules). A revoke takes the body and keeps the goal; a cancel takes the goal."""
+        ag = self.agents.agents.get(dom) if hasattr(self.agents, "agents") else None
+        if ag is None:
+            return
+        line = "+tick__cancel(%s) 1" % dom
+        self.serve_line({"take": [line], "domain": dom, "refresh": False}, "take")
+        self._granted.add(dom)
+        self.journal.record({"kind": "dlg-relay", "what": "cancel", "domain": dom, "stamp": self.beat})
+
     def grant(self, dom, res, on):
         """A tree director's grant (on) or revoke of resource RES: synced into DOM's session as the protocol's
         tick__grant(DOM, RES) (a line the agent takes, the world not re-read); only the holder's commands reach
@@ -572,6 +590,7 @@ class Live:
         line = "+%s 1" % atom if on and have <= 0 else ("-%s %d" % (atom, have) if not on and have > 0 else None)
         if line:
             self.serve_line({"take": [line], "domain": dom, "refresh": False}, "take")
+            self._granted.add(dom)
         # the director's decision, stamped (brief §10), whether a line was needed or not: a member that consumed its
         # own grant copy (a cook at plate: a copy is linear) is revoked with no line, the decision still journaled
         self.journal.record({"kind": "dlg-relay", "what": "grant" if on else "revoke", "domain": dom, "res": res,
@@ -626,6 +645,8 @@ class Live:
         seen = self._seen_rows.get(d)
         if seen is None or seen[0] != id(ag.repl) or len(ag.repl.fired) > seen[1] or getattr(ag, "held", None):
             return "change"                          # (a reloaded domain is a new session: its first beat is a change)
+        if d in self._granted:                       # a grant, revoke or cancel taken (after the tick's beats too:
+            return "change"                          # step 3c, v8 §13.2 (c) — a member whose only new fact is its grant)
         outer = getattr(ag, "host", None)
         if getattr(outer, "queue", None) or getattr(outer, "world_lines", None):   # an intent or a world line waits for its tick
             return "change"
@@ -891,9 +912,8 @@ class Live:
             if d in self.loaded and d not in self.off:
                 self.domain_verb("deactivate", d, "director")
         if self.tick_all:
-            # the tick: every grant revoked (a stopped specialist's session keeps the goal it was on — as today's
-            # does — and beats like any other: without the grant its commands are held), the statuses relayed anew
-            # into the reloaded director
+            # the tick: every grant revoked (a new game; a stop under the tree is stop_hierarchy's: no reload), the
+            # statuses relayed anew into the reloaded director
             for d in sorted(self.director.facts["specialist"]):
                 ag = self.agents.agents.get(d)
                 for a, n in sorted((ag.repl.counts.items() if ag is not None else ())):
@@ -910,6 +930,37 @@ class Live:
         self.director.frames = Frames(self.director.facts)
         self.task_view, self.ask_now = {"chain": [], "results": []}, None
         self.emit_hierarchy()
+
+    def stop_hierarchy(self):
+        """A stop under the tree (step 3c, v8 §13.2; spec/15 amendment 7): no reload, the same sessions. The agent's
+        tick__stop, a one-tick world signal, is put into the director for the stop's tick and retracted at the next;
+        the director's own rules do the rest — its bridge puts the woken specialists to sleep and the routing back at
+        its start, its tree cancels the members on the path (tick__cancel(D), relayed like any of its outs: each drops
+        its own goal), frees what is held (tick__revoke) and passes over the tickets queued. The agent deactivates the
+        specialists (their cards leave the turn) and resets the DirectorLoop's own bookkeeping, as for a reset."""
+        name = self.director.name
+        for d in sorted(self.director.facts["specialist"]):
+            if d in self.loaded and d not in self.off:
+                self.domain_verb("deactivate", d, "director")
+        # a world line, not a take: it lands at the director's next tick in one row with the release of the outs it
+        # already handed over (its last beat's wake / forward / grants) — a take applied at once would meet a
+        # wake(D) still standing, and the bridge's grant_free / path_on would undo stop_release / stop_cancel
+        self.serve_line({"world": ["+tick__stop"], "domain": name}, "world")
+        self._stop = "asserted"
+        from .director import Frames
+        self.director.queue, self.director.came, self.director.outcome = [], {}, None
+        self.director.frames = Frames(self.director.facts)
+        self.task_view, self.ask_now = {"chain": [], "results": []}, None
+
+    def stop_tick(self, after_beats):
+        """tick__stop's one tick: after the stop's tick's beats the director's state on the wire (world/hierarchy:
+        its stop rules fired); at the next tick, before its beats, retracted."""
+        if self._stop == "asserted" and after_beats:
+            self._stop = "beaten"
+            self.emit_hierarchy()
+        elif self._stop == "beaten" and not after_beats:
+            self.serve_line({"world": ["-tick__stop"], "domain": self.director.name}, "world")
+            self._stop = None
 
     def emit_hierarchy(self, beat=-1):
         """The director's state atoms alone (world/hierarchy with no arrival): on hello and after a reset
@@ -1056,6 +1107,8 @@ class Live:
                                 if k in ("tick__grant", "tick__revoke"):
                                     dom, res = [x.strip() for x in a[a.index("(") + 1:-1].split(",")]
                                     self._grant_q.append((dom, res, k == "tick__grant"))   # applied after the beats
+                                elif k == "tick__cancel":
+                                    self._cancel_q.append(a[a.index("(") + 1:-1].strip())
                     # (the tick, step 2: activation is the director's — an inactive specialist beats on its copies,
                     # but only an active one's products arrive, as today, where an inactive one never beats)
                     if not (self.tick_all and d in self.off and d in self.director.facts["specialist"]):
@@ -1185,6 +1238,8 @@ class Live:
     def tick(self):
         self.beat += 1
         due = []
+        if self.tick_all and self.director is not None:
+            self.stop_tick(False)
         if self.tick_all:
             self.latch()
         for c in self.clocks:
@@ -1207,6 +1262,7 @@ class Live:
                 ag = self.agents.agents.get(d)
                 self._seen_rows[d] = (id(ag.repl), len(ag.repl.fired)) if ag is not None else None
                 self._last_beat[d] = self.beat
+                self._granted.discard(d)
             for r in rs:
                 dom = r.get("domain")
                 if dom not in self.quiet and dom not in self.off:
@@ -1216,6 +1272,11 @@ class Live:
             q, self._grant_q = self._grant_q, []
             for dom, res, on in q:
                 self.grant(dom, res, on)
+            q, self._cancel_q = self._cancel_q, []
+            for dom in q:
+                self.cancel(dom)
+            if self.director is not None:
+                self.stop_tick(True)
         self.handle_due(self.beat, due)
         k = len(self.director.log) if self.director is not None else 0
         self.director_step()
@@ -1291,7 +1352,10 @@ class Live:
                 return '{"intent":"NEW_GAME"}', voice, self.journal.say_rec("turn", voice)
             if O.keyword_stop(text, self.stop_words) and self.director is not None:
                 # alf-demo step 3b F5: the director's run stops — the hierarchy at its start, the world as it is
-                self.reset_hierarchy()
+                if self.tick_all:
+                    self.stop_hierarchy()          # the tree: the director's own stop rules, no reload (step 3c)
+                else:
+                    self.reset_hierarchy()
                 self.director.outcome = "ended(stop)"
                 self.journal.record({"kind": "dlg-director", "director": self.director.name, "stopped": True})
                 self.set_status("waiting", "Stopped. " + self.waiting_text())
