@@ -34,13 +34,14 @@ def host_key(name):
 def _host_module(d, name, fresh=False, file=None):
     """The domain's host module: the manifest's `host:` file (`mh_host.py:make` names mh_host.py),
     else <name>_host.py; keyed by the domain's name (host_key), so packages that share a host file's
-    name (every MiniHack level's mh_host.py) stay apart."""
+    name (every MiniHack level's mh_host.py) stay apart. A cached host holds for its own file only: a
+    second Live over another root has its own package of the name."""
     p = d / (file or ("%s_host.py" % name))
     if not p.exists():
         return None
     key = host_key(name)
-    if fresh:
-        sys.modules.pop(key, None)                  # reload: the host re-read from disk
+    if fresh or getattr(sys.modules.get(key), "__file__", str(p)) != str(p):
+        sys.modules.pop(key, None)                  # reload, or another package's host of this name: read from disk
     if key not in sys.modules:
         sys.path.insert(0, str(d))
         spec = importlib.util.spec_from_file_location(key, p)

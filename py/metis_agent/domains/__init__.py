@@ -104,12 +104,27 @@ if not any(isinstance(f, _Finder) for f in sys.meta_path):
     sys.meta_path.append(_Finder())
 
 
+def _here(mod, name):
+    """The cached module holds for the catalog's root as it is now: none cached yet, one not built from a
+    manifest, or one built from this root's manifest of `name` (the module is keyed by the domain's name,
+    which another root has too)."""
+    d = getattr(mod, "MANIFEST", None)
+    if d is None:
+        return True
+    try:
+        return Path(d.dir).resolve() == Path(catalog().get(name).dir).resolve()
+    except KeyError:
+        return True                                 # not in this root: the import says so as before
+
+
 def load(name, fresh=False):
     """The domain's module; fresh: built again from the files on disk (a new
     module object, so a failed reload can put the old one back)."""
     key = "%s.%s" % (__name__, name)
     if not fresh:
-        return importlib.import_module(key)
+        if _here(sys.modules.get(key), name):
+            return importlib.import_module(key)
+        fresh = True                                # built over another root (a second Live in this process)
     sys.modules.pop(key, None)
     spec = importlib.util.spec_from_loader(key, _Loader(name, fresh=True), origin=None)
     mod = importlib.util.module_from_spec(spec)
