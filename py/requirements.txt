@@ -1,6 +1,7 @@
 # py/ (the specialist, the domain agent): pinned to the dev venv (py/.venv,
 # 2026-10-14). metispy is a sibling checkout, installed editable beside this
-# (pip install -e ../metispy); it is not on PyPI.
+# (pip install -e ../metispy); it is not on PyPI. semantic-world (the worlds' semantic map:
+# their hosts run in this process) lives in the metis-worlds checkout (pip install -e ../metis-worlds/libs/semantic-world).
 # llama_cpp_python builds from source (CPU in CI: CMAKE_ARGS in ci.yml);
 # seat.py imports it at module level, so every test file needs it importable
 # even though no test loads weights.
