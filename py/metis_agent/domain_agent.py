@@ -936,8 +936,10 @@ class DomainAgent:
         if plugin is None:
             return [reply(self.name, "error", id=msg.get("id"), error="take: this session has no env to take lines through")]
         inner = getattr(self.host, "inner", self.host)
-        if hasattr(inner, "refresh"):
+        if hasattr(inner, "refresh") and msg.get("refresh", True):
             inner.refresh()                    # the host reads the world as it stands now (another host stepped it)
+            # (refresh: false — a token the agent syncs, the tick's motion grant: the world is not re-read, the
+            # binding not re-frozen)
         old = plugin.__dict__.get("tick", None)
         plugin.tick = lambda counts: list(lines)
         try:

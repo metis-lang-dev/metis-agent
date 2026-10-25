@@ -322,6 +322,12 @@ class Live:
         # attended specialist), the turn rebuilt on every activate/deactivate — a deactivated card
         # leaves the turn, so N installs never add up in the context
         self.serve = str(v3.get("serve", "all"))
+        # the tick (specialist-tree s-404d001f step 2, the v3 ruling): every domain evaluates on every tick, the
+        # activated or not (an inactive one fires only what its own rules allow on its synced atoms); `off` then
+        # means only that its card leaves the person's turn. Without the flag: today's Live
+        self.tick_all = bool(dcfg.get("tick"))
+        self._tick_rows, self._last_status, self.holder = {}, None, None
+        self._seen_rows, self._last_beat, self._why = {}, {}, {}
         if self.serve not in ("all", "active"):
             raise ValueError("v3.serve: all | active, not %r" % self.serve)
         self.loaded, self.off = list(v3["loaded"]), set()
@@ -370,6 +376,8 @@ class Live:
         self.director, self._dir_traces = None, None
         if v3.get("director"):
             self.director = self.director_loop(str(v3["director"]))
+        if self.tick_all:
+            self.gate_commands()
         # the world page (alf-demo step 2, DEMO.md §4): the world's map file, served at /world/map.json and
         # named on every hello (world/map); the director's task chain and result lines (world/delta task)
         self.world_map = v3.get("world_map")
@@ -514,6 +522,9 @@ class Live:
             def deactivate(self, dom):
                 live.domain_verb("deactivate", dom, "director")
 
+            def grant(self, dom, res, on):
+                live.grant(dom, res, on)
+
             def say(self, text, kind="line"):
                 if kind == "ask":
                     q, opts = split_options(live.spoken(text))
@@ -544,6 +555,143 @@ class Live:
         if host.instance(dom, goal, tokens):
             self.world_frames()             # the old instance's frames first: the reload replaces its host
             self.reload(dom, by="director")
+
+    # ── the tick (specialist-tree s-404d001f step 2, the v3 ruling; metis-lang spec/15 §4 form S) ──
+    STATUSES = ("running", "success", "failure", "idle")
+
+    def grant(self, dom, res, on):
+        """A tree director's grant (on) or revoke of resource RES: synced into DOM's session as the protocol's
+        tick__grant(DOM, RES) (a line the agent takes, the world not re-read); only the holder's commands reach
+        the world."""
+        ag = self.agents.agents.get(dom) if hasattr(self.agents, "agents") else None
+        if ag is None:
+            return
+        atom = "tick__grant(%s,%s)" % (dom, res)
+        have = ag.repl.counts.get(atom, 0)
+        line = "+%s 1" % atom if on and have <= 0 else ("-%s %d" % (atom, have) if not on and have > 0 else None)
+        if line:
+            self.serve_line({"take": [line], "domain": dom, "refresh": False}, "take")
+            # the boundary stamp (brief §10: the in-process relay is the degenerate case of the actors' protocol)
+            self.journal.record({"kind": "dlg-relay", "what": "grant" if on else "revoke", "domain": dom, "res": res,
+                                 "stamp": self.beat})
+        self.holder = dom if on else (None if self.holder == dom else self.holder)
+
+    def holds(self, ag, dom):
+        return any(n > 0 and a.startswith("tick__grant(%s," % dom) for a, n in ag.repl.counts.items())
+
+    def gate_commands(self):
+        """Only the resource's holder acts: a specialist that declares a resource (its manifest's shared) has its
+        host's on_event wrapped — without the protocol's tick__grant(D, R) in its session the command is held and
+        journaled (dlg-held)."""
+        from .domains import catalog
+        for name, ag in self.agents.agents.items():
+            try:
+                shared = catalog().get(name).manifest.get("shared") or {}
+            except KeyError:
+                continue
+            inner = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+            if "resource" not in shared.values() or not hasattr(inner, "on_event"):
+                continue
+            f = inner.on_event
+
+            def gated(nm, args, _f=f, _ag=ag, _d=name):
+                if self.holds(_ag, _d):
+                    return _f(nm, args)
+                self.journal.record({"kind": "dlg-held", "domain": _d, "rule": nm, "why": "no grant: not the holder"})
+            inner.on_event = gated
+
+    def wake_why(self, d):
+        """Why domain D beats this tick (brief v2 §9 rules 1 and 3): `change` — a copy in its in set changed since
+        its last beat: a line taken into its session (a goal, a grant, a status: another domain's output), an
+        intent or a world line waiting for its tick, its host's queue (the director's arrivals), its held replies, or its world reading differs from what its
+        session holds (its own outputs are in its session already: its echo is no difference); `clock` — its
+        manifest's clock period (ticks) elapsed; else `none`."""
+        ag = self.agents.agents.get(d) if hasattr(self.agents, "agents") else None
+        if ag is None or d not in self._last_beat:
+            return "change"
+        seen = self._seen_rows.get(d)
+        if seen is None or seen[0] != id(ag.repl) or len(ag.repl.fired) > seen[1] or getattr(ag, "held", None):
+            return "change"                          # (a reloaded domain is a new session: its first beat is a change)
+        outer = getattr(ag, "host", None)
+        if getattr(outer, "queue", None) or getattr(outer, "world_lines", None):   # an intent or a world line waits for its tick
+            return "change"
+        inner = getattr(outer, "inner", outer)
+        if getattr(inner, "queue", None):
+            return "change"
+        sync = getattr(inner, "sync", None)
+        if callable(sync) and sync(dict(ag.repl.counts)):
+            return "change"
+        try:
+            from .domains import catalog
+            period = int((catalog().get(d).manifest.get("clock") or {}).get("period") or 0)
+        except (KeyError, ValueError, TypeError):
+            period = 0
+        if period and self.beat - self._last_beat[d] >= period:
+            return "clock"
+        return "none"
+
+    def latch(self):
+        """Rule 2 (outputs latched to the next boundary), for the world's copies: every domain but the resource's
+        holder reads the world as it stood at this tick's boundary (its host's reading snapshotted), so another
+        domain's command this tick reaches it at the next boundary; the holder reads its own commands at once."""
+        self._latched = {}
+        for d, ag in self.agents.agents.items():
+            inner = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+            if d == self.holder or not callable(getattr(inner, "reading", None)):
+                continue
+            snap = inner.reading()
+            self._latched[d] = (inner, inner.__dict__.get("reading"))
+            inner.reading = lambda _s=snap: dict(_s)
+
+    def unlatch(self):
+        for d, (inner, own) in getattr(self, "_latched", {}).items():
+            if own is None:
+                inner.__dict__.pop("reading", None)
+            else:
+                inner.reading = own
+        self._latched = {}
+
+    def statuses(self):
+        """Every hierarchy domain's status this tick (spec/15 §4.4, from its fired rows and its manifest's status:
+        success when it put out a success atom, failure a failure atom, running when it fired, idle when not),
+        relayed into the director's session as status(D, S) when they changed, and journaled (dlg-status)."""
+        from .domains import catalog
+        rows, self._tick_rows = self._tick_rows, {}
+        out = {}
+        for d in sorted(self.director.domains):
+            try:
+                st = catalog().get(d).manifest.get("status") or {}
+            except KeyError:
+                st = {}
+            fired = rows.get(d, [])
+            kinds = {a.split("(")[0] for r in fired for a in r.get("produce") or []}
+            out[d] = ("success" if kinds & set(st.get("success") or ()) else
+                      "failure" if kinds & set(st.get("failure") or ()) else "running" if fired else "idle")
+        dag = self.agents.agents.get(self.director.name)
+        if dag is not None:
+            # into the director at the boundary (latched: it reads them next tick): the statuses that changed, with
+            # changed(D) — their hysteresis age starts again —, the others' age one tick more (tick_s(D)), and the
+            # grants' age one tick more (tick)
+            # (an age token only while there is an age to count: a grant held, a status not yet at the top age —
+            # an idle tick wakes no one, the director included: rule 1)
+            last, held = self._last_status or {}, dag.repl.counts
+            top = {a[len("top("):-1] for a, n in held.items() if n > 0 and a.startswith("top(")} or {"a3"}
+            lines = ["+tick 1"] if self.holder else []
+            for d, s in sorted(out.items()):
+                if last.get(d) != s:
+                    lines += (["-tick__status(%s,%s) 1" % (d, last[d])] if d in last else []) + [
+                        "+tick__status(%s,%s) 1" % (d, s), "+changed(%s) 1" % d]
+                elif not any(held.get("age_of(%s,%s)" % (d, t), 0) > 0 for t in top):
+                    lines.append("+tick_s(%s) 1" % d)
+            if lines:
+                self.serve_line({"take": lines, "domain": self.director.name, "refresh": False}, "take")
+                self.journal.record({"kind": "dlg-relay", "what": "report", "domain": self.director.name, "lines": lines,
+                                     "stamp": self.beat})
+            self._last_status = out
+        counts = dag.repl.counts if dag is not None else {}
+        path = sorted(a[5:-1] for a, n in counts.items() if n > 0 and a.startswith("path("))
+        self.journal.record({"kind": "dlg-status", "beat": self.beat, "statuses": out, "path": path, "holder": self.holder,
+                             "why": dict(self._why)})
 
     def director_step(self):
         """The arrivals the last beat queued, each one director beat (journaled as dlg-director)."""
@@ -825,6 +973,8 @@ class Live:
         for r in rs:
             if r.get("kind") == "trace":
                 d = r.get("domain")
+                if self.tick_all:
+                    self._tick_rows.setdefault(d, []).extend(row for row in r.get("fired") or [] if row.get("kind") != "exo")
                 if self.director is not None:
                     if d == self.director.name and self._dir_traces is not None:
                         self._dir_traces.append(r)
@@ -954,10 +1104,16 @@ class Live:
     def tick(self):
         self.beat += 1
         due = []
+        if self.tick_all:
+            self.latch()
         for c in self.clocks:
             d = c.get("domain")
-            if d in self.off:
+            if d in self.off and not self.tick_all:
                 continue
+            if self.tick_all:
+                self._why[d] = self.wake_why(d)
+                if self._why[d] == "none":           # nothing in its copies changed, its clock is not due: no beat
+                    continue
             lock = self.locks.get(d)
             if lock and not lock.acquire(blocking=False):      # the domain's consult runs: it waits (observe-only)
                 continue
@@ -966,10 +1122,16 @@ class Live:
             finally:
                 if lock:
                     lock.release()
+            if self.tick_all:
+                ag = self.agents.agents.get(d)
+                self._seen_rows[d] = (id(ag.repl), len(ag.repl.fired)) if ag is not None else None
+                self._last_beat[d] = self.beat
             for r in rs:
                 dom = r.get("domain")
                 if dom not in self.quiet and dom not in self.off:
                     due.append(r)
+        if self.tick_all:
+            self.unlatch()
         self.handle_due(self.beat, due)
         k = len(self.director.log) if self.director is not None else 0
         self.director_step()
@@ -977,6 +1139,8 @@ class Live:
         # timing: a 13-step task waited 13 ticks of tick_ms, 3.9 s of a 1.3 s turn's work)
         self.eager = self.director is not None and len(self.director.log) > k and self.director.outcome is None
         self.release_held(k)
+        if self.tick_all and self.director is not None:
+            self.statuses()
         self.world_frames()                    # the hosts' world/* frames of this tick (alf-demo step 2)
         self.card_changes()
         self.auto_reload()
@@ -1296,6 +1460,8 @@ class Live:
         """A live domain's session takes do-lines as one row (DomainAgent.take): its next activation
         without a reload. → True when taken; a failure is journaled and the caller reloads instead."""
         rec = {"kind": "dlg-domain", "verb": "take", "domain": d, "by": by, "lines": len(lines)}
+        if self.tick_all:                       # the copy's boundary stamp (the tick, brief §10)
+            rec["stamp"] = self.beat
         rs = self.serve_line({"take": list(lines), "domain": d}, "take")
         err = next((r.get("error") for r in rs if r.get("kind") == "error"), None)
         if err is None and not any(r.get("kind") == "taken" and r.get("domain") == d for r in rs):
