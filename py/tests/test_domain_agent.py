@@ -2,6 +2,8 @@
 dog's mapper, the replier's binding of outcomes to intents, and the dog's
 hosted day as intents against dog-transcript.md."""
 import json
+
+import yaml
 import sys
 from pathlib import Path
 
@@ -356,7 +358,9 @@ def test_a_beat_that_never_settles_stops_at_its_cap_under_a_memory_limit(tmp_pat
     lines, _ = run("--beat-steps", "25", beats=1)
     assert [l for l in lines if l.get("kind") == "quiescence"][0]["unsettled"] == [["stays_moist", 25]]
     mf = d / "domain.yaml"
-    mf.write_text(mf.read_text().replace("clock: {beats: 1}", "clock: {beats: 1, steps: 30}"))
+    m = yaml.safe_load(mf.read_text())                       # the clock's steps set (whatever else the clock holds:
+    m["clock"] = dict(m.get("clock") or {}, steps=30)         # the plant's period, specialist-tree step 3a)
+    mf.write_text(yaml.safe_dump(m, sort_keys=False))
     lines, _ = run(beats=1)
     assert [l for l in lines if l.get("kind") == "quiescence"][0]["unsettled"] == [["stays_moist", 30]]
 
