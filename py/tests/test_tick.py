@@ -195,3 +195,18 @@ def test_the_interface_check(tmp_path):
     assert "shared reached has several signatures: reached(thing) in nav, reached(place) in plan" in f
     assert not any("goto" in x for x in f)
     assert "plan: in gone has no producer (no peer's out, not a world port)" not in check({"plan": plan, "nav": nav}, world_out=("gone",))
+
+
+def test_an_inactive_specialists_products_do_not_arrive(live):
+    """Step 2 (activation is the director's): an inactive specialist beats on its copies, but its products reach the
+    director only while it is active — as today, where an inactive one never beats."""
+    got = []
+    live.director = types.SimpleNamespace(name="director", domains={"nav", "task"}, facts={"specialist": {"nav"}},
+                                          produced=lambda d, r: got.append(d))
+    live._dir_traces, live.off = None, {"nav"}
+    trace = {"kind": "trace", "domain": "nav", "fired": [{"kind": "clause", "event": "go", "produce": ["reached(p1)"]}]}
+    live.sift([trace])
+    assert got == [] and live._tick_rows["nav"]                  # its status still counts its rows
+    live.off = set()
+    live.sift([trace])
+    assert got == ["nav"]

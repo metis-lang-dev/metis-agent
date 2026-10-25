@@ -836,6 +836,16 @@ class Live:
         for d in sorted(self.director.facts["specialist"]):
             if d in self.loaded and d not in self.off:
                 self.domain_verb("deactivate", d, "director")
+        if self.tick_all:
+            # the tick: every grant revoked (a stopped specialist's session keeps the goal it was on — as today's
+            # does — and beats like any other: without the grant its commands are held), the statuses relayed anew
+            # into the reloaded director
+            for d in sorted(self.director.facts["specialist"]):
+                ag = self.agents.agents.get(d)
+                for a, n in sorted((ag.repl.counts.items() if ag is not None else ())):
+                    if n > 0 and a.startswith("tick__grant(%s," % d):
+                        self.grant(d, a[len("tick__grant(%s," % d):-1], False)
+            self.holder, self._last_status = None, None
         dh = self.served_hosts().get(name)
         for p in sorted(self.director.facts["planner"]):
             if dh is not None and hasattr(dh, "instance") and dh.instance(p, None, {}):
@@ -982,7 +992,10 @@ class Live:
                 if self.director is not None:
                     if d == self.director.name and self._dir_traces is not None:
                         self._dir_traces.append(r)
-                    self.director.produced(d, r)
+                    # (the tick, step 2: activation is the director's — an inactive specialist beats on its copies,
+                    # but only an active one's products arrive, as today, where an inactive one never beats)
+                    if not (self.tick_all and d in self.off and d in self.director.facts["specialist"]):
+                        self.director.produced(d, r)
                 self.journal.record(dict(r, kind="dlg-trace"))
             else:
                 out.append(r)
