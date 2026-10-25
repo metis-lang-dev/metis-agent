@@ -572,9 +572,10 @@ class Live:
         line = "+%s 1" % atom if on and have <= 0 else ("-%s %d" % (atom, have) if not on and have > 0 else None)
         if line:
             self.serve_line({"take": [line], "domain": dom, "refresh": False}, "take")
-            # the boundary stamp (brief §10: the in-process relay is the degenerate case of the actors' protocol)
-            self.journal.record({"kind": "dlg-relay", "what": "grant" if on else "revoke", "domain": dom, "res": res,
-                                 "stamp": self.beat})
+        # the director's decision, stamped (brief §10), whether a line was needed or not: a member that consumed its
+        # own grant copy (a cook at plate: a copy is linear) is revoked with no line, the decision still journaled
+        self.journal.record({"kind": "dlg-relay", "what": "grant" if on else "revoke", "domain": dom, "res": res,
+                             "stamp": self.beat, "taken": bool(line)})
         self.holder = dom if on else (None if self.holder == dom else self.holder)
 
     def holds(self, ag, dom):
@@ -649,11 +650,20 @@ class Live:
     def latch(self):
         """Rule 2 (outputs latched to the next boundary), for the world's copies: every domain but the resource's
         holder reads the world as it stood at this tick's boundary (its host's reading snapshotted), so another
-        domain's command this tick reaches it at the next boundary; the holder reads its own commands at once."""
+        domain's command this tick reaches it at the next boundary; the holder reads its own commands at once. A
+        host with latch()/unlatch() faces latches itself (what others change at the boundary, its own at once)."""
         self._latched = {}
         for d, ag in self.agents.agents.items():
             inner = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
-            if d == self.holder or not callable(getattr(inner, "reading", None)):
+            if d == self.holder:
+                continue
+            if callable(getattr(inner, "latch", None)) and callable(getattr(inner, "unlatch", None)):
+                # a host that knows its own changes from the others' (a self-gating cook acts ungranted on its own
+                # hand): it latches what OTHERS change at the boundary and shows its own at once
+                inner.latch()
+                self._latched[d] = (inner, "host")
+                continue
+            if not callable(getattr(inner, "reading", None)):
                 continue
             snap = inner.reading()
             self._latched[d] = (inner, inner.__dict__.get("reading"))
@@ -661,7 +671,9 @@ class Live:
 
     def unlatch(self):
         for d, (inner, own) in getattr(self, "_latched", {}).items():
-            if own is None:
+            if own == "host":
+                inner.unlatch()
+            elif own is None:
                 inner.__dict__.pop("reading", None)
             else:
                 inner.reading = own

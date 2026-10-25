@@ -119,12 +119,16 @@ def test_only_the_holder_acts(live):
     assert nav.host.inner.events == [] and live.journal.rows[-1]["kind"] == "dlg-held"
     live.grant("nav", "motion", True)
     assert live.taken[-1] == ("nav", ["+tick__grant(nav,motion) 1"]) and live.holder == "nav"
-    assert live.journal.rows[-1] == {"kind": "dlg-relay", "what": "grant", "domain": "nav", "res": "motion", "stamp": 5}
+    assert live.journal.rows[-1] == {"kind": "dlg-relay", "what": "grant", "domain": "nav", "res": "motion", "stamp": 5, "taken": True}
     nav.repl.counts["tick__grant(nav,motion)"] = 1                # the line taken
     nav.host.inner.on_event("go[R=p1]", ())
     assert nav.host.inner.events == ["go[R=p1]"]
     live.grant("nav", "motion", False)
     assert live.taken[-1] == ("nav", ["-tick__grant(nav,motion) 1"]) and live.holder is None
+    n = len(live.taken)
+    nav.repl.counts["tick__grant(nav,motion)"] = 0                  # its copy consumed (a cook's plate)
+    live.grant("nav", "motion", False)                             # … the revoke needs no line, and is journaled
+    assert len(live.taken) == n and live.journal.rows[-1]["what"] == "revoke" and live.journal.rows[-1]["taken"] is False
 
 
 def test_the_statuses_are_relayed_with_their_hysteresis_tokens(live):
@@ -256,3 +260,14 @@ def test_the_directors_own_beat_grants_reach_the_holders(live):
     live._grant_q = []
     live.sift([{"kind": "trace", "domain": "director", "fired": [{"kind": "clause", "produce": ["tick__revoke(nav,motion)"]}]}])
     assert live._grant_q == []
+
+
+def test_a_host_that_latches_itself(live):
+    calls = []
+    inner = live.agents.agents["nav"].host.inner
+    inner.latch, inner.unlatch = (lambda: calls.append("latch")), (lambda: calls.append("unlatch"))
+    live.holder = "task"
+    live.latch()
+    assert calls == ["latch"] and "reading" not in inner.__dict__     # its own latch, not the agent's snapshot
+    live.unlatch()
+    assert calls == ["latch", "unlatch"]
