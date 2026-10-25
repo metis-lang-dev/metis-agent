@@ -603,7 +603,8 @@ class Live:
     def wake_why(self, d):
         """Why domain D beats this tick (brief v2 §9 rules 1 and 3): `change` — a copy in its in set changed since
         its last beat: a line taken into its session (a goal, a grant, a status: another domain's output), an
-        intent or a world line waiting for its tick, its host's queue (the director's arrivals), its held replies, or its world reading differs from what its
+        intent or a world line waiting for its tick, its host's queue (the director's arrivals) or its pending()
+        input (a world's events handed in at its tick), its held replies, or its world reading differs from what its
         session holds (its own outputs are in its session already: its echo is no difference); `clock` — its
         manifest's clock period (ticks) elapsed; else `none`."""
         ag = self.agents.agents.get(d) if hasattr(self.agents, "agents") else None
@@ -617,6 +618,9 @@ class Live:
             return "change"
         inner = getattr(outer, "inner", outer)
         if getattr(inner, "queue", None):
+            return "change"
+        pending = getattr(inner, "pending", None)      # a host's input for its next tick (MiniHack: the message's events)
+        if callable(pending) and pending():
             return "change"
         sync = getattr(inner, "sync", None)
         if callable(sync) and sync(dict(ag.repl.counts)):
