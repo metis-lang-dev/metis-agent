@@ -1243,41 +1243,26 @@ class Live:
         due = []
         if self.tick_all and self.director is not None:
             self.stop_tick(False)
+        # the stop's tick is DIRECTOR-FIRST (specialist-tree step 3c, the architect's ruling on the kitchen's stop):
+        # the director beats first and alone, +tick__stop in its do-row with the reports latched from the last
+        # tick, and its outs (cancels, revokes, grants) are applied at once — the members beat this tick with their
+        # cancel or revoke in their session, so no report is ever made from a cancelled engagement. Every other
+        # tick keeps rule 2 (the Moore latch): the director's outs reach the members at the next tick.
+        first = self.tick_all and self.director is not None and self._stop == "asserted"
+        if first:
+            c = next((c for c in self.clocks if c.get("domain") == self.director.name), None)
+            if c is not None:
+                self._beat_one(c, due)
+            self._apply_outs()
         if self.tick_all:
             self.latch()
         for c in self.clocks:
-            d = c.get("domain")
-            if d in self.off and not self.tick_all:
-                continue
-            if self.tick_all:
-                self._why[d] = self.wake_why(d)
-                if self._why[d] == "none":           # nothing in its copies changed, its clock is not due: no beat
-                    continue
-            lock = self.locks.get(d)
-            if lock and not lock.acquire(blocking=False):      # the domain's consult runs: it waits (observe-only)
-                continue
-            try:
-                rs = self.serve_line({"clock": "beat", "domain": d, "n": int(c.get("n", 1))}, "clock", held=True)
-            finally:
-                if lock:
-                    lock.release()
-            if self.tick_all:
-                ag = self.agents.agents.get(d)
-                self._seen_rows[d] = (id(ag.repl), len(ag.repl.fired)) if ag is not None else None
-                self._last_beat[d] = self.beat
-                self._granted.discard(d)
-            for r in rs:
-                dom = r.get("domain")
-                if dom not in self.quiet and dom not in self.off:
-                    due.append(r)
+            if first and c.get("domain") == self.director.name:
+                continue                             # no second director beat on the stop's tick
+            self._beat_one(c, due)
         if self.tick_all:
             self.unlatch()
-            q, self._grant_q = self._grant_q, []
-            for dom, res, on in q:
-                self.grant(dom, res, on)
-            q, self._cancel_q = self._cancel_q, []
-            for dom in q:
-                self.cancel(dom)
+            self._apply_outs()
             if self.director is not None:
                 self.stop_tick(True)
         self.handle_due(self.beat, due)
@@ -1296,6 +1281,42 @@ class Live:
         again, self.ports_due = self.ports_due, set()
         for d in again:
             self.push_ports(d)
+
+    def _beat_one(self, c, due):
+        """One clock's beat in this tick (rule 1's wake under the tick), its due replies onto DUE."""
+        d = c.get("domain")
+        if d in self.off and not self.tick_all:
+            return
+        if self.tick_all:
+            self._why[d] = self.wake_why(d)
+            if self._why[d] == "none":           # nothing in its copies changed, its clock is not due: no beat
+                return
+        lock = self.locks.get(d)
+        if lock and not lock.acquire(blocking=False):      # the domain's consult runs: it waits (observe-only)
+            return
+        try:
+            rs = self.serve_line({"clock": "beat", "domain": d, "n": int(c.get("n", 1))}, "clock", held=True)
+        finally:
+            if lock:
+                lock.release()
+        if self.tick_all:
+            ag = self.agents.agents.get(d)
+            self._seen_rows[d] = (id(ag.repl), len(ag.repl.fired)) if ag is not None else None
+            self._last_beat[d] = self.beat
+            self._granted.discard(d)
+        for r in rs:
+            dom = r.get("domain")
+            if dom not in self.quiet and dom not in self.off:
+                due.append(r)
+
+    def _apply_outs(self):
+        """The director's grants, revokes and cancels queued by its beat, into the members' sessions."""
+        q, self._grant_q = self._grant_q, []
+        for dom, res, on in q:
+            self.grant(dom, res, on)
+        q, self._cancel_q = self._cancel_q, []
+        for dom in q:
+            self.cancel(dom)
 
     def handle_due(self, beat, due):
         queue_ = []
