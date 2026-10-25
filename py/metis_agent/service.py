@@ -328,6 +328,7 @@ class Live:
         self.tick_all = bool(dcfg.get("tick"))
         self._tick_rows, self._last_status, self.holder = {}, None, None
         self._seen_rows, self._last_beat, self._why = {}, {}, {}
+        self._grant_q = []                     # the director's own beats' grants, applied after the tick's beats
         if self.serve not in ("all", "active"):
             raise ValueError("v3.serve: all | active, not %r" % self.serve)
         self.loaded, self.off = list(v3["loaded"]), set()
@@ -580,9 +581,10 @@ class Live:
         return any(n > 0 and a.startswith("tick__grant(%s," % dom) for a, n in ag.repl.counts.items())
 
     def gate_commands(self):
-        """Only the resource's holder acts: a specialist that declares a resource (its manifest's shared) has its
-        host's on_event wrapped — without the protocol's tick__grant(D, R) in its session the command is held and
-        journaled (dlg-held)."""
+        """Only the resource's holder acts: a specialist that declares a resource (its manifest's shared) and
+        `gating: host` (the default) has its host's on_event wrapped — without the protocol's tick__grant(D, R) in
+        its session the command is held and journaled (dlg-held). `gating: program`: its rules read tick__grant
+        and gate themselves; the host sends its commands (step 3b: a cook that fetches and serves ungranted)."""
         from .domains import catalog
         for name, ag in self.agents.agents.items():
             try:
@@ -592,6 +594,8 @@ class Live:
             inner = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
             if "resource" not in shared.values() or not hasattr(inner, "on_event"):
                 continue
+            if (catalog().get(name).manifest.get("gating") or "host") == "program":
+                continue                     # its program reads tick__grant and gates itself: the host sends its commands
             f = inner.on_event
 
             def gated(nm, args, _f=f, _ag=ag, _d=name):
@@ -606,10 +610,18 @@ class Live:
         intent or a world line waiting for its tick, its host's queue (the director's arrivals) or its pending()
         input (a world's events handed in at its tick), its held replies, or its world reading differs from what its
         session holds (its own outputs are in its session already: its echo is no difference); `clock` — its
-        manifest's clock period (ticks) elapsed; else `none`."""
+        manifest's clock period (ticks) elapsed, or it is no composition's member (its manifest declares no
+        shared: today's every-tick clock); else `none`."""
         ag = self.agents.agents.get(d) if hasattr(self.agents, "agents") else None
         if ag is None or d not in self._last_beat:
             return "change"
+        try:
+            from .domains import catalog
+            member = bool(catalog().get(d).manifest.get("shared"))
+        except KeyError:
+            member = False
+        if not member:                       # outside any composition (no shared): clocked every tick, as today
+            return "clock"                   # (a world that moves by itself: the dog, the plant)
         seen = self._seen_rows.get(d)
         if seen is None or seen[0] != id(ag.repl) or len(ag.repl.fired) > seen[1] or getattr(ag, "held", None):
             return "change"                          # (a reloaded domain is a new session: its first beat is a change)
@@ -655,6 +667,34 @@ class Live:
                 inner.reading = own
         self._latched = {}
 
+    REPORTS = None
+
+    def report_preds(self):
+        """The protocol's report-natured preds (metis.catalog.iface's natures: tick__want, tick__release,
+        tick__active, tick__done, tick__stuck; tick__status is the agent's own relay)."""
+        if Live.REPORTS is None:
+            import yaml
+            from metis.catalog import iface
+            nature = yaml.safe_load(iface.path("protocol_domain.yaml").read_text())["nature"]
+            Live.REPORTS = frozenset(p for p, n in nature.items() if n == "report" and p != "tick__status")
+        return Live.REPORTS
+
+    def relay_reports(self, rows):
+        """Step 3b (brief §3, the inversion): the report atoms (the protocol's report natures) ANY specialist's
+        rules produced this tick, woken or not, relayed into the director's session at the boundary — latched: it
+        reads them next tick; one stamped dlg-relay row per specialist. The specialist keeps its own copy (its
+        rules do not read it back); a report goes over once, from its produce rows. Kind arrivals (results, goals)
+        stay gated by activation (sift)."""
+        reports = self.report_preds()
+        for d in sorted(rows):
+            if d == self.director.name:
+                continue
+            lines = ["+%s 1" % a for r in rows[d] for a in r.get("produce") or () if a.split("(")[0] in reports]
+            if lines:
+                self.serve_line({"take": lines, "domain": self.director.name, "refresh": False}, "take")
+                self.journal.record({"kind": "dlg-relay", "what": "report", "from": d, "domain": self.director.name,
+                                     "lines": lines, "stamp": self.beat})
+
     def statuses(self):
         """Every hierarchy domain's status this tick (spec/15 §4.4, from its fired rows and its manifest's status:
         success when it put out a success atom, failure a failure atom, running when it fired, idle when not),
@@ -689,9 +729,11 @@ class Live:
                     lines.append("+tick_s(%s) 1" % d)
             if lines:
                 self.serve_line({"take": lines, "domain": self.director.name, "refresh": False}, "take")
-                self.journal.record({"kind": "dlg-relay", "what": "report", "domain": self.director.name, "lines": lines,
+                self.journal.record({"kind": "dlg-relay", "what": "status", "domain": self.director.name, "lines": lines,
                                      "stamp": self.beat})
             self._last_status = out
+        if dag is not None:
+            self.relay_reports(rows)
         counts = dag.repl.counts if dag is not None else {}
         path = sorted(a[5:-1] for a, n in counts.items() if n > 0 and a.startswith("path("))
         self.journal.record({"kind": "dlg-status", "beat": self.beat, "statuses": out, "path": path, "holder": self.holder,
@@ -992,6 +1034,16 @@ class Live:
                 if self.director is not None:
                     if d == self.director.name and self._dir_traces is not None:
                         self._dir_traces.append(r)
+                    elif self.tick_all and d == self.director.name:
+                        # the director's own beat (its clock, on a change: a relayed report): the grants and revokes
+                        # its tree rules put out (grant_on_want, preempt, the releases) reach the holders' sessions,
+                        # as DirectorLoop.step applies those of the beats it runs
+                        for row in r.get("fired") or []:
+                            for a in row.get("produce") or []:
+                                k = a.split("(")[0]
+                                if k in ("tick__grant", "tick__revoke"):
+                                    dom, res = [x.strip() for x in a[a.index("(") + 1:-1].split(",")]
+                                    self._grant_q.append((dom, res, k == "tick__grant"))   # applied after the beats
                     # (the tick, step 2: activation is the director's — an inactive specialist beats on its copies,
                     # but only an active one's products arrive, as today, where an inactive one never beats)
                     if not (self.tick_all and d in self.off and d in self.director.facts["specialist"]):
@@ -1149,6 +1201,9 @@ class Live:
                     due.append(r)
         if self.tick_all:
             self.unlatch()
+            q, self._grant_q = self._grant_q, []
+            for dom, res, on in q:
+                self.grant(dom, res, on)
         self.handle_due(self.beat, due)
         k = len(self.director.log) if self.director is not None else 0
         self.director_step()

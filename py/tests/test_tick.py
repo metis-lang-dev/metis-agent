@@ -50,7 +50,7 @@ class Agent:
 MANIFESTS = {"nav": {"shared": {"at": "world-private", "goto": "in", "reached": "out", "motion": "resource"},
                      "status": {"success": ["reached"], "failure": []}},
              "task": {"shared": {"fetch": "in", "goto": "out", "done": "out"}, "status": {"success": ["done"], "failure": ["stuck"]}},
-             "director": {}}
+             "director": {"shared": {"tick__status": "in"}}, "dog": {}}
 
 
 @pytest.fixture
@@ -61,7 +61,7 @@ def live(monkeypatch):
     lv = object.__new__(service.Live)
     lv.journal, lv.beat, lv.tick_all = Journal(), 5, True
     lv._tick_rows, lv._last_status, lv.holder = {}, None, None
-    lv._seen_rows, lv._last_beat, lv._why = {}, {}, {}
+    lv._seen_rows, lv._last_beat, lv._why, lv._grant_q = {}, {}, {}, []
     lv.agents = types.SimpleNamespace(agents={"nav": Agent(reading={"at(lhere)": 1}, counts={"at(lhere)": 1}),
                                               "task": Agent(), "director": Agent(counts={"top(a3)": 1})})
     lv.director = types.SimpleNamespace(name="director", domains={"nav", "task"})
@@ -210,3 +210,49 @@ def test_an_inactive_specialists_products_do_not_arrive(live):
     live.off = set()
     live.sift([trace])
     assert got == ["nav"]
+
+
+def test_any_specialists_reports_are_relayed_stamped(live):
+    """Step 3b: the report atoms a specialist's rules produced this tick, woken or not, go into the director's
+    session at the boundary (one stamped dlg-relay per specialist); its other atoms (a result, a goal) do not."""
+    live.off = {"nav"}                                              # not woken
+    live.relay_reports({"nav": [{"produce": ["tick__want(nav,motion)", "reached(p1)"]}],
+                        "task": [{"produce": ["goto(p2)"]}], "director": [{"produce": ["tick__grant(nav,motion)"]}]})
+    assert live.taken == [("director", ["+tick__want(nav,motion) 1"])]
+    row = live.journal.rows[-1]
+    assert row == {"kind": "dlg-relay", "what": "report", "from": "nav", "domain": "director",
+                   "lines": ["+tick__want(nav,motion) 1"], "stamp": 5}
+
+
+def test_a_program_gated_specialist_sends_its_commands(live):
+    MANIFESTS["nav"]["gating"] = "program"
+    try:
+        live.gate_commands()
+        nav = live.agents.agents["nav"]
+        nav.host.inner.on_event("fetch_onion[]", ())                # no grant: its program gates itself
+        assert nav.host.inner.events == ["fetch_onion[]"] and not any(r["kind"] == "dlg-held" for r in live.journal.rows)
+    finally:
+        MANIFESTS["nav"].pop("gating")
+
+
+def test_a_domain_outside_any_composition_is_clocked_every_tick(live):
+    live.agents.agents["dog"] = Agent()
+    seen(live, "dog")
+    assert live.wake_why("dog") == "clock"                      # no shared: today's every-tick clock
+    seen(live, "nav")
+    assert live.wake_why("nav") == "none"                       # a member: rule 1
+
+
+def test_the_directors_own_beat_grants_reach_the_holders(live):
+    """Step 3b: a relayed report fires the tree director's request rules on its own beat (not in DirectorLoop.step):
+    their tick__grant / tick__revoke are queued by sift and applied after the tick's beats."""
+    live.director = types.SimpleNamespace(name="director", domains={"nav", "task"}, facts={"specialist": {"nav"}},
+                                          produced=lambda d, r: None)
+    live._dir_traces, live.off = None, set()
+    live.sift([{"kind": "trace", "domain": "director",
+                "fired": [{"kind": "clause", "event": "grant_on_want", "produce": ["holder(nav,motion)", "tick__grant(nav,motion)"]}]}])
+    assert live._grant_q == [("nav", "motion", True)] and live.taken == []
+    live._dir_traces = []                                           # inside DirectorLoop.step: it applies its own
+    live._grant_q = []
+    live.sift([{"kind": "trace", "domain": "director", "fired": [{"kind": "clause", "produce": ["tick__revoke(nav,motion)"]}]}])
+    assert live._grant_q == []
