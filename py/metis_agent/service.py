@@ -560,7 +560,8 @@ class Live:
             # domain is reloaded as before
             lines = deliver(dom, goal, tokens)
             if lines is not None and self.take(dom, lines, by="director"):
-                self._goal_take[dom] = self.beat           # the relay order (§14.6): a cancel waits for this goal's beat
+                if hasattr(self, "_goal_take"):             # the relay order (§14.6): a cancel waits for this goal's beat
+                    self._goal_take[dom] = getattr(self, "beat", 0)
                 return
         if host.instance(dom, goal, tokens):
             self.world_frames()             # the old instance's frames first: the reload replaces its host
@@ -1098,8 +1099,17 @@ class Live:
         for r in rs:
             if r.get("kind") == "trace":
                 d = r.get("domain")
-                if self.tick_all:
+                # a member whose cancel waits (the relay order, design §14.6 (c)): its beat runs — the goal begins, the
+                # model stays consistent, nothing withdrawn — but what it says is a cancelled engagement's (the
+                # cancel's stamp precedes this beat): its products do not reach the DirectorLoop, its reports are
+                # not relayed; journaled as dropped
+                muted = self.tick_all and d in getattr(self, "_cancel_defer", ())
+                if self.tick_all and not muted:
                     self._tick_rows.setdefault(d, []).extend(row for row in r.get("fired") or [] if row.get("kind") != "exo")
+                if muted:
+                    self.journal.record({"kind": "dlg-dropped", "domain": d, "why": "a cancelled engagement's", "stamp": self.beat,
+                                         "produce": sorted({a for row in r.get("fired") or [] if row.get("kind") != "exo"
+                                                            for a in row.get("produce") or []})})
                 if self.director is not None:
                     if d == self.director.name and self._dir_traces is not None:
                         self._dir_traces.append(r)
@@ -1117,7 +1127,7 @@ class Live:
                                     self._cancel_q.append(a[a.index("(") + 1:-1].strip())
                     # (the tick, step 2: activation is the director's — an inactive specialist beats on its copies,
                     # but only an active one's products arrive, as today, where an inactive one never beats)
-                    if not (self.tick_all and d in self.off and d in self.director.facts["specialist"]):
+                    if not muted and not (self.tick_all and d in self.off and d in self.director.facts["specialist"]):
                         self.director.produced(d, r)
                 self.journal.record(dict(r, kind="dlg-trace"))
             else:

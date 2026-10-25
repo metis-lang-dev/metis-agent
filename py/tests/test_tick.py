@@ -338,3 +338,28 @@ def test_a_cancel_waits_for_the_beat_of_a_goal_just_forwarded(live):
     live._cancel_q = ["task"]
     live._apply_outs()
     assert live.taken[-1] == ("task", ["+tick__cancel(task) 1"])
+
+
+def test_a_planner_forwarded_then_stopped_speaks_into_no_engagement(live):
+    """Design §14.6 (c): the task forwarded reached(dest) at tick 5 and stopped at 6 — its cancel waits for its beat;
+    that beat runs (the stale arrival acted on: open_dest puts out open(dest)) but is a cancelled engagement's: its
+    products do not reach the DirectorLoop, its reports are not relayed, the agent journals them dropped; the cancel
+    lands after the beat; after it the task's products arrive again."""
+    got = []
+    live.director = types.SimpleNamespace(name="director", domains={"nav", "task"}, facts={"specialist": {"nav"}},
+                                          produced=lambda d, r: got.append((d, r)))
+    live._dir_traces, live.off, live._tick_rows = [], set(), {}
+    live._goal_take["task"], live._last_beat["task"] = 5, 5
+    live._cancel_q = ["task"]
+    live._apply_outs()                                              # the stop's tick, director-first: the cancel waits
+    assert live._cancel_defer == ["task"]
+    beat = [{"kind": "trace", "domain": "task", "fired": [{"kind": "clause", "event": "open_dest", "produce": ["open(dest)", "tick__active(task)"]}]}]
+    live.sift(beat)                                                 # its beat: the goal begins, it speaks — into nothing
+    assert got == [] and "task" not in live._tick_rows
+    dropped = [r for r in live.journal.rows if r["kind"] == "dlg-dropped"]
+    assert dropped and dropped[-1]["domain"] == "task" and "open(dest)" in dropped[-1]["produce"]
+    live._last_beat["task"] = 6
+    live._apply_outs()                                              # after its beat: the cancel lands
+    assert live._cancel_defer == [] and live.taken[-1] == ("task", ["+tick__cancel(task) 1"])
+    live.sift(beat)                                                 # a live engagement again: its products arrive
+    assert [d for d, _ in got] == ["task"]
