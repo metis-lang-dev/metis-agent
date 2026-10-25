@@ -311,11 +311,11 @@ def test_tick_stop_holds_one_tick(live):
     shown = []
     live.emit_hierarchy = lambda beat=-1: shown.append(beat)
     worlds = []
-    live.serve_line = lambda msg, kind, held=False: worlds.append((msg["domain"], list(msg["world"]))) or []
+    live.serve_line = lambda msg, kind, held=False: worlds.append((msg["domain"], kind, list(msg.get("world") or msg.get("take")))) or []
     live._stop = "asserted"
     live.stop_tick(False)
     assert live._stop == "asserted" and worlds == []               # the stop's tick, before its beats: nothing yet
     live.stop_tick(True)
     assert live._stop == "beaten" and shown == [-1]
     live.stop_tick(False)
-    assert live._stop is None and worlds == [("director", ["-tick__stop"])]
+    assert live._stop is None and worlds == [("director", "take", ["-tick__stop 1"])]   # before any rule of the next beat

@@ -954,12 +954,15 @@ class Live:
 
     def stop_tick(self, after_beats):
         """tick__stop's one tick: after the stop's tick's beats the director's state on the wire (world/hierarchy:
-        its stop rules fired); at the next tick, before its beats, retracted."""
+        its stop rules fired); at the next tick, before its beats, retracted (a take: before any of its rules)."""
         if self._stop == "asserted" and after_beats:
             self._stop = "beaten"
             self.emit_hierarchy()
         elif self._stop == "beaten" and not after_beats:
-            self.serve_line({"world": ["-tick__stop"], "domain": self.director.name}, "world")
+            # a take (no rules run), not a world line: a world line lands in the director's do-row after its beat's
+            # first pass, and that pass runs on the reports relayed in the stop's tick — a member's request made
+            # before its cancel reached it met the stop a second time (the kitchen's stop, the holder re-asking)
+            self.serve_line({"take": ["-tick__stop 1"], "domain": self.director.name, "refresh": False}, "take")
             self._stop = None
 
     def emit_hierarchy(self, beat=-1):
