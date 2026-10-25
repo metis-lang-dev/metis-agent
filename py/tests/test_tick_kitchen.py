@@ -9,8 +9,14 @@ log must show (the brief's pass conditions):
 5. hysteresis (no revoke within K beats of its grant) and fairness (no cook granted twice in a row while the
    other's request waits);
 6. the outcome: 4 served, 0 onions lost, the pot never over 3, nothing impossible — on seeds 1 to 5;
-7. replay: two runs with the same seed give the same journal (clock fields aside)."""
+7. replay: two runs with the same seed give the same journal (clock fields aside);
+8. the package certificate (spec/15 §8.1): `metisc --interface` on the kitchen's composition at 0 errors, its
+   package key and each member's key and ei_key recorded and the same across the seeds' runs;
+9. F1, a member replayed alone (spec/15 §8.2): cook_a's journaled input log (its exo rows: the syncs, the grants'
+   and revokes' takes) fed through the interface stub boundary by boundary gives cook_a's fired rows exactly."""
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -28,6 +34,7 @@ MEMBERS = ["cook_a", "cook_b"]
 K = 2                               # the instance's grant hysteresis (mature_grant from a2)
 CLOCK = {"t", "ms", "wait_ms", "seq", "wall", "elapsed", "ref"}
 HANDS = ("hand_free", "held_onion", "held_dish", "held_soup")
+METISC = Path(os.environ.get("METISC") or ROOT.parent / "metis-lang" / "src" / "metisc")
 
 pytestmark = pytest.mark.skipif(not KITCHEN.is_dir(), reason="no metis-catalog with domains/kitchen_pot beside metis-agent")
 
@@ -38,6 +45,9 @@ def _sibling_catalog(monkeypatch):
 
 
 def run(tmp_path, seed=1, members=MEMBERS, ticks=200):
+    for n, m in list(sys.modules.items()):                     # a fresh kitchen per run, before the sessions read it
+        if n.startswith("kitchen_pot_host_"):                   # (the host module stays cached: empty its registry)
+            m.SHARED.clear()
     cfg = S.load_config(ROOT / "py/config.live.yaml")
     cfg["intent"] = {"grammar": "../go/grammar/e11-next.gbnf"}  # no member takes a person's intent: no turn uses it
     names = list(members) + ["pot_director"]
@@ -48,7 +58,6 @@ def run(tmp_path, seed=1, members=MEMBERS, ticks=200):
                           clocks=[{"domain": d, "n": 1} for d in names], tick=True)
     lv = S.Live(cfg, FakeLLM())
     kit = lv.agents.agents[members[0]].host.inner.kitchen         # the one kitchen, through a cook's host
-    kit.__init__(tuple(sorted(members)))                         # fresh for this run (a host module may be cached)
     ahead = []
     for _ in range(ticks):
         lv.tick()
@@ -141,7 +150,11 @@ def strip(r):
 def test_the_members_order_does_not_decide_the_pot(tmp_path):
     a_lv, a, _ = run(tmp_path / "ab", members=["cook_a", "cook_b"])
     b_lv, b, _ = run(tmp_path / "ba", members=["cook_b", "cook_a"])
-    assert [(e["cook"], e["event"]) for e in a.log] == [(e["cook"], e["event"]) for e in b.log]
+    # within one tick the two cooks' commands are concurrent (neither reads the other's before the next boundary):
+    # the config's order may interleave them differently inside the tick; each cook's own sequence and every one of
+    # the director's decisions must not change
+    per = lambda k: {c: [e["event"] for e in k.log if e["cook"] == c] for c in MEMBERS}
+    assert per(a) == per(b)
     assert [x[:2] + (sorted(x[3]),) for x in director_rows(a_lv)] == [x[:2] + (sorted(x[3]),) for x in director_rows(b_lv)]
 
 
@@ -150,3 +163,62 @@ def test_the_same_seed_replays_the_same_journal(tmp_path):
     b_lv, b, _ = run(tmp_path / "b")
     assert [strip(r) for r in a_lv.journal.recs] == [strip(r) for r in b_lv.journal.recs]
     assert a.log == b.log
+
+
+def interface():
+    """`metisc --interface` on the kitchen's composition: {"errors": n, "package": key, "members": {name: (key, ei)}}."""
+    from metis import catalog
+    env = dict(os.environ)
+    env.setdefault("METIS_HOME", str(Path(catalog.__file__).resolve().parent))    # where the iface/ packages are
+    r = subprocess.run([str(METISC), "--interface", "composition.yaml"], cwd=KITCHEN, capture_output=True, text=True,
+                       env=env, timeout=120)
+    out = {"members": {}}
+    for line in r.stdout.splitlines():
+        w = line.split()
+        if w[:1] == ["member"]:
+            out["members"][w[1]] = (w[w.index("key") + 1], w[w.index("ei") + 1])
+        elif w[:1] == ["package"]:
+            out["package"] = w[1]
+        elif w[:1] == ["result"]:
+            out["errors"] = int(w[1])
+    return out
+
+
+@pytest.mark.skipif(not METISC.is_file(), reason="no metisc built beside metis-agent (metis-lang/src/metisc)")
+def test_the_package_certificate_is_the_same_across_the_seeds(tmp_path):
+    cert = interface()
+    assert cert.get("errors") == 0 and cert.get("package"), cert
+    assert set(cert["members"]) == {"cook_a", "cook_b", "pot_director"}
+    for seed in (1, 2, 3):
+        lv, kit, ahead = run(tmp_path / str(seed), seed=seed)
+        check(lv, kit, ahead)
+        assert interface() == cert                                           # the same package ran every seed
+
+
+def do_lines(event):
+    """A journaled exo row's do-lines ('do +order 2 -held_onion' → ['+order 2', '-held_onion 1'])."""
+    return ["%s %s" % (a, n or "1") for a, n in re.findall(r"([+-][^\s]+)(?: (\d+))?", event[len("do "):])]
+
+
+def test_a_member_replays_alone_from_its_input_log(tmp_path):
+    import yaml
+    from metis.catalog import stub
+    from metis_agent.domains import catalog
+    lv, kit, ahead = run(tmp_path / "run")
+    check(lv, kit, ahead)
+    boundaries, last = [], None
+    for r in lv.journal.recs:
+        if r["kind"] == "dlg-trace" and r.get("domain") == "cook_a":
+            rows = r.get("fired") or []
+            b = {"lines": [l for row in rows if row.get("kind") == "exo" for l in do_lines(row["event"])],
+                 "expect": {"fired": [row["event"].split("[")[0] for row in rows if row.get("kind") != "exo"]}}
+            if r["beat"] == last:                      # the same own beat: a take (a grant, a revoke), no rule runs
+                b["run"] = False
+            boundaries.append(b)
+            last = r["beat"]
+    assert len(boundaries) > 4
+    case = tmp_path / "replay.yaml"
+    case.write_text(yaml.safe_dump({"case": "cook_a replayed alone from its journaled inputs", "seed": 1,
+                                    "boundaries": boundaries}, sort_keys=False))
+    res = stub.run_case(catalog().get("cook_a"), case)
+    assert res.passed, stub.render([res])
