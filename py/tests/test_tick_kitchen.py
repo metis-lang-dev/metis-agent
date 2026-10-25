@@ -13,7 +13,10 @@ log must show (the brief's pass conditions):
 8. the package certificate (spec/15 §8.1): `metisc --interface` on the kitchen's composition at 0 errors, its
    package key and each member's key and ei_key recorded and the same across the seeds' runs;
 9. F1, a member replayed alone (spec/15 §8.2): cook_a's journaled input log (its exo rows: the syncs, the grants'
-   and revokes' takes) fed through the interface stub boundary by boundary gives cook_a's fired rows exactly."""
+   and revokes' takes) fed through the interface stub boundary by boundary gives cook_a's fired rows exactly;
+10. a stop (specialist-tree step 3c, the architect's ruling (c)): both cooks engaged, the person's stop cancels both
+   (tick__cancel), revokes the holder and skips the waiter's ticket, with no reload; with the orders standing both
+   ask again with fresh tickets and the kitchen finishes; with the orders withdrawn at the stop, nobody asks."""
 import os
 import re
 import subprocess
@@ -44,7 +47,7 @@ def _sibling_catalog(monkeypatch):
     monkeypatch.setenv("METIS_CATALOG", str(CATALOG))          # the sibling checkout (conftest's default: the installed one)
 
 
-def run(tmp_path, seed=1, members=MEMBERS, ticks=200):
+def run(tmp_path, seed=1, members=MEMBERS, ticks=200, on_tick=None):
     for n, m in list(sys.modules.items()):                     # a fresh kitchen per run, before the sessions read it
         if n.startswith("kitchen_pot_host_"):                   # (the host module stays cached: empty its registry)
             m.SHARED.clear()
@@ -65,6 +68,8 @@ def run(tmp_path, seed=1, members=MEMBERS, ticks=200):
             have = sorted(a for a, n in lv.agents.agents[c].repl.counts.items() if n > 0 and a in HANDS)
             if have != [kit.hand[c]]:
                 ahead.append((lv.beat, c, have, kit.hand[c]))
+        if on_tick is not None:
+            on_tick(lv, kit)
         if sum(kit.served.values()) == 2 * len(members):
             break
     return lv, kit, ahead
@@ -134,7 +139,9 @@ def check(lv, kit, ahead):
 def test_two_cooks_one_pot(tmp_path):
     lv, kit, ahead = run(tmp_path)
     grants = check(lv, kit, ahead)
-    assert [d for _, d in grants] == ["cook_a", "cook_b", "cook_a", "cook_b"]
+    order = [d for _, d in grants]
+    assert sorted(order) == ["cook_a", "cook_a", "cook_b", "cook_b"]
+    assert all(a != b for a, b in zip(order, order[1:]))     # turn about: who goes first is the director's sampled order
 
 
 @pytest.mark.parametrize("seed", [2, 3, 4, 5])
@@ -222,3 +229,87 @@ def test_a_member_replays_alone_from_its_input_log(tmp_path):
                                     "boundaries": boundaries}, sort_keys=False))
     res = stub.run_case(catalog().get("cook_a"), case)
     assert res.passed, stub.render([res])
+
+
+def counts(lv, d):
+    return {a for a, n in lv.agents.agents[d].repl.counts.items() if n > 0}
+
+
+def fired_rows(lv, d):
+    """D's own fired rows with the Live's tick (read off the dlg-status rows, as condition 4): [(tick, rule, produce)]."""
+    out, tick = [], 1
+    for r in lv.journal.recs:
+        if r["kind"] == "dlg-status":
+            tick = r["beat"] + 1
+        elif r["kind"] == "dlg-trace" and r.get("domain") == d:
+            out += [(tick, row["event"].split("[")[0], row.get("produce") or []) for row in r.get("fired") or [] if row.get("kind") != "exo"]
+    return out
+
+
+def stopped(tmp_path, withdraw, seed=1):
+    """SEED with the person's stop at the first tick both cooks are on the director's path, one holding the pot and
+    the other queued for it; WITHDRAW: the kitchen's orders withdrawn at the stop."""
+    at = {}
+
+    def stop(lv, kit):
+        d = counts(lv, "pot_director")
+        if at or not {"path(cook_a)", "path(cook_b)"} <= d or not any(a.startswith("holder(") for a in d) \
+                or not any(a.startswith("queued(") for a in d):
+            return
+        at.update(tick=lv.beat + 1, holder=next(args(a)[0] for a in d if a.startswith("holder(")),
+                  waiter=next(args(a)[0] for a in d if a.startswith("queued(")),
+                  sessions={n: id(a.repl) for n, a in lv.agents.agents.items()})
+        lv.stop_hierarchy()
+        if withdraw:              # the kitchen's orders, and each cook's copy at once (a take: no rules run), so no
+            for c in MEMBERS:     # cook's pass on its old copy races the withdrawal (a command the kitchen refuses)
+                n = lv.agents.agents[c].repl.counts.get("order", 0)
+                if n > 0:
+                    assert lv.take(c, ["-order %d" % n], by="world")
+            kit.orders = {c: 0 for c in kit.orders}
+    lv, kit, ahead = run(tmp_path, seed=seed, ticks=80 if withdraw else 200, on_tick=stop)
+    assert at, "both cooks never engaged at once"
+    rows = fired_rows(lv, "pot_director")
+    t = next(tk for tk, rule, _ in rows if rule.startswith("stop_"))
+    stop = [(rule, prod) for tk, rule, prod in rows if tk == t and rule.startswith("stop_")]
+    # the stop's tick: both engaged cooks cancelled, the holder revoked, the waiter's ticket skipped, no reload
+    assert sorted(a for rule, p in stop if rule == "stop_cancel" for a in p if a.startswith("tick__cancel(")) == \
+        ["tick__cancel(cook_a)", "tick__cancel(cook_b)"]
+    assert [rule for tk, rule, _ in rows if tk > t and rule.startswith("stop_")] == []      # a one-tick signal
+    assert [p for rule, p in stop if rule == "stop_release"] == [["free(pot)", "tick__revoke(%s,pot)" % at["holder"]]]
+    assert [rule for rule, _ in stop].count("stop_dequeue") == 1
+    assert not any(a.startswith("holder(") for a in counts(lv, "pot_director")) or not withdraw
+    for c in MEMBERS:          # each cook took its cancel: its engagement dropped, or absorbed (done in the stop's tick)
+        assert any(rule in ("cancel", "cancel_none") and tk > t for tk, rule, _ in fired_rows(lv, c)), c
+    assert not [r for r in lv.journal.recs if r["kind"] == "dlg-domain" and str(r.get("verb", "")).startswith("reload")]
+    assert at["sessions"] == {n: id(a.repl) for n, a in lv.agents.agents.items()}
+    assert not kit.summary()["impossible"] and not ahead, (kit.summary()["impossible"], ahead[:5])   # never ahead of the world
+    return lv, kit, at, t
+
+
+def test_a_stop_cancels_both_cooks_and_the_kitchen_resumes_on_its_orders(tmp_path):
+    lv, kit, at, t = stopped(tmp_path, withdraw=False)
+    s = kit.summary()
+    assert s["served"] == {m: 2 for m in kit.served}                        # the soups finished
+    assert s["fetched"] == s["loaded"] and s["max_onions"] <= 3
+    asks = [(tk, c) for c in MEMBERS for tk, rule, _ in fired_rows(lv, c) if rule in ("ask_pot", "ask_plate") and tk > t]
+    assert {c for _, c in asks} == set(MEMBERS)                              # both asked again …
+    tickets = [args(p)[2] for tk, rule, prod in fired_rows(lv, "pot_director") if tk > t and rule == "want_queue"
+               for p in prod if p.startswith("queued(")]
+    assert len(tickets) >= 2 and len(set(tickets)) == len(tickets)          # … each with a fresh ticket
+    live = None                                                              # one holder after the stop as before it
+    for tk, rule, prod in fired_rows(lv, "pot_director"):
+        for a in prod:
+            if a.startswith("tick__grant("):
+                assert live is None, "a grant to %s at tick %d while %s holds" % (args(a)[0], tk, live)
+                live = args(a)[0]
+            elif a.startswith("tick__revoke(") and args(a)[0] == live:
+                live = None
+
+
+def test_a_stop_with_the_orders_withdrawn_halts_the_kitchen(tmp_path):
+    lv, kit, at, t = stopped(tmp_path, withdraw=True)
+    for c in MEMBERS:
+        assert not [rule for tk, rule, _ in fired_rows(lv, c) if tk > t and rule in ("ask_pot", "ask_plate")], c   # nobody asks
+        assert "calm(%s)" % c in counts(lv, c)
+    assert not [rule for tk, rule, _ in fired_rows(lv, "pot_director") if tk > t and rule in ("want_queue", "grant_on_want", "preempt")]
+    assert not any(a.startswith(("holder(", "queued(")) for a in counts(lv, "pot_director"))
