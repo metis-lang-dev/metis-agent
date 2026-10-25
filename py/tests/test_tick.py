@@ -63,6 +63,7 @@ def live(monkeypatch):
     lv._tick_rows, lv._last_status, lv.holder = {}, None, None
     lv._seen_rows, lv._last_beat, lv._why, lv._grant_q, lv._granted = {}, {}, {}, [], set()
     lv._cancel_q, lv._stop = [], None
+    lv._goal_take, lv._cancel_defer = {}, []
     lv.agents = types.SimpleNamespace(agents={"nav": Agent(reading={"at(lhere)": 1}, counts={"at(lhere)": 1}),
                                               "task": Agent(), "director": Agent(counts={"top(a3)": 1})})
     lv.director = types.SimpleNamespace(name="director", domains={"nav", "task"})
@@ -319,3 +320,21 @@ def test_tick_stop_holds_one_tick(live):
     assert live._stop == "beaten" and shown == [-1]
     live.stop_tick(False)
     assert live._stop is None and worlds == [("director", "take", ["-tick__stop 1"])]   # before any rule of the next beat
+
+
+def test_a_cancel_waits_for_the_beat_of_a_goal_just_forwarded(live):
+    """Design §14.6, the relay order: a member forwarded its goal at tick N (taken in the director's step, after N's
+    beats) and stopped at N + 1 (director-first: the stop's outs applied before the members beat) has not beaten
+    since the take — its cancel waits for that beat, so the goal begins and then cancels; a member that has beaten
+    since takes its cancel at once. Only the cancel waits."""
+    live._goal_take["nav"], live._last_beat["nav"] = 5, 5          # taken at tick 5, after nav's beat at 5
+    live._cancel_q = ["nav"]
+    live._apply_outs()
+    assert live._cancel_defer == ["nav"] and not any("tick__cancel" in str(t) for t in live.taken)
+    live._last_beat["nav"] = 6                                    # its beat at tick 6: the goal begun
+    live._apply_outs()
+    assert live._cancel_defer == [] and live.taken[-1] == ("nav", ["+tick__cancel(nav) 1"])
+    live._goal_take["task"], live._last_beat["task"] = 3, 7       # beaten since its goal: at once
+    live._cancel_q = ["task"]
+    live._apply_outs()
+    assert live.taken[-1] == ("task", ["+tick__cancel(task) 1"])

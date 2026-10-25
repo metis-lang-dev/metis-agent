@@ -331,6 +331,8 @@ class Live:
         self._grant_q = []                     # the director's own beats' grants, applied after the tick's beats
         self._granted = set()                  # members given a grant, revoke or cancel since their last beat (3c)
         self._cancel_q = []                    # the director's own beats' cancels, applied after the tick's beats
+        self._goal_take = {}                   # member → the tick its last goal was taken in (the director's forward)
+        self._cancel_defer = []                # cancels held for a member that has not beaten since its goal's take
         self._stop = None                      # tick__stop's one tick: asserted, beaten, retracted (3c)
         if self.serve not in ("all", "active"):
             raise ValueError("v3.serve: all | active, not %r" % self.serve)
@@ -558,6 +560,7 @@ class Live:
             # domain is reloaded as before
             lines = deliver(dom, goal, tokens)
             if lines is not None and self.take(dom, lines, by="director"):
+                self._goal_take[dom] = self.beat           # the relay order (§14.6): a cancel waits for this goal's beat
                 return
         if host.instance(dom, goal, tokens):
             self.world_frames()             # the old instance's frames first: the reload replaces its host
@@ -1314,9 +1317,16 @@ class Live:
         q, self._grant_q = self._grant_q, []
         for dom, res, on in q:
             self.grant(dom, res, on)
-        q, self._cancel_q = self._cancel_q, []
+        # the relay order (design §14.6, the stated rule): pending in-copies apply in stamp order, and a cancel is never
+        # coalesced into one beat with a goal forwarded at an earlier stamp — a member that has not beaten since its
+        # goal's take gets its cancel after that beat (the goal begins on its beat, cancels on the next). Agent
+        # bookkeeping only: no member state read, nothing withdrawn; only a cancel waits
+        q, self._cancel_q, self._cancel_defer = self._cancel_defer + self._cancel_q, [], []
         for dom in q:
-            self.cancel(dom)
+            if self._last_beat.get(dom, -1) <= self._goal_take.get(dom, -1):
+                self._cancel_defer.append(dom)
+            else:
+                self.cancel(dom)
 
     def handle_due(self, beat, due):
         queue_ = []
