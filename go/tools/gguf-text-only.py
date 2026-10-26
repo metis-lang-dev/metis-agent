@@ -9,7 +9,8 @@ gemma3.rope.freq_base — ollama's own runner fills them in, stock
 llama.cpp refuses to load. HARNESS.md §3 allows "copy it next to the other
 device-local models"; this is that copy, text-only.
 
-    PYTHONPATH=<llama.cpp>/gguf-py tools/gguf-text-only.py \
+    pip install <llama.cpp>/gguf-py      # once, into the python that runs it (the submodule's gguf)
+    python tools/gguf-text-only.py \
         ~/.ollama/models/blobs/sha256-aeda... models/gemma3-4b-it-Q4_K_M.gguf
 
 Also trims the tokenizer arrays to the embedding's row count (ollama lists

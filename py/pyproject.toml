@@ -1,0 +1,20 @@
+# metis-agent's python (py/: metis_agent, the specialist and the domain agent) as an installable
+# distribution (metis-packages s-65778b98 step 3), so its consumers import it from their python
+# instead of putting py/ on PYTHONPATH: py/.venv (README "Setup") and the alfworld world's venv
+# (metis-worlds alfworld/setup.sh, for demo.sh). Installed EDITABLE: `pip install -e py`. Its
+# dependencies are pinned in requirements.txt (llama-cpp-python builds with CUDA flags), so none are
+# declared here: `pip install --no-deps -e py` where only metis_agent itself is wanted.
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "metis-agent"
+version = "0.1.0"
+description = "The metis domain agent: the specialist, the domain agents, the service"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["metis_agent*"]

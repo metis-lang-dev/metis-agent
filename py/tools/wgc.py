@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "py"))
 from metis_agent.loop import Specialist  # noqa: E402
-from metis_loop_sdk import catalog  # noqa: E402
+from metis import catalog  # noqa: E402
 
 WGC = catalog.root() / "domains/wgc/wgc.llp"
 

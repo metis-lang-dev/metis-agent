@@ -23,17 +23,30 @@ The kitchen has no intents (its orders come from the env): it reports
 orders arriving (event), an order done (quiescence), and the first cook's
 surprise when the second cook loads its pot; its REPL answers are final.
 
-    python3 tools/e13-dialog.py      # from go/ → grammar/e13-dialog.jsonl
+    ../py/.venv/bin/python tools/e13-dialog.py      # from go/ → grammar/e13-dialog.jsonl (metispy, metis-catalog installed)
 """
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 
+from metis import catalog
+
 GO = Path(__file__).resolve().parent.parent
-CATALOG = GO.parent.parent / "metis-catalog/domains/dog"
-sys.path.insert(0, str(CATALOG))
-import dog_host  # noqa: E402
+
+
+def _host(name):
+    """The domain's host module, the file its manifest names (metis.catalog: $METIS_CATALOG, else the
+    installed metis-catalog's own catalog), loaded from that file as the kernel loads a host plugin."""
+    path, _ = catalog.get(name, os.environ.get("METIS_CATALOG") or catalog.installed()["catalog"]).host
+    spec = importlib.util.spec_from_file_location("%s_host" % name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+dog_host = _host("dog")
 
 OUT = "grammar/e13-dialog.jsonl"
 PROMPT = "grammar/e13-prompt-t.txt"

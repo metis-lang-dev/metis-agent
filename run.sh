@@ -79,9 +79,9 @@ LIB_DIR="${LIB_DIR:-$(cd "$ROOT/.." && pwd)/fsttm-web/lib}"
 PY="$ROOT/py/.venv/bin/python"
 [ -x "$PY" ] || { echo "no py/.venv — the domain agents need it (cd py && python3 -m venv .venv && .venv/bin/pip install -e .)" >&2; exit 1; }
 
-# the catalog: the loop SDK (metis-loop/sdk: the one access to metis-catalog, the
-# CATALOG widget) — both backends read it (Go through its CLI)
-if ! "$PY" -c "import metis_loop_sdk.catalog as c; c.loader()" 2>/dev/null; then
+# the catalog: metispy's metis.catalog over the installed metis-catalog, and the loop SDK
+# (metis-loop/sdk: the CATALOG widget) — both backends read them (Go through their CLIs)
+if ! "$PY" -c "import metis.catalog as c, metis_loop_sdk.web; c.loader()" 2>/dev/null; then
   SDK="$(cd "$ROOT/.." && pwd)/metis-loop/sdk"
   [ -f "$SDK/pyproject.toml" ] || { echo "no loop SDK at $SDK (a metis-loop checkout beside this one)" >&2; exit 1; }
   echo "installing the catalog's loader and the loop SDK into py/.venv …"
@@ -101,7 +101,7 @@ if [ "$BACKEND" = go ]; then
     mv "$J" "$RUN/session-$(date -r "$J" +%Y%m%d-%H%M%S).jsonl"
   fi
   cd "$GO"
-  WIDGET_DIR="$("$PY" -c 'from metis_loop_sdk.catalog import WIDGET_DIR; print(WIDGET_DIR)')"   # the loop SDK's CATALOG widget
+  WIDGET_DIR="$("$PY" -c 'from metis_loop_sdk.web import WIDGET_DIR; print(WIDGET_DIR)')"   # the loop SDK's CATALOG widget
   nohup "$BIN" -config "$CONFIG" -loop v3 -no-domains -wait-viewer -addr "$ADDR" -ui-dir "$UI_DIR" -lib-dir "$LIB_DIR" -widget-dir "$WIDGET_DIR" >"$LOG" 2>&1 &
 else
   "$PY" -c "import aiohttp, llama_cpp" 2>/dev/null || {

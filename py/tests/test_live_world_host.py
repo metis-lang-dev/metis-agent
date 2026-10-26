@@ -68,7 +68,7 @@ def test_the_person_wins_the_demo_through_the_page_from_the_host(tmp_path):
                             sys.executable, "-m", "metis_agent.service", "--config", str(root / ".run" / "config.yaml"),
                             "--no-wait-viewer", "--ui-dir", str(web), "--lib-dir", str(web / "vendor"), "--addr", "127.0.0.1:%d" % port],
                            cwd=AGENT / "py", stdout=log, stderr=subprocess.STDOUT,
-                           env=dict(env, METIS_CATALOG=str(root), METIS_ALF_PY=ALF_PY, PYTHONPATH=str(AGENT / "py")))
+                           env=dict(env, METIS_CATALOG=str(root), METIS_ALF_PY=ALF_PY))
     prof, chrome = tempfile.mkdtemp(prefix="ma-host-chrome-"), None
 
     async def run():

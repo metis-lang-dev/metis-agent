@@ -4,7 +4,7 @@
 three arms — so every question's evidence is checked against what each
 arm would insert.
 
-    PYTHONPATH=../../metispy python3 tools/e7-corpus.py [-o grammar]
+    ../py/.venv/bin/python tools/e7-corpus.py [-o grammar]      # a python with metispy installed
       -> grammar/e7-pair.jsonl     the pair run: both signal streams on one
                                     clock (t), mirror rows at every ask point,
                                     the env's ground truth

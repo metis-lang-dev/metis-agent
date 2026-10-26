@@ -87,7 +87,7 @@ def main():
     if a.mapper:
         return mapper_parity(a.ref, a.out_dir)
 
-    from metis_loop_sdk import catalog
+    from metis import catalog
     dog = catalog.intents("dog")          # the dog's generated intent material, at its fixed names
     persona = dog["prompt"].read_text() + dog["examples"]["gemma4"].read_text()
     gbnf = dog["grammar"].read_text()

@@ -25,6 +25,7 @@ CUDACXX=/usr/local/cuda/bin/nvcc CMAKE_ARGS="-DGGML_CUDA=on -DCMAKE_CUDA_ARCHITE
 py/.venv/bin/pip install -e ../metispy pytest
 py/.venv/bin/pip install -e ../metis-catalog -e ../metis-loop/sdk   # the loop SDK: the claude seat's process
 py/.venv/bin/pip install -e ../metis-worlds/libs/semantic-world   # the semantic map the worlds' hosts run in this process
+py/.venv/bin/pip install --no-deps -e py      # metis_agent itself (py/pyproject.toml): no PYTHONPATH anywhere
 ```
 
 `py/requirements.txt` pins what this venv has (CI installs it, with

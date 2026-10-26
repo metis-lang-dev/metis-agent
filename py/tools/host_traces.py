@@ -25,10 +25,10 @@ import json
 import sys
 from pathlib import Path
 
-from metis_loop_sdk import catalog
+from metis import catalog
 
 ROOT = Path(__file__).resolve().parents[2]
-CATALOG = catalog.root()                     # the loop SDK's root: $METIS_CATALOG, else the sibling checkout
+CATALOG = catalog.root()                     # metis.catalog's root: $METIS_CATALOG, else the cwd
 
 
 class Recorder:

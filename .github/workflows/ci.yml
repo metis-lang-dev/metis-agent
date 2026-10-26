@@ -75,8 +75,9 @@ jobs:
         run: |
           python -m venv metis-agent/py/.venv
           metis-agent/py/.venv/bin/pip install -q -e ./metispy -e ./metis-catalog PyYAML==6.0.3 \
-            "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@sdk-v0.1.6#subdirectory=sdk"
-          cd metis-agent/py && .venv/bin/python -c "import metis.kernel.artifact, metis_agent.domain_agent"
+            "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@sdk-v0.1.14#subdirectory=sdk"
+          metis-agent/py/.venv/bin/pip install -q --no-deps -e ./metis-agent/py
+          metis-agent/py/.venv/bin/python -c "import metis.kernel.artifact, metis_agent.domain_agent, metis_loop_sdk.web"
       - name: Checkout metis-lang at the pin (public; the runtime internal/rt binds)
         uses: actions/checkout@v4
         with:
@@ -161,13 +162,12 @@ jobs:
         run: |
           pip install -r metis-agent/py/requirements.txt
           pip install -e ./metispy
-          pip install -e ./metis-catalog     # the domains' loader, which the loop SDK imports
-          # the loop SDK at its tag (brief/repo-alignment.md §2): the one access to the
-          # catalog, the CATALOG widget, the claude seat's process; after the two above,
-          # which it names as dependencies
-          # sdk-v0.1.6: the SDK the domain agent is tested against locally (metis-loop's sdk/ at
-          # its head); v0.1.0 predates take, edit, the notch and an RDDL package's program
-          pip install "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@sdk-v0.1.6#subdirectory=sdk"
+          pip install -e ./metis-catalog     # the domains metis.catalog reads
+          # the loop SDK at its git tag (it is not a PyPI package): the CATALOG widget
+          # (metis_loop_sdk.web) and the model adapters; the catalog itself is metispy's
+          # metis.catalog. sdk-v0.1.14: the shims (metis_loop_sdk.catalog, .gate) are gone
+          pip install "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@sdk-v0.1.14#subdirectory=sdk"
+          pip install --no-deps -e ./metis-agent/py    # metis_agent itself (py/pyproject.toml)
       - name: One llama.cpp for both stacks (the submodule = llama_cpp_python's vendored commit)
         run: metis-agent/third_party/check-pin.sh python
       # nav's host steps the IPPC gym (metis-catalog tools/rddl_gym.py) in an interpreter of its

@@ -6,9 +6,9 @@ contradicting statement for the conflict probe.
 
 The facts are taken from real runs of the metispy runtime (the five
 fixtures, oracle triage, mirror reads at quiescence) — the raw lines are
-what `watch` streams, byte for byte. Needs metispy on PYTHONPATH:
+what `watch` streams, byte for byte. Needs a python with metispy installed:
 
-    PYTHONPATH=../../metispy python3 tools/splice-corpus.py > grammar/splice-corpus.jsonl
+    ../py/.venv/bin/python tools/splice-corpus.py > grammar/splice-corpus.jsonl
 """
 import io
 import json
