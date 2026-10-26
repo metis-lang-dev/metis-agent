@@ -54,6 +54,14 @@ commit (`METIS_LANG_COMMIT`, the runtime build cached on it), and runs
 vet, the build and the tests against both; the py job runs
 `third_party/check-pin.sh` against the installed binding.
 
+**`internal/dagent/testdata` is py's**: the streams py's own domain agent
+wrote on the catalog, which Go's must equal. A catalog change that moves
+what py says (a line number in a read, a reply) needs them written again on
+that catalog: `py/.venv/bin/python py/tools/dagent_fixtures.py`, then a
+look at every diff line before the commit. The mapper's intents include
+the recorded dispatches in `go/results/e13` (not in git): regenerate
+where they are.
+
 The model is the GGUF ollama holds for its tag (`~/.ollama/models/…`) or
 any GGUF; `llm.template: auto` takes the chat template from the GGUF,
 `gemma4` is rendered by the adapter.

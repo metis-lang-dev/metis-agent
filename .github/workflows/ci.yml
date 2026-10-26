@@ -121,7 +121,19 @@ jobs:
         run: |
           rc=0
           ./build.sh test -count=1 -v ./... > go-test.log 2>&1 || rc=$?
-          grep -E '^(ok|FAIL|--- FAIL|panic)|^\s+\S+_test\.go:[0-9]+:' go-test.log || true
+          # every package's line, and a failing test's WHOLE block (its === RUN to its --- FAIL: a
+          # recording's diff spans lines, and the first line alone hid it for two days); a panic to its
+          # package's FAIL; a passing or skipped test's output is dropped
+          awk '
+            /^=== (RUN|CONT|PAUSE|NAME) / { cur = $3; buf[cur] = buf[cur] $0 "\n"; next }
+            match($0, /^ *--- (PASS|SKIP): /) { split(substr($0, RLENGTH + 1), w, " "); delete buf[w[1]]; next }
+            match($0, /^ *--- FAIL: /) { split(substr($0, RLENGTH + 1), w, " "); printf "%s", buf[w[1]]; print; delete buf[w[1]]; next }
+            /^\? / { cur = ""; next }
+            /^(ok|FAIL) / || /^FAIL$/ { print; cur = ""; inpanic = 0; next }
+            /^panic/ && !inpanic { printf "%s", buf[cur]; inpanic = 1 }
+            inpanic || cur == "" { print; next }
+            { buf[cur] = buf[cur] $0 "\n" }
+          ' go-test.log || true
           {
             echo "### go test: $(grep -c -- '--- PASS' go-test.log) passed, $(grep -c -- '--- SKIP' go-test.log) skipped, $(grep -c -- '--- FAIL' go-test.log) failed"
             echo '```'
