@@ -22,10 +22,17 @@ and the turn goes on as without it. 0 = thinking off (the default).
 import time
 from dataclasses import dataclass, field
 
-import llama_cpp as L
-
 from . import gemma4
-from .llm import LLM
+
+try:
+    import llama_cpp as L
+    from .llm import LLM
+except ModuleNotFoundError as e:
+    # no binding (the Go job's venv: no Go test loads weights through py): Call and Text still
+    # import, so the template consult and the loop's shapes work; a Gemma4Seat needs the binding
+    if e.name != "llama_cpp":
+        raise
+    L = LLM = None
 
 
 @dataclass
@@ -68,6 +75,8 @@ class Gemma4Seat:
 
     @classmethod
     def load(cls, model_path, n_ctx=8192, **kw):
+        if LLM is None:
+            raise ModuleNotFoundError("a Gemma4Seat needs llama_cpp_python (py/requirements.txt)", name="llama_cpp")
         return cls(LLM(model_path, n_ctx=n_ctx, **kw))
 
     def tokens(self):
