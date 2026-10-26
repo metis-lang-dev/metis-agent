@@ -16,6 +16,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 const spinLLP = `catalog spin 1.
@@ -34,13 +36,27 @@ func TestABeatThatNeverSettlesStopsAtItsCapAsPys(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "extensions", "spin.llp"), []byte(spinLLP), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	// the cap from the manifest's clock: {steps}
+	// the cap from the manifest's clock: {steps}, set through the mapping (whatever else the clock
+	// holds: the plant's period, specialist-tree step 3a) as py's test does; a manifest without a
+	// clock fails here, not as a cap that never applied
 	mf := filepath.Join(dir, "domain.yaml")
 	b, err := os.ReadFile(mf)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(mf, []byte(strings.Replace(string(b), "clock: {beats: 1}", "clock: {beats: 1, steps: 40}", 1)), 0o644); err != nil {
+	var m map[string]any
+	if err := yaml.Unmarshal(b, &m); err != nil {
+		t.Fatal(err)
+	}
+	clock, ok := m["clock"].(map[string]any)
+	if !ok {
+		t.Fatalf("the plant's manifest has no clock mapping (clock: %v): the cap cannot be set", m["clock"])
+	}
+	clock["steps"] = 40
+	if b, err = yaml.Marshal(m); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mf, b, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	ins := []string{`{"clock": "beat", "domain": "plant", "n": 1}`, `{"clock": "beat", "domain": "plant", "n": 1}`}
