@@ -23,11 +23,11 @@ The kitchen has no intents (its orders come from the env): it reports
 orders arriving (event), an order done (quiescence), and the first cook's
 surprise when the second cook loads its pot; its REPL answers are final.
 
-    ../py/.venv/bin/python tools/e13-dialog.py      # from go/ → grammar/e13-dialog.jsonl (metispy, metis-catalog installed)
+    cd <catalog> && <metis-agent>/py/.venv/bin/python <metis-agent>/go/tools/e13-dialog.py
+                                     # → go/grammar/e13-dialog.jsonl; the dog is the catalog's (the cwd's, else METIS_HOME's)
 """
 import importlib.util
 import json
-import os
 import sys
 from pathlib import Path
 
@@ -37,9 +37,10 @@ GO = Path(__file__).resolve().parent.parent
 
 
 def _host(name):
-    """The domain's host module, the file its manifest names (metis.catalog: $METIS_CATALOG, else the
-    installed metis-catalog's own catalog), loaded from that file as the kernel loads a host plugin."""
-    path, _ = catalog.get(name, os.environ.get("METIS_CATALOG") or catalog.installed()["catalog"]).host
+    """The domain's host module: metis.catalog.get(name) in the catalog this runs in ($METIS_CATALOG,
+    else the cwd; a package it lacks, METIS_HOME's), the file its manifest names, loaded as metispy
+    loads a host plugin (metis.fw.plugin: a file.py:factory spec, by its file)."""
+    path, _ = catalog.get(name).host
     spec = importlib.util.spec_from_file_location("%s_host" % name, path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)

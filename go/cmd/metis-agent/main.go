@@ -18,6 +18,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -111,6 +112,12 @@ type config struct {
 	} `yaml:"catalog"`
 }
 
+// pkgFlag is -pkg NAME, repeatable.
+type pkgFlag []string
+
+func (p *pkgFlag) String() string     { return strings.Join(*p, ",") }
+func (p *pkgFlag) Set(v string) error { *p = append(*p, v); return nil }
+
 var defaultStopWords = []string{"stop", "halt", "freeze", "health"}
 
 func main() {
@@ -125,6 +132,8 @@ func main() {
 	printGrammar := flag.Bool("print-grammar", false, "-loop v3: print the person turn's intent grammar as built (one intent domain's own, or several's union) and exit")
 	modelF := flag.String("v3-model", "", "-loop v3: the model shape — two (the default, v3.model: a context per role) | one (every role on one context, its KV swapped per turn)")
 	kernelF := flag.String("kernel", "", "-loop v3: who serves the domain agents — py (the default, v3.kernel) | cgo (the Go domain agent in-process over the C++ runtime)")
+	var pkgs pkgFlag
+	flag.Var(&pkgs, "pkg", "-loop v3: load the package domains/NAME at the start (the catalog root's, else METIS_HOME's: python -m metis.catalog find); repeatable; the widget lists and loads the rest")
 	waitViewer := flag.Bool("wait-viewer", false, "attach the domains (v2), start the domain agents' clock (v3) when the first page connects (it hears the run from its start)")
 	flag.Parse()
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
@@ -136,6 +145,28 @@ func main() {
 	var cfg config
 	if err := yaml.Unmarshal(raw, &cfg); err != nil {
 		log.Fatal(err)
+	}
+	// the catalog: $METIS_CATALOG (run.sh: the directory it was started in), else the config's
+	// catalog.root, else the cwd — metis.catalog.root()'s rule
+	cfg.Catalog.Root = catalog.Root(cfg.Catalog.Root)
+	var pkgDomains []string // -pkg NAME…: resolved before anything loads (a miss names both places)
+	for _, n := range pkgs {
+		if cfg.Catalog.Python == "" {
+			log.Fatalf("[catalog] -pkg %s: set catalog.python (an interpreter with metispy: python -m metis.catalog find)", n)
+		}
+		p, err := catalog.Find(cfg.Catalog.Python, cfg.Catalog.Root, n)
+		if err != nil {
+			log.Fatalf("[catalog] %v", err)
+		}
+		if len(p.Domains) == 0 {
+			log.Fatalf("[catalog] -pkg %s: no domain manifest in %s", n, p.Dir)
+		}
+		log.Printf("[catalog] -pkg %s: %s (%s): %s", n, p.Dir, p.From, strings.Join(p.Domains, ", "))
+		for _, d := range p.Domains {
+			if !slices.Contains(pkgDomains, d) {
+				pkgDomains = append(pkgDomains, d)
+			}
+		}
 	}
 	var manifests map[string]catalog.Manifest
 	var v3Intents []agent.IntentDomain
@@ -274,7 +305,7 @@ func main() {
 					log.Printf("[catalog] the console's list: %v (the served domains only)", err)
 				}
 				for _, e := range es { // a partner (kitchen_shared) its own row, as py's
-					v3.Listed = append(v3.Listed, agent.Listed{Name: e.Name, Kind: e.Kind, Display: e.Display, Line: e.Line, Has: e.Has, PartnerOf: e.PartnerOf})
+					v3.Listed = append(v3.Listed, agent.Listed{Name: e.Name, Kind: e.Kind, Display: e.Display, Line: e.Line, Has: e.Has, PartnerOf: e.PartnerOf, Shared: e.Shared})
 				}
 			}
 		}
@@ -371,6 +402,12 @@ func main() {
 		log.Fatal(err)
 	}
 	defer a.Close()
+	for _, d := range pkgDomains { // as the widget's pick: activate installs a domain no process serves
+		if err := a.V3Pkg(d); err != nil {
+			log.Fatalf("[catalog] -pkg: %s: %v", d, err)
+		}
+		log.Printf("[catalog] -pkg: %s loaded", d)
+	}
 	go a.Run(ctx)
 	go func() {
 		for n := range a.Narration() {

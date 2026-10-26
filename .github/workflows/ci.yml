@@ -75,7 +75,7 @@ jobs:
         run: |
           python -m venv metis-agent/py/.venv
           metis-agent/py/.venv/bin/pip install -q -e ./metispy -e ./metis-catalog PyYAML==6.0.3 \
-            "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@sdk-v0.1.14#subdirectory=sdk"
+            "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@metis-packages-3#subdirectory=sdk"
           metis-agent/py/.venv/bin/pip install -q --no-deps -e ./metis-agent/py
           metis-agent/py/.venv/bin/python -c "import metis.kernel.artifact, metis_agent.domain_agent, metis_loop_sdk.web"
       - name: Checkout metis-lang at the pin (public; the runtime internal/rt binds)
@@ -166,7 +166,8 @@ jobs:
           # the loop SDK at its git tag (it is not a PyPI package): the CATALOG widget
           # (metis_loop_sdk.web) and the model adapters; the catalog itself is metispy's
           # metis.catalog. sdk-v0.1.14: the shims (metis_loop_sdk.catalog, .gate) are gone
-          pip install "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@sdk-v0.1.14#subdirectory=sdk"
+          # (on the branch: metis-loop's metis-packages-3 until the tag; the merge flips it to sdk-v0.1.14)
+          pip install "metis-loop-sdk @ git+https://github.com/metis-lang-dev/metis-loop@metis-packages-3#subdirectory=sdk"
           pip install --no-deps -e ./metis-agent/py    # metis_agent itself (py/pyproject.toml)
       - name: One llama.cpp for both stacks (the submodule = llama_cpp_python's vendored commit)
         run: metis-agent/third_party/check-pin.sh python

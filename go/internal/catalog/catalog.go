@@ -60,7 +60,8 @@ type Manifest struct {
 	Records   string   `yaml:"records"`
 	Reload    string   `yaml:"reload"` // propose (default) | auto: the agent's reload policy when its files change (human-loop)
 
-	Dir string `yaml:"-"` // the manifest's directory
+	Dir      string `yaml:"-"` // the manifest's directory
+	FromHome bool   `yaml:"-"` // from $METIS_HOME/domains: the root has no package of the name
 }
 
 // Path is a manifest path made absolute ("" stays "").
@@ -93,9 +94,12 @@ func (m Manifest) Extensions() []string {
 	return out
 }
 
-// Keys are the manifest's keys (metis_catalog KEYS); any other is refused.
+// Keys are the manifest's keys (metispy's metis.catalog.manifests KEYS); any other is refused.
+// The interface's (spec/15: shared, status, world, resources, gating), the instrument's (spec/16:
+// beliefs, levels, evaluate) and actor are metispy's to check: Go reads them past.
 var Keys = []string{"program", "extensions", "serves", "host", "intent", "clock", "reload", "records",
-	"display", "line", "voice", "agent", "pair", "partner_of", "notch"}
+	"display", "line", "voice", "agent", "actor", "pair", "partner_of", "notch",
+	"shared", "status", "world", "resources", "gating", "beliefs", "levels", "evaluate"}
 
 // CheckManifest reads one domain.yaml by the loader's rules (py
 // check_manifest): a mapping of the known keys only, intent {spec} only,
@@ -196,6 +200,80 @@ func contains(xs []string, s string) bool {
 // Scan reads every domain package under root/domains (a domain.yaml in its
 // directory), by name — the directory's; a name twice is an error.
 func Scan(root string) (map[string]Manifest, error) {
+	out, err := scanDir(root)
+	if err != nil {
+		return nil, err
+	}
+	// a package the root lacks resolves from METIS_HOME (metispy's include rule, metis.catalog
+	// find_package: the root first, then home); unset, metispy's own catalog has no domains/
+	home := os.Getenv("METIS_HOME")
+	if home == "" || sameDir(home, root) {
+		return out, nil
+	}
+	shared, err := scanDir(home)
+	if err != nil {
+		return nil, err
+	}
+	for n, m := range shared {
+		if _, own := out[n]; !own {
+			m.FromHome = true
+			out[n] = m
+		}
+	}
+	return out, nil
+}
+
+func sameDir(a, b string) bool {
+	x, err1 := filepath.Abs(a)
+	y, err2 := filepath.Abs(b)
+	return err1 == nil && err2 == nil && filepath.Clean(x) == filepath.Clean(y)
+}
+
+// Root is the catalog a backend serves: $METIS_CATALOG, else the configured
+// root (relative to the cwd), else the cwd — metis.catalog.root()'s rule, so
+// `cd <catalog> && metis-agent` serves that directory.
+func Root(configured string) string {
+	r := os.Getenv("METIS_CATALOG")
+	if r == "" {
+		r = configured
+	}
+	if r == "" {
+		r = "."
+	}
+	if abs, err := filepath.Abs(r); err == nil {
+		return abs
+	}
+	return r
+}
+
+// Package is metis.catalog find NAME: the package's directory (the root's
+// domains/NAME, else METIS_HOME's), where it came from (root | home) and its
+// domains — metispy's one package rule, through its CLI.
+type Package struct {
+	Name    string   `json:"name"`
+	Dir     string   `json:"dir"`
+	From    string   `json:"from"`
+	Domains []string `json:"domains"`
+	Error   string   `json:"error"`
+}
+
+// Find resolves -pkg NAME through python -m metis.catalog find (a miss names both places).
+func Find(python, root, name string) (Package, error) {
+	var p Package
+	b, err := py(python, "metis.catalog", root, "find", name, "--json")
+	if len(b) > 0 && json.Unmarshal(b, &p) == nil && p.Error != "" {
+		return p, fmt.Errorf("-pkg %s: %s", name, p.Error)
+	}
+	if err != nil {
+		return p, fmt.Errorf("-pkg %s: %v", name, err)
+	}
+	if err := json.Unmarshal(b, &p); err != nil {
+		return p, fmt.Errorf("-pkg %s: %v", name, err)
+	}
+	return p, nil
+}
+
+func scanDir(root string) (map[string]Manifest, error) {
 	out := map[string]Manifest{}
 	base := filepath.Join(root, "domains")
 	if _, err := os.Stat(base); err != nil {
@@ -237,6 +315,7 @@ type Entry struct {
 	Has     json.RawMessage `json:"has"`
 
 	PartnerOf string `json:"partner_of,omitempty"`
+	Shared    bool   `json:"shared,omitempty"` // METIS_HOME's package (metis.catalog listing)
 }
 
 // py runs a module's CLI on python (an interpreter with metispy and the loop
@@ -259,7 +338,7 @@ func py(python, module, root string, args ...string) ([]byte, error) {
 	b, err := cmd.Output()
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("%s %s: %v: %s", module, args[0], err, ee.Stderr)
+			return b, fmt.Errorf("%s %s: %v: %s", module, args[0], err, strings.TrimSpace(string(ee.Stderr)+" "+string(b)))
 		}
 		return nil, fmt.Errorf("%s %s: %w", module, args[0], err)
 	}

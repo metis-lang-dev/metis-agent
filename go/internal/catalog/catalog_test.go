@@ -92,7 +92,7 @@ func TestThePackageShape(t *testing.T) {
 	}
 	write("intent/toy.gbnf", "root ::= \"x\"")
 	for _, c := range []struct{ yaml, err string }{
-		{"name: toy\nprogram: toy.llp\n", "unknown key name (the package's keys: program, extensions, serves, host, intent, clock, reload, records, display, line, voice, agent, pair, partner_of, notch)"},
+		{"name: toy\nprogram: toy.llp\n", "unknown key name (the package's keys: program, extensions, serves, host, intent, clock, reload, records, display, line, voice, agent, actor, pair, partner_of, notch, shared, status, world, resources, gating, beliefs, levels, evaluate)"},
 		{"intent: {spec: intent.yaml, grammar: g.gbnf, prompt: p.txt}\n", "unknown intent keys grammar, prompt (intent is {spec}; the generated files sit at fixed names in intent/)"},
 		{"intent: intent.yaml\n", "intent is {spec: intent.yaml}"},
 		{"pair: kitchen\n", "pair is a list"},
@@ -130,5 +130,89 @@ func TestWidgetDirIsTheSDKs(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(d, f)); err != nil {
 			t.Fatalf("widget %s: %v", f, err)
 		}
+	}
+}
+
+func writePkg(t *testing.T, base, name string) {
+	t.Helper()
+	d := filepath.Join(base, "domains", name)
+	if err := os.MkdirAll(d, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	m := "program: " + name + ".llp\ndisplay: the " + name + "\nline: the " + name + "\n"
+	if err := os.WriteFile(filepath.Join(d, "domain.yaml"), []byte(m), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(d, name+".llp"), []byte("catalog "+name+" 1.\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// A package the root lacks comes from METIS_HOME (metispy's include rule:
+// the root first, then home); a name in both is the root's.
+func TestScanTakesTheRootThenMetisHome(t *testing.T) {
+	r, h := t.TempDir(), t.TempDir()
+	writePkg(t, r, "lamp")
+	writePkg(t, h, "lamp")
+	writePkg(t, h, "bell")
+	t.Setenv("METIS_HOME", "")
+	ms, err := Scan(r)
+	if err != nil || len(ms) != 1 {
+		t.Fatalf("no METIS_HOME: %v %v", ms, err)
+	}
+	t.Setenv("METIS_HOME", h)
+	if ms, err = Scan(r); err != nil {
+		t.Fatal(err)
+	}
+	if ms["lamp"].FromHome || ms["lamp"].Dir != filepath.Join(r, "domains", "lamp") {
+		t.Errorf("lamp: %+v, want the root's", ms["lamp"])
+	}
+	if !ms["bell"].FromHome || ms["bell"].Dir != filepath.Join(h, "domains", "bell") {
+		t.Errorf("bell: %+v, want METIS_HOME's, shared", ms["bell"])
+	}
+	if ms, _ = Scan(h); ms["bell"].FromHome { // the root is METIS_HOME: nothing is shared
+		t.Errorf("home as the root: %+v", ms["bell"])
+	}
+}
+
+// The catalog is $METIS_CATALOG, else the configured root, else the cwd.
+func TestRootIsTheEnvElseTheConfigElseTheCwd(t *testing.T) {
+	d := t.TempDir()
+	t.Setenv("METIS_CATALOG", d)
+	if got := Root("elsewhere"); got != d {
+		t.Errorf("env: %s", got)
+	}
+	t.Setenv("METIS_CATALOG", "")
+	if got, want := Root(d), d; got != want {
+		t.Errorf("config: %s", got)
+	}
+	wd, _ := os.Getwd()
+	if got := Root(""); got != wd {
+		t.Errorf("cwd: %s, want %s", got, wd)
+	}
+}
+
+// -pkg NAME resolves through metispy (python -m metis.catalog find): the root's, else METIS_HOME's.
+func TestFindIsMetispysPackageRule(t *testing.T) {
+	py := "../../../py/.venv/bin/python"
+	if _, err := os.Stat(py); err != nil {
+		t.Skip("no py venv")
+	}
+	r, h := t.TempDir(), t.TempDir()
+	writePkg(t, r, "lamp")
+	writePkg(t, h, "bell")
+	t.Setenv("METIS_HOME", h)
+	p, err := Find(py, r, "lamp")
+	if err != nil && strings.Contains(err.Error(), "invalid choice") {
+		t.Skip("metispy without metis.catalog find (0.1.4)")
+	}
+	if err != nil || p.From != "root" || len(p.Domains) != 1 || p.Domains[0] != "lamp" {
+		t.Fatalf("lamp: %+v %v", p, err)
+	}
+	if p, err = Find(py, r, "bell"); err != nil || p.From != "home" || p.Dir != filepath.Join(h, "domains", "bell") {
+		t.Fatalf("bell: %+v %v", p, err)
+	}
+	if _, err = Find(py, r, "nosuch"); err == nil || !strings.Contains(err.Error(), "METIS_HOME") {
+		t.Fatalf("a miss names both places: %v", err)
 	}
 }

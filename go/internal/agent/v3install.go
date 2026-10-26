@@ -316,7 +316,7 @@ func (v *v3) relist(last *string) {
 	}
 	var listed []Listed
 	for _, e := range es {
-		listed = append(listed, Listed{Name: e.Name, Kind: e.Kind, Display: e.Display, Line: e.Line, Has: e.Has, PartnerOf: e.PartnerOf})
+		listed = append(listed, Listed{Name: e.Name, Kind: e.Kind, Display: e.Display, Line: e.Line, Has: e.Has, PartnerOf: e.PartnerOf, Shared: e.Shared})
 	}
 	v.mu.Lock()
 	v.listed = listed

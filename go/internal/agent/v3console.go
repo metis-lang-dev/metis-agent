@@ -18,6 +18,7 @@ type Listed struct {
 	Name, Kind, Display, Line string
 	Has                       json.RawMessage
 	PartnerOf                 string // a partner's lead (kind partner)
+	Shared                    bool   // METIS_HOME's package (the catalog root has none of the name)
 }
 
 // V3Frame is one frame for the page: {ev, …F}.
@@ -71,6 +72,20 @@ func (a *Agent) V3Domain(verb, domain string, bindings any) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	err := v.domainVerb(verb, domain, bindings, "person")
+	v.pushCatalog()
+	return err
+}
+
+// V3Pkg activates a domain of a -pkg package at the start, as the page's
+// pick does (a domain no process serves is installed from its manifest).
+func (a *Agent) V3Pkg(domain string) error {
+	v := a.v3
+	if v == nil || v.live == nil {
+		return fmt.Errorf("-pkg needs live domain agents (-loop v3 with v3.domains)")
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	err := v.domainVerb("activate", domain, nil, "pkg")
 	v.pushCatalog()
 	return err
 }
@@ -197,6 +212,9 @@ func (v *v3) catalog() []map[string]any {
 			}
 			if l.PartnerOf != "" {
 				e["partner_of"] = l.PartnerOf
+			}
+			if l.Shared {
+				e["shared"] = true
 			}
 		}
 		if c := ld.changed[n]; c != "" {

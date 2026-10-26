@@ -3,6 +3,7 @@ the model: the real domain agents in-process, the orchestrator on a fake
 dialog model — the journal's shapes and sources, a domain's consult not
 holding another domain's dispatch, reload, the world, the watcher."""
 import json
+import os
 import sys
 import threading
 import time
@@ -540,8 +541,9 @@ def test_the_catalog_is_the_loop_sdks(tmp_path):
 
 def test_the_catalog_is_the_env_else_the_configs_root(tmp_path, monkeypatch):
     """cwd-root s-ddac2cbf: the service serves $METIS_CATALOG, else its config's
-    catalog.root (relative to the config file, as Go's is to go/) — never a
-    sibling the SDK guesses; set as $METIS_CATALOG for the SDK and the agents."""
+    catalog.root (relative to the config file, as Go's is to go/), else the
+    directory it was started in (metis-packages step 3: cd DIR && metis-agent)
+    — never a sibling the SDK guesses; set as $METIS_CATALOG for the agents."""
     from metis_agent.service import catalog_root
     (tmp_path / "py").mkdir()
     cfg = tmp_path / "py" / "config.yaml"
@@ -550,7 +552,8 @@ def test_the_catalog_is_the_env_else_the_configs_root(tmp_path, monkeypatch):
     monkeypatch.delenv("METIS_CATALOG")
     assert catalog_root({"catalog": {"root": "../cat"}}, cfg) == str((tmp_path / "cat").resolve())
     monkeypatch.delenv("METIS_CATALOG")
-    assert catalog_root({}, cfg) is None
+    monkeypatch.chdir(tmp_path)
+    assert catalog_root({}, cfg) == str(tmp_path.resolve()) == os.environ["METIS_CATALOG"]
 
 
 def _page_live(tmp_path):

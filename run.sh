@@ -9,7 +9,11 @@
 #   BACKEND=go            the Go service (-loop v3), the domain agents spawned
 #                         from py/ on the JSON-lines wire (config go/config.v3-live.yaml)
 #
-#   ./run.sh            start in the background (go: build if needed), print the URL
+#   cd <catalog> && …/run.sh [--pkg NAME …]
+#                       start in the background (go: build if needed), print the URL. The
+#                       catalog is the directory it was started in ($METIS_CATALOG overrides it);
+#                       --pkg NAME (repeatable) loads domains/NAME at the start — the catalog's,
+#                       else METIS_HOME's — and the widget lists and loads the rest
 #   ./run.sh stop       stop it (the domain agents end with it)
 #   ./run.sh status     running or not, which backend, the URL, the GPU
 #   ./run.sh log        follow the service's log
@@ -23,6 +27,7 @@
 # Each start keeps the previous journal (go: session-<time>.jsonl; py: its
 # session-py.jsonl rotated by the service).
 set -euo pipefail
+export METIS_CATALOG="${METIS_CATALOG:-$PWD}"     # the catalog: where it was started, before any cd
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 GO="$ROOT/go"
 RUN="$GO/results/live"
@@ -46,7 +51,18 @@ gpu() {
   nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader | sed 's/^/  holder: /'
 }
 
-case "${1:-start}" in
+PKG_PY=() PKG_GO=()
+VERB="${1:-start}"
+case "$VERB" in --*) VERB=start ;; start) shift ;; esac
+if [ "$VERB" = start ]; then
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --pkg) PKG_PY+=(--pkg "$2"); PKG_GO+=(-pkg "$2"); shift 2 ;;
+      *) echo "usage: $0 [start] [--pkg NAME …] | stop | status | log" >&2; exit 2 ;;
+    esac
+  done
+fi
+case "$VERB" in
 stop)
   if running; then
     p=$(cat "$PID"); kill "$p"
@@ -63,7 +79,7 @@ status)
 log)
   exec tail -f "$LOG" ;;
 start) ;;
-*) echo "usage: $0 [start|stop|status|log]" >&2; exit 2 ;;
+*) echo "usage: $0 [start] [--pkg NAME …] | stop | status | log" >&2; exit 2 ;;
 esac
 
 if running; then echo "already running (pid $(cat "$PID"), backend $(cat "$BACKEND_F" 2>/dev/null || echo '?')) — $URL"; exit 0; fi
@@ -102,12 +118,12 @@ if [ "$BACKEND" = go ]; then
   fi
   cd "$GO"
   WIDGET_DIR="$("$PY" -c 'from metis_loop_sdk.web import WIDGET_DIR; print(WIDGET_DIR)')"   # the loop SDK's CATALOG widget
-  nohup "$BIN" -config "$CONFIG" -loop v3 -no-domains -wait-viewer -addr "$ADDR" -ui-dir "$UI_DIR" -lib-dir "$LIB_DIR" -widget-dir "$WIDGET_DIR" >"$LOG" 2>&1 &
+  nohup "$BIN" -config "$CONFIG" -loop v3 -no-domains -wait-viewer -addr "$ADDR" -ui-dir "$UI_DIR" -lib-dir "$LIB_DIR" -widget-dir "$WIDGET_DIR" ${PKG_GO[@]+"${PKG_GO[@]}"} >"$LOG" 2>&1 &
 else
   "$PY" -c "import aiohttp, llama_cpp" 2>/dev/null || {
     echo "py/.venv lacks the service's packages: $ROOT/py/.venv/bin/pip install -r $ROOT/py/requirements.txt" >&2; exit 1; }
   cd "$ROOT/py"
-  nohup "$PY" -m metis_agent.service --config "$CONFIG" --addr "$ADDR" --ui-dir "$UI_DIR" --lib-dir "$LIB_DIR" >"$LOG" 2>&1 &
+  nohup "$PY" -m metis_agent.service --config "$CONFIG" --addr "$ADDR" --ui-dir "$UI_DIR" --lib-dir "$LIB_DIR" ${PKG_PY[@]+"${PKG_PY[@]}"} >"$LOG" 2>&1 &
 fi
 echo $! >"$PID"
 echo "$BACKEND" >"$BACKEND_F"

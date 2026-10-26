@@ -1594,6 +1594,8 @@ class Live:
                     e["display"] = le["display"]
                 if le.get("partner_of"):
                     e["partner_of"] = le["partner_of"]
+                if le.get("shared"):
+                    e["shared"] = True                 # METIS_HOME's package (the root has none of the name)
             if self.changed.get(n):
                 e["changed"] = self.changed[n]
             if served:
@@ -2010,14 +2012,32 @@ def make_app(live, ui_dir, lib_dir=None):
 
 def catalog_root(cfg, path):
     """The catalog this service serves: $METIS_CATALOG, else the config's
-    catalog.root (relative to the config file, as the Go backend's is to go/)
-    — set as $METIS_CATALOG for the loop SDK and the domain agents. Neither:
-    the SDK's own rule, the cwd (cwd-root s-ddac2cbf)."""
+    catalog.root (relative to the config file, as the Go backend's is to go/),
+    else the directory it was started in (metis.catalog's rule: cd DIR &&
+    metis-agent) — set as $METIS_CATALOG for the domain agents, so they read
+    the same one wherever they run."""
     import os
     r = (cfg.get("catalog") or {}).get("root")
-    if r and not os.environ.get("METIS_CATALOG"):
-        os.environ["METIS_CATALOG"] = str((Path(path).resolve().parent / r).resolve())
+    if not os.environ.get("METIS_CATALOG"):
+        os.environ["METIS_CATALOG"] = str((Path(path).resolve().parent / r).resolve() if r else Path.cwd().resolve())
     return os.environ.get("METIS_CATALOG")
+
+
+def pkg_domains(names):
+    """--pkg NAME…: each package's domains, NAME resolved as metispy resolves an include — the
+    catalog root's domains/NAME, else METIS_HOME's (metis.catalog.find_package; a miss names both
+    places) — in order, each once. SystemExit on a miss."""
+    from metis import catalog
+    out = []
+    for n in names:
+        try:
+            ds = catalog.package_domains(n) if hasattr(catalog, "package_domains") else [catalog.get(n)]
+        except (FileNotFoundError, KeyError) as e:
+            raise SystemExit("[catalog] --pkg %s: %s" % (n, e.args[0] if e.args else e))
+        if not ds:
+            raise SystemExit("[catalog] --pkg %s: no domain manifest in %s" % (n, catalog.find_package(n)))
+        out += [d.name for d in ds if d.name not in out]
+    return out
 
 
 def load_config(path):
@@ -2032,6 +2052,9 @@ def main():
     ap.add_argument("--ui-dir", default="")
     ap.add_argument("--lib-dir", default="")
     ap.add_argument("--no-wait-viewer", action="store_true", help="start the clock at once (else at the first page)")
+    ap.add_argument("--pkg", action="append", default=[], metavar="NAME",
+                    help="load the package domains/NAME at the start (the catalog root's, else METIS_HOME's); "
+                         "repeatable; the widget lists and loads the rest")
     ap.add_argument("--print-turn", action="store_true",
                     help="print the orchestrator's system turn as built (the catalog's cards and declarations) and exit")
     ap.add_argument("--print-grammar", action="store_true",
@@ -2040,6 +2063,7 @@ def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
     cfg = load_config(a.config)
     catalog_root(cfg, a.config)
+    pkgs = pkg_domains(a.pkg)                        # before the model loads: a miss fails at once
     try:
         turn = build_turn(cfg)
     except ValueError as e:
@@ -2056,6 +2080,9 @@ def main():
     model = str(ROOT / "py" / cfg["model"])
     llm = LLM(model, n_ctx=int(cfg["domains"].get("narrator_n_ctx", 8192)))
     live = Live(cfg, llm)
+    for dom in pkgs:                                 # as the widget's pick: activate installs it (domain_verb)
+        live.jobs.put(("call", live.domain_verb, ("activate", dom, "pkg"),
+                       lambda err, dom=dom: log.info("[catalog] --pkg %s: %s", dom, err or "loaded")))
     if a.no_wait_viewer:
         live.started.set()
     threading.Thread(target=live.run, daemon=True, name="agent").start()
