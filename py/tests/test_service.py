@@ -574,7 +574,11 @@ def test_a_host_drives_a_page_through_the_relay(tmp_path):
     (fsttm_web.chat.Chat.connect) types to the page opened last (chat, ctl), and hears every page's
     chat / event / state; those frames are the host's, never the service's (no turn, no reply)."""
     import asyncio
+    import importlib.util
     from aiohttp.test_utils import TestClient, TestServer
+    if importlib.util.find_spec("fsttm_web") is None or importlib.util.find_spec("fsttm_web.chat") is None:
+        import pytest
+        pytest.skip("no fsttm_web.chat (its Relay): the service mounts no /host")
     lv, _ = live(tmp_path)
     app = S.make_app(lv, str(ROOT / "console"))
     threading.Thread(target=lv.run, daemon=True).start()
