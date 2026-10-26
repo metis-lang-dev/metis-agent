@@ -104,74 +104,15 @@ from .repl_tools import scrub
 from .replier import Replier
 from .reply import reply
 
-READS = ("state", "ctx", "events", "why", "findings")
+# the served program and its words (rule_docs, apply_extensions, the mirror, the script, the
+# offered cards, READS, NO_INTENTS): metispy's metis.domain.package (dagent-fixtures step 2)
+from metis.domain.package import (NO_INTENTS, READS, apply_extensions, mirror_atoms,  # noqa: F401
+                                  offered_moves, other_cards, rule_docs, scripts_of)
+
 SURPRISE_VERBS = ("reset", "explain", "escalate")
 LATER = ("activate", "deactivate")
 
 
-def rule_docs(path):
-    """rule → its %% comment in words (tag lines such as `target: kitchen`
-    dropped, as the script op does), over the file with its includes spliced
-    (the kitchen's rules live in the included kitchen.llp): the artifact's
-    sidecar lines, metis.kernel.artifact.rule_lines."""
-    from metis.kernel.artifact import rule_lines
-    return {r: w for r, (w, _) in rule_lines([Path(path)]).items()}
-
-
-def extension_text(src):
-    """A extension's approved text: its leading `%` comment block (the loop
-    console's `load` convention) — what its %% docs quote at the gate."""
-    head = []
-    for line in src.splitlines():
-        if line.startswith("%"):
-            head.append(line.lstrip("%").strip())
-        elif line.strip():
-            break
-    return "\n".join(head) or "extension"
-
-
-def apply_extensions(repl, extensions):
-    """The served program = the program plus its extensions (human-loop step 1):
-    each extension gated against the program and accepted, in order — the loop's
-    own llp → gate → accept, as the loop console's copy + extensions. The key
-    covers the union. An extension not admitted raises (a reload keeps the old)."""
-    for p in extensions:
-        src = Path(p).read_text()
-        repl.cmd_text(extension_text(src))
-        repl.cmd_llp(src)
-        rep = repl.cmd_gate("")
-        if not rep.get("ok"):
-            found = rep.get("findings") or [rep.get("error", "rejected")]
-            raise ValueError("extension %s not admitted: %s" % (Path(p).name, "; ".join(map(str, found))[:600]))
-        repl.cmd_accept("")
-        repl.loop.text = ""
-
-
-def mirror_atoms(text):
-    """The catalog's #query lines: the atoms the mirror line counts."""
-    return [l.split(None, 1)[1].strip() for l in text.splitlines() if l.startswith("#query ")]
-
-
-def scripts_of(repl, extensions=()):
-    """The runtime's `script` op, in-process: the cards offerable here, the
-    served card's clauses followed by its extensions', each tagged "extension": <file>
-    (runtime-binding F3, the architect's ruling; the sidecar's script)."""
-    from metis.loop.cards import script
-    return script(repl, extensions=extensions)
-
-
-def other_cards(repl):
-    return list(offered_moves(repl))
-
-
-def offered_moves(repl):
-    """{card: [moves]} of the cards that could explain a surprise here."""
-    from metis.loop.cards import cards
-    return {c["name"]: list(c.get("moves") or []) for c in cards(repl) if c["relation"] != "served"}
-
-
-# a domain with no verbs refuses every intent with this (py and Go)
-NO_INTENTS = "this domain takes no intents"
 
 
 class DomainAgent:

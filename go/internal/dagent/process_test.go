@@ -115,13 +115,14 @@ func TestReloadAndAddArePys(t *testing.T) {
 
 // The process builds every scene from the catalog itself (the packages
 // read, the bundles emitted, the Go hosts from the registry) and serves
-// the scripted days as py does.
+// the scripted days as py does (the dog's and the plant's: their goldens,
+// goldens_test.go).
 func TestTheProcessServesTheDays(t *testing.T) {
 	python := venvPython(t)
 	for _, c := range []struct {
 		day   string
 		names []string
-	}{{"dog", []string{"dog"}}, {"plant", []string{"plant"}}, {"kitchen", []string{"kitchen", "kitchen_shared"}},
+	}{{"kitchen", []string{"kitchen", "kitchen_shared"}},
 		{"love_triangle", []string{"love_triangle"}}} { // a program only: no host, no intent.yaml, no verbs
 		proc := &Process{Root: catalogDir(t), Metispy: metispyDir(t), Python: python,
 			BuildDir: t.TempDir(), Names: c.names}

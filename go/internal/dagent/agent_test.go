@@ -1,14 +1,21 @@
 package dagent
 
-// The Go domain agent against py's on the scripted days (step 4's check,
-// run as the agent lands): every line of days/<d>.jsonl through Serve, the
-// whole output stream compared with py's serve() (days/<d>.out.jsonl) as
-// parsed JSON, the ready line first.
+// The Go domain agent against py's on the agent's own machinery (step 4's
+// check; dagent-fixtures s-86bbd1e7 step 2): what a package states is its
+// golden (goldens_test.go); what no package states — the consult, the
+// surprise verbs (explain, reset, escalate), the console's trace, the
+// narrator's wiring — is the agent's, and the two agents are held equal on
+// it. The scripted days (days/<d>.jsonl: the packages' days with the agent's
+// tools among them) run through py's serve() as the test runs
+// (py/tools/dagent_fixtures.py --live, the template seat, the stub narrator
+// for a narrated day), nothing recorded, and through Go's Serve: the whole
+// stream compared as parsed JSON, the ready line first.
 
 import (
 	"bytes"
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strconv"
@@ -43,23 +50,46 @@ func testDomain(t *testing.T, d string) Domain {
 	return dom
 }
 
-func TestTheAgentStreamIsPys(t *testing.T) {
+// liveDay is py's serve() on the day now: dagent_fixtures.py --live, its stream's lines.
+func liveDay(t *testing.T, d string, trace, narrate bool) [][]byte {
+	python := venvPython(t)
+	tool, _ := filepath.Abs("../../../py/tools/dagent_fixtures.py")
+	day, _ := filepath.Abs("testdata/days/" + d + ".jsonl")
+	args := []string{tool, "--live", d, day}
+	if trace {
+		args = append(args, "--trace")
+	}
+	if narrate {
+		args = append(args, "--narrate")
+	}
+	cmd := exec.Command(python, args...)
+	cmd.Env = append(os.Environ(), "METIS_CATALOG="+catalogDir(t))
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("py --live %s: %v: %s", d, err, stderr.String())
+	}
+	return bytes.Split(bytes.TrimRight(out, "\n"), []byte("\n"))
+}
+
+func TestTheAgentMachineryIsPys(t *testing.T) {
 	for _, tc := range []struct {
-		d, stream string
-		trace     bool
-	}{{"dog", "dog.out", false}, {"plant", "plant.out", false}, {"plant", "plant.trace.out", true},
-		{"dog", "dog.narrated.out", true}, {"plant", "plant.narrated.out", true}} {
+		d              string
+		trace, narrate bool
+	}{{"dog", false, false}, {"plant", false, false}, {"plant", true, false}, {"dog", true, true}, {"plant", true, true}} {
 		d := tc.d
+		stream := liveDay(t, d, tc.trace, tc.narrate)
 		a, err := NewAgent(testDomain(t, d), 1, "replay")
 		if err != nil {
 			t.Fatal(err)
 		}
 		a.Tracing = tc.trace // py's day runs have no records sink: a trace lists none
-		if strings.Contains(tc.stream, "narrated") {
+		if tc.narrate {
 			a.Narrator = stubNarrator{a.D.Display}
 		}
 		n, lines := 0, 0
-		jsonl(t, "testdata/days/"+tc.stream+".jsonl", func(raw []byte) {
+		for _, raw := range stream {
 			var row struct {
 				In  json.RawMessage   `json:"in"`
 				Out []json.RawMessage `json:"out"`
@@ -70,7 +100,7 @@ func TestTheAgentStreamIsPys(t *testing.T) {
 			n++
 			if row.In == nil { // the ready line
 				sameJSON(t, d+" ready", raw, a.Ready())
-				return
+				continue
 			}
 			var msg map[string]any
 			dec := json.NewDecoder(bytes.NewReader(row.In))
@@ -88,9 +118,9 @@ func TestTheAgentStreamIsPys(t *testing.T) {
 				sameJSON(t, d+" line "+strconv.Itoa(n)+" "+string(row.In)+" out "+strconv.Itoa(i), unfile(row.Out[i]), unfile(got[i]))
 			}
 			lines += len(got)
-		})
+		}
 		a.Close()
-		t.Logf("%s: %d input lines, %d output lines equal", tc.stream, n-1, lines)
+		t.Logf("%s (trace %v, narrated %v): %d input lines, %d output lines equal to py's now", d, tc.trace, tc.narrate, n-1, lines)
 	}
 }
 

@@ -3,9 +3,10 @@
 # the scripted days driven into py on the template seat — the domain agents
 # built from the catalog's packages (py's Process) — and into Go (the same
 # lines; the Go process builds the same packages through metispy's
-# emitter), the reply streams diffed as parsed JSON, the module traces
-# (mapper, replier, AgentHost, the watch with its records, the sink, the
-# T reads, the template consult) diffed beside them. py's side is
+# emitter), the reply streams diffed as parsed JSON, the AgentHost's calls
+# diffed beside them (the dog's and the plant's own day, mapper and script are
+# their goldens in the catalog, and the agent's machinery on them is diffed
+# against py live: dagent-fixtures s-86bbd1e7 step 2). py's side is
 # regenerated FRESH into a scratch directory, not read from the committed
 # fixtures. A likelihood compares within 1e-9 relative and 0 exactly
 # (watch_test.go LikelihoodTol); every other value exactly. Exit 0: parity.

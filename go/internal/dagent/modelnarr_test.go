@@ -22,7 +22,7 @@ func TestModelNarratorIsPys(t *testing.T) {
 	python := venvPython(t)
 	root := catalogDir(t)
 	spk := &recSpeaker{}
-	for _, names := range [][]string{{"dog"}, {"plant"}, {"kitchen", "kitchen_shared"}} {
+	for _, names := range [][]string{{"kitchen", "kitchen_shared"}} { // the dog's, the plant's: their goldens' script
 		proc := &Process{Root: root, Metispy: metispyDir(t), Python: python, BuildDir: t.TempDir(),
 			Names: names, Narrate: []string{"*"}, Speaker: spk}
 		srv, err := proc.Build(1, "replay")

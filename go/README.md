@@ -54,13 +54,22 @@ commit (`METIS_LANG_COMMIT`, the runtime build cached on it), and runs
 vet, the build and the tests against both; the py job runs
 `third_party/check-pin.sh` against the installed binding.
 
-**`internal/dagent/testdata` is py's**: the streams py's own domain agent
-wrote on the catalog, which Go's must equal. A catalog change that moves
-what py says (a line number in a read, a reply) needs them written again on
-that catalog: `py/.venv/bin/python py/tools/dagent_fixtures.py`, then a
-look at every diff line before the commit. The mapper's intents include
-the recorded dispatches in `go/results/e13` (not in git): regenerate
-where they are.
+**A package states itself in its golden** (dagent-fixtures s-86bbd1e7):
+metis-catalog `domains/<d>/goldens/` holds the package's day in and what it
+says out, and its intents and their atoms, written by metispy (`python -m
+metis.catalog golden <d>`) and checked by the catalog's CI. The Go agent is
+held to those files where the catalog checkout has them
+(`internal/dagent/goldens_test.go`: the day's stream, its end, the mapper,
+the narrator's script), as py's agent is (`py/tests/test_package_goldens.py`);
+dog and plant have goldens. What no package states is the agent's own
+machinery (the consult, the surprise verbs, the trace, the narrator's
+wiring): Go is held to py's agent on it as the test runs
+(`py/tools/dagent_fixtures.py --live`, nothing recorded), on the scripted
+days in `internal/dagent/testdata/days/`. The recordings still committed
+there are the generic machinery's (scrub, reload/add, the kitchen pair, the
+program-only day, the AgentHost's calls): `py/.venv/bin/python
+py/tools/dagent_fixtures.py` writes them again, then a look at every diff
+line before the commit.
 
 The model is the GGUF ollama holds for its tag (`~/.ollama/models/…`) or
 any GGUF; `llm.template: auto` takes the chat template from the GGUF,
