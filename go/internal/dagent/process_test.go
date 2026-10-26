@@ -91,6 +91,9 @@ func TestReloadAndAddArePys(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if !strings.Contains(string(b), e["from"].(string)) { // an edit that no longer applies fails, not a no-op
+				t.Fatalf("reload line %d: %s has no %q to edit", n, e["file"], e["from"])
+			}
 			if err := os.WriteFile(f, []byte(strings.Replace(string(b), e["from"].(string), e["to"].(string), 1)), 0o644); err != nil {
 				t.Fatal(err)
 			}
@@ -102,7 +105,7 @@ func TestReloadAndAddArePys(t *testing.T) {
 			t.Fatalf("reload line %d %s: %d outputs, py %d:\n got %s\n want %s", n, row.In, len(got), len(row.Out), js(got), js(row.Out))
 		}
 		for i := range got {
-			want := json.RawMessage(pyScratch.ReplaceAllString(string(row.Out[i]), root))
+			want := json.RawMessage(strings.ReplaceAll(pyScratch.ReplaceAllString(string(row.Out[i]), root), "<metis_home>", proc.home()))
 			sameJSON(t, "reload line "+strconv.Itoa(n)+" "+string(row.In)+" out "+strconv.Itoa(i), want, got[i])
 		}
 		lines += len(got)

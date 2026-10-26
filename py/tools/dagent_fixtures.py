@@ -465,14 +465,20 @@ def reload_day(lines, out):
         if "edit" in msg:
             e = msg["edit"]
             f = root / "domains" / "plant" / e["file"]
+            if e["from"] not in f.read_text():                # an edit that no longer applies: no silent no-op
+                raise SystemExit("reload day: %s has no %r to edit" % (e["file"], e["from"]))
             f.write_text(f.read_text().replace(e["from"], e["to"]))
             stream.append({"in": msg, "out": []})
             continue
         with contextlib.redirect_stderr(io.StringIO()):
             agent, o = serve(agent, msg, proc.build, proc.reload, proc.add_line)
         stream.append({"in": msg, "out": o})
-    # the scratch catalog's path is the machine's: <catalog> in the fixture
-    Path(out).write_text("".join(json.dumps(r).replace(str(root), "<catalog>") + "\n" for r in stream))
+    # the scratch catalog's and METIS_HOME's paths are the machine's: <catalog> and <metis_home>
+    # in the fixture (a miss names both places: metis.catalog.get)
+    from metis import catalog
+    home = str(catalog.home())
+    Path(out).write_text("".join(json.dumps(r).replace(str(root), "<catalog>").replace(home, "<metis_home>") + "\n"
+                                 for r in stream))
 
 
 def main():

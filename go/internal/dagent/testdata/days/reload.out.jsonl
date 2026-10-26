@@ -15,7 +15,7 @@
 {"in": {"reload": {}, "domain": "nowhere", "id": "r2"}, "out": [{"domain": "plant", "kind": "error", "error": "reload: no domain 'nowhere' here"}, {"ack": "reload", "id": "r2"}]}
 {"in": {"add": {}, "domain": "plant", "id": "a0"}, "out": [{"domain": "plant", "kind": "error", "error": "add: plant is served here already"}, {"ack": "add", "id": "a0"}]}
 {"in": {"add": {}, "domain": "kitchen_shared", "id": "a1"}, "out": [{"domain": "kitchen_shared", "kind": "error", "error": "add: kitchen_shared is stepped with its pair: add kitchen"}, {"ack": "add", "id": "a1"}]}
-{"in": {"add": {}, "domain": "nowhere", "id": "a2"}, "out": [{"domain": "plant", "kind": "error", "error": "add: no domain 'nowhere' in the catalog (\"no domain 'nowhere' in <catalog>\")"}, {"ack": "add", "id": "a2"}]}
+{"in": {"add": {}, "domain": "nowhere", "id": "a2"}, "out": [{"domain": "plant", "kind": "error", "error": "add: no domain 'nowhere' in the catalog (\"no domain 'nowhere' in <catalog> (the catalog root), <metis_home> (METIS_HOME)\")"}, {"ack": "add", "id": "a2"}]}
 {"in": {"add": {}, "domain": "dog", "id": "a3"}, "out": [{"domain": "dog", "kind": "added", "key": "f2927673f8e455d9f5bb83ce678f6a4adc533aa100cb29f40ccc082e1f82cb67"}, {"ack": "add", "id": "a3"}]}
 {"in": {"clock": "beat"}, "out": [{"clock": "beat", "beat": 9, "over": false, "domains": {"plant": {"beat": 9, "over": false}, "dog": {"beat": 1, "over": false}}}]}
 {"in": {"id": "c1", "domain": "dog", "verb": "LOCAL_ACTION", "args": {"action": "SIT_DOWN"}}, "out": [{"domain": "dog", "kind": "result", "ref": {"beat": 1}, "text": "Accepted.", "id": "c1", "status": "accepted"}, {"ack": "intent", "id": "c1"}]}

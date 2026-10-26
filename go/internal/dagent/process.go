@@ -72,6 +72,18 @@ type Process struct {
 	Speaker Speaker
 }
 
+// home is METIS_HOME as metis.catalog.home() resolves it: the variable, else metispy's own metis/catalog.
+func (p *Process) home() string {
+	h := os.Getenv("METIS_HOME")
+	if h == "" {
+		h = filepath.Join(p.Metispy, "metis", "catalog")
+	}
+	if abs, err := filepath.Abs(h); err == nil {
+		return abs
+	}
+	return h
+}
+
 func (p *Process) narrated(d string) bool {
 	for _, n := range p.Narrate {
 		if n == "*" || n == d {
@@ -313,7 +325,8 @@ func (p *Process) Add(s Server, d string) (Server, []any) {
 	ms, err := catalog.Scan(p.Root)
 	m, ok := ms[d]
 	if err != nil || !ok {
-		why := fmt.Sprintf("%q", fmt.Sprintf("no domain %s in %s", pyRepr(d), p.Root)) // py: the loader's KeyError
+		// py: metis.catalog.get's KeyError, naming both places a package is looked for
+		why := fmt.Sprintf("%q", fmt.Sprintf("no domain %s in %s (the catalog root), %s (METIS_HOME)", pyRepr(d), p.Root, p.home()))
 		if err != nil {
 			why = err.Error()
 		}
