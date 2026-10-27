@@ -264,7 +264,7 @@ function domState(name) {
 // domain: an active one shows its tab; an inactive one is activated.
 const HAS = ['agent', 'intent', 'host', 'notch', 'readme'];
 // a domain no agent serves is installed by its activate (hot-install from its manifest): the backend says if it cannot
-function canActivate(d) { return ws && catalogLive && !d.loaded && d.kind !== 'partner' && !/pair/.test(d.state ?? ''); }
+function canActivate(d) { return ws && catalogLive && !d.loaded && !d.shadowed && d.kind !== 'partner' && !/pair/.test(d.state ?? ''); }
 function stateOf(d) {
   let text = d.state ?? '';
   if (!catalogLive) text = d.loaded ? domState(d.name).text : 'not loaded';
@@ -274,9 +274,10 @@ function stateOf(d) {
   return { text: d.loaded && /^idle$/.test(text) ? 'active · idle' : text, cls };
 }
 function openDomain(d) {
-  if (d.loaded || /pair/.test(d.state ?? '')) { selectTab(d.partner_of || (/pair/.test(d.state ?? '') ? 'kitchen' : d.name)); return; }
+  if (!d.shadowed && (d.loaded || /pair/.test(d.state ?? ''))) { selectTab(d.partner_of || (/pair/.test(d.state ?? '') ? 'kitchen' : d.name)); return; }
   if (!canActivate(d)) {
     note(!catalogLive ? `${d.name}: activating needs the live service`
+      : d.shadowed ? `${d.path}: the name ${d.name} is ${d.shadowed}'s here (the runtime serves a name once)`
       : d.kind === 'partner' ? `${d.name} is stepped with its pair: activate ${d.partner_of ?? 'its lead'}` : `${d.name}: cannot be activated`);
     return;
   }
@@ -297,20 +298,21 @@ function renderDomains() {
     box.replaceChildren(el('div', { class: 'empty' }, 'The catalog widget did not load (/sdk/catalog/catalog.js: the loop SDK).'));
   } else {
     MetisCatalog.render(box, catalog.domains, {
-      tags: HAS, display: true, key: d => d.name, empty: foot, foot,
+      // each row by its path, as the loop console (a name can be listed twice: the second shadowed)
+      tags: HAS, display: true, key: d => d.path || d.name, empty: foot, foot,
       tagTitle: (d, k, on) => on ? `it has ${k}` : `no ${k}`,
-      current: d => d.name === tab,
+      current: d => d.name === tab && !d.shadowed,
       title: d => d.loaded ? `open ${d.name}'s tab` : canActivate(d) ? (d.served === false ? `activate ${d.name}: its agent is installed from the manifest` : `activate ${d.name}`) : '',
       decorate: (d, parts) => {
         const st = stateOf(d);
         parts.lead.push(el('span', { class: `st ${st.cls}`, title: st.text }, st.text.length > 46 ? st.text.slice(0, 44) + '…' : st.text || '—'));
-        if (d.loaded && !/pair/.test(d.state ?? '')) {
+        if (d.loaded && !d.shadowed && !/pair/.test(d.state ?? '')) {
           const off = el('button', { class: 'btn', title: 'deactivate(domain): detach it from the runtime tree' }, 'deactivate');
           off.disabled = !ws || !catalogLive;
           off.onclick = e => { e.stopPropagation(); send({ ev: 'deactivate', domain: d.name }); off.disabled = true; };
           parts.acts.push(off);
         }
-        if (d.served !== false && (d.loaded || d.served) && !(d.partner_of || /pair/.test(d.state ?? ''))) {
+        if (!d.shadowed && d.served !== false && (d.loaded || d.served) && !(d.partner_of || /pair/.test(d.state ?? ''))) {
           const rl = el('button', { class: 'btn', title: d.changed ? `reload: the files changed — ${d.changed}` : 'reload(domain): the domain agent recompiles from its files' }, d.changed ? 'reload ●' : 'reload');
           rl.disabled = !ws || !catalogLive;
           rl.onclick = e => { e.stopPropagation(); send({ ev: 'reload', domain: d.name }); rl.disabled = true; };

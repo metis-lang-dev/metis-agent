@@ -305,7 +305,7 @@ func main() {
 					log.Printf("[catalog] the console's list: %v (the served domains only)", err)
 				}
 				for _, e := range es { // a partner (kitchen_shared) its own row, as py's
-					v3.Listed = append(v3.Listed, agent.Listed{Name: e.Name, Kind: e.Kind, Display: e.Display, Line: e.Line, Has: e.Has, PartnerOf: e.PartnerOf, Shared: e.Shared})
+					v3.Listed = append(v3.Listed, agent.Listed{Name: e.Name, Kind: e.Kind, Display: e.Display, Line: e.Line, Path: e.Path, Has: e.Has, PartnerOf: e.PartnerOf, Shared: e.Shared})
 				}
 			}
 		}

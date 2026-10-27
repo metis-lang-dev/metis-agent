@@ -16,6 +16,7 @@ import (
 // Listed is one row of the catalog's list (the loop SDK's catalog.listing()).
 type Listed struct {
 	Name, Kind, Display, Line string
+	Path                      string // the row's catalog path: the page's key (a name can be listed twice)
 	Has                       json.RawMessage
 	PartnerOf                 string // a partner's lead (kind partner)
 	Shared                    bool   // METIS_HOME's package (the catalog root has none of the name)
@@ -173,9 +174,12 @@ func (v *v3) catalog() []map[string]any {
 		}
 	}
 	add(v.cfg.Loaded...)
-	listed := map[string]Listed{}
-	for _, e := range v.listed {
-		listed[e.Name] = e
+	listed := map[string]Listed{} // a name's first row: the one the runtime serves
+	firstRow := map[string]int{}
+	for i, e := range v.listed {
+		if _, ok := listed[e.Name]; !ok {
+			listed[e.Name], firstRow[e.Name] = e, i
+		}
 	}
 	for _, s := range ld.specs {
 		if len(s.Domains) == 0 {
@@ -205,8 +209,8 @@ func (v *v3) catalog() []map[string]any {
 		}
 		e := map[string]any{"name": n, "display": v.cfg.Display[n], "loaded": loaded,
 			"served": served, "state": state}
-		if l, ok := listed[n]; ok { // the catalog's: its line, what it has, its kind
-			e["line"], e["has"], e["kind"] = l.Line, l.Has, l.Kind
+		if l, ok := listed[n]; ok { // the catalog's: its line, what it has, its kind, its path
+			e["line"], e["has"], e["kind"], e["path"] = l.Line, l.Has, l.Kind, l.Path
 			if l.Display != "" {
 				e["display"] = l.Display
 			}
@@ -225,6 +229,23 @@ func (v *v3) catalog() []map[string]any {
 			if e["reload"] == "" {
 				e["reload"] = "propose"
 			}
+		}
+		out = append(out, e)
+	}
+	// a name twice in the list (domains/hanoi/hanoi, domains/rddl/hanoi/hanoi) is
+	// two rows, keyed by path on the page as in the loop console; the runtime
+	// serves a name once, its first row's, so a later row is listed only:
+	// shadowed (release-r02 step 1b, D6)
+	for i, l := range v.listed {
+		if firstRow[l.Name] == i {
+			continue
+		}
+		first := listed[l.Name]
+		e := map[string]any{"name": l.Name, "display": l.Display, "loaded": false, "served": false,
+			"state": "shadowed: " + first.Path, "shadowed": first.Path,
+			"line": l.Line, "has": l.Has, "kind": l.Kind, "path": l.Path}
+		if l.Shared {
+			e["shared"] = true
 		}
 		out = append(out, e)
 	}

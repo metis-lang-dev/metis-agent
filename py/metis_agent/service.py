@@ -1573,9 +1573,15 @@ class Live:
     def catalog(self):
         """Every domain the page can see (v3console.go catalog()): the loaded
         ones, those served here, the catalog's list (else the system turn's
-        catalog); each with its state, and the list's line, has and kind."""
+        catalog); each with its state, and the list's line, has, kind and path.
+        A name twice in the list (domains/hanoi/hanoi, domains/rddl/hanoi/hanoi)
+        is two rows, keyed by path on the page as in the loop console; the
+        runtime serves a name once, the first row's, so a later row of the
+        name is listed only: shadowed (release-r02 step 1b, D6)."""
         names = []
-        listed = {e["name"]: e for e in self.listed}
+        listed = {}
+        for e in self.listed:
+            listed.setdefault(e["name"], e)
         for n in self.loaded + self.names + (list(listed) if listed else self.catalog_names):
             if n not in names:
                 names.append(n)
@@ -1589,7 +1595,7 @@ class Live:
                 e["line"] = self.lines[n]
             if n in listed:
                 le = listed[n]
-                e.update(line=le.get("line") or "", has=le.get("has"), kind=le.get("kind"))
+                e.update(line=le.get("line") or "", has=le.get("has"), kind=le.get("kind"), path=le.get("path"))
                 if le.get("display"):
                     e["display"] = le["display"]
                 if le.get("partner_of"):
@@ -1601,6 +1607,15 @@ class Live:
             if served:
                 e["reload"] = self.policy.get(n, "propose")
             out.append(e)
+        for le in self.listed:
+            first = listed[le["name"]]
+            if le is not first:
+                e = {"name": le["name"], "display": le.get("display") or "", "loaded": False, "served": False,
+                     "state": "shadowed: " + str(first.get("path")), "shadowed": first.get("path"),
+                     "line": le.get("line") or "", "has": le.get("has"), "kind": le.get("kind"), "path": le.get("path")}
+                if le.get("shared"):
+                    e["shared"] = True
+                out.append(e)
         return out
 
     def mirror_state(self, d):

@@ -667,3 +667,21 @@ def test_a_typed_intent_over_the_wire(tmp_path):
     finally:
         lv.stop.set()
 
+
+
+def test_a_name_listed_twice_is_two_rows_the_second_shadowed(tmp_path):
+    """release-r02 step 1b, D6: a name listed twice (domains/hanoi/hanoi, domains/rddl/hanoi/hanoi)
+    is two rows, each with its path (the page's key, as in the loop console); the runtime serves the
+    name's first row, so the second is listed only, shadowed by the first. As Go's
+    TestANameListedTwiceIsTwoRowsTheSecondShadowed."""
+    lv, _ = live(tmp_path)
+    dog = next(e for e in lv.listed if e["name"] == "dog")
+    lv.listed = lv.listed + [dict(dog, path="elsewhere/dog/dog", line="another dog")]
+    cat = lv.catalog()
+    first, second = [e for e in cat if e["name"] == "dog"]
+    assert (first["path"], second["path"]) == (dog["path"], "elsewhere/dog/dog")
+    assert first["loaded"] and "shadowed" not in first and first["line"] == dog["line"]
+    assert (second["shadowed"], second["loaded"], second["served"], second["state"], second["line"]) == (
+        dog["path"], False, False, "shadowed: " + dog["path"], "another dog")
+    keys = [e.get("path") or e["name"] for e in cat]
+    assert len(keys) == len(set(keys))                                   # the page's keys are unique
