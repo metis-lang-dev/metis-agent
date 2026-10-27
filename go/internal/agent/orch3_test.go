@@ -340,3 +340,79 @@ func TestInstalledCardsRebuildTheTurn(t *testing.T) {
 		t.Fatal("a domain without a line must be refused")
 	}
 }
+
+// consultDomains answers the consult call with its reply, nothing else
+type consultDomains struct{ r Reply }
+
+func (d consultDomains) Call(c Call) (Reply, bool) {
+	if c.Name == "consult" {
+		return d.r, true
+	}
+	return Reply{}, false
+}
+func (consultDomains) Intent(c Call) (Reply, bool) { return Reply{}, false }
+
+// release-r02 step 1b, D2 (the architect's ruling): a failed command opens
+// the orchestrator's consult, which answers answer_kind "answer" (a
+// question's consult); the harness says its text to the person, with no
+// further generation, so a failed command never ends in silence; an answer
+// with no text says lineNoAnswer. As py's
+// test_a_failed_command_is_answered_with_the_consults_text.
+func TestAFailedCommandIsAnsweredWithTheConsultsText(t *testing.T) {
+	consult := `<|tool_call>call:consult{domain:<|"|>dog<|"|>,question:<|"|>why did the command fail?<|"|>}<tool_call|>`
+	for _, tc := range []struct{ text, want string }{
+		{"I was already sitting, so no rule took it.", "I was already sitting, so no rule took it."},
+		{"", lineNoAnswer},
+	} {
+		var says [][2]string
+		f := &fakeDialog{outs: []string{consult}}
+		d := consultDomains{Reply{Domain: "dog", Kind: "consult", AnswerKind: "answer", Text: tc.text}}
+		o := NewOrch(V3Config{Tools: testTools(t), Loaded: []string{"dog", "kitchen"}, Mirror: true,
+			OnSay: func(k, l string) { says = append(says, [2]string{k, l}) }}, f, d)
+		sit := Call{J: []byte(`{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}`)}
+		o.byID["c1"] = sit
+		o.m.see(Reply{Domain: "dog", Kind: "result", ID: "c1", Status: "accepted"}, sit)
+		r := Reply{Domain: "dog", Kind: "result", ID: "c1", Status: "failed", Reason: "No rule took the command."}
+		if _, err := o.Handle(Inbound{Reply: &r}, "", nil); err != nil {
+			t.Fatalf("%q: %v", tc.text, err)
+		}
+		if f.n != 1 || !strings.Contains(strings.Join(f.log, "\n"), "gen "+consult) {
+			t.Fatalf("%q: %d generations, want the consult only:\n%s", tc.text, f.n, strings.Join(f.log, "\n"))
+		}
+		if len(says) != 1 || says[0] != [2]string{"template", tc.want} {
+			t.Fatalf("%q: said %v, want template %q", tc.text, says, tc.want)
+		}
+		if !strings.Contains(strings.Join(f.log, "\n"), speakCue+" "+tc.want) {
+			t.Fatalf("%q: the answer is not in the dialog:\n%s", tc.text, strings.Join(f.log, "\n"))
+		}
+	}
+}
+
+// release-r02 step 1b, D6: a name listed twice (domains/hanoi/hanoi,
+// domains/rddl/hanoi/hanoi) is two rows, each with its path (the page's key,
+// as in the loop console); the runtime serves the name's first row, so the
+// second is listed only, shadowed by the first. As py's
+// test_a_name_listed_twice_is_two_rows_the_second_shadowed.
+func TestANameListedTwiceIsTwoRowsTheSecondShadowed(t *testing.T) {
+	v := &v3{live: &liveDomains{}, listed: []Listed{
+		{Name: "hanoi", Kind: "domain", Path: "domains/hanoi/hanoi", Line: "the arcade's"},
+		{Name: "wgc", Kind: "domain", Path: "domains/wgc/wgc"},
+		{Name: "hanoi", Kind: "domain", Path: "domains/rddl/hanoi/hanoi", Line: "born from RDDL"},
+	}}
+	cat := v.catalog()
+	var paths []string
+	for _, e := range cat {
+		paths = append(paths, e["path"].(string))
+	}
+	if strings.Join(paths, " ") != "domains/hanoi/hanoi domains/wgc/wgc domains/rddl/hanoi/hanoi" {
+		t.Fatalf("rows %v", paths)
+	}
+	first, second := cat[0], cat[2]
+	if _, ok := first["shadowed"]; ok || first["line"] != "the arcade's" || first["state"] != "not installed" {
+		t.Fatalf("the first hanoi: %v", first)
+	}
+	if second["shadowed"] != "domains/hanoi/hanoi" || second["loaded"] != false || second["served"] != false ||
+		second["state"] != "shadowed: domains/hanoi/hanoi" || second["line"] != "born from RDDL" {
+		t.Fatalf("the second hanoi: %v", second)
+	}
+}

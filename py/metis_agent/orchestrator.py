@@ -545,6 +545,7 @@ def note_ask_words(words):
 LINE_ESCALATE = "I've passed this to the people who revise the model."
 LINE_RESET = "That reading was noise, so I'm carrying on."
 LINE_LEAVE_IT = "Alright, I'll leave it."
+LINE_NO_ANSWER = "I could not find out why."     # a consult's answer with no text
 
 
 def line_explain(display, domain, card, move):
@@ -1485,6 +1486,15 @@ class Orch:
         self.say("line", line)
         self.end()
 
+    def say_answer(self, b):
+        """The consult answered in text (answer_kind answer: a consult the orchestrator opened as a
+        question, the one after a failed command among them): the harness speaks that text to the
+        person, no generation, so a failed command never ends in silence (release-r02 step 1b, D2)."""
+        line = b.reply.text.strip() or LINE_NO_ANSWER
+        self.w(SPEAK_CUE + " " + line)
+        self.say("template", line)
+        self.end()
+
     def speak(self):
         self.w(SPEAK_CUE)
         line = self.speak_line(self.br)
@@ -1626,6 +1636,8 @@ class Orch:
             return ""
         if b.name == "again" and b.pick == "ask":
             return cue_ask_again(b.words, self.cfg.mirror)
+        if b.name == "answer" and b.reply.answer_kind == "answer":
+            return ""           # the harness says the answer (say_answer): no move for the model
         if b.name == "answer" and b.reply.answer_kind == "missing" and self.cfg.ask_check and b.offers:
             return cue_ask_offer(b.words, b.offers)
         if b.name == "answer" and b.reply.answer_kind == "missing" and self.cfg.ask_check:
@@ -1641,6 +1653,8 @@ class Orch:
         b = self.br
         if b.name == "surprise" and self.cfg.mirror:
             return self.harness_consult(b)
+        if b.name == "answer" and b.reply.answer_kind == "answer":
+            return self.say_answer(b)
         if b.pick == "escalate":
             self.harness_escalate(b)
             return self.answer(b)

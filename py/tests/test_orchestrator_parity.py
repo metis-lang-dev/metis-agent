@@ -152,3 +152,27 @@ def test_the_repl_api_is_metispys(monkeypatch):
     after = O.api_declarations(["dog"], ["dog"])
     assert "why, said differently" in after and "why an atom holds or not" not in after
     assert [v[0] for v in O.repl_api(["dog"], ["dog"])] == [v["name"] for v in api]
+
+
+def test_a_failed_command_is_answered_with_the_consults_text():
+    """release-r02 step 1b, D2 (the architect's ruling): a failed command opens the orchestrator's
+    consult, which answers answer_kind "answer" (a question's consult); the harness says its text to
+    the person, with no further generation, so a failed command never ends in silence; an answer
+    with no text says LINE_NO_ANSWER. As Go's TestAFailedCommandIsAnsweredWithTheConsultsText."""
+    consult = '<|tool_call>call:consult{domain:<|"|>dog<|"|>,question:<|"|>why did the command fail?<|"|>}<tool_call|>'
+    for text, want in (("I was already sitting, so no rule took it.", "I was already sitting, so no rule took it."),
+                       ("", O.LINE_NO_ANSWER)):
+        says = []
+        rec = Rec([consult])
+        dom = Domains([{"by": "name", "key": "consult",
+                        "reply": {"domain": "dog", "kind": "consult", "answer_kind": "answer", "text": text}}])
+        o = O.Orch(O.V3Config(CATALOG, LOADED, DISPLAY, mirror=True, on_say=lambda k, l: says.append((k, l))), rec, dom)
+        sit = O.Call(j='{"intent":"LOCAL_ACTION","action":"SIT_DOWN"}')
+        o.by_id["c1"] = sit
+        o.m.see(O.Reply({"domain": "dog", "kind": "result", "id": "c1", "status": "accepted"}), sit)
+        o.handle(O.Inbound(reply=O.Reply({"domain": "dog", "kind": "result", "id": "c1", "status": "failed",
+                                          "reason": "No rule took the command."})), "", [])
+        gens = [l for l in rec.log if l.startswith("gen")]
+        assert len(gens) == 1 and "call:consult" in gens[0], rec.log          # the consult, then no model move
+        assert says == [("template", want)], says
+        assert any(O.SPEAK_CUE + " " + want in x for x in rec.log), rec.log

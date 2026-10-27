@@ -90,6 +90,7 @@ func noteAskWords(words string) string {
 const (
 	lineEscalate = "I've passed this to the people who revise the model."
 	lineReset    = "That reading was noise, so I'm carrying on."
+	lineNoAnswer = "I could not find out why." // a consult's answer with no text
 )
 
 func lineExplain(display map[string]string, domain, card, move string) string {

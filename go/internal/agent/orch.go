@@ -382,6 +382,20 @@ func (o *Orch) genCapture(label, g string, b branch) (string, int, error) {
 	return out, mark, err
 }
 
+// sayAnswer: the consult answered in text (answer_kind answer: a consult the
+// orchestrator opened as a question, the one after a failed command among
+// them); the harness speaks that text to the person, no generation, so a
+// failed command never ends in silence (release-r02 step 1b, D2).
+func (o *Orch) sayAnswer(b branch) error {
+	line := strings.TrimSpace(b.reply.Text)
+	if line == "" {
+		line = lineNoAnswer
+	}
+	o.pend.WriteString(speakCue + " " + line)
+	o.say("template", line)
+	return o.End()
+}
+
 // Speak: a reply that wants no move (an outcome, an acceptance) gets its
 // spoken line after the speak cue.
 func (o *Orch) Speak() error {
@@ -582,6 +596,8 @@ func (o *Orch) cue(b branch) string {
 	switch {
 	case b.pick == "escalate":
 		return ""
+	case b.name == "answer" && b.reply.AnswerKind == "answer": // the harness says the answer (sayAnswer): no move for the model
+		return ""
 	case b.name == "again" && b.pick == "ask":
 		return cueAskAgain(b.words, o.cfg.Mirror)
 	case b.name == "answer" && b.reply.AnswerKind == "missing" && o.cfg.AskCheck && len(b.offers) > 0:
@@ -605,6 +621,9 @@ func (o *Orch) Move() error {
 	b := o.br
 	if b.name == "surprise" && o.cfg.Mirror { // the consult's question is the harness's, from the difference (DESIGN c5043a6)
 		return o.harnessConsult(b)
+	}
+	if b.name == "answer" && b.reply.AnswerKind == "answer" {
+		return o.sayAnswer(b)
 	}
 	if b.pick == "escalate" {
 		if err := o.harnessEscalate(b); err != nil {
