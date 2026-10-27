@@ -53,7 +53,7 @@ gpu() {
 
 PKG_PY=() PKG_GO=()
 VERB="${1:-start}"
-case "$VERB" in --*) VERB=start ;; start) shift ;; esac
+case "${1:-}" in --*) VERB=start ;; start) shift ;; esac   # no argument is start too: nothing to shift
 if [ "$VERB" = start ]; then
   while [ $# -gt 0 ]; do
     case "$1" in
