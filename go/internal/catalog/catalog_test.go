@@ -1,8 +1,11 @@
 package catalog
 
 import (
+	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -214,5 +217,52 @@ func TestFindIsMetispysPackageRule(t *testing.T) {
 	}
 	if _, err = Find(py, r, "nosuch"); err == nil || !strings.Contains(err.Error(), "METIS_HOME") {
 		t.Fatalf("a miss names both places: %v", err)
+	}
+}
+
+// The consoles' list holds METIS_HOME's packages the root lacks, after the
+// root's, marked shared, their paths absolute: py's listing (metis.catalog
+// list --consoles with no root given) row for row (release-r02 step 1b, D3).
+func TestListHoldsMetisHomesPackagesAsPysListing(t *testing.T) {
+	py := "../../../py/.venv/bin/python"
+	if _, err := os.Stat(py); err != nil {
+		t.Skip("no py venv")
+	}
+	r, h := t.TempDir(), t.TempDir()
+	writePkg(t, r, "lamp")
+	writePkg(t, h, "lamp")
+	writePkg(t, h, "bell")
+	t.Setenv("METIS_HOME", h)
+	es, err := List(py, r)
+	if err != nil {
+		t.Skip(err) // the loader not importable here
+	}
+	abs, _ := filepath.Abs(py)
+	cmd := exec.Command(abs, "-m", "metis.catalog", "list", "--consoles", "--json")
+	cmd.Dir = r
+	cmd.Env = append(os.Environ(), "METIS_CATALOG="+r)
+	b, err := cmd.Output()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []Entry
+	if err := json.Unmarshal(b, &want); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(want, func(e Entry) bool { return e.Shared }) {
+		t.Skip("metispy without the shared rows (0.1.4)")
+	}
+	g, _ := json.Marshal(es)
+	w, _ := json.Marshal(want)
+	if string(g) != string(w) {
+		t.Fatalf("Go's list is not py's:\n go %s\n py %s", g, w)
+	}
+	if len(es) != 2 || es[0].Name != "lamp" || es[0].Shared || es[1].Name != "bell" || !es[1].Shared ||
+		!filepath.IsAbs(es[1].Path) {
+		t.Fatalf("the root's lamp, then METIS_HOME's bell, shared: %+v", es)
+	}
+	t.Setenv("METIS_HOME", r) // the root is METIS_HOME: nothing is shared
+	if es, err = List(py, r); err != nil || len(es) != 1 || es[0].Shared {
+		t.Fatalf("home as the root: %+v %v", es, err)
 	}
 }

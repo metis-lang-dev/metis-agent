@@ -347,8 +347,43 @@ func py(python, module, root string, args ...string) ([]byte, error) {
 
 // List is the consoles' list as the catalog's loader makes it, through
 // metispy's metis.catalog (py's service.catalog_list is the same call): the
-// index's domains, then each partner as its own row.
+// index's domains, then each partner as its own row; METIS_HOME's rows the
+// root lacks after the root's, marked shared, their paths absolute — what
+// metis.catalog.listing() gives with no root (metis-packages Amendment 2).
+// The root is passed here (--root), and a given root sees only itself, so
+// METIS_HOME is listed as its own root (release-r02 step 1b, D3).
 func List(python, root string) ([]Entry, error) {
+	es, err := list(python, root)
+	if err != nil {
+		return nil, err
+	}
+	if h := homeDir(); h != "" && !sameDir(h, root) {
+		if _, err := os.Stat(filepath.Join(h, "domains")); err == nil {
+			hs, err := list(python, h)
+			if err != nil {
+				return nil, err
+			}
+			own := map[string]bool{}
+			for _, e := range es {
+				own[e.Name] = true
+			}
+			for _, e := range hs {
+				if own[e.Name] {
+					continue // a name in both is the root's
+				}
+				if !filepath.IsAbs(e.Path) {
+					e.Path = filepath.Join(h, e.Path)
+				}
+				e.Shared = true
+				es = append(es, e)
+			}
+		}
+	}
+	sort.SliceStable(es, func(i, j int) bool { return es[i].Kind == "domain" && es[j].Kind != "domain" })
+	return es, nil
+}
+
+func list(python, root string) ([]Entry, error) {
 	b, err := py(python, "metis.catalog", root, "list", "--consoles", "--json")
 	if err != nil {
 		return nil, err
@@ -357,8 +392,23 @@ func List(python, root string) ([]Entry, error) {
 	if err := json.Unmarshal(b, &es); err != nil {
 		return nil, fmt.Errorf("metis.catalog list: %w", err)
 	}
-	sort.SliceStable(es, func(i, j int) bool { return es[i].Kind == "domain" && es[j].Kind != "domain" })
 	return es, nil
+}
+
+// homeDir is $METIS_HOME as metis.catalog.home() resolves it (absolute, the
+// links resolved); "" when unset (metispy's own catalog has no domains/).
+func homeDir() string {
+	h := os.Getenv("METIS_HOME")
+	if h == "" {
+		return ""
+	}
+	if a, err := filepath.Abs(h); err == nil {
+		h = a
+	}
+	if r, err := filepath.EvalSymlinks(h); err == nil {
+		h = r
+	}
+	return h
 }
 
 // WidgetDir is the directory of the loop SDK's CATALOG widget (catalog.js,
