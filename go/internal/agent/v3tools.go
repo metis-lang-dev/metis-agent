@@ -18,6 +18,7 @@ import (
 	"strings"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/catalog"
+	"github.com/metis-lang-dev/metis-agent/go/internal/dagent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/repltools"
 )
 
@@ -44,19 +45,12 @@ func replAPIFrom(tools []repltools.Tool, catalogDoms, loaded []string) []apiTool
 	return out
 }
 
-// BundleDir is a package's bundle as the emitter writes it by default.
-func BundleDir(m catalog.Manifest) string { return filepath.Join(m.Dir, "build", m.Name+".metis") }
-
-// ServedTools reads the REPL API from the served packages' bundles, in
-// activation order. Each bundle is first held to metispy's REPL API now:
-// python (catalog.python) -m metis.lang.repl --tools-json, else, with no
-// python, `metis --tools-json` from PATH (metispy's console script; the
-// same main). A missing or different tools.json — a bundle built before a
-// metispy update — is emitted again (python -m metis.kernel.artifact, on
-// the metis script's own interpreter in the fallback), so Go never speaks
-// older declarations than py; a py-served package has its bundle too, as
-// reload re-emits it anyway. Only when neither exists is the check skipped
-// (logged) and the bundles read as they are.
+// ServedTools reads the REPL API from the served packages' images, in activation order (spec/17 §6, linker
+// s-5908724a, ruled): each package is linked to its one-member image (dagent.Process.Emit, metisc --link) and the
+// image root's tools.json is served, the one constant metisc writes (metis-lang src/tools_json.ml). It is held to
+// metispy's REPL API now (python -m metis.lang.repl --tools-json, else `metis --tools-json` from PATH): a
+// difference is metisc's constant gone stale, an error that names it; metispy no longer re-emits a bundle (one
+// toolchain). With neither python nor metis the check is skipped (logged).
 func ServedTools(root, python string, names []string) ([]repltools.Tool, error) {
 	ms, err := catalog.Scan(root)
 	if err != nil {
@@ -67,8 +61,13 @@ func ServedTools(root, python string, names []string) ([]repltools.Tool, error) 
 		return nil, err
 	}
 	if src.now == nil {
-		log.Printf("[catalog] the REPL API's freshness check skipped (no catalog.python, no metis on PATH): the bundles are read as they are")
+		log.Printf("[catalog] the REPL API's freshness check skipped (no catalog.python, no metis on PATH): the images' tools.json is read as metisc wrote it")
 	}
+	metispy := os.Getenv("METISPY")
+	if metispy == "" {
+		metispy = filepath.Join(filepath.Dir(root), "metispy")
+	}
+	proc := &dagent.Process{Root: root, Metispy: metispy}
 	var bundles []repltools.NamedDir
 	seen := map[string]bool{}
 	for _, n := range names {
@@ -77,22 +76,15 @@ func ServedTools(root, python string, names []string) ([]repltools.Tool, error) 
 			continue
 		}
 		seen[n] = true
-		dir := BundleDir(m)
+		dir, img, err := proc.Emit(n, m)
+		if err != nil {
+			return nil, err
+		}
 		if src.now != nil {
-			have, _ := os.ReadFile(filepath.Join(dir, "tools.json"))
+			have, _ := os.ReadFile(filepath.Join(img.Dir, "tools.json"))
 			if !bytes.Equal(have, src.now) {
-				if src.python == "" {
-					return nil, fmt.Errorf("%s's bundle differs from metispy's REPL API (%s) and no interpreter to emit it: re-emit %s", n, src.what, n)
-				}
-				cmd := exec.Command(src.python, "-m", "metis.kernel.artifact", n)
-				cmd.Env = append(os.Environ(), "METIS_CATALOG="+root)
-				if b, err := cmd.CombinedOutput(); err != nil {
-					return nil, fmt.Errorf("emit %s's bundle: %v: %s", n, err, strings.TrimSpace(string(b)))
-				}
-				if have, _ = os.ReadFile(filepath.Join(dir, "tools.json")); !bytes.Equal(have, src.now) {
-					return nil, fmt.Errorf("%s's bundle, emitted again, still differs from metispy's REPL API (%s)", n, src.what)
-				}
-				log.Printf("[catalog] %s's bundle emitted (its REPL API was missing or older than metispy's, %s)", n, src.what)
+				return nil, fmt.Errorf("%s's image (v-%s): its tools.json, metisc's constant, differs from metispy's REPL API (%s): "+
+					"metis-lang src/tools_json.ml is stale (write metispy's REPL API into it, rebuild metisc)", n, img.Hash, src.what)
 			}
 		}
 		bundles = append(bundles, repltools.NamedDir{Name: n, Dir: dir})
@@ -101,7 +93,7 @@ func ServedTools(root, python string, names []string) ([]repltools.Tool, error) 
 }
 
 // replSource is metispy's REPL API now: the bytes, what printed them, and
-// the interpreter that emits a bundle ("" = none known).
+// the interpreter behind them ("" = none known).
 type replSource struct {
 	now    []byte
 	what   string
