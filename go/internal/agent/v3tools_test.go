@@ -4,7 +4,6 @@ package agent
 // byte as the hand-built table did (the -loop v3 system turn unchanged).
 
 import (
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -45,65 +44,15 @@ func testTools(t testing.TB) []repltools.Tool {
 	return tools
 }
 
-// A bundle whose REPL API is older than metispy's is emitted again at
-// startup when python is given (nina's finding: every served bundle stale
-// alike passes the cross-bundle check); without python it is read as is.
-func TestServedToolsHoldsTheBundlesToMetispy(t *testing.T) {
-	python, _ := filepath.Abs("../../../py/.venv/bin/python")
-	if err := exec.Command(python, "-c", "import metis.kernel.artifact").Run(); err != nil {
-		t.Skip("no metispy in the py venv")
+// plantRoot is a catalog root holding a copy of metis-catalog's plant (METIS_CATALOG, else the sibling checkout).
+func plantRoot(t *testing.T) string {
+	cat := os.Getenv("METIS_CATALOG")
+	if cat == "" {
+		cat, _ = filepath.Abs("../../../../metis-catalog")
 	}
-	cat, _ := filepath.Abs("../../../../metis-catalog")
-	root := t.TempDir()
-	if err := exec.Command("cp", "-r", filepath.Join(cat, "domains", "plant"), filepath.Join(root, "domains", "plant")).Run(); err != nil {
-		if err := os.MkdirAll(filepath.Join(root, "domains"), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := exec.Command("cp", "-r", filepath.Join(cat, "domains", "plant"), filepath.Join(root, "domains", "plant")).Run(); err != nil {
-			t.Fatal(err)
-		}
+	if _, err := os.Stat(filepath.Join(cat, "domains", "plant")); err != nil {
+		t.Skipf("no metis-catalog at %s (METIS_CATALOG)", cat)
 	}
-	os.RemoveAll(filepath.Join(root, "domains", "plant", "build"))
-	tools, err := ServedTools(root, python, []string{"plant"}) // missing: emitted
-	if err != nil || len(tools) != 12 {
-		t.Fatalf("a missing bundle: %d tools, %v", len(tools), err)
-	}
-	// a bundle an emitter before a metispy update wrote: its own version
-	// directory, the link pointing at it
-	build := filepath.Join(root, "domains", "plant", "build")
-	real, _ := filepath.EvalSymlinks(filepath.Join(build, "plant.metis"))
-	old := filepath.Join(build, "plant.metis.v-0ld0ld0ld0ld")
-	if err := exec.Command("cp", "-r", real, old).Run(); err != nil {
-		t.Fatal(err)
-	}
-	b, _ := os.ReadFile(filepath.Join(old, "tools.json"))
-	stale := strings.Replace(string(b), "the domain's recent events", "the domain's OLD events", 1)
-	if err := os.WriteFile(filepath.Join(old, "tools.json"), []byte(stale), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	os.Remove(filepath.Join(build, "plant.metis"))
-	if err := os.Symlink(filepath.Base(old), filepath.Join(build, "plant.metis")); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", t.TempDir()) // no metis on PATH either
-	if tools, err = ServedTools(root, "", []string{"plant"}); err != nil || !strings.Contains(fmt.Sprint(tools), "OLD") {
-		t.Fatalf("without python or metis the bundle is read as it is: %v", err)
-	}
-	if tools, err = ServedTools(root, python, []string{"plant"}); err != nil || strings.Contains(fmt.Sprint(tools), "OLD") {
-		t.Fatalf("an older REPL API is emitted again: %v %v", err, strings.Contains(fmt.Sprint(tools), "OLD"))
-	}
-}
-
-// Without catalog.python, metis on PATH holds the bundles to metispy's
-// REPL API (repl-tools step 4): metis --tools-json, and a stale bundle
-// emitted on the script's own interpreter; a metis whose interpreter is
-// unknown refuses it ('re-emit <package>'); a failing metis is named.
-func TestServedToolsFallsBackToMetisOnPath(t *testing.T) {
-	python, _ := filepath.Abs("../../../py/.venv/bin/python")
-	if err := exec.Command(python, "-c", "import metis.kernel.artifact").Run(); err != nil {
-		t.Skip("no metispy in the py venv")
-	}
-	cat, _ := filepath.Abs("../../../../metis-catalog")
 	root := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(root, "domains"), 0o755); err != nil {
 		t.Fatal(err)
@@ -112,6 +61,40 @@ func TestServedToolsFallsBackToMetisOnPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.RemoveAll(filepath.Join(root, "domains", "plant", "build"))
+	return root
+}
+
+// The served REPL API is the images' (spec/17 §6, linker s-5908724a, ruled): a package is linked to its one-member
+// image and the image root's tools.json is served, held to metispy's REPL API now (python -m metis.lang.repl
+// --tools-json); a difference is metisc's constant gone stale, named as metis-lang src/tools_json.ml. metispy never
+// re-emits a bundle.
+func TestServedToolsAreTheImagesHeldToMetispy(t *testing.T) {
+	python, _ := filepath.Abs("../../../py/.venv/bin/python")
+	if err := exec.Command(python, "-c", "import metis.lang.repl").Run(); err != nil {
+		t.Skip("no metispy in the py venv")
+	}
+	root := plantRoot(t)
+	tools, err := ServedTools(root, python, []string{"plant"}) // no image yet: linked
+	if err != nil || len(tools) != 12 {
+		t.Fatalf("plant's image: %d tools, %v", len(tools), err)
+	}
+	imgs, _ := filepath.Glob(filepath.Join(root, "domains", "plant", "build", "plant.image.v-*", "tools.json"))
+	if len(imgs) != 1 {
+		t.Fatalf("plant's image root holds its tools.json: %v", imgs)
+	}
+	if tools, err = ServedTools(root, "", []string{"plant"}); err != nil || len(tools) != 12 {
+		t.Fatalf("without python the image's tools are read as metisc wrote them: %d, %v", len(tools), err)
+	}
+}
+
+// Without catalog.python, metis on PATH holds the images to metispy's REPL API (repl-tools step 4): metis
+// --tools-json; a newer API than metisc's constant is refused, naming tools_json.ml; a failing metis is named.
+func TestServedToolsFallsBackToMetisOnPath(t *testing.T) {
+	python, _ := filepath.Abs("../../../py/.venv/bin/python")
+	if err := exec.Command(python, "-c", "import metis.lang.repl").Run(); err != nil {
+		t.Skip("no metispy in the py venv")
+	}
+	root := plantRoot(t)
 	bin := t.TempDir()
 	t.Setenv("PATH", bin)
 	metis := func(script string) {
@@ -121,29 +104,22 @@ func TestServedToolsFallsBackToMetisOnPath(t *testing.T) {
 	}
 	// pip's console script: the venv's python on the #! line
 	metis("#!" + python + "\nimport sys\nfrom metis.lang.repl import main\nsys.exit(main())\n")
-	tools, err := ServedTools(root, "", []string{"plant"}) // missing: emitted on the script's python
+	tools, err := ServedTools(root, "", []string{"plant"})
 	if err != nil || len(tools) != 12 {
-		t.Fatalf("metis on PATH, a missing bundle: %d tools, %v", len(tools), err)
+		t.Fatalf("metis on PATH agreeing with the image: %d tools, %v", len(tools), err)
 	}
 	now, err := exec.Command(filepath.Join(bin, "metis"), "--tools-json").Output()
 	if err != nil {
 		t.Fatal(err)
 	}
-	// metis prints a newer REPL API than the bundle's, its interpreter unknown
-	metis("#!/bin/sh\nexec /bin/cat " + filepath.Join(bin, "now.json") + "\n")
+	// metispy's REPL API moved on: metisc's constant is stale, and the error says where to update it
 	newer := strings.Replace(string(now), "the domain's recent events", "the domain's NEW events", 1)
 	if err := os.WriteFile(filepath.Join(bin, "now.json"), []byte(newer), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = ServedTools(root, "", []string{"plant"}); err == nil || !strings.Contains(err.Error(), "re-emit plant") {
-		t.Fatalf("a stale bundle with no interpreter to emit it: %v", err)
-	}
-	// the same bytes as the bundle's: read as it is
-	if err := os.WriteFile(filepath.Join(bin, "now.json"), now, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if tools, err = ServedTools(root, "", []string{"plant"}); err != nil || len(tools) != 12 {
-		t.Fatalf("metis agreeing with the bundle: %d tools, %v", len(tools), err)
+	metis("#!/bin/sh\nexec /bin/cat " + filepath.Join(bin, "now.json") + "\n")
+	if _, err = ServedTools(root, "", []string{"plant"}); err == nil || !strings.Contains(err.Error(), "src/tools_json.ml is stale") {
+		t.Fatalf("a newer REPL API than metisc's constant: %v", err)
 	}
 	metis("#!/bin/sh\nexit 3\n")
 	if _, err = ServedTools(root, "", []string{"plant"}); err == nil || !strings.Contains(err.Error(), "no catalog.python; "+filepath.Join(bin, "metis")+" --tools-json") {
