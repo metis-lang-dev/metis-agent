@@ -24,7 +24,8 @@ import (
 // Go backend holds them.
 type Domain struct {
 	Name, Display, Voice string
-	Bundle               string // the bundle directory (ground.wire + sidecar.json)
+	Bundle               string // the bundle directory (ground.wire + sidecar.json): IMAGE/members/<name>
+	Image                Image  // the one-member image it was linked to (spec/17 §6: the hash and lock for the handshake)
 	Source               string // the served program's source text (the rule spans)
 	Spec                 *Spec  // intent.yaml (nil: a domain with no intents, the kitchen's cooks, a program-only domain)
 	Generic              bool   // the generic agent: the host wrapped as the AgentHost (intent.spec)

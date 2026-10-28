@@ -18,7 +18,7 @@ env:
   # the one py's llama_cpp_python vendors (third_party/check-pin.sh, py job)
   # the metis runtime (go/internal/rt): metis-lang (public) at the commit the
   # binding is built and tested against; build.sh builds libmetis_rt there
-  METIS_LANG_COMMIT: 18da80344eac87603b97b9d80b05004a80ac5ddd
+  METIS_LANG_COMMIT: 5089a200b6e47f60c6d05583f0e32228ca97f80d   # linker s-5908724a step 4: metisc --link PKGDIR (metis-lang link-package; master once merged)
   # metispy and metis-catalog are public siblings, checked out beside the repo
 
 jobs:
@@ -40,7 +40,7 @@ jobs:
   # without weights (go/models is not in git); the metispy-backed kernel test
   # runs on the checked-out metispy.
   go:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04      # ocaml-nox for metisc (ubuntu-latest's 26.04 has none)
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -84,6 +84,13 @@ jobs:
           repository: metis-lang-dev/metis-lang
           ref: ${{ env.METIS_LANG_COMMIT }}
           path: metis-lang
+      # spec/17 (linker s-5908724a step 4): a lone package loads through its one-member image, which metisc links
+      # (metisc --link PKGDIR): the agent's linker, at the same pin
+      - name: metisc (the linker, at the pin)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ocaml-nox
+          make -C metis-lang/src metisc
+          echo "METISC=$GITHUB_WORKSPACE/metis-lang/src/metisc" >> "$GITHUB_ENV"
       - name: Cache libmetis_rt (the pinned commit)
         uses: actions/cache@v4
         with:

@@ -74,6 +74,12 @@ type Tool struct {
 
 // Read reads a bundle directory's tools.json.
 func Read(dir string) ([]Tool, error) {
+	// an image's member bundle (spec/17 §3.1: IMAGE/members/<m>/): the REPL API is the image's, once at its root
+	if _, err := os.Stat(filepath.Join(dir, "tools.json")); os.IsNotExist(err) {
+		if root := filepath.Join(dir, "..", ".."); fileExists(filepath.Join(root, "image.json")) {
+			dir = root
+		}
+	}
 	b, err := os.ReadFile(filepath.Join(dir, "tools.json"))
 	if os.IsNotExist(err) {
 		return nil, fmt.Errorf("%s: no tools.json — a stale bundle, from an emitter before the REPL API rode in it: "+
@@ -141,3 +147,5 @@ func Served(bundles []NamedDir) ([]Tool, error) {
 
 // NamedDir is a package's bundle directory.
 type NamedDir struct{ Name, Dir string }
+
+func fileExists(p string) bool { _, err := os.Stat(p); return err == nil }

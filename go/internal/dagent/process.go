@@ -58,7 +58,8 @@ var Hosts = map[string]HostEntry{
 type Process struct {
 	Root     string // the metis-catalog checkout
 	Metispy  string // the metispy checkout (a `serves` entry's pkg.mod:path)
-	Python   string // the interpreter that runs metispy's emitter
+	Python   string // the interpreter that runs metispy's emitter (spec/17: no more; the image is metisc's)
+	Metisc   string // metis-lang's metisc, the one linker ("" = $METISC, else the sibling metis-lang/src/metisc)
 	BuildDir string // where the bundles go ("" = each package's build/)
 	Names    []string
 	Seed     uint64
@@ -103,25 +104,78 @@ func (p *Process) served(m catalog.Manifest, entry string) string {
 	return m.Path(entry)
 }
 
-// Emit builds a domain's bundle through metispy's emitter.
-func (p *Process) Emit(name string) (string, error) {
-	out := filepath.Join(p.Root, "domains", name, "build", name+".metis")
+// metisc is the linker: Process.Metisc, else $METISC, else the metis-lang checkout beside metispy's.
+func (p *Process) metisc() (string, error) {
+	for _, c := range []string{p.Metisc, os.Getenv("METISC"), filepath.Join(filepath.Dir(p.Metispy), "metis-lang", "src", "metisc")} {
+		if c != "" {
+			if _, err := os.Stat(c); err == nil {
+				return c, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("no metisc: set Process.Metisc or $METISC, or build metis-lang/src/metisc beside metispy")
+}
+
+// servedFiles is the served program's files, in order (py Domain.serves): `serves:` resolved, else the program and
+// its extensions (`extensions:`, else extensions/*.llp beside the manifest in name order).
+func (p *Process) servedFiles(m catalog.Manifest) []string {
+	if len(m.Serves) > 0 {
+		out := make([]string, len(m.Serves))
+		for i, e := range m.Serves {
+			out[i] = p.served(m, e)
+		}
+		return out
+	}
+	if m.Program == "" {
+		return nil
+	}
+	return append([]string{m.Path(m.Program)}, m.Extensions()...)
+}
+
+// Emit links a lone package to its one-member image (spec/17 §2, §6: metisc --link PKGDIR --serve FILE
+// [--extension E]...) and returns the member's bundle, IMAGE/members/<name>, with the image.
+func (p *Process) Emit(name string, m catalog.Manifest) (string, Image, error) {
+	out := filepath.Join(p.Root, "domains", name, "build")
 	if p.BuildDir != "" {
-		out = filepath.Join(p.BuildDir, name+".metis")
+		out = p.BuildDir
 	}
-	cmd := exec.Command(p.Python, "-m", "metis.kernel.artifact", name, "-o", out)
-	cmd.Env = append(os.Environ(), "METIS_CATALOG="+p.Root)
-	b, err := cmd.CombinedOutput()
+	files := p.servedFiles(m)
+	if len(files) == 0 {
+		return "", Image{}, fmt.Errorf("domain %s serves no program", name)
+	}
+	mc, err := p.metisc()
 	if err != nil {
-		return "", fmt.Errorf("the emitter on %s: %v: %s", name, err, strings.TrimSpace(string(b)))
+		return "", Image{}, err
 	}
-	// who compiled the served wire: metisc (OCaml-authoritative) or
-	// metispy's cover (bundle-compiler s-3985caf6 step 3)
-	if i := strings.Index(string(b), "ground.wire by "); i >= 0 {
-		by, _, _ := strings.Cut(string(b)[i+len("ground.wire by "):], "\n")
-		log.Printf("%s's bundle: ground.wire by %s", name, strings.TrimSpace(by))
+	args := []string{"--link", filepath.Dir(m.Path("domain.yaml")), "-o", out, "--serve", files[0]}
+	for _, e := range files[1:] {
+		args = append(args, "--extension", e)
 	}
-	return out, nil
+	cmd := exec.Command(mc, args...)
+	cmd.Env = append(os.Environ(), "METIS_HOME="+p.home())
+	b, err := cmd.Output()
+	if err != nil {
+		var stderr string
+		if ee, ok := err.(*exec.ExitError); ok {
+			stderr = string(ee.Stderr)
+		}
+		return "", Image{}, fmt.Errorf("metisc --link %s: %v: %s%s", name, err, strings.TrimSpace(string(b)), strings.TrimSpace(stderr))
+	}
+	var dir string
+	for _, l := range strings.Split(string(b), "\n") {
+		if w, ok := strings.CutPrefix(l, "wrote "); ok {
+			dir = filepath.Join(out, strings.Fields(w)[0])
+		}
+	}
+	if dir == "" {
+		return "", Image{}, fmt.Errorf("metisc --link %s wrote no image: %s", name, strings.TrimSpace(string(b)))
+	}
+	img, err := ReadImage(dir, name)
+	if err != nil {
+		return "", Image{}, err
+	}
+	log.Printf("%s's image: v-%s (metisc --link)", name, img.Hash)
+	return filepath.Join(dir, img.Member.Bundle), img, nil
 }
 
 // Domains reads the named packages and emits their bundles; a pair's
@@ -153,24 +207,26 @@ func (p *Process) Domains(names []string) ([]Domain, error) {
 		if !ok && !bare {
 			return nil, fmt.Errorf("domain %s has no Go host", n)
 		}
-		files := m.Serves
-		if len(files) == 0 && m.Program != "" {
-			files = []string{m.Program}
-		}
+		files := p.servedFiles(m)
 		if len(files) == 0 {
 			return nil, fmt.Errorf("domain %s serves no program", n)
 		}
-		src, err := os.ReadFile(p.served(m, files[0]))
+		src, err := os.ReadFile(files[0])
 		if err != nil {
 			return nil, err
 		}
-		bundle, err := p.Emit(n)
+		bundle, img, err := p.Emit(n, m)
 		if err != nil {
+			return nil, err
+		}
+		// the loader's host contract (spec/17 §6): the image's binding, against the manifest and the registry
+		if err := img.CheckHost(n, m.Host != "", ok); err != nil {
 			return nil, err
 		}
 		d := Domain{Name: n, Display: m.Display, Voice: m.Voice, Bundle: bundle, Source: string(src),
 			Tables: h.Tables, PluginSpec: h.PluginSpec, Answers: h.Answers, ExoEvents: h.ExoEvents, FragCounts: h.FragCounts,
-			Quiescence: h.Quiescence, Beats: h.Beats, BeatSteps: m.Clock.Steps, OwnDay: h.OwnDay, Pair: h.Pair, PricedBy: h.PricedBy}
+			Quiescence: h.Quiescence, Beats: h.Beats, BeatSteps: img.Member.Steps(), OwnDay: h.OwnDay, Pair: h.Pair, PricedBy: h.PricedBy,
+			Image: img}
 		if h.Display != "" {
 			d.Display = h.Display
 		}
