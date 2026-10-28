@@ -146,7 +146,7 @@ jobs:
   # imports metispy and reads metis-catalog (domains/dog, wolf-goat-cabbage),
   # both public siblings, checked out beside the repo.
   py:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04            # metisc's OCaml: ubuntu-latest (26.04) has no ocaml-nox
     timeout-minutes: 15
     steps:
       # py/ finds its siblings beside the repo (ROOT.parent/metis-catalog)
@@ -158,6 +158,19 @@ jobs:
         with:
           repository: metis-lang-dev/metispy
           path: metispy
+          # linker s-5908724a step 3: metis.catalog.image is on metispy's link-step3 until it merges (the merge
+          # drops this ref: master again)
+          ref: link-step3
+      - name: Checkout metis-lang (public sibling; the Live's images are linked by its metisc)
+        uses: actions/checkout@v4
+        with:
+          repository: metis-lang-dev/metis-lang
+          path: metis-lang
+      - name: Build metisc (the tree tests' images, spec/17)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ocaml-nox
+          make -C metis-lang/src metisc
+          echo "METISC=$GITHUB_WORKSPACE/metis-lang/src/metisc" >> "$GITHUB_ENV"
       - name: Checkout metis-catalog (public sibling)
         uses: actions/checkout@v4
         with:
