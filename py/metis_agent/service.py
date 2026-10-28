@@ -22,6 +22,7 @@ import logging
 import os
 import queue
 import re
+import signal
 import threading
 import time
 from datetime import datetime, timezone
@@ -387,6 +388,11 @@ class Live:
         # the world page (alf-demo step 2, DEMO.md §4): the world's map file, served at /world/map.json and
         # named on every hello (world/map); the director's task chain and result lines (world/delta task)
         self.world_map = v3.get("world_map")
+        # the world's games (the world page's picker): v3.games, a JSON file {current, games: [{id, label, …}]} served at
+        # /world/games.json; a page's load_game names one of them, written to v3.game_request, and the service stops so
+        # that its runner (alfworld/demo.sh) sets that game up and starts the service again
+        self.games = v3.get("games")
+        self.game_request = v3.get("game_request")
         self.ask_now = None       # the director's open question: {question, options} (world/ask; alf-demo step 3b)
         self.status = None        # what the agent wants from the person now (world/status)
         self.answers = []         # the turns' answers, (text, time): the spoken-repeat guard (alf-demo 3c)
@@ -877,6 +883,21 @@ class Live:
         world's episode ended: a new task needs a new game)."""
         self.status = dict({"state": state, "text": text}, **kw)
         self.emit("world/status", self.status)
+
+    def load_game(self, game):
+        """A page's load_game: GAME, one of v3.games' ids, written to v3.game_request for the runner, which starts
+        the service again on it. → None, or the refusal in words."""
+        if not (self.games and self.game_request):
+            return "This service has no games to load."
+        try:
+            ids = {g.get("id") for g in json.loads(Path(self.games).read_text()).get("games") or ()}
+        except (OSError, ValueError) as e:
+            return "The games list cannot be read: %s" % e
+        if game not in ids:
+            return "There is no game %r here." % game
+        Path(self.game_request).write_text(json.dumps({"game": game}))
+        self.journal.record({"kind": "dlg-director", "load_game": game})
+        return None
 
     def new_game(self, say=True):
         """The same game from its start (alf-demo step 3b F7, the architect's AlfHost.new_episode): every
@@ -1876,7 +1897,7 @@ def make_app(live, ui_dir, lib_dir=None):
     def emit(ev, f):
         """A frame to every page."""
         loop = loop_box.get("loop")
-        if not loop:
+        if not loop or loop.is_closed():       # none yet, or the service stopping (^C, another game): no page left
             return
         data = json.dumps(dict({"ev": ev, "t": _now_rfc()}, **f), ensure_ascii=False, default=str)
         loop.call_soon_threadsafe(lambda: [asyncio.ensure_future(ws.send_str(data))
@@ -1938,6 +1959,13 @@ def make_app(live, ui_dir, lib_dir=None):
                         await send("journal", {"rec": r})
                 elif ev == "new_game":
                     await send("new_game_ack", {"text": await ask(live.new_game)})
+                elif ev == "load_game":     # another game (v3.games): its runner restarts the service on it
+                    game = str(m.get("game") or "")
+                    err = live.load_game(game)
+                    await send("load_game_ack", {"game": game, **({"error": err} if err else {})})
+                    if not err:              # every page reloads once the service is back; the stop is run_app's own
+                        emit("world/loading", {"game": game})
+                        asyncio.get_running_loop().call_later(0.5, os.kill, os.getpid(), signal.SIGINT)
                 elif ev == "say_text":
                     text = str(m.get("text") or "").strip()
                     if not text:
@@ -2017,6 +2045,10 @@ def make_app(live, ui_dir, lib_dir=None):
         async def world_map(request):
             return web.FileResponse(Path(live.world_map), headers={"Cache-Control": "no-store"})
         app.router.add_get("/world/map.json", world_map)
+    if getattr(live, "games", None):
+        async def world_games(request):
+            return web.FileResponse(Path(live.games), headers={"Cache-Control": "no-store"})
+        app.router.add_get("/world/games.json", world_games)
 
     async def index(request):
         return web.FileResponse(Path(ui_dir) / "index.html", headers={"Cache-Control": "no-store"})

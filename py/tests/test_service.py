@@ -685,3 +685,39 @@ def test_a_name_listed_twice_is_two_rows_the_second_shadowed(tmp_path):
         dog["path"], False, False, "shadowed: " + dog["path"], "another dog")
     keys = [e.get("path") or e["name"] for e in cat]
     assert len(keys) == len(set(keys))                                   # the page's keys are unique
+
+
+def test_a_page_loads_another_game_through_its_runner(tmp_path, monkeypatch):
+    """The world page's game picker: v3.games is served at /world/games.json; a page's load_game names one of its ids,
+    which is written to v3.game_request, every page hears world/loading, and the service stops (SIGINT, run_app's own
+    stop) so that its runner (alfworld/demo.sh) starts it on that game; an id not in the list is refused in words."""
+    import asyncio
+    import signal
+    from aiohttp.test_utils import TestClient, TestServer
+    lv, _ = live(tmp_path)
+    games = tmp_path / "games.json"
+    games.write_text(json.dumps({"current": "train/a-1", "games": [{"id": "train/a-1"}, {"id": "train/b-2"}]}))
+    lv.games, lv.game_request = str(games), str(tmp_path / "next.json")
+    kills = []
+    monkeypatch.setattr(os, "kill", lambda pid, sig: kills.append((pid, sig)))
+    app = S.make_app(lv, str(ROOT / "console"))
+
+    async def go():
+        async with TestClient(TestServer(app)) as c:
+            assert (await (await c.get("/world/games.json")).json())["current"] == "train/a-1"
+            a = await c.ws_connect("/ws")
+            await a.send_json({"ev": "load_game", "game": "../etc"})
+            m = json.loads((await a.receive(timeout=10)).data)
+            assert m["ev"] == "load_game_ack" and m["error"] == "There is no game '../etc' here."
+            await a.send_json({"ev": "load_game", "game": "train/b-2"})
+            got = []
+            while not got or got[-1]["ev"] != "world/loading":
+                got.append(json.loads((await a.receive(timeout=10)).data))
+            ack = next(g for g in got if g["ev"] == "load_game_ack")
+            assert ack["game"] == "train/b-2" and "error" not in ack and got[-1]["game"] == "train/b-2"
+            await asyncio.sleep(0.8)
+            await a.close()
+    asyncio.run(go())
+    assert json.loads((tmp_path / "next.json").read_text()) == {"game": "train/b-2"}
+    assert kills == [(os.getpid(), signal.SIGINT)]
+    assert recs(lv, "dlg-director")[-1]["load_game"] == "train/b-2"
