@@ -303,6 +303,7 @@ class Live:
     console's verbs, a deferred consult's answer), the consult on a worker."""
 
     image = None                         # v3.image's (metis.catalog.image.Image), when the config names one
+    proc_split, remote_status = None, {}     # a plan's process (metis_agent.split.Split) and its peer's statuses
 
     def __init__(self, cfg, llm, emit=None):
         self.cfg, self.emit = cfg, emit or (lambda ev, f, **kw: None)
@@ -312,11 +313,21 @@ class Live:
         # the image (linker s-5908724a step 3, spec/17 §6): the members, their clocks and the director come from it,
         # never from the config; each member is built from its source here and must be the program the image linked
         self.image = self.load_image(cfg)
+        self.proc_split, self.remote_status = None, {}
+        if self.image is not None and v3.get("plan"):
+            # one process of a deployment plan (spec 17 §5, linker step 5b): the plan's members beat here
+            from .split import load_plan
+            self.plan_cfg = dict(v3["plan"])
+            self.plan = load_plan(self.image, self.plan_cfg["file"])
+            here = set(self.plan["processes"][self.plan_cfg["process"]]["members"])
+        else:
+            here = None
         if self.image is not None:
             # the beat order: the specialists in the image's order, then the direct member — the order the kitchen's
             # and the road's configs had (their journals stay byte-identical); a director first (the alfworld and
             # minihack trees' configs) gave a member's first sync its own beat-0 row before its first beat
             order = [n for n in self.image.names if n != self.image.direct] + [self.image.direct]
+            order = [n for n in order if here is None or n in here]
             by = {c["domain"]: c for c in self.image.clocks}
             self.names, self.clocks = order, [by[n] for n in order]
         else:
@@ -343,6 +354,9 @@ class Live:
         log.info("[v3] loading the domains (%d): their programs and hosts — this can take a while", len(self.names))
         t_build = time.time()
         self.agents = self.proc.build(int(dcfg.get("seed", 1)), dcfg.get("case", "live"))
+        if getattr(self, "plan", None) is not None and not hasattr(self.agents, "agents"):
+            from .domain_agent import Domains
+            self.agents = Domains([self.agents])        # a plan's process of ONE member is still a tick's member set
         log.info("[v3] domains loaded in %.1fs", time.time() - t_build)
         # the intent material of every served domain that has it (e2e-workflow
         # step 4): the system turn opens with it, the person turn's grammar is
@@ -413,10 +427,14 @@ class Live:
         # route the others; the atoms they produce of its kinds arrive, one director beat each
         self.director, self._dir_traces = None, None
         director = self.image.direct if self.image is not None else v3.get("director")
+        if director and director not in self.names:
+            director = None                    # the plan puts the director in the peer process
         if director:
             self.director = self.director_loop(str(director))
         if self.tick_all:
             self.gate_commands()
+        if getattr(self, "plan", None) is not None:
+            self.open_split()
         # the world page (alf-demo step 2, DEMO.md §4): the world's map file, served at /world/map.json and
         # named on every hello (world/map); the director's task chain and result lines (world/delta task)
         self.world_map = v3.get("world_map")
@@ -457,6 +475,37 @@ class Live:
                                                                % (m, (w or "?")[:12], (k or "?")[:12]) for m, w, k in bad))
         log.info("[v3] image %s v-%s: %s", img.name, img.hash, ", ".join(img.names))
         return img
+
+    def open_split(self):
+        """The plan's transport (metis.transport's socket carrier, v3.plan {file, process, listen, peer}): the
+        handshake on the image's, the plan's and the lock's hashes, then the Split's hosts (spec 17 §5.3-5.4)."""
+        import hashlib
+
+        from metis import transport
+
+        from .split import Split
+        c = self.plan_cfg
+        lock = hashlib.sha256((self.image.dir / "image.lock").read_bytes()).hexdigest()[:12]
+        car = transport.SocketCarrier(c["process"], tuple(c["listen"]), tuple(c["peer"]),
+                                      budget=int((self.plan.get("transport") or {}).get("budget", 1)))
+        car.hello(self.image.hash, self.plan["hash"], lock)
+        self.proc_split = Split(self, self.image, self.plan, c["process"], car)
+        self.proc_split.setup(self.remote_host)
+        self.proc_split.prime(wait=float(c.get("wait", 5)))
+        self.journal.record({"kind": "dlg-split", "process": c["process"], "members": list(self.names),
+                             "peer": self.proc_split.peer, "plan": self.plan["hash"], "image": self.image.hash, "lock": lock})
+
+    def remote_host(self, m):
+        """Member M's own host, built here for the world this process hosts (M beats in the peer process)."""
+        import importlib.util
+
+        from .domains import catalog
+        d = catalog().get(m)
+        f, fac = d.host
+        spec = importlib.util.spec_from_file_location("split_host_%s" % m, f)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return getattr(mod, fac)(None)
 
     def manifest(self, d):
         """Domain D's manifest table: the image's member (what the link checked and recorded), else the catalog's
@@ -646,6 +695,12 @@ class Live:
         """The director's tick__cancel(DOM) (its stop_cancel, on the agent's tick__stop; step 3c, spec/15 amendment
         7), relayed into DOM's session like any director out to a member in: DOM drops its own goal (its generated
         cancel rules). A revoke takes the body and keeps the goal; a cancel takes the goal."""
+        if self.proc_split is not None and dom in self.proc_split.remote:
+            atom = "tick__cancel(%s)" % dom              # crosses to the peer process, taken there (spec 17 §5.2)
+            self.proc_split.outbox[atom] = self.proc_split.outbox.get(atom, 0) + 1
+            self.journal.record({"kind": "dlg-relay", "what": "cancel", "domain": dom, "stamp": self.beat,
+                                 "transport": self.proc_split.peer})
+            return
         ag = self.agents.agents.get(dom) if hasattr(self.agents, "agents") else None
         if ag is None:
             return
@@ -658,6 +713,15 @@ class Live:
         """A tree director's grant (on) or revoke of resource RES: synced into DOM's session as the protocol's
         tick__grant(DOM, RES) (a line the agent takes, the world not re-read); only the holder's commands reach
         the world."""
+        if self.proc_split is not None and dom in self.proc_split.remote:
+            # a member of the peer process (spec 17 §5.2): the grant or revoke crosses as tick__grant ±1, taken
+            # into its session where it beats; the decision journaled here as in one process
+            atom = "tick__grant(%s,%s)" % (dom, res)
+            self.proc_split.outbox[atom] = self.proc_split.outbox.get(atom, 0) + (1 if on else -1)
+            self.journal.record({"kind": "dlg-relay", "what": "grant" if on else "revoke", "domain": dom, "res": res,
+                                 "stamp": self.beat, "taken": True, "transport": self.proc_split.peer})
+            self.holder = dom if on else (None if self.holder == dom else self.holder)
+            return
         ag = self.agents.agents.get(dom) if hasattr(self.agents, "agents") else None
         if ag is None:
             return
@@ -810,6 +874,8 @@ class Live:
             kinds = {a.split("(")[0] for r in fired for a in r.get("produce") or []}
             out[d] = ("success" if kinds & set(st.get("success") or ()) else
                       "failure" if kinds & set(st.get("failure") or ()) else "running" if fired else "idle")
+            if d in self.remote_status:          # a member of the peer process: its status as the peer sent it
+                out[d] = self.remote_status[d]
         dag = self.agents.agents.get(self.director.name)
         if dag is not None:
             # into the director at the boundary (latched: it reads them next tick): the statuses that changed, with
@@ -1329,6 +1395,12 @@ class Live:
     # the clock and the inbox
 
     def tick(self):
+        if self.proc_split is not None and self.proc_split.tick:
+            # the peer's message of the tick both committed, latched before this beat (spec 17 §5.3); where the
+            # director is, the statuses of that tick (the peer's members' with them) are relayed now, before it beats
+            self.proc_split.take(wait=float(self.plan_cfg.get("wait", 5)))
+            if self.tick_all and self.director is not None:
+                self.statuses()
         self.beat += 1
         due = []
         if self.tick_all and self.director is not None:
@@ -1362,8 +1434,10 @@ class Live:
         # timing: a 13-step task waited 13 ticks of tick_ms, 3.9 s of a 1.3 s turn's work)
         self.eager = self.director is not None and len(self.director.log) > k and self.director.outcome is None
         self.release_held(k)
-        if self.tick_all and self.director is not None:
+        if self.tick_all and self.director is not None and self.proc_split is None:
             self.statuses()
+        if self.proc_split is not None:
+            self.proc_split.send()
         self.world_frames()                    # the hosts' world/* frames of this tick (alf-demo step 2)
         self.card_changes()
         self.auto_reload()

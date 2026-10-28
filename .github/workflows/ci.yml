@@ -165,9 +165,9 @@ jobs:
         with:
           repository: metis-lang-dev/metispy
           path: metispy
-          # linker s-5908724a step 3: metis.catalog.image is on metispy's link-step3 until it merges (the merge
+          # linker s-5908724a step 5b: metis.transport is on metispy's link-step5b until it merges (the merge
           # drops this ref: master again)
-          ref: link-step3
+          ref: link-step5b
       - name: Checkout metis-lang (public sibling; the Live's images are linked by its metisc)
         uses: actions/checkout@v4
         with:
