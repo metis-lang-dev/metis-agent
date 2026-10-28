@@ -57,11 +57,12 @@ def composition(tmp_path, members):
     text = (KITCHEN / "composition.yaml").read_text()
     if list(members) == list(yaml.safe_load(text)["specialists"]):
         return KITCHEN
-    d = tmp_path / "kitchen_pot"
+    d = tmp_path / "cat" / "domains" / "kitchen_pot"
     if not d.exists():
         shutil.copytree(KITCHEN, d, ignore=shutil.ignore_patterns("build"))
         # the one line, in the flow style metisc reads (it reads no block YAML)
         (d / "composition.yaml").write_text(re.sub(r"(?m)^specialists:.*$", "specialists: [%s]" % ", ".join(members), text))
+    os.environ["METIS_CATALOG"] = str(tmp_path / "cat")      # its members, where the image's lock names them
     return d
 
 
@@ -348,10 +349,13 @@ def test_a_stop_with_the_orders_withdrawn_halts_the_kitchen(tmp_path):
 
 # ── the image (linker s-5908724a step 3, spec/17 §6) ──────────────────────────────────────────────────────────────
 
-def kitchen_copy(tmp_path):
+def kitchen_copy(tmp_path, monkeypatch):
+    """A copy of the catalog's kitchen_pot in a catalog of its own (the Live resolves its members there: the
+    directories the image's lock names)."""
     import shutil
-    d = tmp_path / "kitchen_pot"
+    d = tmp_path / "cat" / "domains" / "kitchen_pot"
     shutil.copytree(KITCHEN, d, ignore=shutil.ignore_patterns("build"))
+    monkeypatch.setenv("METIS_CATALOG", str(tmp_path / "cat"))
     return d
 
 
@@ -364,11 +368,14 @@ def test_a_config_names_the_image_or_the_members_not_both(tmp_path):
 
 
 def test_a_member_that_is_not_the_program_the_image_linked_refuses_the_start(tmp_path, monkeypatch):
-    """load-key-mismatch: the image linked another cook_a than the one this process resolves (the catalog's)."""
-    d = kitchen_copy(tmp_path)
+    """load-key-mismatch: cook_a's source changed after the image was linked: the program built here is not the
+    image's."""
+    from metis.catalog import image as I
+    d = kitchen_copy(tmp_path, monkeypatch)
+    img = I.image(d)
     p = d / "cook_a" / "cook_a.llp"
     p.write_text(p.read_text().replace("self(cook_a).", "self(cook_b)."))
-    monkeypatch.setattr(sys.modules[__name__], "composition", lambda tmp, members: d)
+    monkeypatch.setattr(sys.modules[__name__], "composition", lambda tmp, members: img.dir)
     with pytest.raises(ValueError, match="load-key-mismatch: cook_a"):
         run(tmp_path / "run")
 
@@ -376,7 +383,7 @@ def test_a_member_that_is_not_the_program_the_image_linked_refuses_the_start(tmp
 def test_the_kitchen_runs_on_a_generated_director(tmp_path, monkeypatch):
     """direct: a name with no package — the link DERIVES the director (spec/17 §3.3) and writes its source into the
     image; the Live builds it from there, on metispy's generic pass host, and the kitchen's conditions hold."""
-    d = kitchen_copy(tmp_path)
+    d = kitchen_copy(tmp_path, monkeypatch)
     text = (d / "composition.yaml").read_text()
     text = re.sub(r"(?m)^direct:.*$", "direct: tree_director\nresources: {pot: 1}", text)
     (d / "composition.yaml").write_text(text)
