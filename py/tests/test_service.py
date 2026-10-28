@@ -721,3 +721,25 @@ def test_a_page_loads_another_game_through_its_runner(tmp_path, monkeypatch):
     assert json.loads((tmp_path / "next.json").read_text()) == {"game": "train/b-2"}
     assert kills == [(os.getpid(), signal.SIGINT)]
     assert recs(lv, "dlg-director")[-1]["load_game"] == "train/b-2"
+
+
+def test_a_slot_binds_only_to_what_the_person_named():
+    """alf-tasks s-e9cc8fae step 3 (the architect's ruling): the card's `grounded:` slots bind only to what the
+    person's words name — a value's kind written together, or a word of theirs inside it; a guess is held back and
+    asked about (no substitution: "teddy bear" is never TOMATO1), a grounded slot the verb needs and the J leaves
+    out is asked for; a card that grounds nothing, or a typed intent (no words), passes as before."""
+    from types import SimpleNamespace
+    spec = {"grounded": ["object", "receptacle"],
+            "map": [{"verb": "FETCH", "atom": "fetch({object:object},{receptacle:receptacle})"}]}
+    me = SimpleNamespace(turn_text=None, grounding_card=lambda d: spec)
+    loose = lambda text, j: (setattr(me, "turn_text", text), S.Live.ungrounded(me, "task", j, "FETCH"))[1]
+    assert loose("bring the teddy bear to the fridge", {"object": "TOMATO1", "receptacle": "FRIDGE1"}) == [("object", "TOMATO1")]
+    assert loose("put the second tomato on the counter", {"object": "TOMATO2", "receptacle": "COUNTERTOP1"}) == []
+    assert loose("move the pepper shaker to a shelf", {"object": "PEPPERSHAKER1", "receptacle": "SHELF"}) == []
+    assert loose("bring the soap to the table", {"object": "SOAPBOTTLE1", "receptacle": "DININGTABLE1"}) == []
+    assert loose("bring me the egg", {"object": "EGG1"}) == [("receptacle", None)]
+    assert loose("bring me the egg", {"object": "EGG1", "receptacle": "COUNTERTOP1"}) == [("receptacle", "COUNTERTOP1")]
+    assert loose("", {"object": "TOMATO1", "receptacle": "FRIDGE1"}) == []                     # typed: no words to hold it to
+    spec["grounded"] = []
+    assert loose("bring the teddy bear to the fridge", {"object": "TOMATO1", "receptacle": "FRIDGE1"}) == []
+    assert S.Live.spoken_value(me, "task", "object", "TOMATO1") == "tomato 1"

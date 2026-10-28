@@ -1300,6 +1300,16 @@ class Live:
             self.on_say("line", line)
             self.set_status("over", line, options=list(NEW_GAME_OPTION))
             return O.Reply({"domain": d, "kind": "error", "error": "the game is over", "text": line}), True
+        loose = self.ungrounded(d, j, verb)
+        if loose:
+            # slot grounding (alf-tasks s-e9cc8fae step 3, the architect's ruling): a slot binds only to what the person
+            # named; a value their words never name is the model's guess, never dispatched (no substitution) — ask
+            slot, value = loose[0]
+            line = ("I need the %s too: say it again with it?" % slot if value is None else
+                    "I didn't hear %s in what you said: say it again with the thing's name?" % self.spoken_value(d, slot, value))
+            self.journal.record({"kind": "dlg-ground", "domain": d, "verb": verb, "ungrounded": loose, "person": self.turn_text})
+            self.on_say("line", line)
+            return O.Reply({"domain": d, "kind": "error", "error": "ungrounded %s=%s" % (slot, value), "text": line}), True
         if self.director is not None and self.director.outcome:
             was = self.director.reengage()                 # after an ask or the end: the person's words go on
             self.task_view = {"chain": [], "results": []}
@@ -1314,6 +1324,49 @@ class Live:
         return self.split(rs, cid, False)
 
     turn_at = None
+    turn_text = None
+
+    def grounding_card(self, d):
+        """Domain D's card (its intent.yaml, the manifest's intent: {spec}; read each turn: a card the host rewrites
+        stays current), or None."""
+        from .domains import catalog
+        import yaml
+        try:
+            spec = catalog().get(d).intent.get("spec")
+            return yaml.safe_load(spec.read_text()) if spec else None
+        except Exception:  # noqa: BLE001 — no card to ground against: nothing is held back
+            return None
+
+    def ungrounded(self, d, j, verb=None):
+        """The card's `grounded:` slots of J that the person's words never name: a value's kind (its letters, the number
+        dropped: TOMATO2 → tomato) is in the words written together, or a word of theirs (four letters or more) is in
+        it ("counter" in countertop, "soap" in soapbottle). → [(slot, value)], empty when every one is named, when the
+        card names no slot to ground, or when there are no words (a typed intent). A grounded slot VERB's atom takes that
+        the J leaves out is (slot, None): asked for, never filled in."""
+        text = (self.turn_text or "").lower()
+        spec = self.grounding_card(d) if text else None
+        slots = (spec or {}).get("grounded") or []
+        if not slots:
+            return []
+        together = re.sub(r"[^a-z]", "", text)
+        words = [w for w in re.findall(r"[a-z]+", text) if len(w) >= 4]
+        uses = {s for row in spec.get("map") or [] if row.get("verb") == verb for s in re.findall(r"\{\w+:(\w+)\}", row.get("atom", ""))}
+        out = []
+        for s in slots:
+            v = j.get(s)
+            if not isinstance(v, str) or not v:
+                if s in uses:
+                    out.append((s, None))
+                continue
+            kind = re.sub(r"[^a-z]", "", re.sub(r"\d+$", "", v.lower()))
+            if kind and not (kind in together or any(w in kind for w in words)):
+                out.append((s, v))
+        return out
+
+    def spoken_value(self, d, slot, value):
+        """A slot's value as the person would say it: TOMATO1 → "tomato 1"."""
+        m = re.match(r"^([a-z]+?)(\d+)$", value.lower())
+        return "%s %s" % (m.group(1), m.group(2)) if m else value.lower()
 
     def typed(self, d, iid, j, page=None):
         """A typed intent from a page (WIRE.md intent{domain, id, j}): the J dispatched to
@@ -1540,6 +1593,7 @@ class Live:
             w["wait_ms"] = int((time.time() - at) * 1000)
         self.journal.record(w)
         self.turn_at = at if at is not None else time.time()
+        self.turn_text = text                     # the person's words, for the slot grounding of the J this turn maps them to
         prev, prev_at = self.journal.say, self.journal.say_at     # the last say before this turn's own
         try:
             if self.director is not None and text.strip().lower().rstrip(".!") in NEW_GAME_WORDS:
