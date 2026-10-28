@@ -252,6 +252,24 @@ def line_voiced(name):
         return False
 
 
+def config_image(cfg):
+    """The image a config names (v3.image, linker s-5908724a step 3, spec/17 §6): an image dir, or a composition dir
+    built into its build/ by metisc (metis.catalog.image); relative to py/ as the config's other paths. None when the
+    config names none (a single-package Live keeps domains.names)."""
+    p = (cfg.get("v3") or {}).get("image")
+    if not p:
+        return None
+    from metis.catalog import image as I
+    p = Path(p)
+    return I.image(p if p.is_absolute() else ROOT / "py" / p)
+
+
+def config_names(cfg, img=None):
+    """The served domains: the image's members (its order), else the config's domains.names."""
+    img = img if img is not None else config_image(cfg)
+    return img.names if img is not None else list(cfg["domains"]["names"])
+
+
 def intents_of(names, template="gemma4"):
     """The served domains with intent material, in the processes' order."""
     return [x for x in (intent_of(n, template) for n in names) if x is not None]
@@ -263,7 +281,7 @@ def build_turn(cfg, intents=None, catalog_=None, loaded=None):
     their "## Domains" cards from the catalog's lines, the declarations."""
     v3 = cfg["v3"]
     if intents is None:
-        intents = intents_of(cfg["domains"]["names"], cfg.get("template", "gemma4"))
+        intents = intents_of(config_names(cfg), cfg.get("template", "gemma4"))
     cat = v3["catalog"] if catalog_ is None else catalog_
     prompt = O.intent_turn(intents) + "".join((ROOT / "py" / p).read_text() for p in v3["prompt"])
     return O.system_turn(prompt, cat, v3["loaded"] if loaded is None else loaded, catalog_lines(cat))
@@ -284,14 +302,27 @@ class Live:
     agent thread (jobs: the clock's ticks, person turns, world lines, the
     console's verbs, a deferred consult's answer), the consult on a worker."""
 
+    image = None                         # v3.image's (metis.catalog.image.Image), when the config names one
+
     def __init__(self, cfg, llm, emit=None):
         self.cfg, self.emit = cfg, emit or (lambda ev, f, **kw: None)
         v3 = cfg["v3"]
         self.journal = Journal(v3.get("journal") and str(ROOT / "py" / v3["journal"]), self.emit)
         dcfg = cfg["domains"]
-        self.names = list(dcfg["names"])
+        # the image (linker s-5908724a step 3, spec/17 §6): the members, their clocks and the director come from it,
+        # never from the config; each member is built from its source here and must be the program the image linked
+        self.image = self.load_image(cfg)
+        if self.image is not None:
+            # the beat order: the specialists in the image's order, then the direct member — the order the kitchen's
+            # and the road's configs had (their journals stay byte-identical); a director first (the alfworld and
+            # minihack trees' configs) gave a member's first sync its own beat-0 row before its first beat
+            order = [n for n in self.image.names if n != self.image.direct] + [self.image.direct]
+            by = {c["domain"]: c for c in self.image.clocks}
+            self.names, self.clocks = order, [by[n] for n in order]
+        else:
+            self.names = list(dcfg["names"])
+            self.clocks = list(dcfg.get("clocks") or [{"domain": n, "n": 1} for n in self.names])
         self.quiet = set(dcfg.get("quiet") or [])
-        self.clocks = list(dcfg.get("clocks") or [{"domain": n, "n": 1} for n in self.names])
         self.pairs = {}
         for g in dcfg.get("pairs") or []:            # a pair steps and waits as one
             for n in g:
@@ -381,8 +412,9 @@ class Live:
         # the director (alf-hierarchy step 3, DIRECTOR.md): v3.director names the domain whose rules
         # route the others; the atoms they produce of its kinds arrive, one director beat each
         self.director, self._dir_traces = None, None
-        if v3.get("director"):
-            self.director = self.director_loop(str(v3["director"]))
+        director = self.image.direct if self.image is not None else v3.get("director")
+        if director:
+            self.director = self.director_loop(str(director))
         if self.tick_all:
             self.gate_commands()
         # the world page (alf-demo step 2, DEMO.md §4): the world's map file, served at /world/map.json and
@@ -402,6 +434,40 @@ class Live:
         self.started = threading.Event()
         self.stop = threading.Event()
         self.beat = 0
+
+    @staticmethod
+    def load_image(cfg):
+        """v3.image, loaded (metis.catalog.image): None without one. The config may not name what the image does
+        (domains.names, domains.clocks, v3.director: one source); a generated member is found as a package
+        (image.use); a member whose source compiles to another program than the image's refuses the start
+        (load-key-mismatch)."""
+        img = config_image(cfg)
+        if img is None:
+            return None
+        both = [k for k in ("names", "clocks") if k in (cfg.get("domains") or {})] + \
+            (["v3.director"] if cfg["v3"].get("director") else [])
+        if both:
+            raise ValueError("v3.image %s names the members, their clocks and the director: the config may not (%s)"
+                             % (img.dir.name, ", ".join(both)))
+        from metis.catalog import image as I
+        I.use(img)
+        bad = I.key_mismatches(img)
+        if bad:
+            raise ValueError("load-key-mismatch: " + "; ".join("%s: the image linked %s, its source here is %s"
+                                                               % (m, (w or "?")[:12], (k or "?")[:12]) for m, w, k in bad))
+        log.info("[v3] image %s v-%s: %s", img.name, img.hash, ", ".join(img.names))
+        return img
+
+    def manifest(self, d):
+        """Domain D's manifest table: the image's member (what the link checked and recorded), else the catalog's
+        manifest; {} for a domain in neither."""
+        if self.image is not None and d in self.image.by_name:
+            return self.image.member(d)
+        from .domains import catalog
+        try:
+            return catalog().get(d).manifest
+        except KeyError:
+            return {}
 
     # the orchestrator's hooks
 
@@ -615,16 +681,13 @@ class Live:
         `gating: host` (the default) has its host's on_event wrapped — without the protocol's tick__grant(D, R) in
         its session the command is held and journaled (dlg-held). `gating: program`: its rules read tick__grant
         and gate themselves; the host sends its commands (step 3b: a cook that fetches and serves ungranted)."""
-        from .domains import catalog
         for name, ag in self.agents.agents.items():
-            try:
-                shared = catalog().get(name).manifest.get("shared") or {}
-            except KeyError:
-                continue
+            man = self.manifest(name)
+            shared = man.get("shared") or {}
             inner = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
             if "resource" not in shared.values() or not hasattr(inner, "on_event"):
                 continue
-            if (catalog().get(name).manifest.get("gating") or "host") == "program":
+            if (man.get("gating") or "host") == "program":
                 continue                     # its program reads tick__grant and gates itself: the host sends its commands
             f = inner.on_event
 
@@ -645,11 +708,7 @@ class Live:
         ag = self.agents.agents.get(d) if hasattr(self.agents, "agents") else None
         if ag is None or d not in self._last_beat:
             return "change"
-        try:
-            from .domains import catalog
-            member = bool(catalog().get(d).manifest.get("shared"))
-        except KeyError:
-            member = False
+        member = bool(self.manifest(d).get("shared"))
         if not member:                       # outside any composition (no shared): clocked every tick, as today
             return "clock"                   # (a world that moves by itself: the dog, the plant)
         seen = self._seen_rows.get(d)
@@ -670,9 +729,8 @@ class Live:
         if callable(sync) and sync(dict(ag.repl.counts)):
             return "change"
         try:
-            from .domains import catalog
-            period = int((catalog().get(d).manifest.get("clock") or {}).get("period") or 0)
-        except (KeyError, ValueError, TypeError):
+            period = int((self.manifest(d).get("clock") or {}).get("period") or 0)
+        except (ValueError, TypeError):
             period = 0
         if period and self.beat - self._last_beat[d] >= period:
             return "clock"
@@ -713,8 +771,10 @@ class Live:
     REPORTS = None
 
     def report_preds(self):
-        """The protocol's report-natured preds (metis.catalog.iface's natures: tick__want, tick__release,
-        tick__active, tick__done, tick__stuck; tick__status is the agent's own relay)."""
+        """The protocol's report-natured preds (tick__want, tick__release, tick__active, tick__done, tick__stuck;
+        tick__status is the agent's own relay): the image's protocol natures, else metis.catalog.iface's."""
+        if self.image is not None:
+            return frozenset(p for p, n in self.image.natures.items() if n == "report" and p != "tick__status")
         if Live.REPORTS is None:
             import yaml
             from metis.catalog import iface
@@ -742,14 +802,10 @@ class Live:
         """Every hierarchy domain's status this tick (spec/15 §4.4, from its fired rows and its manifest's status:
         success when it put out a success atom, failure a failure atom, running when it fired, idle when not),
         relayed into the director's session as status(D, S) when they changed, and journaled (dlg-status)."""
-        from .domains import catalog
         rows, self._tick_rows = self._tick_rows, {}
         out = {}
         for d in sorted(self.director.domains):
-            try:
-                st = catalog().get(d).manifest.get("status") or {}
-            except KeyError:
-                st = {}
+            st = self.manifest(d).get("status") or {}
             fired = rows.get(d, [])
             kinds = {a.split("(")[0] for r in fired for a in r.get("produce") or []}
             out[d] = ("success" if kinds & set(st.get("success") or ()) else
@@ -2119,7 +2175,7 @@ def main():
         print(turn, end="")
         return
     if a.print_grammar:
-        print(build_grammar(cfg, intents_of(cfg["domains"]["names"], cfg.get("template", "gemma4"))), end="")
+        print(build_grammar(cfg, intents_of(config_names(cfg), cfg.get("template", "gemma4"))), end="")
         return
     from aiohttp import web
 

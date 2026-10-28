@@ -48,18 +48,37 @@ def _sibling_catalog(monkeypatch):
     monkeypatch.setenv("METIS_CATALOG", str(CATALOG))          # the sibling checkout (conftest's default: the installed one)
 
 
+def composition(tmp_path, members):
+    """The kitchen's composition dir with the specialists in MEMBERS' order: the catalog's own for the catalog's
+    order, else a copy with its composition.yaml so (the members' sources are the same files: their keys agree)."""
+    import shutil
+
+    import yaml
+    text = (KITCHEN / "composition.yaml").read_text()
+    if list(members) == list(yaml.safe_load(text)["specialists"]):
+        return KITCHEN
+    d = tmp_path / "kitchen_pot"
+    if not d.exists():
+        shutil.copytree(KITCHEN, d, ignore=shutil.ignore_patterns("build"))
+        # the one line, in the flow style metisc reads (it reads no block YAML)
+        (d / "composition.yaml").write_text(re.sub(r"(?m)^specialists:.*$", "specialists: [%s]" % ", ".join(members), text))
+    return d
+
+
 def run(tmp_path, seed=1, members=MEMBERS, ticks=200, on_tick=None):
     for n, m in list(sys.modules.items()):                     # a fresh kitchen per run, before the sessions read it
         if n.startswith("kitchen_pot_host_"):                   # (the host module stays cached: empty its registry)
             m.SHARED.clear()
     cfg = S.load_config(ROOT / "py/config.live.yaml")
     cfg["intent"] = {"grammar": "../go/grammar/e11-next.gbnf"}  # no member takes a person's intent: no turn uses it
-    names = list(members) + ["pot_director"]
     tmp_path.mkdir(parents=True, exist_ok=True)
-    cfg["v3"].update(journal=str(tmp_path / ("j-%d-%s.jsonl" % (seed, "-".join(members)))), catalog=[], loaded=names,
-                     director="pot_director")
-    cfg["domains"].update(names=names, narrate=None, consult=False, records=None, quiet=[], pairs=[], seed=seed,
-                          clocks=[{"domain": d, "n": 1} for d in names], tick=True)
+    # the image (linker step 3, spec/17 §6): the members, their clocks and the director are the composition's, linked
+    # by metisc; another order of the cooks is another composition (a copy of the package with its specialists so)
+    cfg["v3"].update(journal=str(tmp_path / ("j-%d-%s.jsonl" % (seed, "-".join(members)))), catalog=[],
+                     loaded=["pot_director"] + list(members), image=str(composition(tmp_path, members)))
+    cfg["domains"].update(narrate=None, consult=False, records=None, quiet=[], pairs=[], seed=seed, tick=True)
+    for k in ("names", "clocks"):
+        cfg["domains"].pop(k, None)
     lv = S.Live(cfg, FakeLLM())
     kit = lv.agents.agents[members[0]].host.inner.kitchen         # the one kitchen, through a cook's host
     ahead = []
@@ -80,7 +99,7 @@ def director_rows(lv):
     """The director's own fired rows, in order, with the beat: [(beat, rule, consume, produce)]."""
     out = []
     for r in lv.journal.recs:
-        if r["kind"] == "dlg-trace" and r.get("domain") == "pot_director":
+        if r["kind"] == "dlg-trace" and r.get("domain") == lv.director.name:
             for row in r.get("fired") or []:
                 if row.get("kind") != "exo":
                     out.append((r["beat"], row["event"].split("[")[0], row.get("consume") or [], row.get("produce") or []))
@@ -325,3 +344,44 @@ def test_a_stop_with_the_orders_withdrawn_halts_the_kitchen(tmp_path):
         assert "calm(%s)" % c in counts(lv, c)
     assert not [rule for tk, rule, _ in fired_rows(lv, "pot_director") if tk > t and rule in ("want_queue", "grant_on_want", "preempt")]
     assert not any(a.startswith(("holder(", "queued(")) for a in counts(lv, "pot_director"))
+
+
+# ── the image (linker s-5908724a step 3, spec/17 §6) ──────────────────────────────────────────────────────────────
+
+def kitchen_copy(tmp_path):
+    import shutil
+    d = tmp_path / "kitchen_pot"
+    shutil.copytree(KITCHEN, d, ignore=shutil.ignore_patterns("build"))
+    return d
+
+
+def test_a_config_names_the_image_or_the_members_not_both(tmp_path):
+    cfg = S.load_config(ROOT / "py/config.live.yaml")
+    cfg["v3"].update(image=str(KITCHEN), journal=str(tmp_path / "j.jsonl"), catalog=[], loaded=[])
+    cfg["domains"]["names"] = MEMBERS + ["pot_director"]
+    with pytest.raises(ValueError, match="the config may not .*names"):
+        S.Live(cfg, FakeLLM())
+
+
+def test_a_member_that_is_not_the_program_the_image_linked_refuses_the_start(tmp_path, monkeypatch):
+    """load-key-mismatch: the image linked another cook_a than the one this process resolves (the catalog's)."""
+    d = kitchen_copy(tmp_path)
+    p = d / "cook_a" / "cook_a.llp"
+    p.write_text(p.read_text().replace("self(cook_a).", "self(cook_b)."))
+    monkeypatch.setattr(sys.modules[__name__], "composition", lambda tmp, members: d)
+    with pytest.raises(ValueError, match="load-key-mismatch: cook_a"):
+        run(tmp_path / "run")
+
+
+def test_the_kitchen_runs_on_a_generated_director(tmp_path, monkeypatch):
+    """direct: a name with no package — the link DERIVES the director (spec/17 §3.3) and writes its source into the
+    image; the Live builds it from there, on metispy's generic pass host, and the kitchen's conditions hold."""
+    d = kitchen_copy(tmp_path)
+    text = (d / "composition.yaml").read_text()
+    text = re.sub(r"(?m)^direct:.*$", "direct: tree_director\nresources: {pot: 1}", text)
+    (d / "composition.yaml").write_text(text)
+    monkeypatch.setattr(sys.modules[__name__], "composition", lambda tmp, members: d)
+    lv, kit, ahead = run(tmp_path / "run")
+    assert lv.director.name == "tree_director" and lv.image.generated("tree_director")
+    check(lv, kit, ahead)
+

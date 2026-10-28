@@ -24,6 +24,11 @@ v3:
     n_ctx: 16384                 # integration step 4 ruling
     tick_ms: 1500
     journal: ../go/results/live/session-py.jsonl
+    # image: DIR — a composition (a tree under the tick: its director and members) runs from its IMAGE (metis-lang
+    # spec/17 §6; linker s-5908724a step 3): an image dir, or a composition dir metisc builds into its build/. The
+    # image names the members, their clocks and the director, so domains.names, domains.clocks and v3.director are
+    # then absent; each member is built from its source and must be the program the image linked (load-key-mismatch).
+    # A config with no image (this one: single packages) keeps domains.names.
 domains:                         # in-process (no spawn), on the one loaded model
     names: [dog, kitchen, kitchen_shared]
     narrate: dog
