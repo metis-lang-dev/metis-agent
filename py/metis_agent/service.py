@@ -1310,6 +1310,15 @@ class Live:
             self.journal.record({"kind": "dlg-ground", "domain": d, "verb": verb, "ungrounded": loose, "person": self.turn_text})
             self.ground_ask = (d, line)               # the turn's own answer (said after its intent row), an ask of the world
             return O.Reply({"domain": d, "kind": "error", "error": "ungrounded %s=%s" % (slot, value), "text": line}), True
+        if self.director is not None and not self.director.outcome and (self.status or {}).get("state") == "working":
+            # a new errand over one still running (alf-tasks, nina's --view run: a search, then another task): the running
+            # one stops first, as "stop" does (the hierarchy at its start, the world as it is), then the new one goes
+            if self.tick_all:
+                self.stop_hierarchy()
+            else:
+                self.reset_hierarchy()
+            self.director.outcome = "ended(stop)"
+            self.journal.record({"kind": "dlg-director", "director": self.director.name, "stopped": True, "by": "a new errand"})
         if self.director is not None and self.director.outcome:
             was = self.director.reengage()                 # after an ask or the end: the person's words go on
             self.task_view = {"chain": [], "results": []}
