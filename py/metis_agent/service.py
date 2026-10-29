@@ -1308,7 +1308,7 @@ class Live:
             line = ("I need the %s too: say it again with it?" % slot if value is None else
                     "I didn't hear %s in what you said: say it again with the thing's name?" % self.spoken_value(d, slot, value))
             self.journal.record({"kind": "dlg-ground", "domain": d, "verb": verb, "ungrounded": loose, "person": self.turn_text})
-            self.on_say("line", line)
+            self.ground_ask = (d, line)               # the turn's own answer (said after its intent row), an ask of the world
             return O.Reply({"domain": d, "kind": "error", "error": "ungrounded %s=%s" % (slot, value), "text": line}), True
         if self.director is not None and self.director.outcome:
             was = self.director.reengage()                 # after an ask or the end: the person's words go on
@@ -1325,6 +1325,7 @@ class Live:
 
     turn_at = None
     turn_text = None
+    ground_ask = None
 
     def grounding_card(self, d):
         """Domain D's card (its intent.yaml, the manifest's intent: {spec}; read each turn: a card the host rewrites
@@ -1594,6 +1595,7 @@ class Live:
         self.journal.record(w)
         self.turn_at = at if at is not None else time.time()
         self.turn_text = text                     # the person's words, for the slot grounding of the J this turn maps them to
+        self.ground_ask = None
         prev, prev_at = self.journal.say, self.journal.say_at     # the last say before this turn's own
         try:
             if self.director is not None and text.strip().lower().rstrip(".!") in NEW_GAME_WORDS:
@@ -1646,6 +1648,15 @@ class Live:
                 # alf-demo 3b (the user's "put the pencil in microwave" → "unknown", nothing to go on): what
                 # this world is and what to ask, from the map's card, said instead; the status is left as it is
                 voice_s = voice = self.card_line()
+            elif self.ground_ask:
+                # slot grounding's question (alf-tasks, nina's F1): the turn's answer, after its intent row, and in a
+                # world with a director an ask of its own — the status line and the ask box say it, not the last one
+                d, voice_s = self.ground_ask
+                voice = voice_s
+                if self.director is not None:
+                    self.ask_now = {"question": voice_s, "options": list(STOP_OPTION)}
+                    self.emit("world/ask", dict(self.ask_now, by=d))
+                    self.set_status("asking", voice_s, options=list(STOP_OPTION))
             held = self.repeat_held(voice_s, prev, prev_at) if voice_s else None
             own = lambda n: n["sentence"] == voice_s or n["sentence"] in folded   # noqa: E731
             shown = any(n["sentence"] == voice_s for n in self.held)   # the answer is a held narration too
