@@ -994,10 +994,19 @@ class Live:
             stuck = kind_of_atom(b["arrival"]) == "stuck"
             self.set_status("stuck" if stuck else "asking", ask["question"], options=ask["options"])
         elif any(e.startswith("ended(") for e in b.get("effects") or ()):
+            kind = next(e[6:-1] for e in b["effects"] if e.startswith("ended("))
+            answer = None
+            if kind != "done" and src in f["planner"] and b.get("said"):
+                # an end that is an answer, not done (map-queries s-396939dc: a search's "probably no kettle here"): the
+                # planner's line is said, and the status shows it, never "Done." — an answer, not a stall
+                answer = self.spoken(b["said"], src)
+                tv["results"].append(answer)
+                self.on_say("line", answer)
+                self.emit("world/delta", {"task": {"chain": [dict(c) for c in tv["chain"]], "results": list(tv["results"])}})
             if self.world_over():
                 self.set_status("over", OVER_LINE, options=list(NEW_GAME_OPTION))
             else:
-                self.set_status("done", "Done. Tell me another task.")
+                self.set_status("done", (answer + " Tell me another task.") if answer else "Done. Tell me another task.")
 
     def set_status(self, state, text, **kw):
         """What the agent wants from the person now (world/status; alf-demo step 3b): waiting (a task),
