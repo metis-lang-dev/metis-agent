@@ -1,4 +1,4 @@
-% Small Models, Certified Behavior — draft 0.2
+% Small Models, Certified Behavior — draft 0.3
 % Build: tectonic agent.tex   (bibtex-free; references are inline, as the language paper's)
 \documentclass[11pt]{article}
 
@@ -32,7 +32,7 @@
 \author{The metis project\thanks{Sources, the experiments' results, the fixtures and the
 runtime: \agenturl{} and its sibling repositories at \orgurl. Correspondence:
 \texttt{info@robofortis.com}.}}
-\date{Draft 0.2 --- 2026-10-27}
+\date{Draft 0.3 --- 2026-10-29}
 
 \begin{document}
 \maketitle
@@ -45,7 +45,7 @@ to where it stands. Nothing was re-run for the paper. The experiments are the
 record of a design being fixed by measurement, so some of them report a
 configuration that was then rejected; the ruling that followed each one is
 stated with it. The two sibling papers are \emph{Behavior Programs as Measures
-over Proofs} (the language, draft 0.3) and \emph{Behavior Catalogs in
+over Proofs} (the language, draft 0.5) and \emph{Behavior Catalogs in
 Practice} (the catalog and the loop, in preparation).
 \endgroup
 
@@ -322,6 +322,35 @@ extension (30/30) and the kitchen pair (148/148 and 156/156, ports bound by Go),
 snapshot continuity and the recorded surprises' likelihoods equal at $10^{-12}$
 \src{runtime-binding step 5 report; metis-lang 20096ed, metis-agent 3d99a75}. llama.cpp is
 a submodule at a pinned commit, built once in CI and cached.
+
+\paragraph{The loader contract.} What a runtime loads is an \emph{image}
+--- a composition linked by the language's toolchain, or a lone package
+linked into a one-member image --- and a \emph{plan} naming the members
+its process holds; it reads the image and nothing else. From the image
+it takes its members' bundles and the host each binds to (a Go registry
+must hold that host under that name, else it refuses to load), the
+clock of each member, the protocol's natures, the port table, the
+threshold tables its hooks are built from, and the lock it handshakes
+with. It never reads the composition file, a manifest, or the source;
+the Python stack, which develops from source, builds the image through
+the same link and loads what was written, so there is no second
+resolver. The beat order inside a tick is part of the contract and the
+same in every runtime: the specialists first, then the director, which
+reads this tick's outputs and whose grants land next tick; director
+first only for a stop. Across processes the same image is loaded on
+each side with the plan naming the split, and each process sends the
+other copies of the ports it produces, one message per tick, with the
+image and plan hashes in every message so a stale side is refused at
+the first line. The transport is a carrier, not a semantics: sockets
+today, a robot middleware when a behavior test on a simulator needs it,
+and the parser on the receiving side is the same atom reader either
+way. For this paper's shape the split is the dialog on one side ---
+the model, the person's text or voice, the person as the world the
+behavior cannot command --- and the behavior on the other, in one
+process with every domain it holds; a two-cook kitchen replayed under
+both plans showed every member's fired rules identical beat for beat,
+the only difference the first beat's two fetches, whose command crossed
+the boundary one tick later.
 
 \paragraph{Parity on recorded days.} The generic domain agent exists twice --- Python over
 \metispy{}, Go over the C ABI --- and the bar is logic parity: driven by the same inputs,
