@@ -151,8 +151,9 @@ func (p *Process) Emit(name string, m catalog.Manifest) (string, Image, error) {
 	for _, e := range files[1:] {
 		args = append(args, "--extension", e)
 	}
+	// the environment as it is: metisc finds its own standard units (iface/, metis-lang spec/17 amendment 5), so
+	// METIS_HOME is the user's when set and absent when not
 	cmd := exec.Command(mc, args...)
-	cmd.Env = append(os.Environ(), "METIS_HOME="+p.home())
 	b, err := cmd.Output()
 	if err != nil {
 		var stderr string

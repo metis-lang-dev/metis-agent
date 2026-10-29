@@ -227,3 +227,30 @@ func TestTheRecordsGoWherePysGo(t *testing.T) {
 		}
 	}
 }
+
+// The link sets nothing (metis-lang spec/17 amendment 5): with METIS_HOME unset, a package whose program includes
+// a standard unit (kitchen_pot's cook_a: cook_domain.llp includes iface/protocol_domain.llp) links, the lock
+// recording the unit's place as std.
+func TestTheLinkFindsTheStandardUnitsWithNoMetisHome(t *testing.T) {
+	t.Setenv("METIS_HOME", "")
+	os.Unsetenv("METIS_HOME")
+	proc := &Process{Root: catalogDir(t), Metispy: metispyDir(t), BuildDir: t.TempDir()}
+	if _, err := proc.metisc(); err != nil {
+		t.Skip(err)
+	}
+	m, err := catalog.CheckManifest(filepath.Join(proc.Root, "domains", "kitchen_pot", "cook_a", "domain.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir, _, err := proc.Emit("cook_a", m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := os.ReadFile(filepath.Join(filepath.Dir(filepath.Dir(dir)), "image.lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !regexp.MustCompile(`"name": "iface/protocol_domain.llp",\s*"place": "std"`).Match(lock) {
+		t.Fatalf("the lock does not place iface/protocol_domain.llp in std:\n%s", lock)
+	}
+}
