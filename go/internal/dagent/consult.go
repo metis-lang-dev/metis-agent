@@ -52,8 +52,8 @@ func Mirror(sh *Shell, w *Watch) (MirrorRow, error) {
 		row.Status = "observe-only"
 	case sh.Stage == Done:
 		row.Status = "done"
-	case len(cs) == 0 || (len(kinds) == 1 && kinds["link"]):
-		row.Status = "quiescent"
+	case (len(cs) == 0 || (len(kinds) == 1 && kinds["link"])) && (w == nil || (w.Quiet && !w.quietDue)):
+		row.Status = "quiescent" // as the watch declared it: a member waiting for its next tick is running
 	default:
 		row.Status = "running"
 	}

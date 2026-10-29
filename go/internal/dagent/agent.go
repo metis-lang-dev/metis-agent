@@ -50,6 +50,7 @@ type Domain struct {
 
 // Agent is py's DomainAgent.
 type Agent struct {
+	cut      bool // the last beat stopped at its step cap: no tick until the program settles
 	D        Domain
 	Name     string
 	P        *rt.Program
@@ -434,17 +435,34 @@ func (a *Agent) Beat() ([]Reply, error) {
 	if steps <= 0 {
 		steps = BeatSteps
 	}
+	if !a.cut {
+		// copy semantics (metis-lang spec/17 amendment 4): the beat's tick first, the world read as it stood at its
+		// start (py Watch.begin); after a beat cut at its cap the clock waits for the program to settle
+		sigs, err := w.Begin()
+		if err != nil {
+			return out, err
+		}
+		for _, s := range sigs {
+			rs, err := a.signal(s)
+			if err != nil {
+				return out, err
+			}
+			out = append(out, rs...)
+		}
+	}
+	a.cut = false
 	for !w.Done {
 		cs, err := a.Sh.Candidates()
 		if err != nil {
 			return out, err
 		}
-		wouldTick := w.ObserveOnly() || (w.Quiet && len(cs) == 0)
+		wouldTick := w.ObserveOnly() || (w.Quiet && len(cs) == 0) || w.TickDue()
 		if w.Beat > b0 && wouldTick {
 			break
 		}
 		if n >= steps {
 			out = append(out, a.unsettled(f0, n))
+			a.cut = true
 			break
 		}
 		n++

@@ -74,6 +74,10 @@ type Watch struct {
 	Intents int
 
 	said      map[string]int
+	quietDue  bool            // copy semantics: a quiescence entered, declared (or not) at the next tick
+	tickDue   bool            // the host stepped its world on the last event: the next step is its tick
+	ownAt     int             // len(Fired) at the last tick's own check (-1: none yet)
+	scope     map[string]bool // an open surprise's atoms (a shared world's own effects)
 	streak    map[cardMove][2]int
 	resetSigs map[sig][2]int
 	explained map[sig]cardMove
@@ -84,7 +88,7 @@ type Watch struct {
 // "order", the repeat notice after 2 orders, no operator, no beat limit).
 func NewWatch(sh *Shell, body string, cards []SideCard) (*Watch, error) {
 	w := &Watch{Sh: sh, Path: sh.Path, Beats: -1, RareRatio: 0.05, Operator: -1, Scope: "order",
-		NoticeAfter: 2, Body: body, Cards: cards, Open: -1,
+		NoticeAfter: 2, Body: body, Cards: cards, Open: -1, ownAt: -1,
 		said: map[string]int{}, streak: map[cardMove][2]int{}, resetSigs: map[sig][2]int{},
 		explained: map[sig]cardMove{}}
 	return w, w.checkpoint()
@@ -99,6 +103,9 @@ func (w *Watch) Step() ([]Signal, error) {
 	if w.Done {
 		return nil, nil
 	}
+	if w.tickDue && !w.ObserveOnly() {
+		return w.tickStep() // the world stepped on the last event: it is read before the next
+	}
 	if !w.ObserveOnly() {
 		cs, err := sh.Candidates()
 		if err != nil {
@@ -109,20 +116,79 @@ func (w *Watch) Step() ([]Signal, error) {
 			if _, _, err := sh.Sample(); err != nil {
 				return nil, err
 			}
-			out := []Signal{w.rowSignal()}
-			rd, err := w.read()
-			return append(out, rd...), err
+			// copy semantics: a fired rule's world reads at the next tick; a host that steps its world on the
+			// event makes that event take a tick
+			if st, ok := w.inner().(interface{ WorldStepped() bool }); ok && st.WorldStepped() {
+				w.tickDue = true
+			}
+			return []Signal{w.rowSignal()}, nil
 		}
 		if !w.Quiet {
 			w.Quiet = true
-			w.taskDone()
-			if sh.Plugin == nil {
-				w.Done = true
+			if sh.Plugin != nil {
+				// whether anything is left to do is known at the next tick, from its reading: the
+				// quiescence is declared there, or not at all (tickRest)
+				w.quietDue = true
+				return nil, nil
 			}
+			w.taskDone()
+			w.Done = true
 			return []Signal{w.signal("quiescence", "stage", sh.Stage, "fired", len(sh.Fired),
-				"episode_over", sh.Plugin == nil)}, nil
+				"episode_over", true)}, nil
 		}
 	}
+	return w.tickStep()
+}
+
+// TickDue is py Watch.tick_due: the world stepped on the last event; the beat ends here.
+func (w *Watch) TickDue() bool { return w.tickDue }
+
+// Begin is py Watch.begin (metis-lang spec/17 amendment 4, copy semantics): a beat's tick comes first, the
+// world read as the snapshot at its start, before any rule fires.
+func (w *Watch) Begin() ([]Signal, error) {
+	if w.Done || w.ObserveOnly() || w.Sh.Plugin == nil {
+		return nil, nil
+	}
+	return w.tickStep()
+}
+
+// inner is the host behind the agent host (the faces a world declares).
+func (w *Watch) inner() any {
+	if ah, ok := w.Sh.Plugin.(*AgentHost); ok {
+		return ah.Inner
+	}
+	return w.Sh.Plugin
+}
+
+// sharedWorld is py Watch._shared_world: other members act on the host's world too.
+func (w *Watch) sharedWorld() bool {
+	for _, h := range []any{w.Sh.Plugin, w.inner()} {
+		if sw, ok := h.(interface{ SharedWorld() bool }); ok && sw.SharedWorld() {
+			return true
+		}
+	}
+	return false
+}
+
+// tickStep is py _tick_step: the window's check, then the host's tick.
+func (w *Watch) tickStep() ([]Signal, error) {
+	var pre []Signal
+	if w.Sh.Plugin != nil && !w.ObserveOnly() {
+		rd, err := w.readOwn()
+		if err != nil {
+			return nil, err
+		}
+		pre = rd
+	}
+	rest, err := w.tickRest()
+	return append(pre, rest...), err
+}
+
+func (w *Watch) tickRest() ([]Signal, error) {
+	sh := w.Sh
+	w.tickDue = false
+	due := w.quietDue
+	w.quietDue = false
 	if sh.Plugin == nil || (w.Beats >= 0 && w.Beat >= w.Beats) {
 		w.Done = true
 		return []Signal{w.signal("quiescence", "stage", sh.Stage, "fired", len(sh.Fired),
@@ -156,6 +222,9 @@ func (w *Watch) Step() ([]Signal, error) {
 				}
 			}
 		}
+		if due {
+			w.taskDone()
+		}
 		w.Done = true
 		return append(out, w.signal("quiescence", "stage", sh.Stage, "fired", len(sh.Fired),
 			"episode_over", true, "observe_only", w.ObserveOnly())), nil
@@ -180,6 +249,18 @@ func (w *Watch) Step() ([]Signal, error) {
 				return nil, err
 			}
 			out = append(out, rd...)
+		}
+	}
+	if due && !w.ObserveOnly() {
+		cs, err := sh.Candidates()
+		if err != nil {
+			return nil, err
+		}
+		if len(cs) == 0 {
+			// the tick's reading left nothing to do: the quiescence the last beat entered, declared now
+			w.Quiet = true
+			w.taskDone()
+			out = append(out, w.signal("quiescence", "stage", sh.Stage, "fired", len(sh.Fired), "episode_over", false))
 		}
 	}
 	return out, nil
@@ -232,12 +313,69 @@ func sameDiff(a, b map[string]int) bool {
 	return true
 }
 
-func (w *Watch) read() ([]Signal, error) {
+// readOwn is py _read(own=True): at a tick, the reading against the model over the window of the member's own
+// events since the checkpoint (copy semantics); nothing new fired since the last tick's check: nothing to compare.
+// In a shared world only the atoms those events consumed or produced are compared.
+func (w *Watch) readOwn() ([]Signal, error) {
 	sh := w.Sh
 	reading := w.reading()
 	if reading == nil {
 		return nil, w.checkpoint()
 	}
+	if len(sh.Fired) == w.ownAt {
+		return nil, nil
+	}
+	w.ownAt = len(sh.Fired)
+	touched := map[string]bool{}
+	for _, r := range sh.Rows[w.cp.fired:] {
+		if r.Kind == "exo" {
+			continue
+		}
+		for _, c := range r.Ev.Consume {
+			touched[c.Atom] = true
+		}
+		for _, c := range r.Ev.Produce {
+			touched[c.Atom] = true
+		}
+	}
+	if len(touched) == 0 {
+		return nil, nil
+	}
+	if w.sharedWorld() {
+		r := map[string]int{}
+		for a, n := range reading {
+			if touched[a] {
+				r[a] = n
+			}
+		}
+		reading = r
+		w.scope = touched
+	}
+	return w.compare(reading)
+}
+
+func (w *Watch) read() ([]Signal, error) {
+	reading := w.reading()
+	if reading == nil {
+		return nil, w.checkpoint()
+	}
+	if w.Open >= 0 && w.scope != nil {
+		r := map[string]int{}
+		for a, n := range reading {
+			if w.scope[a] {
+				r[a] = n
+			}
+		}
+		reading = r
+	} else {
+		w.scope = nil
+	}
+	return w.compare(reading)
+}
+
+// compare is the surprise test on a reading (py _read's body).
+func (w *Watch) compare(reading map[string]int) ([]Signal, error) {
+	sh := w.Sh
 	model := map[string]int{}
 	for a := range reading {
 		model[a] = sh.Counts.N[a]

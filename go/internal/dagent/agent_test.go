@@ -138,8 +138,8 @@ func kitchenPair(t *testing.T) []Domain {
 	env := host.NewMemEnv(host.DefaultPairScript())
 	var out []Domain
 	for _, c := range []struct{ name, display, src, factory string }{
-		{"kitchen", "the first cook", "catalogs/kitchen_host.llp", "make_pair_kitchen"},
-		{"kitchen_shared", "the second cook", "catalogs/shared/kitchen_shared.llp", "make_pair_shared"},
+		{"kitchen", "the first cook", "catalogs/tick/kitchen_host.llp", "make_pair_kitchen"}, // pair.SCENES: the tick form
+		{"kitchen_shared", "the second cook", "catalogs/tick/shared/kitchen_shared.llp", "make_pair_shared"},
 	} {
 		src, err := os.ReadFile(filepath.Join(py, "metis/domains/kitchen", c.src))
 		if err != nil {

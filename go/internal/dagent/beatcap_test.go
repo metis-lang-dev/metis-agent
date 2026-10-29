@@ -99,7 +99,7 @@ func TestABeatThatNeverSettlesStopsAtItsCapAsPys(t *testing.T) {
 		if n := len(a.Sh.Rows); n != 40*(beat+1) {
 			t.Fatalf("beat %d: %d fired rows, want the cap's %d", beat+1, n, 40*(beat+1))
 		}
-		if a.BeatNo() != 0 {
+		if a.BeatNo() != 1 { // the first beat's tick (copy semantics: a beat begins with it), then no other
 			t.Fatalf("the clock advanced to %d on a beat that never settled", a.BeatNo())
 		}
 		var q map[string]any

@@ -352,7 +352,8 @@ def test_a_beat_that_never_settles_stops_at_its_cap_under_a_memory_limit(tmp_pat
         q = lines[i - 1]
         assert q["kind"] == "quiescence" and q["unsettled"] == [["stays_moist", 200]], q
         assert q["ref"]["seq"] == 200 * n and "stays_moist (200) kept firing" in q["text"]
-        assert lines[i]["beat"] == 0             # the clock does not advance until the program settles
+        assert lines[i]["beat"] == 1             # the first beat's tick (copy semantics: a beat begins with it);
+                                                 # then the clock does not advance until the program settles
     check(lines[clocks[0] - 1])
     # the cap is the domain's: --beat-steps, else the manifest's clock: {steps}
     lines, _ = run("--beat-steps", "25", beats=1)

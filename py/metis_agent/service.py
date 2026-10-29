@@ -801,21 +801,14 @@ class Live:
         return "none"
 
     def latch(self):
-        """Rule 2 (outputs latched to the next boundary), for the world's copies: every domain but the resource's
-        holder reads the world as it stood at this tick's boundary (its host's reading snapshotted), so another
-        domain's command this tick reaches it at the next boundary; the holder reads its own commands at once. A
-        host with latch()/unlatch() faces latches itself (what others change at the boundary, its own at once)."""
+        """Copy semantics (metis-lang spec/17 amendment 4): every domain reads the world as it stood at this tick's
+        start, its host's reading snapshotted for the tick, the resource's holder included and its own commands
+        too: a command shows in the world from the commanding member's next tick, as it would across processes.
+        Another domain's command this tick reaches it at the next boundary. A host's own latch()/unlatch() faces
+        (what others change latched, its own live) are not used: there is no in-process shortcut."""
         self._latched = {}
         for d, ag in self.agents.agents.items():
             inner = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
-            if d == self.holder:
-                continue
-            if callable(getattr(inner, "latch", None)) and callable(getattr(inner, "unlatch", None)):
-                # a host that knows its own changes from the others' (a self-gating cook acts ungranted on its own
-                # hand): it latches what OTHERS change at the boundary and shows its own at once
-                inner.latch()
-                self._latched[d] = (inner, "host")
-                continue
             if not callable(getattr(inner, "reading", None)):
                 continue
             snap = inner.reading()
@@ -824,9 +817,7 @@ class Live:
 
     def unlatch(self):
         for d, (inner, own) in getattr(self, "_latched", {}).items():
-            if own == "host":
-                inner.unlatch()
-            elif own is None:
+            if own is None:
                 inner.__dict__.pop("reading", None)
             else:
                 inner.reading = own

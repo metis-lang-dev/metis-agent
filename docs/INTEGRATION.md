@@ -100,6 +100,21 @@ in the runtime is phase 2).
 | 4 | nina | context file v1 (CLM regions: stable prefix / cards / journal / mirror / inbox) rendered into the gemma4 prefix with KV reuse; the journal as the only model-written region; size flat over an hour-long kitchen run | context size flat; narration faithful (numbers match the mirror) |
 | 5 | both | evaluation arms A (LLM alone) / B (+ runtime, no journal) / C (full) on the injected surprises; report with the stop conditions of DESIGN.md | triage beats always-escalate; false resumes = 0 |
 
+**Copy semantics (metis-lang spec/17 amendment 4, toolchain-units s-ddaed776 step 3).** A domain reads its world
+as the snapshot at the start of its own tick, and its own command shows in the world from its next tick. The Live
+snapshots every domain's reading at the tick, the resource's holder included and its own commands too: there is no
+in-process shortcut. A beat begins with its tick, and the watch's surprise test runs at the tick over the beat's
+window: the reading against the effects the domain modelled for its own commands since its last consistent
+reading. The taxonomy is unchanged in name (transient, wrong-domain, novel), with each kind's diff, `since` and
+`steps` the window's. A transient must last to a tick to be observed at all. A domain that chains its own modelled
+effects within a beat sees a partner's change only through its consequence on its own commands, which is a belief
+change, never a sibling's card. The kitchen fixtures that exercise the explanation path therefore use the tick
+form (metispy `catalogs/tick/`: one action per tick, the window one action). The quiescence is declared at the
+tick whose reading leaves the domain nothing to fire. A domain whose host steps the world on an event (an RDDL
+observing world's move) reads that world only at its tick, so each such event takes a tick. A program that chains
+such events on its own modelled state runs ahead of a world it cannot see. The live read after a firing hid this
+before: nav's planted-death test found its 10 of 10 that way.
+
 Phase 1b (next subject): the Go adapter embeds the C++ evaluator +
 registry + blackboard (cgo), `nav` as the robot-shaped host, same
 wire ops from Go. Phase 2 (metis line): G-C observe-only as runtime

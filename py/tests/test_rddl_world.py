@@ -162,15 +162,21 @@ def test_world_lines_hold_before_the_programs_next_move():
 
 def test_a_program_that_never_goes_quiet_ends_with_the_gyms_episode():
     """rddl-worlds step 3: hanoi's mv is always enabled, so its program never
-    goes quiet and the watch never ticks; the gym's horizon (20 steps) ends the
-    beat and the agent's episode, and after it the world reads nothing (no
-    surprise from a world that stopped answering)."""
+    goes quiet; each move steps the gym, so it takes a tick (copy semantics: the
+    program reads the gym's outcome at its next tick), one move per beat; the
+    gym's horizon (20 steps) ends the agent's episode, and after it the world
+    reads nothing (no surprise from a world that stopped answering)."""
     p = Process(["hanoi"], seat="template")
     a = p.build(1, "replay")
     a, r = serve(a, {"reset": {"seed": 3, "case": "replay"}}, p.build, p.reload, p.add_line)
-    a, r = serve(a, {"clock": "beat", "score": True}, p.build, p.reload, p.add_line)
-    assert r[-1]["over"] and not any(l.get("kind") == "surprise" for l in r)
+    outs, lines = [], []
+    for _ in range(30):
+        a, r = serve(a, {"clock": "beat", "score": True}, p.build, p.reload, p.add_line)
+        lines += r
+        outs += (r[-1].get("score") or {}).get("outcomes") or []
+        if r[-1].get("over"):
+            break
+    assert r[-1]["over"] and not any(l.get("kind") == "surprise" for l in lines)
     a, g = serve(a, {"ports": {}, "id": "p"}, p.build, p.reload, p.add_line)
     assert g[0]["host"]["gym"]["done"] and g[0]["host"]["gym"]["step"] == 20
-    outs = r[-1]["score"]["outcomes"]
     assert len(outs) == 20 and all(o["p"] == 1.0 for o in outs)       # every move the gym answered as the program said

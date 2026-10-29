@@ -8,11 +8,11 @@ Speak one short plain sentence in the person's words. Name the agent as the frag
 
 The scripts:
 Script of the second cook (kitchen shared): a shared kitchen: a second cook also loads onions into the pot
-- move fetch onion: "walk to a dispenser and take an onion."; needs hand free; leaves held onion.
-- move load: "drop the onion into pot capacity."; needs held onion, pot space; leaves hand free, pot onion.
-- move cook: "three onions start the cook — needs a free hand to press start (the env's interact semantics; also forces cook-before-dish)."; needs hand free (kept), 3 pot onion; leaves cooking.
-- move fetch dish: "fetch a dish while the soup cooks."; needs hand free; leaves held dish.
-- move plate: "cooked soup onto the held dish."; needs held dish, cooking; leaves held soup.
-- move serve: "deliver."; needs held soup; leaves hand free, served.
-- move partner load, acts on the first cook: "the second cook drops the onion it holds into the first cook's pot."; needs held onion; leaves hand free.
-- things it counts: hand free = a free hand; held onion = an onion in hand; held dish = a dish in hand; held soup = a soup in hand; pot space = room in the pot; pot onion = onions in the pot; cooking = a soup cooking; ready = a soup ready; served = soups served
+- move fetch onion: "walk to a dispenser and take an onion."; needs turn, hand free; leaves held onion.
+- move load: "drop the onion into pot capacity."; needs turn, held onion, pot space; leaves hand free, pot onion.
+- move cook: "three onions start the cook — needs a free hand to press start (the env's interact semantics; also forces cook-before-dish)."; needs turn, hand free (kept), 3 pot onion; leaves cooking.
+- move fetch dish: "fetch a dish while the soup cooks."; needs turn, hand free; leaves held dish.
+- move plate: "cooked soup onto the held dish."; needs turn, held dish, cooking; leaves held soup.
+- move serve: "deliver."; needs turn, held soup; leaves hand free, served.
+- move partner load, acts on the first cook: "the second cook drops the onion it holds into the first cook's pot."; needs turn, held onion; leaves hand free.
+- things it counts: hand free = a free hand; held onion = an onion in hand; held dish = a dish in hand; held soup = a soup in hand; pot space = room in the pot; pot onion = onions in the pot; cooking = a soup cooking; ready = a soup ready; served = soups served; turn = the world's turn: one action per tick

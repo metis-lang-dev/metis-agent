@@ -103,7 +103,7 @@ def test_a_domain_beats_on_a_change_in_its_copies_or_its_clock(live):
         MANIFESTS["nav"].pop("clock")
 
 
-def test_the_world_is_latched_at_the_boundary_for_all_but_the_holder(live):
+def test_the_world_is_latched_at_the_boundary_for_every_member(live):
     live.holder = "task"
     nav = live.agents.agents["nav"].host.inner
     live.latch()
@@ -264,15 +264,18 @@ def test_the_directors_own_beat_grants_reach_the_holders(live):
     assert live._grant_q == []
 
 
-def test_a_host_that_latches_itself(live):
+def test_every_member_reads_the_snapshot_holder_and_self_latching_host_alike(live):
+    """Copy semantics (metis-lang spec/17 amendment 4): the resource's holder reads the tick's snapshot too, and a host
+    with its own latch()/unlatch() faces (what others change latched, its own live) gets the snapshot as any other:
+    a member's own command shows in its world from its next tick, in one process as across a split."""
     calls = []
     inner = live.agents.agents["nav"].host.inner
     inner.latch, inner.unlatch = (lambda: calls.append("latch")), (lambda: calls.append("unlatch"))
-    live.holder = "task"
+    live.holder = "nav"
     live.latch()
-    assert calls == ["latch"] and "reading" not in inner.__dict__     # its own latch, not the agent's snapshot
+    assert calls == [] and "reading" in inner.__dict__                  # the Live's snapshot, the holder included
     live.unlatch()
-    assert calls == ["latch", "unlatch"]
+    assert calls == [] and "reading" not in inner.__dict__
 
 
 def test_a_grant_after_the_beats_wakes_the_member_at_the_next_tick(live):

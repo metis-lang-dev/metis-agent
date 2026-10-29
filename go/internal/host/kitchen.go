@@ -180,7 +180,7 @@ func (c *Cook) with(f func(*PairEnv)) {
 	}
 }
 
-func (c *Cook) Tick(map[string]int) (dos []string, end bool) {
+func (c *Cook) Tick(counts map[string]int) (dos []string, end bool) {
 	c.with(func(e *PairEnv) {
 		if e.Beat[c.Path] >= e.Script.Beats {
 			end = true
@@ -196,6 +196,9 @@ func (c *Cook) Tick(map[string]int) (dos []string, end bool) {
 				dos = append(dos, "+pot_space 3")
 				break
 			}
+		}
+		if counts["turn"] == 0 {
+			dos = append(dos, "+turn 1") // the cook's turn, once per tick (the pair's tick form, py pair.CookHost)
 		}
 		e.Beat[c.Path]++
 	})

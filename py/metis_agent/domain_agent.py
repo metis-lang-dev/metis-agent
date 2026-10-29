@@ -328,6 +328,19 @@ class DomainAgent:
         # a lockstep world's beat is one pass of its stage pipeline: the first
         # beat the #init pass, every other the beat's tick and the pass it starts
         lock = getattr(w, "lockstep", False)
+        if not getattr(inner, "done", False) and callable(getattr(w, "begin", None)) \
+                and not self.__dict__.get("_cut"):
+            # copy semantics (metis-lang spec/17 amendment 4): the beat's tick first, the world read as it stood at
+            # its start, before any rule fires (metispy Watch.begin). After a beat cut at its step cap the program
+            # has not settled: the clock does not advance (no tick) until it does
+            for s in w.begin():
+                if score and isinstance(s.get("diff"), dict) and s["diff"]:
+                    diffs.append(dict(s["diff"]))
+                out += self.signal(s)
+            rows = self.repl.fired_rows
+            if score and len(rows) > s0 and rows[-1][0] == "exo":
+                start, s0 = (self.repl.stage, dict(self.repl.counts)), len(rows)
+        self._cut = False
         while not w.done:
             if getattr(inner, "done", False):
                 # the world's episode is over (an RDDL gym's horizon) though the
@@ -336,11 +349,13 @@ class DomainAgent:
                 w.done = True
                 break
             # (a lockstep world's wrapped pass is held for the beat as a quiet one is)
-            would_tick = w.observe_only or (w.quiet and not self.repl._candidates()) or getattr(w, "held", False)
+            would_tick = w.observe_only or (w.quiet and not self.repl._candidates()) or getattr(w, "held", False) \
+                or getattr(w, "tick_due", False)        # the world stepped on the last event: its tick is next
             if would_tick and (w.beat > b0 or (lock and len(self.repl.fired_rows) > f0)):
                 break
             if n >= self.beat_steps:
                 out += self.unsettled(f0, n)
+                self._cut = True
                 break
             n += 1
             beat = w.beat

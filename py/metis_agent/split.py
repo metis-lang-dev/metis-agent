@@ -44,7 +44,12 @@ def _hash(p):
 
 class ProxyHost:
     """A member's host where the world is another process's: reading = the world's last reading + this member's own
-    commands since (from its fired rows on its world-private preds); its commands go out as world commands."""
+    commands since (from its fired rows on its world-private preds); its commands go out as world commands. The pending
+    rule of copy semantics (metis-lang spec/17 amendment 4): a reading is timestamped by the world's tick and never
+    contradicts a command newer than itself, so the member's own effects issued after it stay until the world's
+    message covers them (take_remote)."""
+
+    shared_world = True                            # the plan's world: other members act on it too (as PotHost)
 
     def __init__(self, member, private, commands, tick=lambda: 0):
         self.member, self.private, self.commands, self.tick_of = member, set(private), commands, tick
@@ -91,12 +96,6 @@ class ProxyHost:
     def tick(self, counts):
         self.beat += 1
         return self.sync(counts)
-
-    def latch(self):
-        pass                                       # the world's process latched it: what arrives is the boundary's
-
-    def unlatch(self):
-        pass
 
     def pending(self):
         return False
