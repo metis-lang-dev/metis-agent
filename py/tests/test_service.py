@@ -731,7 +731,7 @@ def test_a_slot_binds_only_to_what_the_person_named():
     from types import SimpleNamespace
     spec = {"grounded": ["object", "receptacle"],
             "map": [{"verb": "FETCH", "atom": "fetch({object:object},{receptacle:receptacle})"}]}
-    me = SimpleNamespace(turn_text=None, grounding_card=lambda d: spec)
+    me = SimpleNamespace(turn_text=None, grounding_card=lambda d: spec, slot_candidates=lambda d, k: None)   # no map
     loose = lambda text, j: (setattr(me, "turn_text", text), S.Live.ungrounded(me, "task", j, "FETCH"))[1]
     assert loose("bring the teddy bear to the fridge", {"object": "TOMATO1", "receptacle": "FRIDGE1"}) == [("object", "TOMATO1")]
     assert loose("put the second tomato on the counter", {"object": "TOMATO2", "receptacle": "COUNTERTOP1"}) == []
@@ -743,3 +743,37 @@ def test_a_slot_binds_only_to_what_the_person_named():
     spec["grounded"] = []
     assert loose("bring the teddy bear to the fridge", {"object": "TOMATO1", "receptacle": "FRIDGE1"}) == []
     assert S.Live.spoken_value(me, "task", "object", "TOMATO1") == "tomato 1"
+
+
+def test_a_named_slot_is_held_to_the_maps_candidates():
+    """map-queries s-396939dc step 3 (the architect's ruling): a named slot's candidates are bind(kind), the agent's
+    only map path; the ask fires on a conflict between the words and the value, never on the map's multiplicity (a
+    kind names any of its instances): another instance named is a guess; a value the room does not have asks which,
+    its answers bind()'s candidates through the ask-form, capped; no candidates (a kind the room lacks): as before."""
+    from types import SimpleNamespace
+    spec = {"grounded": ["object", "receptacle"],
+            "map": [{"verb": "FETCH", "atom": "fetch({object:object},{receptacle:receptacle})"}]}
+    room = {"tomato": ["tomato1", "tomato2"], "countertop": ["countertop1", "countertop2", "countertop3"],
+            "cabinet": ["cabinet%d" % i for i in range(1, 21)], "microwave": ["microwave1"], "apple": ["apple"]}
+    me = SimpleNamespace(turn_text=None, grounding_card=lambda d: spec, slot_candidates=lambda d, k: room.get(k, []),
+                         ASK_CAP=S.Live.ASK_CAP)
+    me.spoken_value = lambda d, s, v: S.Live.spoken_value(me, d, s, v)
+    loose = lambda text, j: (setattr(me, "turn_text", text), S.Live.ungrounded(me, "task", j, "FETCH"))[1]
+    # a kind names any instance: no ask for several countertops, twenty cabinets, two tomatoes (the 4-task sequence)
+    assert loose("put the apple on the countertop", {"object": "APPLE", "receptacle": "COUNTERTOP1"}) == []
+    assert loose("put the bowl in the cabinet", {"object": "BOWL1", "receptacle": "CABINET1"}) == []
+    assert loose("put a tomato in the microwave", {"object": "TOMATO2", "receptacle": "MICROWAVE1"}) == []
+    assert loose("put the apple on countertop 2", {"object": "APPLE", "receptacle": "COUNTERTOP2"}) == []
+    # a conflict: another instance named, the value is a guess
+    assert loose("put the apple on countertop 2", {"object": "APPLE", "receptacle": "COUNTERTOP1"}) == [("receptacle", "COUNTERTOP1")]
+    # a value the room does not have: which of bind()'s
+    w = loose("put tomato 3 in the microwave", {"object": "TOMATO3", "receptacle": "MICROWAVE1"})
+    assert w == [("object", "TOMATO3", "tomato", "tomato", ["tomato1", "tomato2"])]
+    q, opts = S.split_options(S.Live.which_line(me, "task", w[0]))
+    assert q == "Which tomato: tomato 1 or tomato 2?"
+    assert [o["say"] for o in opts] == ["put tomato 1 in the microwave", "put tomato 2 in the microwave", "stop"]
+    w = loose("put the bowl in the cabinet", {"object": "BOWL1", "receptacle": "CABINET30"})
+    q, opts = S.split_options(S.Live.which_line(me, "task", w[0]))
+    assert q.endswith("cabinet 5, …?") and len(opts) == S.Live.ASK_CAP + 1
+    # no candidates: a kind the room lacks (the host's nothere), or no map: the words' rule alone
+    assert loose("bring the kettle to the sink", {"object": "KETTLE", "receptacle": "SINK1"}) == []

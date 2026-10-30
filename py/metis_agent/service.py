@@ -1305,11 +1305,15 @@ class Live:
         if loose:
             # slot grounding (alf-tasks s-e9cc8fae step 3, the architect's ruling): a slot binds only to what the person
             # named; a value their words never name is the model's guess, never dispatched (no substitution) — ask
-            slot, value = loose[0]
+            slot, value = loose[0][:2]
+            which = loose[0][2] if len(loose[0]) > 2 else None
             line = ("I need the %s too: say it again with it?" % slot if value is None else
+                    self.which_line(d, which) if which else
                     "I didn't hear %s in what you said: say it again with the thing's name?" % self.spoken_value(d, slot, value))
-            self.journal.record({"kind": "dlg-ground", "domain": d, "verb": verb, "ungrounded": loose, "person": self.turn_text})
-            self.ground_ask = (d, line)               # the turn's own answer (said after its intent row), an ask of the world
+            self.journal.record({"kind": "dlg-ground", "domain": d, "verb": verb, "ungrounded": [list(x) for x in loose],
+                                 "person": self.turn_text})
+            q, opts = split_options(line)
+            self.ground_ask = (d, q, opts)            # the turn's own answer (said after its intent row), an ask of the world
             return O.Reply({"domain": d, "kind": "error", "error": "ungrounded %s=%s" % (slot, value), "text": line}), True
         if self.director is not None and not self.director.outcome and (self.status or {}).get("state") == "working":
             # a new errand over one still running (alf-tasks, nina's --view run: a search, then another task): the running
@@ -1348,12 +1352,47 @@ class Live:
         except Exception:  # noqa: BLE001 — no card to ground against: nothing is held back
             return None
 
+    ASK_CAP = 5                # a which-ask offers at most this many of bind()'s candidates, stop the last answer
+
+    def slot_candidates(self, d, kind):
+        """The map's entries KIND can name: domain D's host's `candidates(kind)` face (semantic_world's bind, map-queries
+        s-396939dc step 3: the agent's only path to the map), else the first served host's; None with no map."""
+        ags = self.agents.agents if hasattr(self.agents, "agents") else {}
+        for ag in ([ags[d]] if d in ags else []) + [a for n, a in ags.items() if n != d]:
+            h = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+            f = getattr(h, "candidates", None)
+            if callable(f):
+                try:
+                    return f(kind)
+                except Exception:  # noqa: BLE001 — a host's map never stops a turn: the words' rule alone
+                    return None
+        return None
+
+    def which_line(self, d, which):
+        """The which-ask over bind()'s candidates (slot, value, kind, word, cands): its question and its answers in
+        the ask-form (`question | answer | …`), each answer the person's sentence with the instance named."""
+        slot, value, kind, word, cands = which
+        names = [self.spoken_value(d, slot, c) for c in cands[:self.ASK_CAP]]
+        listed = ", ".join(names[:-1]) + " or " + names[-1] if len(names) > 1 else names[0]
+        if len(cands) > self.ASK_CAP:
+            listed = ", ".join(names) + ", …"
+        text = self.turn_text or ""
+        says = [re.sub(r"\b%s(\s*\d+)?\b" % re.escape(word), n, text, count=1, flags=re.I) for n in names]
+        return " | ".join(["Which %s: %s?" % (kind, listed)] + says + ["stop"])
+
     def ungrounded(self, d, j, verb=None):
         """The card's `grounded:` slots of J that the person's words never name: a value's kind (its letters, the number
         dropped: TOMATO2 → tomato) is in the words written together, or a word of theirs (four letters or more) is in
         it ("counter" in countertop, "soap" in soapbottle). → [(slot, value)], empty when every one is named, when the
         card names no slot to ground, or when there are no words (a typed intent). A grounded slot VERB's atom takes that
-        the J leaves out is (slot, None): asked for, never filled in."""
+        the J leaves out is (slot, None): asked for, never filled in.
+
+        A named slot is then held to the map's candidates, bind(kind) (slot_candidates; map-queries step 3): the ask
+        fires on a CONFLICT between the words and the value, never on the map's multiplicity — a kind names any of its
+        instances. An instance the words name ("countertop 2") that is not the value: (slot, value), the ask as for a
+        guess. A value not among bind(kind) (an instance this room does not have): (slot, value, kind, word, cands),
+        the which-ask over them. No map, or bind(kind) empty (a kind the room lacks, one not seen yet): the words'
+        rule alone, the host refuses or searches as before."""
         text = (self.turn_text or "").lower()
         spec = self.grounding_card(d) if text else None
         slots = (spec or {}).get("grounded") or []
@@ -1370,8 +1409,19 @@ class Live:
                     out.append((s, None))
                 continue
             kind = re.sub(r"[^a-z]", "", re.sub(r"\d+$", "", v.lower()))
-            if kind and not (kind in together or any(w in kind for w in words)):
+            named = [kind] if kind and kind in together else [w for w in words if w in kind]
+            if kind and not named:
                 out.append((s, v))
+                continue
+            cands = self.slot_candidates(d, kind) if kind else None
+            if not cands:
+                continue
+            word = named[0]
+            inst = re.search(r"\b%s\s*(\d+)\b" % re.escape(word), text)
+            if inst and kind + inst.group(1) in cands and kind + inst.group(1) != v.lower():
+                out.append((s, v))                     # they named another instance: the value is a guess
+            elif v.lower() != kind and v.lower() not in cands:
+                out.append((s, v, kind, word, cands))  # not one of the room's: which of them
         return out
 
     def spoken_value(self, d, slot, value):
@@ -1661,12 +1711,12 @@ class Live:
             elif self.ground_ask:
                 # slot grounding's question (alf-tasks, nina's F1): the turn's answer, after its intent row, and in a
                 # world with a director an ask of its own — the status line and the ask box say it, not the last one
-                d, voice_s = self.ground_ask
+                d, voice_s, opts = self.ground_ask
                 voice = voice_s
                 if self.director is not None:
-                    self.ask_now = {"question": voice_s, "options": list(STOP_OPTION)}
+                    self.ask_now = {"question": voice_s, "options": list(opts)}
                     self.emit("world/ask", dict(self.ask_now, by=d))
-                    self.set_status("asking", voice_s, options=list(STOP_OPTION))
+                    self.set_status("asking", voice_s, options=list(opts))
             held = self.repeat_held(voice_s, prev, prev_at) if voice_s else None
             own = lambda n: n["sentence"] == voice_s or n["sentence"] in folded   # noqa: E731
             shown = any(n["sentence"] == voice_s for n in self.held)   # the answer is a held narration too
