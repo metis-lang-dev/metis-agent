@@ -159,6 +159,32 @@ def test_an_ask_says_the_arrivals_own_line():
     assert loop.log[0]["said_as_ask"] and loop.log[0]["from"] == "task"
 
 
+def test_an_answer_end_says_the_answers_fact_not_done():
+    """nina's map-queries M1: the planner gives the search up with its own line; the director's generic end line
+    ("gave up: the task is done.") keeps its kind and says the answer's fact; a done end keeps its line."""
+    from metis_agent.director import DirectorLoop
+    said = []
+
+    class Ops:
+        def beat(self, name, lines):
+            k = lines[0][len("+seen("):].split(")")[0]
+            return [{"fired": [{"kind": "clause", "produce": ["ended(%s)" % k],
+                                "line": "%s: the task is done." % k.replace("_", " ")}]}]
+
+        def say(self, text, kind="line"):
+            said.append((text, kind))
+    loop = DirectorLoop("director", FACTS, ["gave_up", "done"], Ops())
+    loop.produced("task", {"fired": [{"kind": "clause", "produce": ["gave_up(kettle)"],
+                                      "line": "There is probably no kettle in this room: I stop looking."}]})
+    loop.step()
+    assert said == [("gave up: there is probably no kettle in this room.", "line")]
+    assert loop.log[0]["said_as_answer"] and loop.outcome == "ended(gave_up)"
+    loop.outcome, said[:] = None, []
+    loop.produced("task", {"fired": [{"kind": "clause", "produce": ["done(target)"], "line": "I put it there."}]})
+    loop.step()
+    assert said == [("done: the task is done.", "line")] and "said_as_answer" not in loop.log[-1]
+
+
 def test_a_planner_that_takes_a_result_and_sends_no_goal_replans_aloud():
     """semantic-map step 3 (the architect: the one voice says why the robot moves on): the planner's
     rule that consumed a specialist's result (a `result` kind) and produced no director kind re-plans —

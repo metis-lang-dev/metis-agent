@@ -992,7 +992,8 @@ class Live:
                 # planner's line is said, and the status shows it, never "Done." — an answer, not a stall
                 answer = self.spoken(b["said"], src)
                 tv["results"].append(answer)
-                self.on_say("line", answer)
+                if not b.get("said_as_answer"):        # the director's end line said it already (nina's M1)
+                    self.on_say("line", answer)
                 self.emit("world/delta", {"task": {"chain": [dict(c) for c in tv["chain"]], "results": list(tv["results"])}})
             if self.world_over():
                 self.set_status("over", OVER_LINE, options=list(NEW_GAME_OPTION))

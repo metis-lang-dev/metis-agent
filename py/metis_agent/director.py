@@ -189,6 +189,15 @@ class DirectorLoop:
                 # the director's generic line only when the arrival has none (nina's alf-demo step-2 R1)
                 said = [(src_line, "ask") if k == "ask" else (t, k) for t, k in said]
                 beat["said_as_ask"] = True
+            elif src_line and src in self.facts["planner"] and \
+                    any(kind_of(a) == "ended" and a != "ended(done)" for a in outs):
+                # an end that is the planner's answer (gave_up): the director's end line keeps its kind and says the
+                # answer's fact ("gave up: there is probably no kettle in this room."), never its generic "the task is
+                # done." (nina's map-queries M1); the service says no second line for it
+                fact = src_line.split(": ")[0].rstrip(".")
+                said = [("%s: %s." % (t.split(":")[0], fact[:1].lower() + fact[1:]), k) if k == "line" else (t, k)
+                        for t, k in said]
+                beat["said_as_answer"] = True
             for verb, args in effects(outs):
                 if verb == "forward":
                     d, k = args
