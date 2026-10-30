@@ -1047,9 +1047,11 @@ class Live:
                 leave = getattr(h, "leave_room", None)
                 if callable(leave):
                     leave()
+            t1 = time.time()
             if enter(room) is None:
                 self.emit("world/room", {"game": doc.get("current")})
                 return "This world has no rooms to go to."
+            t2 = time.time()
         except Exception as e:  # noqa: BLE001 — the agent stays where it is, and says why
             log.exception("[v3] enter_room %s", room)
             self.emit("world/room", {"game": doc.get("current")})
@@ -1058,9 +1060,11 @@ class Live:
         for d in sorted(self.director.facts["specialist"]):
             if d in self.names:
                 self.reload(d, by="room")
-        Path(self.games).write_text(json.dumps(dict(doc, current=room), indent=1))
+        house = doc.get("house")                   # a room chosen from the rest joins the rooms the picker shows
+        house = (house + [room] if room not in house else house) if house is not None else None
+        Path(self.games).write_text(json.dumps(dict(doc, current=room, **({"house": house} if house is not None else {})), indent=1))
         self.journal.record({"kind": "dlg-room", "room": room, "label": entry.get("label") or room, "left": doc.get("current"),
-                             "ms": int((time.time() - t0) * 1000)})
+                             "ms": int((time.time() - t0) * 1000), "ms_open": int((t2 - t1) * 1000), "ms_domains": int((time.time() - t2) * 1000)})
         if self.world_map:
             self.emit("world/map", {"url": "world/map.json"})
         self.on_say("line", "I am in %s now." % (entry.get("label") or room))

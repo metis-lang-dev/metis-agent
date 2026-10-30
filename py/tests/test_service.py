@@ -723,6 +723,7 @@ def test_a_page_moves_the_agent_to_another_room_with_no_restart(tmp_path, monkey
     assert calls == [("frames",), ("leave",), ("enter", "train/b-2"), ("reset",), ("reload", "grasp", "room"), ("reload", "nav", "room")]
     assert json.loads(games.read_text())["current"] == "train/b-2"
     r = recs(lv, "dlg-room")[-1]
+    assert r["ms_open"] >= 0 and r["ms_domains"] >= 0
     assert r["room"] == "train/b-2" and r["left"] == "train/a-1" and r["label"] == "bathroom 2" and r["ms"] >= 0
     evs = [e for e, _ in frames]
     assert evs.index("world/loading") < evs.index("world/map") < evs.index("world/room")
@@ -736,6 +737,15 @@ def test_a_page_moves_the_agent_to_another_room_with_no_restart(tmp_path, monkey
             assert any(json.loads(l)["kind"] == "dlg-room" for l in saved.splitlines()) and len(saved.splitlines()) == len(lv.journal.recs)
     asyncio.run(go())
     assert not stops
+
+
+def test_a_room_chosen_from_the_rest_joins_the_house(tmp_path):
+    """rooms step 2: the picker shows the house; a room chosen from the rest is kept in it, once."""
+    lv, frames, games, calls = _room_service(tmp_path)
+    d = json.loads(games.read_text())
+    games.write_text(json.dumps(dict(d, house=["train/a-1"])))
+    assert lv.enter_room("train/b-2") is None and json.loads(games.read_text())["house"] == ["train/a-1", "train/b-2"]
+    assert lv.enter_room("train/a-1") is None and json.loads(games.read_text())["house"] == ["train/a-1", "train/b-2"]
 
 
 def test_the_door_is_refused_with_a_thing_in_hand(tmp_path):
