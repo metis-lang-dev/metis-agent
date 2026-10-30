@@ -989,6 +989,17 @@ class Live:
         elif any(e.startswith("ended(") for e in b.get("effects") or ()):
             kind = next(e[6:-1] for e in b["effects"] if e.startswith("ended("))
             answer = None
+            if kind == "done":                          # our own check, before the status says so (the card's `agrees`)
+                for h in (self.served_hosts().get(p) for p in sorted(f["planner"])):
+                    unmet = h.goal_unmet() if callable(getattr(h, "goal_unmet", None)) else None
+                    if unmet:
+                        line = self.spoken(unmet)
+                        self.journal.record({"kind": "dlg-disagree", "said": "done", "world": line})
+                        tv["results"].append(line)
+                        self.on_say("line", line)
+                        self.emit("world/delta", {"task": {"chain": [dict(c) for c in tv["chain"]], "results": list(tv["results"])}})
+                        self.set_status("stuck", line, options=list(STOP_OPTION))
+                        return
             if kind != "done" and src in f["planner"] and b.get("said"):
                 # an end that is an answer, not done (map-queries s-396939dc: a search's "probably no kettle here"): the
                 # planner's line is said, and the status shows it, never "Done." — an answer, not a stall
@@ -1276,6 +1287,23 @@ class Live:
                 if ev.startswith("world/"):
                     self.emit(ev, dict(f, domain=name))
 
+    def world_refused(self, d, trace):
+        """A rule fires on the program's belief, and its host may then find the world took nothing (a host's `world_refused()`
+        face). The result it produced is not so, and must not reach the director as a result (rooms s-b51a2e80, nina's F1:
+        a put the world refused was reported placed, then done): the fired row says the refusal instead, the program's own
+        for it, and the line says what was refused. The world's next sync brings the session back to what is so."""
+        ag = self.agents.agents.get(d) if hasattr(self.agents, "agents") else None
+        h = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+        f = getattr(h, "world_refused", None)
+        if not callable(f):
+            return
+        for ref in f() or ():
+            row = next((x for x in trace.get("fired") or [] if x.get("event") == ref["rule"]), None)
+            if row is not None:
+                row["produce"] = [a for a in row.get("produce") or [] if a.split("(")[0] not in ref["withdraw"]] + [ref["answer"]]
+                row["line"] = ref["line"]
+            self.journal.record({"kind": "dlg-refused", "domain": d, "rule": ref["rule"], "command": ref["command"], "answer": ref["answer"]})
+
     def card_changes(self):
         """A host whose card grew (its `card_changed()` face: semantic-map step 3, a thing the map saw for
         the first time, the card rewritten from the map): the agent's mapper re-reads it and the person
@@ -1321,6 +1349,7 @@ class Live:
                                     self._cancel_q.append(a[a.index("(") + 1:-1].strip())
                     # (the tick, step 2: activation is the director's — an inactive specialist beats on its copies,
                     # but only an active one's products arrive, as today, where an inactive one never beats)
+                    self.world_refused(d, r)
                     if not muted and not (self.tick_all and d in self.off and d in self.director.facts["specialist"]):
                         self.director.produced(d, r)
                 self.journal.record(dict(r, kind="dlg-trace"))

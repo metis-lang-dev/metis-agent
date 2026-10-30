@@ -748,6 +748,26 @@ def test_a_room_chosen_from_the_rest_joins_the_house(tmp_path):
     assert lv.enter_room("train/a-1") is None and json.loads(games.read_text())["house"] == ["train/a-1", "train/b-2"]
 
 
+def test_a_result_the_world_refused_never_reaches_the_director(tmp_path):
+    """rooms s-b51a2e80, nina's F1: put_plain fired on the program's belief and the game refused the move; the row that goes on
+    says the program's refusal and what was refused, not placed; a host with nothing refused leaves the row alone."""
+    from types import SimpleNamespace
+    lv, frames = live(tmp_path)
+    host = SimpleNamespace(refs=[{"rule": "put_plain[O=target,R=dest]", "command": "move candle 1 to bathtub 1", "answer": "refused_put(dest)",
+                                  "withdraw": ["placed"], "line": "The world refused it: move candle 1 to bathtub 1."}])
+    host.world_refused = lambda: (host.refs, setattr(host, "refs", []))[0]
+    lv.agents = SimpleNamespace(agents={"place": SimpleNamespace(host=host)})
+    row = {"kind": "clause", "event": "put_plain[O=target,R=dest]", "produce": ["handsfree", "placed(target,dest)"], "line": "I put target on dest."}
+    trace = {"domain": "place", "fired": [row]}
+    lv.world_refused("place", trace)
+    assert row["produce"] == ["handsfree", "refused_put(dest)"] and row["line"] == "The world refused it: move candle 1 to bathtub 1."
+    r = recs(lv, "dlg-refused")[-1]
+    assert r["domain"] == "place" and r["command"] == "move candle 1 to bathtub 1" and r["answer"] == "refused_put(dest)"
+    ok = {"kind": "clause", "event": "put_plain[O=target,R=dest]", "produce": ["placed(target,dest)"], "line": "I put target on dest."}
+    lv.world_refused("place", {"fired": [ok]})
+    assert ok["produce"] == ["placed(target,dest)"] and len(recs(lv, "dlg-refused")) == 1
+
+
 def test_the_door_is_refused_with_a_thing_in_hand(tmp_path):
     """The ruling: a held thing exists only in its room's game. Refused in words, nothing moved."""
     lv, frames, games, calls = _room_service(tmp_path, holding="apple1")
