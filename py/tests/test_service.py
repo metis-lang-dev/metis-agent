@@ -687,40 +687,74 @@ def test_a_name_listed_twice_is_two_rows_the_second_shadowed(tmp_path):
     assert len(keys) == len(set(keys))                                   # the page's keys are unique
 
 
-def test_a_page_loads_another_game_through_its_runner(tmp_path, monkeypatch):
-    """The world page's game picker: v3.games is served at /world/games.json; a page's load_game names one of its ids,
-    which is written to v3.game_request, every page hears world/loading, and the service stops (SIGINT, run_app's own
-    stop) so that its runner (alfworld/demo.sh) starts it on that game; an id not in the list is refused in words."""
-    import asyncio
-    import signal
-    from aiohttp.test_utils import TestClient, TestServer
-    lv, _ = live(tmp_path)
+def _room_service(tmp_path, holding=None):
+    """A service with a director whose host enters rooms; the calls recorded in order."""
+    from types import SimpleNamespace
+    lv, frames = live(tmp_path)
     games = tmp_path / "games.json"
-    games.write_text(json.dumps({"current": "train/a-1", "games": [{"id": "train/a-1"}, {"id": "train/b-2"}]}))
-    lv.games, lv.game_request = str(games), str(tmp_path / "next.json")
-    kills = []
-    monkeypatch.setattr(os, "kill", lambda pid, sig: kills.append((pid, sig)))
+    games.write_text(json.dumps({"current": "train/a-1", "games": [{"id": "train/a-1", "label": "kitchen 1"}, {"id": "train/b-2", "label": "bathroom 2"}]}))
+    lv.games = str(games)
+    lv.world_map = str(tmp_path / "world-map.json")
+    Path(lv.world_map).write_text("{}")
+    calls = []
+    dh = SimpleNamespace(holding=lambda: holding, enter_room=lambda r: (calls.append(("enter", r)), r)[1],
+                         leave_room=lambda: calls.append(("leave",)))
+    lv.director = SimpleNamespace(name="director", facts={"specialist": ["nav", "grasp"], "planner": ["task"]}, outcome=None)
+    lv.names = ["director", "task", "nav", "grasp"]
+    lv.served_hosts = lambda: {"director": dh}
+    lv.world_frames = lambda: calls.append(("frames",))
+    lv.reset_hierarchy = lambda: calls.append(("reset",))
+    lv.reload = lambda d, by="person": calls.append(("reload", d, by))
+    return lv, frames, games, calls
+
+
+def test_a_page_moves_the_agent_to_another_room_with_no_restart(tmp_path, monkeypatch):
+    """rooms s-b51a2e80 step 1: a page's load_game names a room of v3.games; the agent goes there and no process stops, in
+    the design's order (the last room's frames, the running task's card closed, the room's world and map, the hierarchy
+    reset, the specialists' hosts re-read, the page's map, the status); the journal says so."""
+    import asyncio
+    from aiohttp.test_utils import TestClient, TestServer
+    lv, frames, games, calls = _room_service(tmp_path)
+    stops = []
+    monkeypatch.setattr(os, "kill", lambda pid, sig: stops.append(sig))
+    assert lv.enter_room("../etc") == "There is no room '../etc' here." and calls == []
+    assert lv.enter_room("train/a-1") == "I am already there." and calls == []
+    assert lv.enter_room("train/b-2") is None
+    assert calls == [("frames",), ("leave",), ("enter", "train/b-2"), ("reset",), ("reload", "grasp", "room"), ("reload", "nav", "room")]
+    assert json.loads(games.read_text())["current"] == "train/b-2"
+    r = recs(lv, "dlg-room")[-1]
+    assert r["room"] == "train/b-2" and r["left"] == "train/a-1" and r["label"] == "bathroom 2" and r["ms"] >= 0
+    evs = [e for e, _ in frames]
+    assert evs.index("world/loading") < evs.index("world/map") < evs.index("world/room")
+    assert dict(frames)["world/status"]["state"] == "waiting" and dict(frames)["world/room"]["game"] == "train/b-2"
     app = S.make_app(lv, str(ROOT / "console"))
 
     async def go():
         async with TestClient(TestServer(app)) as c:
-            assert (await (await c.get("/world/games.json")).json())["current"] == "train/a-1"
-            a = await c.ws_connect("/ws")
-            await a.send_json({"ev": "load_game", "game": "../etc"})
-            m = json.loads((await a.receive(timeout=10)).data)
-            assert m["ev"] == "load_game_ack" and m["error"] == "There is no game '../etc' here."
-            await a.send_json({"ev": "load_game", "game": "train/b-2"})
-            got = []
-            while not got or got[-1]["ev"] != "world/loading":
-                got.append(json.loads((await a.receive(timeout=10)).data))
-            ack = next(g for g in got if g["ev"] == "load_game_ack")
-            assert ack["game"] == "train/b-2" and "error" not in ack and got[-1]["game"] == "train/b-2"
-            await asyncio.sleep(0.8)
-            await a.close()
+            assert (await (await c.get("/world/games.json")).json())["current"] == "train/b-2"
+            saved = await (await c.get("/world/journal.jsonl")).text()     # a page's save: the whole run, from before it loaded
+            assert any(json.loads(l)["kind"] == "dlg-room" for l in saved.splitlines()) and len(saved.splitlines()) == len(lv.journal.recs)
     asyncio.run(go())
-    assert json.loads((tmp_path / "next.json").read_text()) == {"game": "train/b-2"}
-    assert kills == [(os.getpid(), signal.SIGINT)]
-    assert recs(lv, "dlg-director")[-1]["load_game"] == "train/b-2"
+    assert not stops
+
+
+def test_the_door_is_refused_with_a_thing_in_hand(tmp_path):
+    """The ruling: a held thing exists only in its room's game. Refused in words, nothing moved."""
+    lv, frames, games, calls = _room_service(tmp_path, holding="apple1")
+    said = lv.enter_room("train/b-2")
+    assert "holding" in said and "put it down" in said and calls == []
+    assert json.loads(games.read_text())["current"] == "train/a-1" and not recs(lv, "dlg-room")
+
+
+def test_a_room_the_host_cannot_open_leaves_the_agent_where_it_is(tmp_path):
+    lv, frames, games, calls = _room_service(tmp_path)
+
+    def broken(room):
+        raise OSError("no game file")
+    lv.served_hosts()["director"].enter_room = broken
+    said = lv.enter_room("train/b-2")
+    assert said == "I could not go there: no game file" and ("reset",) not in calls
+    assert json.loads(games.read_text())["current"] == "train/a-1" and dict(frames)["world/room"]["game"] == "train/a-1"
 
 
 def test_a_slot_binds_only_to_what_the_person_named():

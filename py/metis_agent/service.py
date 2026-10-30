@@ -22,7 +22,6 @@ import logging
 import os
 import queue
 import re
-import signal
 import threading
 import time
 from datetime import datetime, timezone
@@ -59,6 +58,11 @@ class Journal:
         self.emit = emit
         self.wake, self.gens, self.say, self.say_at = None, [], None, None
         self.clock_ms = []
+
+    def jsonl(self):
+        """Every record of this run as JSON lines (a page's save: from before it loaded too)."""
+        with self.lock:
+            return "".join(json.dumps(r) + "\n" for r in self.recs)
 
     def record(self, rec):
         """One record: to the file, the kept list, and the pages as journal frames."""
@@ -439,10 +443,8 @@ class Live:
         # named on every hello (world/map); the director's task chain and result lines (world/delta task)
         self.world_map = v3.get("world_map")
         # the world's games (the world page's picker): v3.games, a JSON file {current, games: [{id, label, …}]} served at
-        # /world/games.json; a page's load_game names one of them, written to v3.game_request, and the service stops so
-        # that its runner (alfworld/demo.sh) sets that game up and starts the service again
+        # /world/games.json; a page's load_game names one of them and the agent goes there (enter_room)
         self.games = v3.get("games")
-        self.game_request = v3.get("game_request")
         self.ask_now = None       # the director's open question: {question, options} (world/ask; alf-demo step 3b)
         self.status = None        # what the agent wants from the person now (world/status)
         self.answers = []         # the turns' answers, (text, time): the spoken-repeat guard (alf-demo 3c)
@@ -1007,19 +1009,63 @@ class Live:
         self.status = dict({"state": state, "text": text}, **kw)
         self.emit("world/status", self.status)
 
-    def load_game(self, game):
-        """A page's load_game: GAME, one of v3.games' ids, written to v3.game_request for the runner, which starts
-        the service again on it. → None, or the refusal in words."""
-        if not (self.games and self.game_request):
-            return "This service has no games to load."
+    def enter_room(self, room):
+        """Another room, the same agent (rooms s-b51a2e80): ROOM, one of v3.games' ids. The programs are compiled over roles
+        and do not change; the room is data under them. Applied on the agent thread, between ticks (a world event): no
+        host reads two rooms in one tick. In order: a running task stopped with its card kept (each host's `leave_room`
+        face), the room's world opened and its map made active (the director's host's `enter_room` face), the hierarchy at
+        its start and every domain's host re-read on the room's data, the mapper re-primed on its card (reload_intents, in
+        the reload), the map and the status on the wire. No process stops: the model, the journal and the dialog go on.
+        A held thing stays in its room's game, so the door is refused with it in hand. → None, or the refusal in words."""
+        if not self.games or self.director is None:
+            return "This service has no rooms to go to."
         try:
-            ids = {g.get("id") for g in json.loads(Path(self.games).read_text()).get("games") or ()}
+            doc = json.loads(Path(self.games).read_text())
         except (OSError, ValueError) as e:
-            return "The games list cannot be read: %s" % e
-        if game not in ids:
-            return "There is no game %r here." % game
-        Path(self.game_request).write_text(json.dumps({"game": game}))
-        self.journal.record({"kind": "dlg-director", "load_game": game})
+            return "The rooms list cannot be read: %s" % e
+        entry = next((g for g in doc.get("games") or () if g.get("id") == room), None)
+        if entry is None:
+            return "There is no room %r here." % room
+        name = self.director.name
+        hosts = self.served_hosts()
+        dh = hosts.get(name)
+        enter = getattr(dh, "enter_room", None)
+        if not callable(enter):
+            return "This world has no rooms to go to."
+        if room == doc.get("current"):
+            return "I am already there."
+        held = dh.holding() if callable(getattr(dh, "holding", None)) else None
+        if held:
+            line = self.spoken("I am holding %s: tell me where to put it down first." % held)
+            self.on_say("line", line)
+            return line
+        t0 = time.time()
+        self.emit("world/loading", {"game": room})
+        try:
+            self.world_frames()                    # the last room's frames first: the reloads replace their hosts
+            for h in hosts.values():
+                leave = getattr(h, "leave_room", None)
+                if callable(leave):
+                    leave()
+            if enter(room) is None:
+                self.emit("world/room", {"game": doc.get("current")})
+                return "This world has no rooms to go to."
+        except Exception as e:  # noqa: BLE001 — the agent stays where it is, and says why
+            log.exception("[v3] enter_room %s", room)
+            self.emit("world/room", {"game": doc.get("current")})
+            return "I could not go there: %s" % e
+        self.reset_hierarchy()                     # the planner and the director re-read
+        for d in sorted(self.director.facts["specialist"]):
+            if d in self.names:
+                self.reload(d, by="room")
+        Path(self.games).write_text(json.dumps(dict(doc, current=room), indent=1))
+        self.journal.record({"kind": "dlg-room", "room": room, "label": entry.get("label") or room, "left": doc.get("current"),
+                             "ms": int((time.time() - t0) * 1000)})
+        if self.world_map:
+            self.emit("world/map", {"url": "world/map.json"})
+        self.on_say("line", "I am in %s now." % (entry.get("label") or room))
+        self.set_status("waiting", self.waiting_text())
+        self.emit("world/room", {"game": room})
         return None
 
     def new_game(self, say=True):
@@ -2214,13 +2260,10 @@ def make_app(live, ui_dir, lib_dir=None):
                         await send("journal", {"rec": r})
                 elif ev == "new_game":
                     await send("new_game_ack", {"text": await ask(live.new_game)})
-                elif ev == "load_game":     # another game (v3.games): its runner restarts the service on it
+                elif ev == "load_game":     # another room (v3.games): the agent goes there, on its own thread
                     game = str(m.get("game") or "")
-                    err = live.load_game(game)
+                    err = await ask(live.enter_room, game)
                     await send("load_game_ack", {"game": game, **({"error": err} if err else {})})
-                    if not err:              # every page reloads once the service is back; the stop is run_app's own
-                        emit("world/loading", {"game": game})
-                        asyncio.get_running_loop().call_later(0.5, os.kill, os.getpid(), signal.SIGINT)
                 elif ev == "say_text":
                     text = str(m.get("text") or "").strip()
                     if not text:
@@ -2300,6 +2343,10 @@ def make_app(live, ui_dir, lib_dir=None):
         async def world_map(request):
             return web.FileResponse(Path(live.world_map), headers={"Cache-Control": "no-store"})
         app.router.add_get("/world/map.json", world_map)
+
+        async def world_journal(request):
+            return web.Response(text=live.journal.jsonl(), content_type="application/jsonl", headers={"Cache-Control": "no-store"})
+        app.router.add_get("/world/journal.jsonl", world_journal)
     if getattr(live, "games", None):
         async def world_games(request):
             return web.FileResponse(Path(live.games), headers={"Cache-Control": "no-store"})
