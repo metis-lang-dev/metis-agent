@@ -69,6 +69,32 @@ def test_a_planners_refusal_that_asks_is_a_result_line_said_once():
     assert view["cornered"] == "fridge1" and view["task"]["results"] == ["Fridge 1 is not where this task wants tomato 1."]
 
 
+def test_a_claimed_done_whose_goal_does_not_hold_is_not_said_done():
+    """rooms s-b51a2e80 step 5, the backstop: the director ends on done and the planner host's goal_unmet() says the world
+    disagrees: the status is stuck with the world's words, never "Done", and the journal says so; a goal that holds
+    (goal_unmet None), or a host with no such face, is done as before."""
+    def ended(unmet):
+        h = SimpleNamespace(goal_unmet=lambda: unmet)
+        lv, frames, said = stand_in(outcome="ended(done)", hosts={"task": h})
+        recs = []
+        lv.journal = SimpleNamespace(record=recs.append)
+        lv.served_hosts = lambda: {"task": h}
+        S.Live.world_beat(lv, 0, {"arrival": "done", "effects": ["ended(done)"], "goals": [], "from": "task", "said": "target is in dest: done."})
+        return lv, frames, said, recs
+    line = "candle 1 is not in bathtub 1 in the world: the task is not done."
+    lv, frames, said, recs = ended(line)
+    assert lv.status["state"] == "stuck" and lv.status["text"] == "Candle 1 is not in bathtub 1 in the world: the task is not done."
+    assert "Done" not in lv.status["text"] and ("line", lv.status["text"]) in said
+    assert recs == [{"kind": "dlg-disagree", "said": "done", "world": lv.status["text"]}]
+    assert [f for ev, f in frames if ev == "world/delta"][-1]["task"]["results"][-1] == lv.status["text"]
+    lv, frames, said, recs = ended(None)
+    assert lv.status["state"] == "done" and lv.status["text"] == "Done. Tell me another task." and recs == []
+    lv, frames, said = stand_in(outcome="ended(done)", hosts={"task": SimpleNamespace()})
+    lv.served_hosts = lambda: {"task": SimpleNamespace()}
+    S.Live.world_beat(lv, 0, {"arrival": "done", "effects": ["ended(done)"], "goals": []})
+    assert lv.status["state"] == "done"
+
+
 def test_a_held_result_is_voiced_when_the_director_took_nothing_from_it():
     """nina's N7: a director domain's result is held for the director's beats; voiced after all when
     they took no arrival from that domain (a refusal the director never answers is never silence)."""
