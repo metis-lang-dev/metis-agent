@@ -27,7 +27,7 @@ renames and the roles are the instance's facts.
 import re
 
 ROLE_FACTS = ("handles", "planner", "specialist", "result", "end", "detour", "escalate", "nohandler", "rename")
-OUT = ("wake", "sleep", "forward", "ask", "ended", "tick__grant", "tick__revoke", "tick__cancel")   # the last three: a tree director's (the tick)
+OUT = ("wake", "sleep", "forward", "ask", "ended", "tick__grant", "tick__gen", "tick__revoke", "tick__cancel")   # the last three: a tree director's (the tick)
 
 
 def kind_of(atom):
@@ -211,6 +211,9 @@ class DirectorLoop:
                 elif verb in ("tick__grant", "tick__revoke"):   # a tree director's resource (specialist-tree, the tick)
                     if hasattr(self.ops, "grant"):
                         self.ops.grant(args[0], args[1], verb == "tick__grant")
+                elif verb == "tick__gen":                       # the grant's generation (spec/15 amendment 10)
+                    if hasattr(self.ops, "generation"):
+                        self.ops.generation(*args)
                 elif verb == "tick__cancel":                    # a tree director's stop (step 3c): the member drops its goal
                     if hasattr(self.ops, "cancel"):
                         self.ops.cancel(args[0])
