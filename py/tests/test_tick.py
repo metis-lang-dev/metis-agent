@@ -386,5 +386,6 @@ def test_a_generation_replaces_the_last_in_the_members_session(tmp_path):
     assert len(taken) == 1
     live.journal, live.beat, live.director = Journal(), 9, types.SimpleNamespace(name="director")
     live.note_stale({"event": "release_old[1]"})
+    live.note_stale({"event": "unwant[1]"})
     live.note_stale({"event": "release_on_report[1]"})
-    assert [(r["what"], r["rule"]) for r in live.journal.rows if r["kind"] == "dlg-relay"] == [("stale", "release_old")]
+    assert [(r["what"], r["rule"]) for r in live.journal.rows if r["kind"] == "dlg-relay"] == [("stale", "release_old"), ("unwant", "unwant")]

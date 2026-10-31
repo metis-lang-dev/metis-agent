@@ -853,14 +853,14 @@ class Live:
             Live.REPORTS = frozenset(p for p, n in nature.items() if n == "report" and p != "tick__status")
         return Live.REPORTS
 
-    STALE = ("release_withdraw", "release_old", "release_on_free", "release_other", "late_release_free", "late_release_other", "late_free", "late_other")
+    STALE = ("release_old", "release_on_free", "release_other", "late_release_free", "late_release_other", "late_free", "late_other")
 
     def note_stale(self, row):
         """A release that outlived its grant, consumed by the director's rules (spec/15 amendment 10): said in the journal."""
         rule = str(row.get("event", "")).split("[")[0]
-        if rule in self.STALE:
-            self.journal.record({"kind": "dlg-relay", "what": "stale", "domain": self.director.name, "rule": rule,
-                                 "event": row.get("event"), "stamp": self.beat})
+        if rule in self.STALE or rule == "unwant":
+            self.journal.record({"kind": "dlg-relay", "what": "unwant" if rule == "unwant" else "stale", "domain": self.director.name,
+                                 "rule": rule, "event": row.get("event"), "stamp": self.beat})
 
     def relay_reports(self, rows):
         """Step 3b (brief §3, the inversion): the report atoms (the protocol's report natures) ANY specialist's
