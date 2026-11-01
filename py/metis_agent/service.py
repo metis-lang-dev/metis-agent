@@ -456,7 +456,7 @@ class Live:
         self.stop = threading.Event()
         self.beat = 0
         self.tracer = None
-        if cfg.get("trace"):                   # a reader around the tick (metis_agent.trace), off unless the config asks
+        if cfg.get("trace") is not None:       # a reader around the tick (metis_agent.trace), off unless the config asks; a key it cannot honour stops the start
             from .trace import attach
             self.tracer = attach(self, cfg["trace"])
 

@@ -49,8 +49,24 @@ def origin(msg, kind):
     return kind
 
 
+TRACE_KEYS = ("dir", "every", "ring", "commands")
+
+
+def check_config(cfg):
+    """A `trace:` the reader cannot honour stops the start: a run that thinks it is traced and is not costs a run."""
+    if not isinstance(cfg, dict):
+        raise ValueError("trace: a mapping of %s (an empty one: the defaults), not %r" % (", ".join(TRACE_KEYS), cfg))
+    unknown = sorted(set(cfg) - set(TRACE_KEYS))
+    if unknown:
+        raise ValueError("trace: unknown key%s %s (it knows: %s)" % ("s" if len(unknown) > 1 else "", ", ".join(unknown), ", ".join(TRACE_KEYS)))
+    for k in ("every", "ring"):
+        if k in cfg and (isinstance(cfg[k], bool) or not isinstance(cfg[k], int) or cfg[k] < 0):
+            raise ValueError("trace: %s is a count of ticks, not %r" % (k, cfg[k]))
+
+
 class Tracer:
     def __init__(self, live, cfg):
+        check_config(cfg)
         self.lv = live
         journal = live.journal.fh.name if live.journal.fh else "journal.jsonl"
         path = Path(cfg.get("dir") or Path(journal).resolve().parent / ".run" / "trace")
@@ -268,7 +284,7 @@ class Tracer:
 
 
 def attach(live, cfg):
-    return Tracer(live, cfg or {})
+    return Tracer(live, cfg)
 
 
 # ── the agent's own state a checkpoint carries: a window of the trace replays from it, on the same relay code ──

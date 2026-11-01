@@ -35,6 +35,20 @@ def test_each_member_replays_alone_with_no_world(tmp_path, seed):
         assert r.rules and r.ticks == lv.tracer.k
 
 
+def test_an_empty_trace_key_is_the_defaults_not_off(tmp_path):
+    lv, _, _ = run(tmp_path, ticks=2, trace={"dir": str(tmp_path / "t")})
+    lv.tracer.close()
+    assert lv.tracer.seg.every == 200 and lv.tracer.seg.ring == 6000
+    from metis_agent.trace import check_config
+    check_config({})                                   # an empty mapping asks for the defaults: not falsy-and-off
+
+
+@pytest.mark.parametrize("bad, words", [({"evry": 5}, "unknown key evry"), ("yes", "a mapping of"), (True, "a mapping of"), ({"every": "ten"}, "every is a count"), ({"ring": -1}, "ring is a count")])
+def test_a_trace_key_it_cannot_honour_stops_the_start(tmp_path, bad, words):
+    with pytest.raises(ValueError, match=words):
+        run(tmp_path, ticks=1, trace=bad)
+
+
 def test_off_unless_the_config_asks(tmp_path):
     lv, _, _ = run(tmp_path, ticks=3)
     assert lv.tracer is None and "tick" not in lv.__dict__ and "latch" not in lv.__dict__

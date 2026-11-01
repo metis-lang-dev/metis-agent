@@ -80,7 +80,7 @@ def run(tmp_path, seed=1, members=MEMBERS, ticks=200, on_tick=None, trace=None):
     cfg["domains"].update(narrate=None, consult=False, records=None, quiet=[], pairs=[], seed=seed, tick=True)
     for k in ("names", "clocks"):
         cfg["domains"].pop(k, None)
-    if trace:
+    if trace is not None:
         cfg["trace"] = trace
     lv = S.Live(cfg, FakeLLM())
     kit = lv.agents.agents[members[0]].host.inner.kitchen         # the one kitchen, through a cook's host
