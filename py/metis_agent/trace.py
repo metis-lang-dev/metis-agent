@@ -8,7 +8,7 @@ config none of this is loaded.
            commands: [P, ...]           the world's commands; default the image's world.in
 
 A host may say where its world is at a checkpoint: `trace_ref()` → a JSON value, the world's own reference ({"t": …} also
-stamps the ticks)."""
+stamps the ticks); and what a fired rule commands: `trace_command(name)` → (kind, args...) as its restrictor emits it, or None."""
 import hashlib
 from pathlib import Path
 
@@ -193,7 +193,9 @@ class Tracer:
                 fired = [x for item in seq for x in (item.get("fired") or item.get("step") or ())]
                 events = self.events[d][1] if self.events.get(d, (None,))[0] == id(ag.repl) else {}
                 out_preds = set(self.out_preds.get(d, ()))
-                out = [o for name in fired if name in events for o in T.outputs(events[name], self.commands, out_preds)]
+                inner = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+                said = getattr(inner, "trace_command", None)
+                out = [o for name in fired if name in events for o in T.outputs(events[name], self.commands, out_preds, said if callable(said) else None)]
                 if out:
                     e["out"] = out
             c = self.reads.pop(d, None)

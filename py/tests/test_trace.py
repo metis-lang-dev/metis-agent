@@ -62,7 +62,9 @@ def test_a_tick_says_what_each_member_applied_read_fired_and_put_out(tmp_path):
     assert all(i.get("by") for i in items if "take" in i), "every take says where it came from"
     assert [c["domain"] for c in seg.header["clocks"]] == [c["domain"] for c in lv.clocks] and seg.header["live"]
     assert any("copy" in e for e in entries), "the reading's change at the latch"
-    out = {a.split("(")[0] for e in entries for a in e.get("out", ())}
+    said = [a for e in entries for a in e.get("out", ())]
+    assert any(isinstance(a, dict) and a["kind"] and "rule" in a for a in said), "a world command says its kind"
+    out = {a.split("(")[0] for a in said if isinstance(a, str)}
     assert {"tick__want", "tick__released"} <= out, "every out port, not the commands alone: %s" % sorted(out)
     director = [t["members"]["pot_director"] for t in seg.ticks if "pot_director" in t["members"]]
     assert not any("copy" in e for e in director), "the director reads no world"
