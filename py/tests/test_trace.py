@@ -212,7 +212,7 @@ def test_a_room_change_is_refused_in_words(tmp_path):
         replay_composition(d, kitchen_cfg(lv))
 
 
-judged = pytest.mark.skipif(not hasattr(trace, "apply_pack"), reason="metispy before metis.trace's apply_pack: this CI's sibling at its head, until it merges")
+judged = pytest.mark.skipif(not hasattr(trace, "family_skips"), reason="metispy before metis.trace's family_skips: this CI's sibling at its head, until it merges")
 
 
 def kitchen_root(tmp_path):
