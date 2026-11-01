@@ -226,7 +226,7 @@ def test_a_room_change_is_refused_in_words(tmp_path):
         replay_composition(d, kitchen_cfg(lv))
 
 
-judged = pytest.mark.skipif(not hasattr(trace, "family_skips"), reason="metispy before metis.trace's family_skips: this CI's sibling at its head, until it merges")
+judged = pytest.mark.skipif(not hasattr(trace, "deadline"), reason="metispy before metis.trace's deadline: this CI's sibling at its head, until it merges")
 
 
 def kitchen_root(tmp_path):
@@ -382,6 +382,69 @@ stage act {
     assert e["reasons"] == [] and e["rules"] == ["serve_late"] and e["receipt"]["moved"] == ["cook_a"] and e["receipt"]["ei_holds"]
     assert e["cases"][0]["before"] == {"passed": False} and e["cases"][0]["passed"] and e["cases"][0]["composition"]["passed"]
     assert e["first_enabled"]["rule"].startswith("serve_late") and "serve" in " ".join(e["first_enabled"]["beside"]) and e["first_fired_diff"]
+
+
+@judged
+def test_a_judgement_past_its_budget_says_not_judged_and_where(tmp_path):
+    from metis_agent.trace import judge
+    d, lv, config = judged_run(tmp_path)
+    e = judge(d, "cook_a", BREAKS, kitchen_root(tmp_path), config, composition="domains/kitchen_pot", budget=0.05)
+    assert e["verdict"] == "not judged" and "passed its budget of 0.05 s" in e["reasons"][0] and e["not_judged"]["stage"] in e["reasons"][0], e["reasons"]
+    assert "first_fired_diff" not in e
+    e = judge(d, "cook_a", BREAKS, kitchen_root(tmp_path), config, composition="domains/kitchen_pot")
+    assert [x["stage"] for x in e["times"]][:2] == ["the baseline's replay", "the goldens as they are"] and all("seconds" in x and "t0" not in x for x in e["times"])
+
+
+@judged
+def test_a_golden_past_its_budget_leaves_it_not_judged_not_accepted(tmp_path, monkeypatch):
+    from metis_agent.trace import judge
+    d, lv, config = judged_run(tmp_path)
+    real = trace.goldens
+
+    def slow(dom, seeds=(1, 2, 3), skip=None, budget=None):
+        return False, [{"case": "slow", "file": "slow.yaml", "seed": 1, "not_judged": True, "failures": ["slow.yaml: past its budget of 1 s"]}]
+    pack = "pred plated_late : cook.\nstage act {\n  %% Never here.\n  serve_late [dyn] : held_soup * order * $self(S) * $tick__gen(S, pot, g3) -o hand_free * plated_late.\n}\n"
+    monkeypatch.setattr(trace, "goldens", slow)
+    e = judge(d, "cook_a", pack, kitchen_root(tmp_path), config, composition="domains/kitchen_pot")
+    assert e["verdict"] == "not judged" and "golden slow.yaml of cook_a, seed 1" in " ".join(e["reasons"]), e["reasons"]
+    monkeypatch.setattr(trace, "goldens", real)
+    # a refusal stands, whatever else ran out
+    assert judge(d, "cook_a", REPEAT, kitchen_root(tmp_path), config)["verdict"] == "refused"
+
+
+@judged
+def test_a_golden_that_moves_with_the_amendment_is_held_in_its_new_text(tmp_path):
+    """A rule renamed on purpose breaks the goldens that name it; the amendment carries them, a person reads them. The old text stays the baseline."""
+    from metis_agent.trace import judge
+    d, lv, config = judged_run(tmp_path)
+    root = kitchen_root(tmp_path)
+    old = (KITCHEN / "cook_a" / "cases" / "waits.yaml").read_text()
+    new = tmp_path / "waits.yaml"
+    new.write_text(old.replace("fetch_onion", "grab_onion"))
+    e = judge(d, "cook_a", BREAKS, root, config, composition="domains/kitchen_pot", moved=[new])
+    assert e["moved"] == ["waits.yaml"], e.get("reasons")
+    assert (KITCHEN / "cook_a" / "cases" / "waits.yaml").read_text() == old, "the catalog itself is not touched"
+    assert any(x["file"] == "waits.yaml" for x in e["goldens"]["failed"]), "held to the new text, which this pack does not satisfy"
+    gone = tmp_path / "nothing_like_it.yaml"
+    gone.write_text("boundaries: []\n")
+    r = judge(d, "cook_a", BREAKS, root, config, composition="domains/kitchen_pot", moved=[gone])
+    assert r["verdict"] == "refused" and "no package here has a case" in " ".join(r["reasons"]), r["reasons"]
+
+
+@judged
+def test_the_root_is_the_compositions_not_the_cwds_tree(tmp_path, monkeypatch):
+    """A cwd whose tree holds a domain twice (metis-worlds: the road's task, alfworld's) is no business of a judgement on one root."""
+    from metis_agent.trace import judge
+    d, lv, config = judged_run(tmp_path)
+    for where in ("a", "b"):
+        pkg = tmp_path / "tree" / where / "domains" / "task"
+        pkg.mkdir(parents=True)
+        (pkg / "task.llp").write_text("catalog task 1.\n")
+        (pkg / "domain.yaml").write_text("program: task.llp\ndisplay: task\nline: a task\n")
+    monkeypatch.chdir(tmp_path / "tree")
+    monkeypatch.delenv("METIS_CATALOG")
+    e = judge(d, "cook_a", BREAKS, kitchen_root(tmp_path), config, composition="domains/kitchen_pot")
+    assert e["verdict"] == "refused" and "golden" in " ".join(e["reasons"]) and "twice" not in " ".join(e["reasons"]), e["reasons"]
 
 
 @judged

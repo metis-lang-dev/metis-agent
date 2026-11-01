@@ -28,6 +28,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 from metis import trace as T
@@ -660,7 +661,7 @@ def _under(path, root):
         return None
 
 
-def _consumer_goldens(name, root, seeds, skips=None):
+def _consumer_goldens(name, root, seeds, skips=None, budget=None):
     """A family's other consumer: its members' cases as the environment's family has them. SKIPS: {member: the files not its own}, read on the family as it is. → (how many ran,
     [each failure, named], {member: its family_skips})."""
     from metis.catalog import manifests as mc
@@ -672,21 +673,32 @@ def _consumer_goldens(name, root, seeds, skips=None):
             files = T.golden_files(d, skip)
             if files:
                 ran[d.name] = len(files)
-                bad += [dict(x, member=d.name, consumer=name) for x in T.goldens(d, seeds=seeds, skip=skip)[1]]
+                bad += [dict(x, member=d.name, consumer=name) for x in T.goldens(d, seeds=seeds, skip=skip, budget=budget)[1]]
     return ran, bad, read
 
 
-def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), composition=None, unit=None, consumers=()):
+def _mark(times, stage):
+    """A stage of the judgement begins: for the evidence, and on stderr so a long one is not taken for a hang."""
+    now = time.monotonic()
+    if times and "seconds" not in times[-1]:
+        times[-1]["seconds"] = round(now - times[-1].pop("t0"), 1)
+    if stage:
+        times.append({"stage": stage, "t0": now})
+        print("judge: %s" % stage, file=sys.stderr, flush=True)
+
+
+def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), composition=None, unit=None, consumers=(), golden_budget=None, times=None, moved=()):
     """The candidate program TEXT for MEMBER, judged on the composition: on a copy of the catalog at ROOT (nothing here touches ROOT), CONFIG(root)
     the Live's config for a root. UNIT: the file TEXT replaces (default the member's program), under ROOT or under METIS_HOME: a family's unit is judged on a copy of the family, and
-    CONSUMERS ([(name, root, composition)]: the family's other consumers, spec/18 §5) must still link and keep their goldens. First the baseline must replay to the record, or
-    there is nothing to compare with. → {
+    CONSUMERS ([(name, root, composition)]: the family's other consumers, spec/18 §5) must still link and keep their goldens. GOLDEN_BUDGET: seconds a run of one golden may take. TIMES: a
+    list the stages' seconds are kept on. First the baseline must replay to the record, or there is nothing to compare with. → {
       baseline: ok, rules: the candidate's new or changed rules,
       receipt: {moved: the members whose program moved (the edit is confined to one), interface: {member: {key, ei_key, before}} from metisc --interface on COMPOSITION,
                 ei_holds, errors: the link's},
       first_enabled: {k, rule, beside: the rules enabled with it}: the first tick one of them is enabled,
       first_fired_diff, first_out_diff: {k, member, ...}: exact up to here; open_loop_after: k: the later copies are of a world that obeyed the old command,
       rows: every tick and member that differs, members: the first differing tick per member,
+      moved: [the goldens the amendment moves with it: their new text, on the copy, is what it is held to; a person reads them],
       goldens: {ok, ran: {member: how many}, failed: named, skipped: a family's that are not this consumer's, already_failing}: every member's cases, what the candidate breaks; cases: [{file, member, at, before: it failed, passed, failures, composition: {...} at its tick}]}"""
     from metis import catalog as C
     from metis.catalog import stub
@@ -694,15 +706,19 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
     head = segs[0].header
     if member not in head["members"]:
         raise T.TraceError("no member %r in the trace (it has: %s)" % (member, ", ".join(sorted(head["members"]))))
-    base = replay_composition(path, config(Path(root)))
+    times = [] if times is None else times
+    _mark(times, "the baseline's replay")
+    with _catalog(root):                       # the root is the composition's, whatever the cwd's tree holds
+        base = replay_composition(path, config(Path(root)))
     if not base.ok:
         return {"baseline": False, "divergence": base.divergence, "why": "the record does not replay on this toolchain: no candidate is judged on it"}
+    _mark(times, "the goldens as they are")
     with _catalog(root):
         target = Path(unit).resolve() if unit else Path(C.get(member).program).resolve()
         doms = {m: _domain_of(C, m) for m in head["members"]}
         # a golden written on one seed may not hold on another as it is (a `fired` in its order): only what the candidate breaks refuses it
         skips = {m: T.family_skips(doms[m]) for m in doms if doms[m] is not None}   # on the program as it is: a candidate's drop excuses nothing
-        already = {(m, g["file"], g["seed"]) for m in doms if doms[m] is not None for g in T.goldens(doms[m], seeds=seeds, skip=[x["file"] for x in skips[m]])[1]}
+        already = {(m, g["file"], g["seed"]) for m in doms if doms[m] is not None for g in T.goldens(doms[m], seeds=seeds, skip=[x["file"] for x in skips[m]], budget=golden_budget)[1] if not g.get("not_judged")}
         was_cases = [_case_result(stub, doms.get(m0), f) for f, m0 in ((f, _case_member(stub, f, member)) for f in cases)]
     home = os.environ.get("METIS_HOME")
     in_home = _under(target, home) if home else None
@@ -712,8 +728,8 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
     consumers = list(consumers) if in_root is None else []     # a member's own file moves no other consumer
     before_consumers, consumer_skips = set(), {}
     for c in consumers:
-        _, bad, consumer_skips[c[0]] = _consumer_goldens(c[0], c[1], seeds)
-        before_consumers |= {(c[0], x["member"], x["file"], x["seed"]) for x in bad}
+        _, bad, consumer_skips[c[0]] = _consumer_goldens(c[0], c[1], seeds, budget=golden_budget)
+        before_consumers |= {(c[0], x["member"], x["file"], x["seed"]) for x in bad if not x.get("not_judged")}
     before_if = _interface(root, composition)
     with tempfile.TemporaryDirectory(prefix="trace-candidate-") as wd:
         copy_root = Path(wd) / "root"
@@ -728,7 +744,17 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
             (copy_home / in_home).write_text(text)
             new_env["METIS_HOME"] = copy_home
         rules = T.new_rules(text, was)
+        moved_names = []
+        for f in moved:                        # a golden that moves with the amendment: named CASES-relative under whichever tree holds the old one
+            f = Path(f)
+            old = [c for tree in ([copy_home] if in_root is None else []) + [copy_root] for c in tree.rglob(f.name) if c.parent.name == "cases"]
+            if not old:
+                raise T.TraceError("the pack moves golden %s, and no package here has a case of that name" % f.name)
+            for t in old:
+                shutil.copyfile(f, t)
+            moved_names.append(f.name)
         with _env(**new_env):
+            _mark(times, "the link, the candidate")
             after_if = _interface(copy_root, composition)
             if after_if and after_if.get("errors"):
                 return {"baseline": True, "rules": rules, "receipt": {"errors": after_if["lines"]}, "link_failed": True}
@@ -738,7 +764,9 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
                 c = stub.load_case(f)
                 if c.get("at") is not None:
                     at.setdefault(int(c["at"]), set()).add(c.get("member") or member)
+            _mark(times, "the candidate's replay")
             run = replay_composition(path, cfg, {"member": member, "rules": rules, "at": at})
+            _mark(times, "the goldens on the candidate")
             moved = _moved(C, head, before_if, after_if)
             failed, ran = [], {}
             for m in head["members"]:
@@ -746,15 +774,16 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
                 if dom is not None:
                     skip = [x["file"] for x in skips.get(m, ())]
                     ran[m] = len(T.golden_files(dom, skip))
-                    failed += [dict(x, member=m) for x in T.goldens(dom, seeds=seeds, skip=skip)[1] if (m, x["file"], x["seed"]) not in already]
+                    failed += [dict(x, member=m) for x in T.goldens(dom, seeds=seeds, skip=skip, budget=golden_budget)[1] if (m, x["file"], x["seed"]) not in already]
             links = {}
             for name, c_root, c_comp in consumers:
                 with _catalog(c_root):
                     linked = _interface(c_root, c_comp)
                 links[name] = {"errors": (linked or {}).get("lines", [])}
-                c_ran, c_bad, _ = _consumer_goldens(name, c_root, seeds, consumer_skips[name])
+                c_ran, c_bad, _ = _consumer_goldens(name, c_root, seeds, consumer_skips[name], golden_budget)
                 ran.update({"%s/%s" % (name, m): n for m, n in c_ran.items()})
                 failed += [x for x in c_bad if (name, x["member"], x["file"], x["seed"]) not in before_consumers]
+            _mark(times, "the cases")
             judged = []
             first_out = next(({"k": r["k"], "member": r["member"], **r["out"]} for r in run.rows if "out" in r), None)
             for i, f in enumerate(cases):
@@ -768,6 +797,7 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
                     fails = T.holds(expect, got["counts"], got["fired"], got["out"])
                     row["composition"] = {"passed": not fails, "failures": fails, "open_loop": bool(first_out and int(c["at"]) > first_out["k"])}
                 judged.append(row)
+        _mark(times, None)
         rows = run.rows
         first_fired = next(({"k": r["k"], "member": r["member"], **r["fired"]} for r in rows if "fired" in r), None)
         by_member = {}
@@ -776,7 +806,8 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
         return {"baseline": True, "rules": rules, "receipt": _receipt(moved, member, before_if, after_if, head),
                 "first_enabled": run.first_enabled, "first_fired_diff": first_fired, "first_out_diff": first_out,
                 "open_loop_after": first_out["k"] if first_out else None, "rows": rows, "members": by_member,
-                "consumers": links, "goldens": {"ok": not failed, "ran": ran, "failed": failed, "skipped": _skipped(skips, consumer_skips), "already_failing": sorted(["%s of %s, seed %s" % (f, m, x) for m, f, x in already] + ["%s of %s/%s, seed %s" % (f, c, m, x) for c, m, f, x in before_consumers])}, "cases": judged}
+                "moved": moved_names, "consumers": links, "goldens": {"ok": not [x for x in failed if not x.get("not_judged")], "ran": ran, "failed": [x for x in failed if not x.get("not_judged")],
+                                                "not_judged": [x for x in failed if x.get("not_judged")], "skipped": _skipped(skips, consumer_skips), "already_failing": sorted(["%s of %s, seed %s" % (f, m, x) for m, f, x in already] + ["%s of %s/%s, seed %s" % (f, c, m, x) for c, m, f, x in before_consumers])}, "cases": judged}
 
 
 def _domain_of(catalog, m):
@@ -842,7 +873,7 @@ def verdict(e, member):
     if why:
         return "refused", why
     r = e.get("receipt") or {}
-    if not e.get("rules"):
+    if "rules" in e and not e["rules"]:
         why.append("the pack adds or changes no rule")
     if r.get("moved") is not None and r["moved"] != [member]:
         why.append("the edit is not confined to %s: the programs of %s moved" % (member, ", ".join(r["moved"]) or "none"))
@@ -866,12 +897,22 @@ def verdict(e, member):
         comp = c.get("composition")
         if comp and not comp["passed"]:
             why.append("case %s at tick %s of %s, on the composition%s: %s" % (c["file"], c["at"], c["member"], " (open-loop past its first differing output)" if comp["open_loop"] else "", "; ".join(comp["failures"])[:160]))
-    return ("refused" if why else "accepted"), why
+    if why:
+        return "refused", why
+    nj = (e.get("goldens") or {}).get("not_judged") or []
+    if e.get("not_judged") or nj:
+        out = []
+        if e.get("not_judged"):
+            out.append("the judgement passed its budget of %s s in: %s" % (e["not_judged"]["seconds"], e["not_judged"]["stage"]))
+        out += ["golden %s of %s, seed %s: %s" % (g["file"], g["member"], g["seed"], "; ".join(g["failures"])) for g in nj]
+        return "not judged", out
+    return "accepted", why
 
 
-def judge(path, member, pack, root, config, cases=(), composition=None, unit=None, seeds=(1, 2, 3), consumers=()):
+def judge(path, member, pack, root, config, cases=(), composition=None, unit=None, seeds=(1, 2, 3), consumers=(), budget=None, golden_budget=None, moved=()):
     """A hand-written PACK for MEMBER, with the same judgement a model's draft gets: the gate cascade (a duplicate, the link, the I-checks, the receipt with ei_key), every
-    member's goldens and the surprises' CASES, the fired diff on the composition's replay. → the evidence, with "verdict" and "reasons"; no world, no model."""
+    member's goldens and the surprises' CASES, the fired diff on the composition's replay. BUDGET: seconds for the whole of it; GOLDEN_BUDGET: for a run of one golden. → the evidence, with
+    "verdict" ("accepted", "refused", or "not judged": out of time, never a hang) and "reasons"; no world, no model."""
     from metis import catalog as C
     with _catalog(root):
         target = Path(unit).resolve() if unit else Path(C.get(member).program).resolve()
@@ -879,14 +920,19 @@ def judge(path, member, pack, root, config, cases=(), composition=None, unit=Non
     home = os.environ.get("METIS_HOME")
     in_home = _under(target, home) if home else None
     in_root = None if in_home is not None else _under(target, root)
-    e = {"member": member, "unit": str(in_root) if in_root is not None else "METIS_HOME/%s" % in_home if in_home is not None else target.name, "world": "none: open-loop only"}
+    e = {"member": member, "unit": str(in_root) if in_root is not None else "METIS_HOME/%s" % in_home if in_home is not None else target.name, "world": "none: open-loop only", "times": []}
     try:
-        text, e["pack"] = T.apply_pack(was, pack)
-        e["duplicates"] = [] if e["pack"]["whole"] else T.duplicates(_without_dropped(pack), _closure(target, was, e["pack"]["dropped"]))
-        if e["duplicates"]:
-            e["baseline"] = True
-        else:
-            e.update(fired_diff(path, member, text, root, config, cases=cases, seeds=seeds, composition=composition, unit=target, consumers=consumers))
+        with T.deadline(budget, "the judgement"), _catalog(root):
+            text, e["pack"] = T.apply_pack(was, pack)
+            e["duplicates"] = [] if e["pack"]["whole"] else T.duplicates(_without_dropped(pack), _closure(target, was, e["pack"]["dropped"]))
+            if e["duplicates"]:
+                e["baseline"] = True
+            else:
+                e.update(fired_diff(path, member, text, root, config, cases=cases, seeds=seeds, composition=composition, unit=target, consumers=consumers,
+                                    golden_budget=golden_budget, times=e["times"], moved=moved))
+    except T.OutOfTime:
+        stage = e["times"][-1]["stage"] if e["times"] else "its start"
+        e["baseline"], e["not_judged"] = e.get("baseline", True), {"what": "budget", "seconds": budget, "stage": stage}
     except (T.TraceError, ValueError, LookupError) as x:      # the compiler's or the linker's words: a refusal, not an end
         e["baseline"], e["gate_error"] = e.get("baseline", True), str(x)[-600:]
     except Exception as x:  # noqa: BLE001 — metis.lang's errors have their own types; the words are the refusal
@@ -894,6 +940,9 @@ def judge(path, member, pack, root, config, cases=(), composition=None, unit=Non
             e["baseline"], e["gate_error"] = e.get("baseline", True), str(x)[-600:]
         else:
             raise
+    _mark(e["times"], None)
+    for x in e["times"]:
+        x.pop("t0", None)
     e["verdict"], e["reasons"] = verdict(e, member)
     return e
 
