@@ -8,11 +8,35 @@ config none of this is loaded.
            commands: [P, ...]           the world's commands; default the image's world.in
 
 A host may say where its world is at a checkpoint: `trace_ref()` → a JSON value, the world's own reference ({"t": …} also
-stamps the ticks); and what a fired rule commands: `trace_command(name)` → (kind, args...) as its restrictor emits it, or None."""
+stamps the ticks); and what a fired rule commands: `trace_command(name)` → (kind, args...) as its restrictor emits it, or None.
+
+The composition's replay (spec/17 amendment 7): the real Live, with each world host replaced by a TraceHost that feeds the recorded
+inputs, so the director's rules run and the agent's own relay code carries what they say, on no world and no model.
+
+    r = replay_composition(TRACE, cfg)                   no candidate: .ok, .divergence (the first: k, member, what, want, got)
+    d = fired_diff(TRACE, member, text, root, config)    a candidate program for one member, on a copy of the catalog: the fired diff (the baseline
+                                                         first), the first tick it is enabled, the first differing output and open-loop after it,
+                                                         the receipt (whose key moved), the goldens that refuse it, the surprise's case
+"""
+import contextlib
+import copy
 import hashlib
+import json
+import os
+import shutil
+import sys
+import tempfile
 from pathlib import Path
 
 from metis import trace as T
+
+
+def _live_key():
+    return hashlib.sha256(Path(__file__).with_name("service.py").read_bytes()).hexdigest()[:16]
+
+
+CALLS = ("stop_hierarchy", "reset_hierarchy", "new_game", "enter_room", "domain_verb")   # what moves the composition from outside
+EXTERNAL = ("take", "world", "intent", "tool")
 
 
 def origin(msg, kind):
@@ -36,6 +60,7 @@ class Tracer:
         self.cur, self.ids, self.wrapped = {}, {}, {}
         self.seqs, self.beats, self.reads, self.copies = {}, {}, {}, {}
         self.events, self.out_preds = {}, {}
+        self.ext, self.in_tick, self.depth = [], False, 0
         tick, latch, serve = live.tick, live.latch, live.serve_line
 
         def traced_serve(msg, kind, held=False):
@@ -43,6 +68,8 @@ class Tracer:
             replay, a person's intent and a world line are its inputs."""
             d = msg.get("domain")
             ag = self.agents().get(d)
+            if not self.in_tick and not self.depth and kind in EXTERNAL:     # from outside the composition: its replay needs them
+                self.ext.append(json.loads(json.dumps({"line": msg, "kind": kind}, default=str)))
             if ag is not None and kind != "clock":
                 self.drain(d, ag)
             try:
@@ -54,10 +81,27 @@ class Tracer:
 
         def traced_tick():
             self.before()
+            self.in_tick = True
             try:
                 return tick()
             finally:
+                self.in_tick = False
                 self.after()
+
+        def traced_call(name):
+            f = getattr(live, name)
+
+            def call(*a, **kw):
+                if not self.in_tick and not self.depth:
+                    self.ext.append(json.loads(json.dumps({"call": name, "args": a, "kw": kw}, default=str)))
+                self.depth += 1
+                try:
+                    return f(*a, **kw)
+                finally:
+                    self.depth -= 1
+            return call
+        for name in CALLS:
+            setattr(live, name, traced_call(name))
 
         def traced_latch():
             latch()
@@ -147,17 +191,20 @@ class Tracer:
             r = ag.repl
             shared = self.lv.manifest(d).get("shared") or {}
             self.out_preds[d] = sorted(p for p, v in shared.items() if v == "out")
+            in_preds = sorted(p for p, v in shared.items() if v in ("in", "resource"))
             self.events[d] = (id(r), {ev.name: ev for _, _, ev in r.events_tbl})
-            ms[d] = {"key": T.program_key(r.path), "seed": r._seed, "weights": T.weights_of(r), "out": self.out_preds[d]}
+            inner = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+            ms[d] = {"key": T.program_key(r.path), "seed": r._seed, "weights": T.weights_of(r), "out": self.out_preds[d], "in": in_preds,
+                     "blind": bool(ag.watch.blind), "steps_world": callable(getattr(inner, "world_stepped", None))}
         img = self.lv.image
         return {"clock": "tick", "composition": img.name if img is not None else None, "image": img.hash if img is not None else None,
                 "protocol": T.protocol_key(), "commands": self.commands, "members": ms,
                 "clocks": [{"domain": c.get("domain"), "n": int(c.get("n", 1))} for c in self.lv.clocks],   # the order Live beats them in
-                "live": hashlib.sha256(Path(__file__).with_name("service.py").read_bytes()).hexdigest()[:16]}   # the rest of the order: Live.tick's
+                "live": _live_key()}               # the rest of the order: Live.tick's
 
     def checkpoint(self):
         return {"sessions": {d: T.session_state(ag.repl) for d, ag in self.agents().items()},
-                "copies": {d: dict(c) for d, c in self.copies.items()}, "world": self.world_ref()}
+                "copies": {d: dict(c) for d, c in self.copies.items()}, "world": self.world_ref(), "agent": agent_state(self.lv)}
 
     def before(self):
         for d, ag in self.agents().items():
@@ -166,7 +213,7 @@ class Tracer:
         if self.cut or self.seg.due(self.k):
             cut = {"cut": "reload"} if self.cut else {}   # a new session's state is no row: this checkpoint does not follow from the last
             if self.seqs and not self.cut and self.seg.fh:   # what came between the ticks, before the checkpoint that holds it
-                self.seg.line({"k": self.k, "between": True, "members": self.entries()})
+                self.seg.line(self.stamped({"k": self.k, "between": True, "members": self.entries()}))
             self.seqs, self.cut = {}, False
             self.seg.open_segment(self.k, dict(self.header(), **cut), self.checkpoint())
 
@@ -175,8 +222,13 @@ class Tracer:
         ref = self.world_ref()
         if isinstance(ref, dict) and "t" in ref:
             rec["t"] = ref["t"]
-        self.seg.line(rec)
+        self.seg.line(self.stamped(rec))
         self.k += 1
+
+    def stamped(self, rec):
+        if self.ext:
+            rec["ext"], self.ext = self.ext, []
+        return rec
 
     def entries(self):
         ms = {}
@@ -215,3 +267,467 @@ class Tracer:
 
 def attach(live, cfg):
     return Tracer(live, cfg or {})
+
+
+# ── the agent's own state a checkpoint carries: a window of the trace replays from it, on the same relay code ──
+SCALAR = (bool, int, float, str, type(None))
+WATCH_SKIP = ("path", "tier")
+
+
+def _scalars(obj, skip=()):
+    return {k: v for k, v in vars(obj).items() if isinstance(v, SCALAR) and k not in skip}
+
+
+def agent_state(lv):
+    """What Live and its agents hold between ticks beside the sessions: when each last beat, what waits to be relayed, the holder, the
+    stop's stage, each watch's and each agent's flags."""
+    ags = getattr(lv.agents, "agents", {})
+    seen = {d: len(ags[d].repl.fired) - n for d, (i, n) in (getattr(lv, "_seen_rows", {}) or {}).items() if d in ags and i == id(ags[d].repl)} \
+        if getattr(lv, "_seen_rows", None) is not None else {}
+    seen_rows = {d: v for d, v in seen.items()}
+    d = lv.director
+    return {"beat": lv.beat, "last_beat": dict(getattr(lv, "_last_beat", {})), "seen": seen_rows, "granted": sorted(getattr(lv, "_granted", ())),
+            "goal_take": dict(getattr(lv, "_goal_take", {})), "stop": getattr(lv, "_stop", None), "holder": getattr(lv, "holder", None),
+            "grant_q": [list(x) for x in getattr(lv, "_grant_q", ())], "cancel_q": list(getattr(lv, "_cancel_q", ())),
+            "cancel_defer": list(getattr(lv, "_cancel_defer", ())), "gen_q": [list(x) for x in getattr(lv, "_gen_q", ())],
+            "last_status": _plain(getattr(lv, "_last_status", None)), "off": sorted(lv.off), "director": {"outcome": d.outcome, "queue": _plain(d.queue), "came": _plain(d.came)} if d is not None else None,
+            "agents": {n: {"watch": _scalars(a.watch, WATCH_SKIP), "agent": {k: v for k, v in _scalars(a).items() if k in ("over", "_cut")},
+                           "host_beat": getattr(getattr(a, "host", None), "beat", None) if isinstance(getattr(a, "host", None), object) else None}
+                       for n, a in ags.items()}}
+
+
+def _plain(x):
+    return json.loads(json.dumps(x, default=str))
+
+
+def restore_agent(lv, st):
+    ags = lv.agents.agents
+    lv.beat = st["beat"]
+    lv._last_beat = dict(st["last_beat"])
+    lv._seen_rows = {d: (id(ags[d].repl), len(ags[d].repl.fired) - n) for d, n in st["seen"].items() if d in ags}
+    lv._granted = set(st["granted"])
+    lv._goal_take = dict(st["goal_take"])
+    lv._stop = st["stop"]
+    lv.holder = st["holder"]
+    lv._grant_q = [tuple(x) for x in st["grant_q"]]
+    lv._cancel_q = list(st["cancel_q"])
+    lv._cancel_defer = list(st["cancel_defer"])
+    lv._gen_q = [tuple(x) for x in st["gen_q"]]
+    lv.off = set(st["off"])
+    if st.get("last_status") is not None:
+        lv._last_status = st["last_status"]
+    if lv.director is not None and st.get("director"):
+        lv.director.outcome = st["director"]["outcome"]
+    for n, a in st["agents"].items():
+        if n in ags:
+            for k, v in a["watch"].items():
+                if k != "blind":
+                    setattr(ags[n].watch, k, v)
+            for k, v in a["agent"].items():
+                setattr(ags[n], k, v)
+
+
+# ── the composition's replay ──
+class NoModel:
+    """The LLM is out: a turn or a narration that wanted one is a fault of the replay, said."""
+    BOOK = ("begin_dialog", "inject")
+
+    def sibling(self, n):
+        return self
+
+    def __getattr__(self, name):
+        if name in self.BOOK:
+            return lambda *a, **k: 0
+        raise T.TraceError("the composition's replay has no model (%s)" % name)
+
+
+class Feed:
+    """The recorded run as the trace hosts read it: the tick's lines, each member's whole copy at it, its beats' inputs in order."""
+
+    def __init__(self, segs):
+        self.segs, self.k = segs, None
+        self.copies = {m: dict(c) for m, c in (segs[0].checkpoint.get("copies") or {}).items()}
+        self.beats = {}
+
+    def at(self, rec):
+        """The tick REC begins: the copies move to it, its members' beat inputs queue up."""
+        self.k, self.beats = rec["k"], {}
+        for m, e in rec["members"].items():
+            c = e.get("copy")
+            if c:
+                now = self.copies.setdefault(m, {})
+                for a in c.get("-", ()):
+                    now.pop(a, None)
+                for a in c.get("+", ()):
+                    now[a] = 1
+            self.beats[m] = [i["beat"] for i in e.get("seq", ()) if "beat" in i]
+
+
+class TraceHost:
+    """A member's world, from the trace: its reading the recorded copy, its tick the lines it applied. A rule fired is no command to anything."""
+    beat, due, script, last = 0, (), {}, None
+    done = False
+    outer = None
+    repl = None
+    watched = ()
+
+    def __init__(self, member, feed):
+        self.member, self.feed = member, feed
+        self.touched, self.world_preds = set(), set()
+
+    def reading(self):
+        return dict(self.feed.copies.get(self.member, {}))
+
+    def observe(self, counts):
+        return self.reading()
+
+    def next_lines(self):
+        q = self.feed.beats.get(self.member) or []
+        for lines in q:
+            if lines:
+                return lines
+        return []
+
+    def tick(self, counts):
+        self.beat += 1
+        q = self.feed.beats.get(self.member) or []
+        lines = list(q.pop(0)) if q else []
+        if self.outer is not None:                 # what the line's queue brings itself (stop_hierarchy's world line) is not twice
+            lines = [x for x in lines if x not in self.outer.world_lines and x not in ("%s 1" % y for y in self.outer.world_lines)]
+        if self.touched:                           # what a candidate's rule did to the world's atoms: its copy stands
+            copy_now = self.feed.copies.get(self.member, {})
+            have = dict(counts)
+            for a in sorted(self.touched):
+                if a in copy_now and not have.get(a):
+                    lines.append("+%s" % a)
+                elif a not in copy_now and have.get(a):
+                    lines.append("-%s" % a)
+            self.touched = set()
+        return lines
+
+    def sync(self, counts):
+        return self.next_lines()                   # the wake's test: its reading differs from what its session holds
+
+    def on_event(self, name, args):
+        if self.watched and name.split("[")[0] in self.watched and self.repl is not None:
+            # a candidate's rule moved a world atom: at its next tick the world says what it says, as a host's sync would
+            ev = next((e for _, _, e in self.repl.events_tbl if e.name == name), None)
+            if ev is not None:
+                self.touched |= {a for a in set(ev.consume) | set(ev.produce) if a.split("(")[0] in self.world_preds}
+
+    def bind(self, reg):
+        pass
+
+    def pending(self):
+        return False
+
+    def world(self, lines):
+        raise T.TraceError("a world line reached a trace host")
+
+    def snapshot(self):
+        return {"beat": self.beat}
+
+    def restore(self, snap):
+        self.beat = snap.get("beat", 0)
+
+    def deliver(self, *a, **kw):
+        raise T.TraceError("%s: a director's deliver is not replayed yet (a goal through its host)" % self.member)
+
+
+class _StandIn:
+    """The host module a package's manifest names, with a trace host in its factory's place: its file is not read, so no world is imported."""
+
+    def __init__(self, member, feed):
+        self.member, self.feed = member, feed
+
+    def __getattr__(self, attr):
+        if attr.startswith("_") or attr.isupper() or attr in ("flips", "words", "reports"):
+            raise AttributeError(attr)
+        return lambda case=None: TraceHost(self.member, self.feed)
+
+
+@contextlib.contextmanager
+def _trace_hosts(feed, names):
+    """Live built with trace hosts: its domains read anew, and read anew after."""
+    from metis.domain import package
+    was = package._host_module
+
+    def purge():
+        for n in names:
+            sys.modules.pop("metis_agent.domains.%s" % n, None)
+            sys.modules.pop(package.host_key(n), None)
+
+    def stand_in(d, name, fresh=False, file=None):
+        return _StandIn(name, feed) if (Path(d) / (file or ("%s_host.py" % name))).exists() else None
+    package._host_module = stand_in
+    purge()
+    try:
+        yield
+    finally:
+        package._host_module = was
+        purge()
+
+
+class CompositionReplay:
+    def __init__(self):
+        self.ticks, self.divergence, self.checkpoints = 0, None, 0
+        self.rows, self.first_enabled, self.live_changed = [], None, False
+
+    @property
+    def ok(self):
+        return self.divergence is None
+
+
+def _compare(rec, got):
+    """The first difference of the recorded tick and the replayed: why a member beat, its seq (inputs, fired rows, takes), its outputs."""
+    names = sorted(set(rec["members"]) | set(got["members"]))
+    for m in names:
+        a, b = rec["members"].get(m, {}), got["members"].get(m, {})
+        for what in ("why", "seq"):
+            if a.get(what) != b.get(what):
+                return {"k": rec["k"], "member": m, "what": what, "want": a.get(what), "got": b.get(what)}
+        wa, wb = [T.out_name(x) for x in a.get("out", ())], [T.out_name(x) for x in b.get("out", ())]
+        if wa != wb:
+            return {"k": rec["k"], "member": m, "what": "out", "want": wa, "got": wb}
+    return None
+
+
+def replay_composition(path, cfg, candidate=None):
+    """Every member and the director over the trace at PATH, on the real Live built from CFG (the run's config, its catalog in the
+    environment): the hosts feed what was applied, the relays are the agent's own. No candidate: it must give the record, every tick,
+    fired rows and commands alike. → CompositionReplay; .divergence the first. CANDIDATE ({"member", "rules"}: CFG's catalog has them): every tick is
+    run and compared (fired_diff)."""
+    from . import service as S
+    segs = T.read(path)
+    head = segs[0].header
+    for m, h in head["members"].items():
+        if h.get("weights"):
+            raise T.TraceError("%s declares weight ports (%s): a trace does not carry their values yet" % (m, ", ".join(h["weights"])))
+        if h.get("steps_world"):
+            raise T.TraceError("%s's host steps its world on a command: its beats are not replayed yet" % m)
+    if head.get("protocol") and head["protocol"] != T.protocol_key():
+        raise T.TraceError("this trace is of another protocol (%s, this toolchain's %s): it does not replay across a protocol change" % (head["protocol"], T.protocol_key()))
+    feed, out = Feed(segs), CompositionReplay()
+    with tempfile.TemporaryDirectory(prefix="trace-replay-") as wd:
+        c = copy.deepcopy(cfg)
+        c["trace"] = {"dir": str(Path(wd) / "t"), "every": 0, "ring": 0, "commands": head.get("commands") or []}
+        c["v3"]["journal"] = str(Path(wd) / "journal.jsonl")
+        with _trace_hosts(feed, list(head["members"])):
+            lv = S.Live(c, NoModel())
+            lv.handle_due = lambda beat, due: None
+            ags = lv.agents.agents
+            if not candidate and head.get("image") and lv.image is not None and lv.image.hash != head["image"]:
+                raise T.TraceError("this trace is of image %s, this config's is %s: it does not replay across a relink" % (head["image"], lv.image.hash))
+            out.live_changed = bool(head.get("live")) and head["live"] != _live_key()
+            for m, a in ags.items():
+                a.watch.blind = True               # a surprise is a reading against a world: none here (a run's stall shows as a divergence)
+                outer = getattr(a, "host", None)
+                inner = getattr(outer, "inner", outer)
+                if isinstance(inner, TraceHost):
+                    inner.outer, outer.commands = outer, ()
+                    if candidate and m == candidate["member"]:
+                        inner.repl, inner.watched = a.repl, set(candidate["rules"])
+                        inner.world_preds = {p for p, v in (lv.manifest(m).get("shared") or {}).items() if v == "world-private"}
+            for m, st in segs[0].checkpoint["sessions"].items():
+                if m in ags:
+                    T.restore_session(ags[m].repl, st)
+            if segs[0].checkpoint.get("agent"):
+                restore_agent(lv, segs[0].checkpoint["agent"])
+            lines, tracer = [], lv.tracer
+            seg_line = tracer.seg.line
+            tracer.seg.line = lambda rec: (lines.append(rec), seg_line(rec))[1]
+            tracer.k = segs[0].k0
+            tracer.copies = {m: dict(x) for m, x in (segs[0].checkpoint.get("copies") or {}).items()}
+            if candidate:
+                _watch_enabled(ags[candidate["member"]].repl, set(candidate["rules"]), feed, out)
+            for i, seg in enumerate(segs):
+                if i and "cut" not in seg.header and not candidate:
+                    bad = _sessions_differ(ags, seg)
+                    if bad:
+                        out.divergence = bad
+                        return out
+                    out.checkpoints += 1
+                for rec in seg.ticks:
+                    for e in rec.get("ext", ()):
+                        _external(lv, e)
+                    if rec.get("between"):                # what came between two ticks, before the checkpoint: its own line
+                        got = {"k": rec["k"], "members": tracer.entries()}
+                    else:
+                        feed.at(rec)
+                        del lines[:]
+                        lv.tick()
+                        out.ticks += 1
+                        got = next((x for x in lines if "members" in x and "trace" not in x and not x.get("between")), None)
+                    bad = _compare(rec, got) if got is not None else {"k": rec["k"], "what": "tick", "want": "a tick", "got": None}
+                    if candidate:
+                        out.rows += _differences(rec, got or {"members": {}})
+                    elif bad:
+                        out.divergence = bad
+                        return out
+            tracer.close()
+    return out
+
+
+def _watch_enabled(sh, rules, feed, out):
+    """The first tick a candidate's rule is ENABLED, chosen or not: a clause merely enabled moves the sampler's stream."""
+    cand = sh._candidates
+
+    def watched():
+        ws = cand()
+        if out.first_enabled is None:
+            for i, _ in ws:
+                if sh.events_tbl[i][2].name.split("[")[0] in rules:
+                    out.first_enabled = {"k": feed.k, "rule": sh.events_tbl[i][2].name}
+                    break
+        return ws
+    sh._candidates = watched
+
+
+def _fired(e):
+    return [x for i in e.get("seq", ()) for x in list(i.get("fired") or ()) + list(i.get("step") or ())]
+
+
+def _differences(rec, got):
+    """Tick REC against what the candidate's run did: [{k, member, fired: {record, candidate}, out: {...}}]."""
+    rows = []
+    for m in sorted(set(rec["members"]) | set(got["members"])):
+        a, b = rec["members"].get(m, {}), got["members"].get(m, {})
+        fa, fb = _fired(a), _fired(b)
+        oa, ob = [T.out_name(x) for x in a.get("out", ())], [T.out_name(x) for x in b.get("out", ())]
+        if fa != fb or oa != ob:
+            row = {"k": rec["k"], "member": m}
+            if fa != fb:
+                row["fired"] = {"record": fa, "candidate": fb}
+            if oa != ob:
+                row["out"] = {"record": oa, "candidate": ob}
+            rows.append(row)
+    return rows
+
+
+# ── a candidate, judged on the composition ──
+SKIP = shutil.ignore_patterns(".git", "build", "__pycache__", ".run", "records", "*.pyc", "node_modules", "client", "vendor")
+
+
+@contextlib.contextmanager
+def _catalog(root):
+    was = os.environ.get("METIS_CATALOG")
+    os.environ["METIS_CATALOG"] = str(root)
+    try:
+        yield
+    finally:
+        if was is None:
+            os.environ.pop("METIS_CATALOG", None)
+        else:
+            os.environ["METIS_CATALOG"] = was
+
+
+def fired_diff(path, member, text, root, config, case=None, seeds=(1, 2, 3)):
+    """The candidate program TEXT for MEMBER, judged on the composition: on a copy of the catalog at ROOT (nothing here touches ROOT), CONFIG(root)
+    the Live's config for a root. First the baseline must replay to the record, or there is nothing to compare with. → {
+      baseline: ok, rules: the candidate's new or changed rules,
+      receipt: {moved: the members whose program moved (the edit is confined to one), image: the new image's hash or None},
+      first_enabled: {k, rule}: the first tick one of them is enabled,
+      first_fired_diff, first_out_diff: {k, member, ...}: exact up to here; open_loop_after: k: the later copies are of a world that obeyed the old command,
+      rows: every tick and member that differs, members: the first differing tick per member,
+      goldens: {ok, failed: named}: the package's cases; case: {passed, seeds}: the surprise's}"""
+    from metis import catalog as C
+    from metis.catalog import stub
+    segs = T.read(path)
+    head = segs[0].header
+    if member not in head["members"]:
+        raise T.TraceError("no member %r in the trace (it has: %s)" % (member, ", ".join(sorted(head["members"]))))
+    base = replay_composition(path, config(Path(root)))
+    if not base.ok:
+        return {"baseline": False, "divergence": base.divergence, "why": "the record does not replay on this toolchain: no candidate is judged on it"}
+    with tempfile.TemporaryDirectory(prefix="trace-candidate-") as wd:
+        copy_root = Path(wd) / "root"
+        shutil.copytree(root, copy_root, ignore=SKIP, symlinks=True)
+        with _catalog(root):
+            source = Path(C.get(member).program).resolve()
+        was = source.read_text()
+        rel = source.relative_to(Path(root).resolve())
+        (copy_root / rel).write_text(text)
+        rules = T.new_rules(text, was)
+        if not rules:
+            raise T.TraceError("the candidate adds or changes no rule of %s" % member)
+        with _catalog(copy_root):
+            cfg = config(copy_root)
+            run = replay_composition(path, cfg, {"member": member, "rules": rules})
+            dom = C.get(member)
+            moved = sorted(m for m, h in head["members"].items() if _program_moved(C, m, h))
+            ok, failed = T.goldens(dom, seeds=seeds)
+            kase = None
+            if case is not None:
+                results = [stub.run_case(dom, case, seed=s) for s in seeds]
+                kase = {"passed": all(x.passed for x in results), "seeds": list(seeds), "failures": [f for x in results for b in x.boundaries for f in b.failures][:6]}
+        rows = run.rows
+        first_fired = next(({"k": r["k"], "member": r["member"], **r["fired"]} for r in rows if "fired" in r), None)
+        first_out = next(({"k": r["k"], "member": r["member"], **r["out"]} for r in rows if "out" in r), None)
+        by_member = {}
+        for r in rows:
+            by_member.setdefault(r["member"], r["k"])
+        return {"baseline": True, "rules": rules, "receipt": {"moved": moved, "image": head.get("image")},
+                "first_enabled": run.first_enabled, "first_fired_diff": first_fired, "first_out_diff": first_out,
+                "open_loop_after": first_out["k"] if first_out else None, "rows": rows, "members": by_member,
+                "goldens": {"ok": ok, "failed": failed}, "case": kase}
+
+
+def _program_moved(catalog, m, h):
+    """Member M's program is not the trace's (a generated member is judged by the link, not here)."""
+    try:
+        return T.program_key(catalog.get(m).program) != h.get("key")
+    except Exception:  # noqa: BLE001 — not in the copy: a generated director, its image's
+        return False
+
+
+def _sessions_differ(ags, seg):
+    for m, st in seg.checkpoint["sessions"].items():
+        if m in ags:
+            have = T.session_state(ags[m].repl)
+            for f in ("counts", "rng", "stage"):
+                if have[f] != st[f]:
+                    return {"k": seg.k0, "member": m, "what": "checkpoint " + f, "want": st[f], "got": have[f]}
+    return None
+
+
+def _external(lv, e):
+    """What came from outside the composition. A call runs as it ran; a take is taken; a person's intent and a world line are in the beats' recorded inputs."""
+    if "call" in e:
+        if e["call"] in ("new_game", "enter_room"):
+            raise T.TraceError("the run's %s is not replayed yet: its world changed under it" % e["call"])
+        getattr(lv, e["call"])(*e.get("args", ()), **e.get("kw", {}))
+    elif e.get("kind") == "take":
+        lv.serve_line(e["line"], "take")
+
+
+def main(argv=None):
+    import argparse
+    from . import service as S
+    ap = argparse.ArgumentParser(prog="python -m metis_agent.trace", description="the composition's replay and a candidate's fired diff")
+    ap.add_argument("verb", choices=("replay", "diff"))
+    ap.add_argument("trace")
+    ap.add_argument("--config", required=True, help="the run's service config")
+    ap.add_argument("--member")
+    ap.add_argument("--candidate", help="the member's program, as the candidate has it")
+    ap.add_argument("--root", help="the catalog root it is judged on a copy of")
+    ap.add_argument("--composition", help="the composition's directory under the root (an image's run)")
+    ap.add_argument("--case", help="the surprise's case")
+    a = ap.parse_args(argv)
+    cfg = S.load_config(a.config)
+    cfg.pop("trace", None)
+
+    def config(root):
+        c = copy.deepcopy(cfg)
+        if a.composition:
+            c["v3"]["image"] = str(Path(root) / a.composition)
+        return c
+    if a.verb == "replay":
+        r = replay_composition(a.trace, cfg)
+        print(json.dumps({"ok": r.ok, "ticks": r.ticks, "checkpoints": r.checkpoints, "divergence": r.divergence}))
+        return 0 if r.ok else 1
+    print(json.dumps(fired_diff(a.trace, a.member, Path(a.candidate).read_text(), a.root, config, case=a.case), indent=1))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

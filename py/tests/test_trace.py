@@ -2,6 +2,7 @@
 config asks; on, the run is the same run; each member replays alone from what it applied, with no world; the ring drops whole
 segments and what is left still replays; a reload starts a new segment. The chair's and the road's are tested in their repos."""
 import json
+from pathlib import Path
 
 import pytest
 
@@ -98,6 +99,199 @@ def test_what_comes_between_two_ticks_stays_before_the_checkpoint_that_holds_it(
     for m in ALL:
         r = trace.replay(d, m, program(lv, m))
         assert r.ok, (m, r.divergence)
+
+
+def kitchen_cfg(lv):
+    """The run's own config, for its replay."""
+    import copy
+    c = copy.deepcopy(lv.cfg)
+    c.pop("trace", None)
+    return c
+
+
+@pytest.mark.parametrize("seed", [1, 2, 3])
+def test_the_composition_replays_with_no_candidate_to_the_record(tmp_path, seed):
+    from metis_agent.trace import replay_composition
+    d = tmp_path / "t"
+    lv, kit, _ = run(tmp_path, seed=seed, trace={"dir": str(d), "every": 4, "ring": 0})
+    lv.tracer.close()
+    r = replay_composition(d, kitchen_cfg(lv))
+    assert r.ok, r.divergence
+    assert r.ticks == lv.tracer.k and r.checkpoints >= 1
+
+
+def test_the_replay_notices_a_record_that_is_not_the_run(tmp_path):
+    from metis_agent.trace import replay_composition
+    d = tmp_path / "t"
+    lv, _, _ = run(tmp_path, trace={"dir": str(d), "every": 0, "ring": 0})
+    lv.tracer.close()
+    f = d / "seg-0.jsonl"
+    rows = [json.loads(x) for x in f.read_text().splitlines()]
+    t = next(x for x in rows[1:] if any(i.get("fired") for i in x["members"].get("cook_a", {}).get("seq", ())))
+    item = next(i for i in t["members"]["cook_a"]["seq"] if i.get("fired"))
+    item["fired"] = item["fired"][1:]
+    f.write_text("\n".join(json.dumps(x) for x in rows) + "\n")
+    r = replay_composition(d, kitchen_cfg(lv))
+    assert not r.ok and r.divergence["k"] == t["k"] and r.divergence["member"] == "cook_a" and r.divergence["what"] == "seq"
+
+
+def test_a_stop_from_outside_is_replayed_by_the_agents_own_code(tmp_path):
+    from metis_agent.trace import replay_composition
+    d = tmp_path / "t"
+    done = []
+
+    def stop_once(lv, kit):
+        if lv.tracer.k == 3 and not done:
+            done.append(1)
+            lv.stop_hierarchy()
+    lv, _, _ = run(tmp_path, ticks=12, on_tick=stop_once, trace={"dir": str(d), "every": 0, "ring": 0})
+    lv.tracer.close()
+    rows = [t for s in trace.read(d) for t in s.ticks]
+    assert done and any(e.get("call") == "stop_hierarchy" for t in rows for e in t.get("ext", ()))
+    assert any(any("+tick__stop" in x for x in i.get("beat", ())) for t in rows for i in t["members"].get("pot_director", {}).get("seq", ()))
+    r = replay_composition(d, kitchen_cfg(lv))
+    assert r.ok, r.divergence
+
+
+def test_a_take_from_outside_is_taken_again(tmp_path):
+    from metis_agent.trace import replay_composition
+    d = tmp_path / "t"
+
+    def take_between(lv, kit):
+        if lv.tracer.k == 3:
+            lv.take(MEMBERS[0], ["+tick__cancel(%s) 1" % MEMBERS[0]], "test")
+    lv, _, _ = run(tmp_path, ticks=6, on_tick=take_between, trace={"dir": str(d), "every": 3, "ring": 0})
+    lv.tracer.close()
+    r = replay_composition(d, kitchen_cfg(lv))
+    assert r.ok, r.divergence
+
+
+def test_a_window_replays_from_its_checkpoint_the_agents_state_with_it(tmp_path):
+    from metis_agent.trace import replay_composition
+    d = tmp_path / "t"
+    lv, _, _ = run(tmp_path, trace={"dir": str(d), "every": 3, "ring": 0})
+    lv.tracer.close()
+    (d / "seg-0.jsonl").unlink()
+    r = replay_composition(d, kitchen_cfg(lv))
+    assert r.ok, r.divergence
+    assert r.ticks == lv.tracer.k - 3
+
+
+def test_another_image_or_protocol_is_refused_with_the_reason(tmp_path):
+    from metis_agent.trace import replay_composition
+    d = tmp_path / "t"
+    lv, _, _ = run(tmp_path, ticks=2, trace={"dir": str(d), "every": 0, "ring": 0})
+    lv.tracer.close()
+    f = d / "seg-0.jsonl"
+    rows = [json.loads(x) for x in f.read_text().splitlines()]
+    head = dict(rows[0])
+    rows[0] = dict(head, image="0" * 12)
+    f.write_text("\n".join(json.dumps(x) for x in rows) + "\n")
+    with pytest.raises(trace.TraceError, match="across a relink"):
+        replay_composition(d, kitchen_cfg(lv))
+    rows[0] = dict(head, protocol="older")
+    f.write_text("\n".join(json.dumps(x) for x in rows) + "\n")
+    with pytest.raises(trace.TraceError, match="across a protocol change"):
+        replay_composition(d, kitchen_cfg(lv))
+    rows[0] = dict(head, live="older")
+    f.write_text("\n".join(json.dumps(x) for x in rows) + "\n")
+    r = replay_composition(d, kitchen_cfg(lv))
+    assert r.ok and r.live_changed, "another Live is said; the record still decides"
+
+
+def test_a_room_change_is_refused_in_words(tmp_path):
+    from metis_agent.trace import replay_composition
+    d = tmp_path / "t"
+    lv, _, _ = run(tmp_path, ticks=2, trace={"dir": str(d), "every": 0, "ring": 0})
+    lv.tracer.close()
+    f = d / "seg-0.jsonl"
+    rows = [json.loads(x) for x in f.read_text().splitlines()]
+    rows[1]["ext"] = [{"call": "enter_room", "args": ["kitchen_2"], "kw": {}}]
+    f.write_text("\n".join(json.dumps(x) for x in rows) + "\n")
+    with pytest.raises(trace.TraceError, match="enter_room is not replayed"):
+        replay_composition(d, kitchen_cfg(lv))
+
+
+judged = pytest.mark.skipif(not hasattr(trace, "goldens"), reason="metispy before metis.trace's goldens and new_rules: this CI's sibling at its head, until it merges")
+
+
+def kitchen_root(tmp_path):
+    """A small catalog with the kitchen, so a candidate has a root to copy (its cases and goldens come along)."""
+    return KITCHEN.parents[1]
+
+
+@judged
+def test_a_candidates_fired_diff_shows_where_it_is_enabled_and_who_answers(tmp_path):
+    """A cook that asks for the pot with a new rule first: enabled at its first beat; its first output differs; the director answers."""
+    from metis_agent.trace import fired_diff
+    d = tmp_path / "t"
+    lv, _, _ = run(tmp_path, trace={"dir": str(d), "every": 0, "ring": 0})
+    lv.tracer.close()
+    cfg = kitchen_cfg(lv)
+
+    def config(root):
+        c = json.loads(json.dumps(cfg))
+        c["v3"]["image"] = str(root / "domains" / "kitchen_pot")
+        return c
+    text = Path(program(lv, "cook_a")).read_text()
+    cand = text + """
+stage act {
+  %% I take an onion by another rule of mine.
+  grab_onion [dyn] : $order * hand_free * $pot_space -o held_onion.
+}
+"""
+    r = fired_diff(d, "cook_a", cand, kitchen_root(tmp_path), config)
+    assert r["baseline"] and r["rules"] == ["grab_onion"]
+    assert r["first_enabled"]["k"] == 0 and r["first_enabled"]["rule"].startswith("grab_onion")
+    assert r["first_fired_diff"] == {"k": 0, "member": "cook_a", "record": ["fetch_onion", "ask_pot[S=cook_a]"], "candidate": ["grab_onion", "ask_pot[S=cook_a]"]}
+    assert r["open_loop_after"] == r["first_out_diff"]["k"] == 0 and "fetch_onion" in r["first_out_diff"]["record"]
+    # the goldens that refuse it are named: a person may overrule them
+    assert not r["goldens"]["ok"] and {"stopped.yaml", "waits.yaml"} <= {x["file"] for x in r["goldens"]["failed"]}
+    assert r["receipt"]["moved"] == ["cook_a"]
+
+
+@judged
+def test_a_candidate_that_withholds_a_report_moves_the_director_too(tmp_path):
+    """The takes are regenerated: a cook that keeps its want to itself gets no grant, and the director's own rows say so. Which of the two
+    enabled rules fires is the sampler's: the seeds where the candidate's does are the ones that show it."""
+    from metis_agent.trace import fired_diff
+    shown = []
+    for seed in range(1, 9):
+        d = tmp_path / str(seed) / "t"
+        lv, _, _ = run(tmp_path / str(seed), seed=seed, trace={"dir": str(d), "every": 0, "ring": 0})
+        lv.tracer.close()
+        cfg = kitchen_cfg(lv)
+
+        def config(root):
+            c = json.loads(json.dumps(cfg))
+            c["v3"]["image"] = str(root / "domains" / "kitchen_pot")
+            return c
+        cand = Path(program(lv, "cook_a")).read_text() + """
+stage act {
+  %% I keep my need to myself.
+  ask_nobody [dyn] : $order * $held_onion * $self(S) * calm(S) -o asked(S).
+}
+"""
+        r = fired_diff(d, "cook_a", cand, kitchen_root(tmp_path), config)
+        assert r["first_enabled"]["rule"].startswith("ask_nobody")
+        fired = [x for row in r["rows"] if row["member"] == "cook_a" for x in row.get("fired", {}).get("candidate", ())]
+        if any(x.startswith("ask_nobody") for x in fired):
+            shown.append((seed, r))
+    assert shown, "no seed of 8 fired the candidate's rule"
+    seed, r = shown[0]
+    assert "pot_director" in r["members"] and r["members"]["cook_a"] <= r["members"]["pot_director"], (seed, r["members"])
+
+
+@judged
+def test_a_candidate_with_no_new_rule_is_refused_in_words(tmp_path):
+    from metis_agent.trace import fired_diff
+    d = tmp_path / "t"
+    lv, _, _ = run(tmp_path, ticks=2, trace={"dir": str(d), "every": 0, "ring": 0})
+    lv.tracer.close()
+    cfg = kitchen_cfg(lv)
+    text = Path(program(lv, "cook_a")).read_text()
+    with pytest.raises(trace.TraceError, match="no rule"):
+        fired_diff(d, "cook_a", text, kitchen_root(tmp_path), lambda root: dict(json.loads(json.dumps(cfg)), v3=dict(cfg["v3"], image=str(root / "domains" / "kitchen_pot"))))
 
 
 def test_a_new_session_ends_the_segment_and_the_next_replays_from_its_checkpoint(tmp_path):
