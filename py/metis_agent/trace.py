@@ -615,7 +615,7 @@ def _differences(rec, got):
 
 
 # ── a candidate, judged on the composition ──
-SKIP = shutil.ignore_patterns(".git", "build", "__pycache__", ".run", "records", "*.pyc", "node_modules", "client", "vendor")
+SKIP = shutil.ignore_patterns(".git", ".deps", "build", "__pycache__", ".run", "records", "*.pyc", "node_modules", "client", "vendor")
 
 
 @contextlib.contextmanager
@@ -685,7 +685,8 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
         already = {(m, g["file"], g["seed"]) for m in doms if doms[m] is not None for g in T.goldens(doms[m], seeds=seeds)[1]}
         was_cases = [_case_result(stub, doms.get(m0), f) for f, m0 in ((f, _case_member(stub, f, member)) for f in cases)]
     home = os.environ.get("METIS_HOME")
-    in_root, in_home = _under(target, root), _under(target, home) if home else None
+    in_home = _under(target, home) if home else None
+    in_root = None if in_home is not None else _under(target, root)   # the family first: a checkout may hold it under the root (.deps)
     if in_root is None and in_home is None:
         raise T.TraceError("the unit %s is under neither the root nor METIS_HOME: nothing here can judge it on a copy" % target)
     consumers = list(consumers) if in_root is None else []     # a member's own file moves no other consumer
@@ -852,7 +853,8 @@ def judge(path, member, pack, root, config, cases=(), composition=None, unit=Non
         target = Path(unit).resolve() if unit else Path(C.get(member).program).resolve()
     was = target.read_text()
     home = os.environ.get("METIS_HOME")
-    in_root, in_home = _under(target, root), _under(target, home) if home else None
+    in_home = _under(target, home) if home else None
+    in_root = None if in_home is not None else _under(target, root)
     e = {"member": member, "unit": str(in_root) if in_root is not None else "METIS_HOME/%s" % in_home if in_home is not None else target.name, "world": "none: open-loop only"}
     try:
         text, e["pack"] = T.apply_pack(was, pack)
