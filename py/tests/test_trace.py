@@ -212,7 +212,7 @@ def test_a_room_change_is_refused_in_words(tmp_path):
         replay_composition(d, kitchen_cfg(lv))
 
 
-judged = pytest.mark.skipif(not hasattr(trace, "goldens"), reason="metispy before metis.trace's goldens and new_rules: this CI's sibling at its head, until it merges")
+judged = pytest.mark.skipif(not hasattr(trace, "apply_pack"), reason="metispy before metis.trace's apply_pack: this CI's sibling at its head, until it merges")
 
 
 def kitchen_root(tmp_path):
@@ -240,8 +240,11 @@ stage act {
   grab_onion [dyn] : $order * hand_free * $pot_space -o held_onion.
 }
 """
-    r = fired_diff(d, "cook_a", cand, kitchen_root(tmp_path), config)
+    r = fired_diff(d, "cook_a", cand, kitchen_root(tmp_path), config, composition="domains/kitchen_pot")
     assert r["baseline"] and r["rules"] == ["grab_onion"]
+    assert r["receipt"]["ei_holds"] and r["receipt"]["interface"]["cook_a"]["before"]["key"] != r["receipt"]["interface"]["cook_a"]["after"]["key"]
+    assert r["receipt"]["interface"]["cook_b"]["before"] == r["receipt"]["interface"]["cook_b"]["after"]
+    assert "fetch_onion" in r["first_enabled"]["beside"], "the rule it competes with"
     assert r["first_enabled"]["k"] == 0 and r["first_enabled"]["rule"].startswith("grab_onion")
     assert r["first_fired_diff"] == {"k": 0, "member": "cook_a", "record": ["fetch_onion", "ask_pot[S=cook_a]"], "candidate": ["grab_onion", "ask_pot[S=cook_a]"]}
     assert r["open_loop_after"] == r["first_out_diff"]["k"] == 0 and "fetch_onion" in r["first_out_diff"]["record"]
@@ -283,15 +286,97 @@ stage act {
 
 
 @judged
-def test_a_candidate_with_no_new_rule_is_refused_in_words(tmp_path):
-    from metis_agent.trace import fired_diff
+def judged_run(tmp_path, seed=1):
     d = tmp_path / "t"
-    lv, _, _ = run(tmp_path, ticks=2, trace={"dir": str(d), "every": 0, "ring": 0})
+    lv, _, _ = run(tmp_path, seed=seed, trace={"dir": str(d), "every": 0, "ring": 0})
     lv.tracer.close()
     cfg = kitchen_cfg(lv)
-    text = Path(program(lv, "cook_a")).read_text()
-    with pytest.raises(trace.TraceError, match="no rule"):
-        fired_diff(d, "cook_a", text, kitchen_root(tmp_path), lambda root: dict(json.loads(json.dumps(cfg)), v3=dict(cfg["v3"], image=str(root / "domains" / "kitchen_pot"))))
+
+    def config(root):
+        c = json.loads(json.dumps(cfg))
+        c["v3"]["image"] = str(root / "domains" / "kitchen_pot")
+        return c
+    return d, lv, config
+
+
+REPEAT = """
+stage act {
+  %% I take an onion, again.
+  fetch_onion [dyn] : $order * hand_free * $pot_space -o held_onion.
+}
+"""
+RENAMED = REPEAT.replace("fetch_onion", "take_onion")
+BREAKS = REPEAT.replace("fetch_onion", "grab_onion").replace("$pot_space -o held_onion", "$order -o held_onion")
+
+
+@judged
+def test_a_pack_that_repeats_a_rule_is_refused_with_the_reason(tmp_path):
+    from metis_agent.trace import judge
+    d, lv, config = judged_run(tmp_path)
+    for pack, how in ((REPEAT, "the same rule"), (RENAMED, "the same premises and effects")):
+        e = judge(d, "cook_a", pack, kitchen_root(tmp_path), config, composition="domains/kitchen_pot")
+        assert e["verdict"] == "refused" and how in " ".join(e["reasons"]) and "fetch_onion" in " ".join(e["reasons"]) and "cook_domain.llp" in " ".join(e["reasons"]), e["reasons"]
+        assert "first_fired_diff" not in e, "refused before any replay"
+
+
+@judged
+def test_a_pack_that_breaks_a_golden_is_refused_naming_it(tmp_path):
+    from metis_agent.trace import judge
+    d, lv, config = judged_run(tmp_path)
+    e = judge(d, "cook_a", BREAKS, kitchen_root(tmp_path), config, composition="domains/kitchen_pot")
+    assert e["verdict"] == "refused" and "golden stopped_cooking.yaml of cook_a" in " ".join(e["reasons"]), e["reasons"]
+    assert e["receipt"]["moved"] == ["cook_a"] and e["receipt"]["ei_holds"] and e["first_fired_diff"] and e["world"].startswith("none")
+
+
+@judged
+def test_a_pack_the_compiler_refuses_is_refused_in_its_words(tmp_path):
+    from metis_agent.trace import judge
+    d, lv, config = judged_run(tmp_path)
+    e = judge(d, "cook_a", "stage act {\n  %% Nonsense.\n  bad_rule [dyn] : no_such_atom -o held_onion.\n}\n", kitchen_root(tmp_path), config, composition="domains/kitchen_pot")
+    assert e["verdict"] == "refused" and "no_such_atom" in " ".join(e["reasons"]), e["reasons"]
+
+
+@judged
+def test_a_pack_that_passes_its_surprise_is_accepted_with_the_diff_named(tmp_path):
+    """A rule only a later grant can enable, so no golden sees it: it passes the surprise's case, in the harness and at the tick on the composition."""
+    from metis_agent.trace import judge
+    pack = """
+pred plated_late : cook.
+stage act {
+  %% My second grant's soup is served and I say so.
+  serve_late [dyn] : held_soup * order * $self(S) * $tick__gen(S, pot, g2) -o hand_free * plated_late.
+}
+"""
+    accepted = []
+    for seed in range(1, 9):
+        root = tmp_path / str(seed)
+        d, lv, config = judged_run(root, seed=seed)
+        rows = [t for s in trace.read(d) for t in s.ticks]
+        at = [t["k"] for t in rows for i in t["members"].get("cook_a", {}).get("seq", ()) if any(x.startswith("serve") for x in i.get("fired") or ())]
+        if not at:
+            continue
+        f = root / "surprise.yaml"
+        f.write_text(trace.case(d, "cook_a", at[-1], after=["plated_late"]))
+        e = judge(d, "cook_a", pack, kitchen_root(tmp_path), config, cases=[f], composition="domains/kitchen_pot")
+        if e["verdict"] == "accepted":
+            accepted.append(e)
+        else:
+            assert any("surprise.yaml" in x or "golden" in x for x in e["reasons"]), e["reasons"]
+    assert accepted, "no seed of 8 passed the surprise: the rule competes with serve, the sampler chooses"
+    e = accepted[0]
+    assert "whole_order.yaml of cook_a, seed 2" in e["goldens"]["already_failing"], "a golden on one seed: not the candidate's doing"
+    assert e["goldens"]["ran"]["cook_a"] >= 4
+    assert e["reasons"] == [] and e["rules"] == ["serve_late"] and e["receipt"]["moved"] == ["cook_a"] and e["receipt"]["ei_holds"]
+    assert e["cases"][0]["before"] == {"passed": False} and e["cases"][0]["passed"] and e["cases"][0]["composition"]["passed"]
+    assert e["first_enabled"]["rule"].startswith("serve_late") and "serve" in " ".join(e["first_enabled"]["beside"]) and e["first_fired_diff"]
+
+
+@judged
+def test_a_candidate_with_no_new_rule_is_refused_in_words(tmp_path):
+    from metis_agent.trace import judge
+    d, lv, config = judged_run(tmp_path)
+    e = judge(d, "cook_a", "%% nothing\n", kitchen_root(tmp_path), config)
+    assert e["verdict"] == "refused" and "no rule" in " ".join(e["reasons"]), e["reasons"]
 
 
 def test_a_new_session_ends_the_segment_and_the_next_replays_from_its_checkpoint(tmp_path):

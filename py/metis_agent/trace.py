@@ -16,7 +16,8 @@ inputs, so the director's rules run and the agent's own relay code carries what 
     r = replay_composition(TRACE, cfg)                   no candidate: .ok, .divergence (the first: k, member, what, want, got)
     d = fired_diff(TRACE, member, text, root, config)    a candidate program for one member, on a copy of the catalog: the fired diff (the baseline
                                                          first), the first tick it is enabled, the first differing output and open-loop after it,
-                                                         the receipt (whose key moved), the goldens that refuse it, the surprise's case
+                                                         the receipt (whose key moved, whose ei_key), the goldens that refuse it, the surprise's cases
+    e = judge(TRACE, member, pack, root, config)         a hand-written pack through all of that: → the evidence, with "verdict" and its "reasons" (metis-loop's propose rules on it)
 """
 import contextlib
 import copy
@@ -24,6 +25,7 @@ import hashlib
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -471,7 +473,7 @@ def _trace_hosts(feed, names):
 class CompositionReplay:
     def __init__(self):
         self.ticks, self.divergence, self.checkpoints = 0, None, 0
-        self.rows, self.first_enabled, self.live_changed = [], None, False
+        self.rows, self.first_enabled, self.live_changed, self.at = [], None, False, {}
 
     @property
     def ok(self):
@@ -540,6 +542,7 @@ def replay_composition(path, cfg, candidate=None):
             tracer.copies = {m: dict(x) for m, x in (segs[0].checkpoint.get("copies") or {}).items()}
             if candidate:
                 _watch_enabled(ags[candidate["member"]].repl, set(candidate["rules"]), feed, out)
+                want_at = candidate.get("at") or {}
             for i, seg in enumerate(segs):
                 if i and "cut" not in seg.header and not candidate:
                     bad = _sessions_differ(ags, seg)
@@ -561,6 +564,9 @@ def replay_composition(path, cfg, candidate=None):
                     bad = _compare(rec, got) if got is not None else {"k": rec["k"], "what": "tick", "want": "a tick", "got": None}
                     if candidate:
                         out.rows += _differences(rec, got or {"members": {}})
+                        for m in want_at.get(rec["k"], ()) if not rec.get("between") else ():
+                            e = (got or {"members": {}})["members"].get(m, {})
+                            out.at[(rec["k"], m)] = {"counts": dict(ags[m].repl.counts), "fired": _fired(e), "out": [x for x in e.get("out", ()) if isinstance(x, str)]}
                     elif bad:
                         out.divergence = bad
                         return out
@@ -577,7 +583,7 @@ def _watch_enabled(sh, rules, feed, out):
         if out.first_enabled is None:
             for i, _ in ws:
                 if sh.events_tbl[i][2].name.split("[")[0] in rules:
-                    out.first_enabled = {"k": feed.k, "rule": sh.events_tbl[i][2].name}
+                    out.first_enabled = {"k": feed.k, "rule": sh.events_tbl[i][2].name, "beside": sorted(sh.events_tbl[j][2].name for j, _ in ws if j != i)}
                     break
         return ws
     sh._candidates = watched
@@ -621,15 +627,17 @@ def _catalog(root):
             os.environ["METIS_CATALOG"] = was
 
 
-def fired_diff(path, member, text, root, config, case=None, seeds=(1, 2, 3)):
+def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), composition=None, unit=None):
     """The candidate program TEXT for MEMBER, judged on the composition: on a copy of the catalog at ROOT (nothing here touches ROOT), CONFIG(root)
-    the Live's config for a root. First the baseline must replay to the record, or there is nothing to compare with. → {
+    the Live's config for a root. UNIT: the file under ROOT that TEXT replaces (default the member's program). First the baseline must replay to the record, or
+    there is nothing to compare with. → {
       baseline: ok, rules: the candidate's new or changed rules,
-      receipt: {moved: the members whose program moved (the edit is confined to one), image: the new image's hash or None},
-      first_enabled: {k, rule}: the first tick one of them is enabled,
+      receipt: {moved: the members whose program moved (the edit is confined to one), interface: {member: {key, ei_key, before}} from metisc --interface on COMPOSITION,
+                ei_holds, errors: the link's},
+      first_enabled: {k, rule, beside: the rules enabled with it}: the first tick one of them is enabled,
       first_fired_diff, first_out_diff: {k, member, ...}: exact up to here; open_loop_after: k: the later copies are of a world that obeyed the old command,
       rows: every tick and member that differs, members: the first differing tick per member,
-      goldens: {ok, failed: named}: the package's cases; case: {passed, seeds}: the surprise's}"""
+      goldens: {ok, ran: {member: how many}, failed: named, already_failing}: every member's cases, what the candidate breaks; cases: [{file, member, at, before: it failed, passed, failures, composition: {...} at its tick}]}"""
     from metis import catalog as C
     from metis.catalog import stub
     segs = T.read(path)
@@ -639,37 +647,199 @@ def fired_diff(path, member, text, root, config, case=None, seeds=(1, 2, 3)):
     base = replay_composition(path, config(Path(root)))
     if not base.ok:
         return {"baseline": False, "divergence": base.divergence, "why": "the record does not replay on this toolchain: no candidate is judged on it"}
+    with _catalog(root):
+        target = Path(unit).resolve() if unit else Path(C.get(member).program).resolve()
+        doms = {m: _domain_of(C, m) for m in head["members"]}
+        # a golden written on one seed may not hold on another as it is (a `fired` in its order): only what the candidate breaks refuses it
+        already = {(m, g["file"], g["seed"]) for m in doms if doms[m] is not None for g in T.goldens(doms[m], seeds=seeds)[1]}
+        was_cases = [_case_result(stub, doms.get(m0), f) for f, m0 in ((f, _case_member(stub, f, member)) for f in cases)]
+    before_if = _interface(root, composition)
     with tempfile.TemporaryDirectory(prefix="trace-candidate-") as wd:
         copy_root = Path(wd) / "root"
         shutil.copytree(root, copy_root, ignore=SKIP, symlinks=True)
-        with _catalog(root):
-            source = Path(C.get(member).program).resolve()
-        was = source.read_text()
-        rel = source.relative_to(Path(root).resolve())
+        was = target.read_text()
+        rel = target.relative_to(Path(root).resolve())
         (copy_root / rel).write_text(text)
         rules = T.new_rules(text, was)
-        if not rules:
-            raise T.TraceError("the candidate adds or changes no rule of %s" % member)
         with _catalog(copy_root):
+            after_if = _interface(copy_root, composition)
+            if after_if and after_if.get("errors"):
+                return {"baseline": True, "rules": rules, "receipt": {"errors": after_if["lines"]}, "link_failed": True}
             cfg = config(copy_root)
-            run = replay_composition(path, cfg, {"member": member, "rules": rules})
-            dom = C.get(member)
+            at = {}
+            for f in cases:
+                c = stub.load_case(f)
+                if c.get("at") is not None:
+                    at.setdefault(int(c["at"]), set()).add(c.get("member") or member)
+            run = replay_composition(path, cfg, {"member": member, "rules": rules, "at": at})
             moved = sorted(m for m, h in head["members"].items() if _program_moved(C, m, h))
-            ok, failed = T.goldens(dom, seeds=seeds)
-            kase = None
-            if case is not None:
-                results = [stub.run_case(dom, case, seed=s) for s in seeds]
-                kase = {"passed": all(x.passed for x in results), "seeds": list(seeds), "failures": [f for x in results for b in x.boundaries for f in b.failures][:6]}
+            failed, ran = [], {}
+            for m in head["members"]:
+                dom = _domain_of(C, m)
+                if dom is not None:
+                    ran[m] = len(T.golden_files(dom))
+                    failed += [dict(x, member=m) for x in T.goldens(dom, seeds=seeds)[1] if (m, x["file"], x["seed"]) not in already]
+            judged = []
+            first_out = next(({"k": r["k"], "member": r["member"], **r["out"]} for r in run.rows if "out" in r), None)
+            for i, f in enumerate(cases):
+                c, m0 = stub.load_case(f), _case_member(stub, f, member)
+                dom = _domain_of(C, m0)
+                results = [stub.run_case(dom, f, seed=s) for s in ([c.get("seed", 1)] if c.get("rng") is not None else seeds)] if dom is not None else []
+                row = {"file": Path(f).name, "member": m0, "at": c.get("at"), "before": was_cases[i], "passed": bool(results) and all(x.passed for x in results),
+                       "failures": [x for r in results for b in r.boundaries for x in b.failures][:6]}
+                if c.get("at") is not None and (int(c["at"]), m0) in run.at:
+                    got, expect = run.at[(int(c["at"]), m0)], next((b["expect"] for b in reversed(c["boundaries"]) if b.get("expect")), {})
+                    fails = T.holds(expect, got["counts"], got["fired"], got["out"])
+                    row["composition"] = {"passed": not fails, "failures": fails, "open_loop": bool(first_out and int(c["at"]) > first_out["k"])}
+                judged.append(row)
         rows = run.rows
         first_fired = next(({"k": r["k"], "member": r["member"], **r["fired"]} for r in rows if "fired" in r), None)
-        first_out = next(({"k": r["k"], "member": r["member"], **r["out"]} for r in rows if "out" in r), None)
         by_member = {}
         for r in rows:
             by_member.setdefault(r["member"], r["k"])
-        return {"baseline": True, "rules": rules, "receipt": {"moved": moved, "image": head.get("image")},
+        return {"baseline": True, "rules": rules, "receipt": _receipt(moved, member, before_if, after_if, head),
                 "first_enabled": run.first_enabled, "first_fired_diff": first_fired, "first_out_diff": first_out,
                 "open_loop_after": first_out["k"] if first_out else None, "rows": rows, "members": by_member,
-                "goldens": {"ok": ok, "failed": failed}, "case": kase}
+                "goldens": {"ok": not failed, "ran": ran, "failed": failed, "already_failing": sorted("%s of %s, seed %s" % (f, m, x) for m, f, x in already)}, "cases": judged}
+
+
+def _domain_of(catalog, m):
+    try:
+        return catalog.get(m)
+    except Exception:  # noqa: BLE001 — a generated member, none in the catalog
+        return None
+
+
+def _case_member(stub, f, member):
+    return stub.load_case(f).get("member") or member
+
+
+def _case_result(stub, dom, f):
+    """Does the case fail on the program as it is? A surprise must."""
+    if dom is None:
+        return None
+    return {"passed": stub.run_case(dom, f).passed}
+
+
+def _interface(root, composition):
+    """metisc --interface on the composition under ROOT: {"members": {name: {"key", "ei_key"}}, "errors": n, "lines": the errors}, or None without one."""
+    from metis.catalog import image as I
+    if not composition:
+        return None
+    env = dict(os.environ, METIS_CATALOG=str(root))
+    r = subprocess.run([str(I.metisc()), "--interface", "composition.yaml"], cwd=Path(root) / composition, capture_output=True, text=True, env=env, timeout=300)
+    out = {"members": {}, "errors": 0, "lines": []}
+    for line in r.stdout.splitlines():
+        w = line.split()
+        if w[:1] == ["member"] and "key" in w and "ei" in w:
+            out["members"][w[1]] = {"key": w[w.index("key") + 1], "ei_key": w[w.index("ei") + 1]}
+        elif w[:1] == ["error"]:
+            out["lines"].append(line)
+        elif w[:1] == ["result"]:
+            out["errors"] = int(w[1])
+    if r.returncode and not out["errors"]:
+        out["errors"], out["lines"] = 1, [(r.stderr or r.stdout).strip()[-400:]]
+    return out
+
+
+def _receipt(moved, member, before, after, head):
+    """The confinement: only one member's program moved, and its external interface holds, so its neighbours' I-checks are untouched."""
+    out = {"moved": moved, "image": head.get("image")}
+    if before and after:
+        out["interface"] = {m: {"before": before["members"].get(m), "after": after["members"].get(m)} for m in sorted(set(before["members"]) | set(after["members"]))}
+        out["ei_holds"] = all((before["members"].get(m) or {}).get("ei_key") == (after["members"].get(m) or {}).get("ei_key") for m in out["interface"])
+    return out
+
+
+def verdict(e, member):
+    """The gate's word on the evidence, mechanically: accepted, or the reasons, each naming what refused. The model writes the ruling from it and cannot move it."""
+    why = []
+    if not e.get("baseline"):
+        why.append("the record does not replay: %s" % (e.get("divergence") or e.get("why")))
+        return "refused", why
+    if e.get("duplicates"):
+        why += ["the pack's %(rule)s repeats %(other)s in %(where)s: %(how)s" % d for d in e["duplicates"]]
+    if e.get("gate_error"):
+        why.append("the gate: %s" % e["gate_error"])
+    if e.get("link_failed"):
+        why.append("the link refused: %s" % "; ".join((e.get("receipt") or {}).get("errors") or ()))
+    if why:
+        return "refused", why
+    r = e.get("receipt") or {}
+    if not e.get("rules"):
+        why.append("the pack adds or changes no rule")
+    if r.get("moved") is not None and r["moved"] != [member]:
+        why.append("the edit is not confined to %s: the programs of %s moved" % (member, ", ".join(r["moved"]) or "none"))
+    if r.get("ei_holds") is False:
+        moved = [m for m, x in r["interface"].items() if (x["before"] or {}).get("ei_key") != (x["after"] or {}).get("ei_key")]
+        why.append("the external interface moved (ei_key of %s): the neighbours' I-checks are not untouched" % ", ".join(moved))
+    named = {}
+    for g in (e.get("goldens") or {}).get("failed") or ():
+        named.setdefault((g["file"], g["member"]), dict(g, seeds=[]))["seeds"].append(g["seed"])
+    for (f, m), g in named.items():
+        why.append("golden %s of %s (%s; seed %s): %s" % (f, m, g["case"][:90], ", ".join(str(x) for x in g["seeds"]), "; ".join(g["failures"])[:160]))
+    for c in e.get("cases") or ():
+        if (c.get("before") or {}).get("passed"):
+            why.append("case %s holds on the program as it is: it is no surprise" % c["file"])
+        if not c["passed"]:
+            why.append("case %s of %s does not pass: %s" % (c["file"], c["member"], "; ".join(c["failures"])[:160]))
+        comp = c.get("composition")
+        if comp and not comp["passed"]:
+            why.append("case %s at tick %s of %s, on the composition%s: %s" % (c["file"], c["at"], c["member"], " (open-loop past its first differing output)" if comp["open_loop"] else "", "; ".join(comp["failures"])[:160]))
+    return ("refused" if why else "accepted"), why
+
+
+def judge(path, member, pack, root, config, cases=(), composition=None, unit=None, seeds=(1, 2, 3)):
+    """A hand-written PACK for MEMBER, with the same judgement a model's draft gets: the gate cascade (a duplicate, the link, the I-checks, the receipt with ei_key), every
+    member's goldens and the surprises' CASES, the fired diff on the composition's replay. → the evidence, with "verdict" and "reasons"; no world, no model."""
+    from metis import catalog as C
+    with _catalog(root):
+        target = Path(unit).resolve() if unit else Path(C.get(member).program).resolve()
+    was = target.read_text()
+    e = {"member": member, "unit": str(target.relative_to(Path(root).resolve())), "world": "none: open-loop only"}
+    try:
+        text, e["pack"] = T.apply_pack(was, pack)
+        e["duplicates"] = [] if e["pack"]["whole"] else T.duplicates(_without_dropped(pack), _closure(target, was, e["pack"]["dropped"]))
+        if e["duplicates"]:
+            e["baseline"] = True
+        else:
+            e.update(fired_diff(path, member, text, root, config, cases=cases, seeds=seeds, composition=composition, unit=target))
+    except (T.TraceError, ValueError, LookupError) as x:      # the compiler's or the linker's words: a refusal, not an end
+        e["baseline"], e["gate_error"] = e.get("baseline", True), str(x)[-600:]
+    except Exception as x:  # noqa: BLE001 — metis.lang's errors have their own types; the words are the refusal
+        if type(x).__module__.startswith("metis"):
+            e["baseline"], e["gate_error"] = e.get("baseline", True), str(x)[-600:]
+        else:
+            raise
+    e["verdict"], e["reasons"] = verdict(e, member)
+    return e
+
+
+def _without_dropped(pack):
+    return "\n".join(line for line in pack.splitlines() if not line.strip().startswith("drop "))
+
+
+def _closure(target, text, dropped):
+    """The unit and the units it includes that can be read, its dropped rules gone: {name: text}: what a pack may repeat."""
+    import re
+    out, seen, todo = {}, set(), [(target.name, target, text)]
+    home = os.environ.get("METIS_HOME")
+    while todo:
+        name, f, body = todo.pop()
+        if name in seen:
+            continue
+        seen.add(name)
+        out[name] = body
+        for inc in re.findall(r'^include "([^"]+)"', body, re.M):
+            for d in [f.parent] + ([Path(home)] if home else []):
+                g = d / inc
+                if g.is_file():
+                    todo.append((inc, g, g.read_text()))
+                    break
+    for name in list(out):
+        for rule in dropped:
+            out[name] = T.apply_pack(out[name], "drop %s" % rule)[0] if rule in T.rules_of(out[name]) else out[name]
+    return out
 
 
 def _program_moved(catalog, m, h):
@@ -711,7 +881,7 @@ def main(argv=None):
     ap.add_argument("--candidate", help="the member's program, as the candidate has it")
     ap.add_argument("--root", help="the catalog root it is judged on a copy of")
     ap.add_argument("--composition", help="the composition's directory under the root (an image's run)")
-    ap.add_argument("--case", help="the surprise's case")
+    ap.add_argument("--case", action="append", default=[], help="a surprise's case")
     a = ap.parse_args(argv)
     cfg = S.load_config(a.config)
     cfg.pop("trace", None)
@@ -725,7 +895,7 @@ def main(argv=None):
         r = replay_composition(a.trace, cfg)
         print(json.dumps({"ok": r.ok, "ticks": r.ticks, "checkpoints": r.checkpoints, "divergence": r.divergence}))
         return 0 if r.ok else 1
-    print(json.dumps(fired_diff(a.trace, a.member, Path(a.candidate).read_text(), a.root, config, case=a.case), indent=1))
+    print(json.dumps(fired_diff(a.trace, a.member, Path(a.candidate).read_text(), a.root, config, cases=a.case, composition=a.composition), indent=1))
     return 0
 
 
