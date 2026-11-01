@@ -35,3 +35,19 @@ def test_a_lifted_instance_declares_its_bases_predicates(tmp_path):
     (d / "lamp.llp").write_text('catalog lamp 1.\ninclude "base/lamp_base.llp".\n#init lit 1\n')
     assert "include" not in program_text(d / "lamp.llp")
     assert declared({"CATALOG": d / "lamp.llp"}) >= {"lit", "cmd_on", "cmd_off"}
+
+
+def test_a_hidden_rule_is_not_in_the_programs_text(tmp_path):
+    """spec/18 §3: `include "u" hiding (r).` splices the unit minus r, its %% lines and alternative heads with it;
+    its preds stay declared."""
+    from metis_agent.intent_check import declared, program_text
+    (tmp_path / "u.llp").write_text('pred lit : u.\npred cmd_on : u.\npred cmd_off : u.\nstage act {\n'
+                                    '  %% It lights.\n  on_rule [dyn] : cmd_on -o lit.\n'
+                                    '  %% It goes out.\n  off_rule [dyn] : lit * cmd_off\n    -o cmd_on.\n}\n')
+    (tmp_path / "mid.llp").write_text('include "u.llp" hiding (off_rule).\n')
+    (tmp_path / "p.llp").write_text('catalog p 1.\ninclude "u.llp" hiding (off_rule).\n')
+    (tmp_path / "q.llp").write_text('catalog q 1.\ninclude "mid.llp".\n')
+    for f in ("p.llp", "q.llp"):
+        text = program_text(tmp_path / f)
+        assert "include" not in text and "off_rule" not in text and "goes out" not in text and "on_rule" in text
+        assert declared({"CATALOG": tmp_path / f}) >= {"lit", "cmd_on", "cmd_off"}

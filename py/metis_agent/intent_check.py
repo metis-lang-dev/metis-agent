@@ -54,13 +54,22 @@ def program_text(path):
     import re
     seen = set()
 
-    def splice(p):
+    def drop(text, name):
+        """A hidden rule's text and its %% lines: it reads and produces nothing (spec/18 §3)."""
+        return re.sub(r'^(?:[ \t]*%%%%[^\n]*\n)*[ \t]*%s(?:-\d+)?\s*\[[^\]]*\]\s*:.*?\.[ \t]*(?:%%[^\n]*)?$\n?' % re.escape(name),
+                      "", text, flags=re.M | re.S)
+
+    def splice(p, hide=frozenset()):
         p = Path(p).resolve()
-        if p in seen:
+        if (p, hide) in seen:
             return ""
-        seen.add(p)
-        return re.sub(r'^\s*include\s+"([^"]+)"\s*\.\s*$', lambda m: splice(p.parent / m.group(1)),
-                      p.read_text(), flags=re.M)
+        seen.add((p, hide))
+        text = p.read_text()
+        for name in hide:
+            text = drop(text, name)
+        return re.sub(r'^\s*include\s+"([^"]+)"\s*(?:hiding\s*\(([^)]*)\)\s*)?\.\s*$',
+                      lambda m: splice(p.parent / m.group(1), hide | frozenset((m.group(2) or "").split())),
+                      text, flags=re.M)
     return splice(path)
 
 
