@@ -455,6 +455,10 @@ class Live:
         self.started = threading.Event()
         self.stop = threading.Event()
         self.beat = 0
+        self.tracer = None
+        if cfg.get("trace"):                   # a reader around the tick (metis_agent.trace), off unless the config asks
+            from .trace import attach
+            self.tracer = attach(self, cfg["trace"])
 
     @staticmethod
     def load_image(cfg):

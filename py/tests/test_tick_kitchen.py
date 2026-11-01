@@ -66,7 +66,7 @@ def composition(tmp_path, members):
     return d
 
 
-def run(tmp_path, seed=1, members=MEMBERS, ticks=200, on_tick=None):
+def run(tmp_path, seed=1, members=MEMBERS, ticks=200, on_tick=None, trace=None):
     for n, m in list(sys.modules.items()):                     # a fresh kitchen per run, before the sessions read it
         if n.startswith("kitchen_pot_host_"):                   # (the host module stays cached: empty its registry)
             m.SHARED.clear()
@@ -80,6 +80,8 @@ def run(tmp_path, seed=1, members=MEMBERS, ticks=200, on_tick=None):
     cfg["domains"].update(narrate=None, consult=False, records=None, quiet=[], pairs=[], seed=seed, tick=True)
     for k in ("names", "clocks"):
         cfg["domains"].pop(k, None)
+    if trace:
+        cfg["trace"] = trace
     lv = S.Live(cfg, FakeLLM())
     kit = lv.agents.agents[members[0]].host.inner.kitchen         # the one kitchen, through a cook's host
     ahead = []
