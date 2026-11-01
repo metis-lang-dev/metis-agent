@@ -379,6 +379,7 @@ class Live:
         self._tick_rows, self._last_status, self.holder = {}, None, None
         self._seen_rows, self._last_beat, self._why = {}, {}, {}
         self._grant_q = []                     # the director's own beats' grants, applied after the tick's beats
+        self._gen_q = []                       # … and their generations (spec/15 amendment 10)
         self._granted = set()                  # members given a grant, revoke or cancel since their last beat (3c)
         self._cancel_q = []                    # the director's own beats' cancels, applied after the tick's beats
         self._goal_take = {}                   # member → the tick its last goal was taken in (the director's forward)
@@ -739,6 +740,19 @@ class Live:
                              "stamp": self.beat, "taken": bool(line)})
         self.holder = dom if on else (None if self.holder == dom else self.holder)
 
+    def generation(self, dom, res, g):
+        """The director's tick__gen(DOM, RES, G) (spec/15 amendment 10), taken into DOM's session in the place of the last:
+        transport, between beats, so no rule races it. A member that gives nothing back has none: its manifest does not name it."""
+        atom = "tick__gen(%s,%s,%s)" % (dom, res, g)
+        if self.proc_split is not None and dom in self.proc_split.remote:
+            self.proc_split.outbox[atom] = self.proc_split.outbox.get(atom, 0) + 1   # the peer replaces it, as here
+            return
+        ag = self.agents.agents.get(dom) if hasattr(self.agents, "agents") else None
+        if ag is None or "tick__gen" not in (self.manifest(dom).get("shared") or {}):
+            return
+        lines = ["-%s %d" % (a, n) for a, n in ag.repl.counts.items() if n > 0 and a.startswith("tick__gen(%s,%s," % (dom, res))]
+        self.serve_line({"take": lines + ["+%s 1" % atom], "domain": dom, "refresh": False}, "take")
+
     def holds(self, ag, dom):
         return any(n > 0 and a.startswith("tick__grant(%s," % dom) for a, n in ag.repl.counts.items())
 
@@ -828,7 +842,7 @@ class Live:
     REPORTS = None
 
     def report_preds(self):
-        """The protocol's report-natured preds (tick__want, tick__release, tick__active, tick__done, tick__stuck;
+        """The protocol's report-natured preds (tick__want, tick__released, tick__active, tick__done, tick__stuck;
         tick__status is the agent's own relay): the image's protocol natures, else metis.catalog.iface's."""
         if self.image is not None:
             return frozenset(p for p, n in self.image.natures.items() if n == "report" and p != "tick__status")
@@ -838,6 +852,15 @@ class Live:
             nature = yaml.safe_load(iface.path("protocol_domain.yaml").read_text())["nature"]
             Live.REPORTS = frozenset(p for p, n in nature.items() if n == "report" and p != "tick__status")
         return Live.REPORTS
+
+    STALE = ("release_old", "release_on_free", "release_other", "late_release_free", "late_release_other", "late_free", "late_other")
+
+    def note_stale(self, row):
+        """A release that outlived its grant, consumed by the director's rules (spec/15 amendment 10): said in the journal."""
+        rule = str(row.get("event", "")).split("[")[0]
+        if rule in self.STALE or rule == "unwant":
+            self.journal.record({"kind": "dlg-relay", "what": "unwant" if rule == "unwant" else "stale", "domain": self.director.name,
+                                 "rule": rule, "event": row.get("event"), "stamp": self.beat})
 
     def relay_reports(self, rows):
         """Step 3b (brief §3, the inversion): the report atoms (the protocol's report natures) ANY specialist's
@@ -1099,7 +1122,7 @@ class Live:
         self.journal.record({"kind": "dlg-director", "director": self.director.name, "new_game": restarted})
         if self.world_map:
             self.emit("world/map", {"url": "world/map.json"})
-        line = "A new game: the same room from its start."
+        line = "A new game."
         if say:
             self.on_say("line", line)
         self.set_status("waiting", self.waiting_text())
@@ -1333,6 +1356,9 @@ class Live:
                                          "produce": sorted({a for row in r.get("fired") or [] if row.get("kind") != "exo"
                                                             for a in row.get("produce") or []})})
                 if self.director is not None:
+                    if d == self.director.name:
+                        for row in r.get("fired") or []:
+                            self.note_stale(row)
                     if d == self.director.name and self._dir_traces is not None:
                         self._dir_traces.append(r)
                     elif self.tick_all and d == self.director.name:
@@ -1345,6 +1371,8 @@ class Live:
                                 if k in ("tick__grant", "tick__revoke"):
                                     dom, res = [x.strip() for x in a[a.index("(") + 1:-1].split(",")]
                                     self._grant_q.append((dom, res, k == "tick__grant"))   # applied after the beats
+                                elif k == "tick__gen":
+                                    self._gen_q.append(tuple(x.strip() for x in a[a.index("(") + 1:-1].split(",")))
                                 elif k == "tick__cancel":
                                     self._cancel_q.append(a[a.index("(") + 1:-1].strip())
                     # (the tick, step 2: activation is the director's — an inactive specialist beats on its copies,
@@ -1668,6 +1696,9 @@ class Live:
 
     def _apply_outs(self):
         """The director's grants, revokes and cancels queued by its beat, into the members' sessions."""
+        q, self._gen_q = self._gen_q, []
+        for dom, res, g in q:
+            self.generation(dom, res, g)
         q, self._grant_q = self._grant_q, []
         for dom, res, on in q:
             self.grant(dom, res, on)

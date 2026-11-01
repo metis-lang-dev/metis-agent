@@ -61,6 +61,7 @@ def live(monkeypatch):
     lv = object.__new__(service.Live)
     lv.journal, lv.beat, lv.tick_all = Journal(), 5, True
     lv._tick_rows, lv._last_status, lv.holder = {}, None, None
+    lv._gen_q = []
     lv._seen_rows, lv._last_beat, lv._why, lv._grant_q, lv._granted = {}, {}, {}, [], set()
     lv._cancel_q, lv._stop = [], None
     lv._goal_take, lv._cancel_defer = {}, []
@@ -260,6 +261,7 @@ def test_the_directors_own_beat_grants_reach_the_holders(live):
     assert live._grant_q == [("nav", "motion", True)] and live.taken == []
     live._dir_traces = []                                           # inside DirectorLoop.step: it applies its own
     live._grant_q = []
+    live._gen_q = []
     live.sift([{"kind": "trace", "domain": "director", "fired": [{"kind": "clause", "produce": ["tick__revoke(nav,motion)"]}]}])
     assert live._grant_q == []
 
@@ -366,3 +368,24 @@ def test_a_planner_forwarded_then_stopped_speaks_into_no_engagement(live):
     assert live._cancel_defer == [] and live.taken[-1] == ("task", ["+tick__cancel(task) 1"])
     live.sift(beat)                                                 # a live engagement again: its products arrive
     assert [d for d, _ in got] == ["task"]
+
+
+def test_a_generation_replaces_the_last_in_the_members_session(tmp_path):
+    """spec/15 amendment 10: tick__gen is the grant's generation; the agent replaces it, between beats, and a member that
+    gives nothing back (its manifest does not name it) gets none. A stale release is said in the journal."""
+    live = service.Live.__new__(service.Live)
+    live.proc_split = None
+    repl = types.SimpleNamespace(counts={"tick__gen(act,motion,g1)": 1})
+    live.agents = types.SimpleNamespace(agents={"act": types.SimpleNamespace(repl=repl), "nav": types.SimpleNamespace(repl=repl)})
+    taken = []
+    live.serve_line = lambda m, *a: taken.append((m["domain"], m["take"]))
+    live.manifest = lambda d: {"shared": {"tick__gen": "in"}} if d == "act" else {"shared": {"tick__grant": "in"}}
+    live.generation("act", "motion", "g2")
+    assert taken == [("act", ["-tick__gen(act,motion,g1) 1", "+tick__gen(act,motion,g2) 1"])]
+    live.generation("nav", "motion", "g3")
+    assert len(taken) == 1
+    live.journal, live.beat, live.director = Journal(), 9, types.SimpleNamespace(name="director")
+    live.note_stale({"event": "release_old[1]"})
+    live.note_stale({"event": "unwant[1]"})
+    live.note_stale({"event": "release_on_report[1]"})
+    assert [(r["what"], r["rule"]) for r in live.journal.rows if r["kind"] == "dlg-relay"] == [("stale", "release_old"), ("unwant", "unwant")]

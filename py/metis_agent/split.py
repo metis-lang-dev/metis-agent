@@ -3,12 +3,12 @@ members the plan puts here; the plan's transport ports cross to the peer through
 message a tick each way, latched at the receiver's next beat — the Moore latch the tick already keeps in one process.
 
 What crosses, by the plan's ports (`from` this process: sent; `to` this process: taken):
-- a report (tick__want, tick__release, tick__active, tick__done, tick__stuck): what a local specialist's rules
+- a report (tick__want, tick__released, tick__active, tick__done, tick__stuck): what a local specialist's rules
   produced this tick, relayed into the director where the director is, as relay_reports does in one process;
 - tick__status(M, S): a local specialist's status this tick (spec 15 §4.4, as statuses() derives it), the state
   the director's process relays as its own (spec 17 §5.2: the statuses cross when the director and a specialist
   are split);
-- a signal (tick__grant, tick__cancel): the director's grant, revoke or cancel of a remote member, taken into its
+- a signal (tick__grant, tick__gen, tick__cancel): the director's grant, revoke or cancel of a remote member, taken into its
   session where it beats (Live.grant / Live.cancel);
 - a world reading (a world-private pred of a remote member, the world hosted here): that member's reading from its
   host HERE, as state (what changed since the last message);
@@ -239,6 +239,8 @@ class Split:
             args = a[len(pred) + 1:-1].split(",") if "(" in a else []
             if pred == "tick__grant" and args and args[0] in lv.agents.agents:
                 lv.grant(args[0], args[1], n > 0)
+            elif pred == "tick__gen" and args and args[0] in lv.agents.agents and n > 0:
+                lv.generation(*args)
             elif pred == "tick__cancel" and args and args[0] in lv.agents.agents and n > 0:
                 lv.cancel(args[0])
             elif pred == "tick__status":
