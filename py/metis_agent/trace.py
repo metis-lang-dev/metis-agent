@@ -512,7 +512,11 @@ def replay_composition(path, cfg, candidate=None):
     feed, out = Feed(segs), CompositionReplay()
     with tempfile.TemporaryDirectory(prefix="trace-replay-") as wd:
         c = copy.deepcopy(cfg)
-        c["trace"] = {"dir": str(Path(wd) / "t"), "every": 0, "ring": 0, "commands": head.get("commands") or []}
+        commands = list(head.get("commands") or [])
+        if candidate:                              # a new rule of a command's kind (brake_late beside brake_lon) is a command: its output must show
+            kinds = {p.split("_")[0] for p in commands}
+            commands += [r for r in candidate["rules"] if r.split("_")[0] in kinds]
+        c["trace"] = {"dir": str(Path(wd) / "t"), "every": 0, "ring": 0, "commands": commands}
         c["v3"]["journal"] = str(Path(wd) / "journal.jsonl")
         with _trace_hosts(feed, list(head["members"])):
             lv = S.Live(c, NoModel())
