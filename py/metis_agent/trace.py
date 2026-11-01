@@ -615,21 +615,48 @@ SKIP = shutil.ignore_patterns(".git", "build", "__pycache__", ".run", "records",
 
 
 @contextlib.contextmanager
-def _catalog(root):
-    was = os.environ.get("METIS_CATALOG")
-    os.environ["METIS_CATALOG"] = str(root)
+def _env(**kw):
+    was = {k: os.environ.get(k) for k in kw}
+    os.environ.update({k: str(v) for k, v in kw.items()})
     try:
         yield
     finally:
-        if was is None:
-            os.environ.pop("METIS_CATALOG", None)
-        else:
-            os.environ["METIS_CATALOG"] = was
+        for k, v in was.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
 
 
-def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), composition=None, unit=None):
+def _catalog(root):
+    return _env(METIS_CATALOG=root)
+
+
+def _under(path, root):
+    """PATH relative to ROOT, or None."""
+    try:
+        return Path(path).resolve().relative_to(Path(root).resolve())
+    except ValueError:
+        return None
+
+
+def _consumer_goldens(name, root, seeds):
+    """A family's other consumer: its members' cases as the environment's family has them. → (how many ran, [each failure, named])."""
+    from metis.catalog import manifests as mc
+    ran, bad = {}, []
+    with _catalog(root):
+        for d in mc.domains(Path(root)):
+            files = T.golden_files(d)
+            if files:
+                ran[d.name] = len(files)
+                bad += [dict(x, member=d.name, consumer=name) for x in T.goldens(d, seeds=seeds)[1]]
+    return ran, bad
+
+
+def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), composition=None, unit=None, consumers=()):
     """The candidate program TEXT for MEMBER, judged on the composition: on a copy of the catalog at ROOT (nothing here touches ROOT), CONFIG(root)
-    the Live's config for a root. UNIT: the file under ROOT that TEXT replaces (default the member's program). First the baseline must replay to the record, or
+    the Live's config for a root. UNIT: the file TEXT replaces (default the member's program), under ROOT or under METIS_HOME: a family's unit is judged on a copy of the family, and
+    CONSUMERS ([(name, root, composition)]: the family's other consumers, spec/18 §5) must still link and keep their goldens. First the baseline must replay to the record, or
     there is nothing to compare with. → {
       baseline: ok, rules: the candidate's new or changed rules,
       receipt: {moved: the members whose program moved (the edit is confined to one), interface: {member: {key, ei_key, before}} from metisc --interface on COMPOSITION,
@@ -653,15 +680,27 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
         # a golden written on one seed may not hold on another as it is (a `fired` in its order): only what the candidate breaks refuses it
         already = {(m, g["file"], g["seed"]) for m in doms if doms[m] is not None for g in T.goldens(doms[m], seeds=seeds)[1]}
         was_cases = [_case_result(stub, doms.get(m0), f) for f, m0 in ((f, _case_member(stub, f, member)) for f in cases)]
+    home = os.environ.get("METIS_HOME")
+    in_root, in_home = _under(target, root), _under(target, home) if home else None
+    if in_root is None and in_home is None:
+        raise T.TraceError("the unit %s is under neither the root nor METIS_HOME: nothing here can judge it on a copy" % target)
+    consumers = list(consumers) if in_root is None else []     # a member's own file moves no other consumer
+    before_consumers = {(c[0], x["member"], x["file"], x["seed"]) for c in consumers for x in _consumer_goldens(c[0], c[1], seeds)[1]}
     before_if = _interface(root, composition)
     with tempfile.TemporaryDirectory(prefix="trace-candidate-") as wd:
         copy_root = Path(wd) / "root"
         shutil.copytree(root, copy_root, ignore=SKIP, symlinks=True)
         was = target.read_text()
-        rel = target.relative_to(Path(root).resolve())
-        (copy_root / rel).write_text(text)
+        new_env = {"METIS_CATALOG": copy_root}
+        if in_root is not None:
+            (copy_root / in_root).write_text(text)
+        else:
+            copy_home = Path(wd) / "home"
+            shutil.copytree(home, copy_home, ignore=SKIP, symlinks=True)
+            (copy_home / in_home).write_text(text)
+            new_env["METIS_HOME"] = copy_home
         rules = T.new_rules(text, was)
-        with _catalog(copy_root):
+        with _env(**new_env):
             after_if = _interface(copy_root, composition)
             if after_if and after_if.get("errors"):
                 return {"baseline": True, "rules": rules, "receipt": {"errors": after_if["lines"]}, "link_failed": True}
@@ -672,13 +711,21 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
                 if c.get("at") is not None:
                     at.setdefault(int(c["at"]), set()).add(c.get("member") or member)
             run = replay_composition(path, cfg, {"member": member, "rules": rules, "at": at})
-            moved = sorted(m for m, h in head["members"].items() if _program_moved(C, m, h))
+            moved = _moved(C, head, before_if, after_if)
             failed, ran = [], {}
             for m in head["members"]:
                 dom = _domain_of(C, m)
                 if dom is not None:
                     ran[m] = len(T.golden_files(dom))
                     failed += [dict(x, member=m) for x in T.goldens(dom, seeds=seeds)[1] if (m, x["file"], x["seed"]) not in already]
+            links = {}
+            for name, c_root, c_comp in consumers:
+                with _catalog(c_root):
+                    linked = _interface(c_root, c_comp)
+                links[name] = {"errors": (linked or {}).get("lines", [])}
+                c_ran, c_bad = _consumer_goldens(name, c_root, seeds)
+                ran.update({"%s/%s" % (name, m): n for m, n in c_ran.items()})
+                failed += [x for x in c_bad if (name, x["member"], x["file"], x["seed"]) not in before_consumers]
             judged = []
             first_out = next(({"k": r["k"], "member": r["member"], **r["out"]} for r in run.rows if "out" in r), None)
             for i, f in enumerate(cases):
@@ -700,7 +747,7 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
         return {"baseline": True, "rules": rules, "receipt": _receipt(moved, member, before_if, after_if, head),
                 "first_enabled": run.first_enabled, "first_fired_diff": first_fired, "first_out_diff": first_out,
                 "open_loop_after": first_out["k"] if first_out else None, "rows": rows, "members": by_member,
-                "goldens": {"ok": not failed, "ran": ran, "failed": failed, "already_failing": sorted("%s of %s, seed %s" % (f, m, x) for m, f, x in already)}, "cases": judged}
+                "consumers": links, "goldens": {"ok": not failed, "ran": ran, "failed": failed, "already_failing": sorted(["%s of %s, seed %s" % (f, m, x) for m, f, x in already] + ["%s of %s/%s, seed %s" % (f, c, m, x) for c, m, f, x in before_consumers])}, "cases": judged}
 
 
 def _domain_of(catalog, m):
@@ -775,9 +822,13 @@ def verdict(e, member):
         why.append("the external interface moved (ei_key of %s): the neighbours' I-checks are not untouched" % ", ".join(moved))
     named = {}
     for g in (e.get("goldens") or {}).get("failed") or ():
-        named.setdefault((g["file"], g["member"]), dict(g, seeds=[]))["seeds"].append(g["seed"])
-    for (f, m), g in named.items():
-        why.append("golden %s of %s (%s; seed %s): %s" % (f, m, g["case"][:90], ", ".join(str(x) for x in g["seeds"]), "; ".join(g["failures"])[:160]))
+        named.setdefault((g["file"], g["member"], g.get("consumer")), dict(g, seeds=[]))["seeds"].append(g["seed"])
+    for (f, m, consumer), g in named.items():
+        who = "%s, the family's consumer %s" % (m, consumer) if consumer else m
+        why.append("golden %s of %s (%s; seed %s): %s" % (f, who, g["case"][:90], ", ".join(str(x) for x in g["seeds"]), "; ".join(g["failures"])[:160]))
+    for name, x in (e.get("consumers") or {}).items():
+        if x.get("errors"):
+            why.append("the family's consumer %s no longer links: %s" % (name, "; ".join(x["errors"])[:200]))
     for c in e.get("cases") or ():
         if (c.get("before") or {}).get("passed"):
             why.append("case %s holds on the program as it is: it is no surprise" % c["file"])
@@ -789,21 +840,23 @@ def verdict(e, member):
     return ("refused" if why else "accepted"), why
 
 
-def judge(path, member, pack, root, config, cases=(), composition=None, unit=None, seeds=(1, 2, 3)):
+def judge(path, member, pack, root, config, cases=(), composition=None, unit=None, seeds=(1, 2, 3), consumers=()):
     """A hand-written PACK for MEMBER, with the same judgement a model's draft gets: the gate cascade (a duplicate, the link, the I-checks, the receipt with ei_key), every
     member's goldens and the surprises' CASES, the fired diff on the composition's replay. → the evidence, with "verdict" and "reasons"; no world, no model."""
     from metis import catalog as C
     with _catalog(root):
         target = Path(unit).resolve() if unit else Path(C.get(member).program).resolve()
     was = target.read_text()
-    e = {"member": member, "unit": str(target.relative_to(Path(root).resolve())), "world": "none: open-loop only"}
+    home = os.environ.get("METIS_HOME")
+    in_root, in_home = _under(target, root), _under(target, home) if home else None
+    e = {"member": member, "unit": str(in_root) if in_root is not None else "METIS_HOME/%s" % in_home if in_home is not None else target.name, "world": "none: open-loop only"}
     try:
         text, e["pack"] = T.apply_pack(was, pack)
         e["duplicates"] = [] if e["pack"]["whole"] else T.duplicates(_without_dropped(pack), _closure(target, was, e["pack"]["dropped"]))
         if e["duplicates"]:
             e["baseline"] = True
         else:
-            e.update(fired_diff(path, member, text, root, config, cases=cases, seeds=seeds, composition=composition, unit=target))
+            e.update(fired_diff(path, member, text, root, config, cases=cases, seeds=seeds, composition=composition, unit=target, consumers=consumers))
     except (T.TraceError, ValueError, LookupError) as x:      # the compiler's or the linker's words: a refusal, not an end
         e["baseline"], e["gate_error"] = e.get("baseline", True), str(x)[-600:]
     except Exception as x:  # noqa: BLE001 — metis.lang's errors have their own types; the words are the refusal
@@ -840,6 +893,13 @@ def _closure(target, text, dropped):
         for rule in dropped:
             out[name] = T.apply_pack(out[name], "drop %s" % rule)[0] if rule in T.rules_of(out[name]) else out[name]
     return out
+
+
+def _moved(catalog, head, before, after):
+    """The members whose program moved: by the compiled key where the composition says it (a family's unit moves a program whose own file is the same), else by its file."""
+    if before and after:
+        return sorted(m for m in set(before["members"]) | set(after["members"]) if (before["members"].get(m) or {}).get("key") != (after["members"].get(m) or {}).get("key"))
+    return sorted(m for m, h in head["members"].items() if _program_moved(catalog, m, h))
 
 
 def _program_moved(catalog, m, h):

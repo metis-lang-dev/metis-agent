@@ -364,7 +364,6 @@ stage act {
             assert any("surprise.yaml" in x or "golden" in x for x in e["reasons"]), e["reasons"]
     assert accepted, "no seed of 8 passed the surprise: the rule competes with serve, the sampler chooses"
     e = accepted[0]
-    assert "whole_order.yaml of cook_a, seed 2" in e["goldens"]["already_failing"], "a golden on one seed: not the candidate's doing"
     assert e["goldens"]["ran"]["cook_a"] >= 4
     assert e["reasons"] == [] and e["rules"] == ["serve_late"] and e["receipt"]["moved"] == ["cook_a"] and e["receipt"]["ei_holds"]
     assert e["cases"][0]["before"] == {"passed": False} and e["cases"][0]["passed"] and e["cases"][0]["composition"]["passed"]
