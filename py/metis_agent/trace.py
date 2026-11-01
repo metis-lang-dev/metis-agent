@@ -644,17 +644,20 @@ def _under(path, root):
         return None
 
 
-def _consumer_goldens(name, root, seeds):
-    """A family's other consumer: its members' cases as the environment's family has them. → (how many ran, [each failure, named])."""
+def _consumer_goldens(name, root, seeds, skips=None):
+    """A family's other consumer: its members' cases as the environment's family has them. SKIPS: {member: the files not its own}, read on the family as it is. → (how many ran,
+    [each failure, named], {member: its family_skips})."""
     from metis.catalog import manifests as mc
-    ran, bad = {}, []
+    ran, bad, read = {}, [], {}
     with _catalog(root):
         for d in mc.domains(Path(root)):
-            files = T.golden_files(d)
+            read[d.name] = T.family_skips(d) if skips is None else skips.get(d.name, [])
+            skip = [x["file"] for x in read[d.name]]
+            files = T.golden_files(d, skip)
             if files:
                 ran[d.name] = len(files)
-                bad += [dict(x, member=d.name, consumer=name) for x in T.goldens(d, seeds=seeds)[1]]
-    return ran, bad
+                bad += [dict(x, member=d.name, consumer=name) for x in T.goldens(d, seeds=seeds, skip=skip)[1]]
+    return ran, bad, read
 
 
 def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), composition=None, unit=None, consumers=()):
@@ -668,7 +671,7 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
       first_enabled: {k, rule, beside: the rules enabled with it}: the first tick one of them is enabled,
       first_fired_diff, first_out_diff: {k, member, ...}: exact up to here; open_loop_after: k: the later copies are of a world that obeyed the old command,
       rows: every tick and member that differs, members: the first differing tick per member,
-      goldens: {ok, ran: {member: how many}, failed: named, already_failing}: every member's cases, what the candidate breaks; cases: [{file, member, at, before: it failed, passed, failures, composition: {...} at its tick}]}"""
+      goldens: {ok, ran: {member: how many}, failed: named, skipped: a family's that are not this consumer's, already_failing}: every member's cases, what the candidate breaks; cases: [{file, member, at, before: it failed, passed, failures, composition: {...} at its tick}]}"""
     from metis import catalog as C
     from metis.catalog import stub
     segs = T.read(path)
@@ -682,7 +685,8 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
         target = Path(unit).resolve() if unit else Path(C.get(member).program).resolve()
         doms = {m: _domain_of(C, m) for m in head["members"]}
         # a golden written on one seed may not hold on another as it is (a `fired` in its order): only what the candidate breaks refuses it
-        already = {(m, g["file"], g["seed"]) for m in doms if doms[m] is not None for g in T.goldens(doms[m], seeds=seeds)[1]}
+        skips = {m: T.family_skips(doms[m]) for m in doms if doms[m] is not None}   # on the program as it is: a candidate's drop excuses nothing
+        already = {(m, g["file"], g["seed"]) for m in doms if doms[m] is not None for g in T.goldens(doms[m], seeds=seeds, skip=[x["file"] for x in skips[m]])[1]}
         was_cases = [_case_result(stub, doms.get(m0), f) for f, m0 in ((f, _case_member(stub, f, member)) for f in cases)]
     home = os.environ.get("METIS_HOME")
     in_home = _under(target, home) if home else None
@@ -690,7 +694,10 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
     if in_root is None and in_home is None:
         raise T.TraceError("the unit %s is under neither the root nor METIS_HOME: nothing here can judge it on a copy" % target)
     consumers = list(consumers) if in_root is None else []     # a member's own file moves no other consumer
-    before_consumers = {(c[0], x["member"], x["file"], x["seed"]) for c in consumers for x in _consumer_goldens(c[0], c[1], seeds)[1]}
+    before_consumers, consumer_skips = set(), {}
+    for c in consumers:
+        _, bad, consumer_skips[c[0]] = _consumer_goldens(c[0], c[1], seeds)
+        before_consumers |= {(c[0], x["member"], x["file"], x["seed"]) for x in bad}
     before_if = _interface(root, composition)
     with tempfile.TemporaryDirectory(prefix="trace-candidate-") as wd:
         copy_root = Path(wd) / "root"
@@ -721,14 +728,15 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
             for m in head["members"]:
                 dom = _domain_of(C, m)
                 if dom is not None:
-                    ran[m] = len(T.golden_files(dom))
-                    failed += [dict(x, member=m) for x in T.goldens(dom, seeds=seeds)[1] if (m, x["file"], x["seed"]) not in already]
+                    skip = [x["file"] for x in skips.get(m, ())]
+                    ran[m] = len(T.golden_files(dom, skip))
+                    failed += [dict(x, member=m) for x in T.goldens(dom, seeds=seeds, skip=skip)[1] if (m, x["file"], x["seed"]) not in already]
             links = {}
             for name, c_root, c_comp in consumers:
                 with _catalog(c_root):
                     linked = _interface(c_root, c_comp)
                 links[name] = {"errors": (linked or {}).get("lines", [])}
-                c_ran, c_bad = _consumer_goldens(name, c_root, seeds)
+                c_ran, c_bad, _ = _consumer_goldens(name, c_root, seeds, consumer_skips[name])
                 ran.update({"%s/%s" % (name, m): n for m, n in c_ran.items()})
                 failed += [x for x in c_bad if (name, x["member"], x["file"], x["seed"]) not in before_consumers]
             judged = []
@@ -752,7 +760,7 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
         return {"baseline": True, "rules": rules, "receipt": _receipt(moved, member, before_if, after_if, head),
                 "first_enabled": run.first_enabled, "first_fired_diff": first_fired, "first_out_diff": first_out,
                 "open_loop_after": first_out["k"] if first_out else None, "rows": rows, "members": by_member,
-                "consumers": links, "goldens": {"ok": not failed, "ran": ran, "failed": failed, "already_failing": sorted(["%s of %s, seed %s" % (f, m, x) for m, f, x in already] + ["%s of %s/%s, seed %s" % (f, c, m, x) for c, m, f, x in before_consumers])}, "cases": judged}
+                "consumers": links, "goldens": {"ok": not failed, "ran": ran, "failed": failed, "skipped": _skipped(skips, consumer_skips), "already_failing": sorted(["%s of %s, seed %s" % (f, m, x) for m, f, x in already] + ["%s of %s/%s, seed %s" % (f, c, m, x) for c, m, f, x in before_consumers])}, "cases": judged}
 
 
 def _domain_of(catalog, m):
@@ -899,6 +907,12 @@ def _closure(target, text, dropped):
         for rule in dropped:
             out[name] = T.apply_pack(out[name], "drop %s" % rule)[0] if rule in T.rules_of(out[name]) else out[name]
     return out
+
+
+def _skipped(skips, consumer_skips):
+    """The family's cases that are not this consumer's, by name: listed, never counted."""
+    rows = [dict(x, member=m) for m, xs in skips.items() for x in xs]
+    return rows + [dict(x, member="%s/%s" % (c, m)) for c, ms in consumer_skips.items() for m, xs in ms.items() for x in xs]
 
 
 def _moved(catalog, head, before, after):
