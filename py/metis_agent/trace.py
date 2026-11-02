@@ -744,16 +744,18 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
             (copy_home / in_home).write_text(text)
             new_env["METIS_HOME"] = copy_home
         rules = T.new_rules(text, was)
-        moved_names = []
+        moved_names, moved_diff = [], []
         for f in moved:                        # a golden that moves with the amendment: named CASES-relative under whichever tree holds the old one
             f = Path(f)
             old = [c for tree in ([copy_home] if in_root is None else []) + [copy_root] for c in tree.rglob(f.name) if c.parent.name == "cases"]
             if not old:
                 raise T.TraceError("the pack moves golden %s, and no package here has a case of that name" % f.name)
+            moved_diff.append(_golden_diff(f, old[0]))       # patterns open item 5: what the move changed, for a person to read
             for t in old:
                 shutil.copyfile(f, t)
             moved_names.append(f.name)
         with _env(**new_env):
+            lint_rows = _lint(copy_root / in_root if in_root is not None else copy_home / in_home, root, member)
             _mark(times, "the link, the candidate")
             after_if = _interface(copy_root, composition)
             if after_if and after_if.get("errors"):
@@ -806,7 +808,7 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
         return {"baseline": True, "rules": rules, "receipt": _receipt(moved, member, before_if, after_if, head),
                 "first_enabled": run.first_enabled, "first_fired_diff": first_fired, "first_out_diff": first_out,
                 "open_loop_after": first_out["k"] if first_out else None, "rows": rows, "members": by_member,
-                "moved": moved_names, "consumers": links, "goldens": {"ok": not [x for x in failed if not x.get("not_judged")], "ran": ran, "failed": [x for x in failed if not x.get("not_judged")],
+                "moved": moved_names, "moved_diff": moved_diff, "lint": lint_rows, "consumers": links, "goldens": {"ok": not [x for x in failed if not x.get("not_judged")], "ran": ran, "failed": [x for x in failed if not x.get("not_judged")],
                                                 "not_judged": [x for x in failed if x.get("not_judged")], "skipped": _skipped(skips, consumer_skips), "already_failing": sorted(["%s of %s, seed %s" % (f, m, x) for m, f, x in already] + ["%s of %s/%s, seed %s" % (f, c, m, x) for c, m, f, x in before_consumers])}, "cases": judged}
 
 
@@ -847,6 +849,57 @@ def _interface(root, composition):
     if r.returncode and not out["errors"]:
         out["errors"], out["lines"] = 1, [(r.stderr or r.stdout).strip()[-400:]]
     return out
+
+
+def _golden_diff(new, old):
+    """What a moved golden changes against the case it replaces, by top-level key: a rename only (`case` and nothing else) or more (patterns: Goldens move by name)."""
+    import yaml
+    try:
+        a, b = yaml.safe_load(new.read_text()) or {}, yaml.safe_load(old.read_text()) or {}
+    except Exception as x:  # noqa: BLE001 — a golden that does not parse is said, not hidden
+        return {"file": new.name, "keys": [], "rename_only": False, "error": str(x)[:120]}
+    keys = sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
+    return {"file": new.name, "keys": keys, "rename_only": set(keys) <= {"case", "note"}}
+
+
+def _lint(unit, root, member):
+    """The linter's rows over the amended unit (metispy `metis.lint`, patterns CHECKS.md §3): warnings a ruling quotes, never a refusal. [] when the unit does not compile (the
+    gate says that itself) or the linter is not there."""
+    try:
+        from metis.kernel.diagnostics import render_text
+        from metis.lang.compiler import load_llp
+        from metis.lint import init_counts, invariant_init, lint
+        from metis import catalog as C
+    except ImportError:
+        return []
+    try:
+        with _catalog(root):
+            manifest = Path(C.get(member).program).resolve().parent / "domain.yaml"
+        text = Path(unit).read_text()
+        doc = load_llp(unit)
+        rows = lint(doc, text, manifest if manifest.is_file() else None, unit) + invariant_init(doc, init_counts(text))
+        return [render_text(d).rstrip("\n") for d in rows]
+    except Exception:  # noqa: BLE001 — the compile's refusal is the gate's to say, in its own place
+        return []
+
+
+def _reads_absent(path, member, text, rules):
+    """The premise predicates of the candidate's new RULES that the trace never carries for MEMBER (metispy `metis.trace.timeline`): a pack reading a class the trace lacks is
+    judged as never enabled (patterns: Class before reader), and the ruling says which."""
+    import re
+    bodies = [T.rules_of(text).get(r, "") for r in rules]
+    preds = set()
+    for b in bodies:
+        left = b.split(":", 1)[1].split("-o", 1)[0] if ":" in b else ""
+        preds |= {m for m in re.findall(r"\$?\b([a-z_][A-Za-z0-9_]*)\b\s*(?:\(|\*|$)", left.strip() + " ")}
+    try:
+        ticks, _ = T.timeline(path, member)
+    except Exception:  # noqa: BLE001 — a trace the reader refuses is already a refusal elsewhere
+        return []
+    seen = set()
+    for t in ticks:
+        seen |= {T.pred_of(a) for a, n in t.counts.items() if n} | {T.pred_of(a) for a in t.made}
+    return sorted(p for p in preds if p not in seen)
 
 
 def _receipt(moved, member, before, after, head):
@@ -944,6 +997,13 @@ def judge(path, member, pack, root, config, cases=(), composition=None, unit=Non
     for x in e["times"]:
         x.pop("t0", None)
     e["verdict"], e["reasons"] = verdict(e, member)
+    if e.get("rules") and e.get("baseline") and not e.get("gate_error"):
+        try:
+            e["reads_absent"] = _reads_absent(path, member, T.apply_pack(was, pack)[0], e["rules"])
+        except Exception:  # noqa: BLE001 — an aside for the ruling, never a verdict
+            pass
+    # patterns open item 6: accepted with no candidate rule enabled says nothing of the rule's effect
+    e["inert"] = e["verdict"] == "accepted" and not e.get("first_enabled")
     return e
 
 
