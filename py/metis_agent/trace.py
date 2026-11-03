@@ -883,9 +883,11 @@ def _lint(unit, root, member):
         return []
 
 
-def _reads_absent(path, member, text, rules):
+def _reads_absent(path, member, text, rules, target=None):
     """The premise predicates of the candidate's new RULES that the trace never carries for MEMBER (metispy `metis.trace.timeline`): a pack reading a class the trace lacks is
-    judged as never enabled (patterns: Class before reader), and the ruling says which."""
+    judged as never enabled (patterns: Class before reader), and the ruling says which. A premise the program itself holds is not absent, though no tick carries it: a
+    fact or a `bwd` declaration (soft(brake_min_correct).: static, never in the multiset), an #init atom, or a pred some rule of the unit and what it includes produces
+    (the closure from TARGET, the candidate's text in place of the unit's)."""
     import re
     bodies = [T.rules_of(text).get(r, "") for r in rules]
     preds = set()
@@ -899,7 +901,28 @@ def _reads_absent(path, member, text, rules):
     seen = set()
     for t in ticks:
         seen |= {T.pred_of(a) for a, n in t.counts.items() if n} | {T.pred_of(a) for a in t.made}
-    return sorted(p for p in preds if p not in seen)
+    return sorted(p for p in preds if p not in seen and p not in _held_by_program(text, target))
+
+
+def _held_by_program(text, target=None):
+    """The preds the program holds without a reading: its facts and `bwd` declarations, its #init atoms, and every rule's produce, in TEXT and the units it includes
+    (from TARGET's directory, then METIS_HOME)."""
+    import re
+    units = _closure(Path(target), text, ()) if target is not None else {"": text}
+    held = set()
+    ident = r"([a-z_][A-Za-z0-9_]*)"
+    for body in units.values():
+        for line in body.splitlines():
+            st = line.split("%", 1)[0].strip()
+            if not st or "-o" in st or ":" in st:
+                continue
+            m = re.match(r"^(?:bwd\s+)?" + ident + r"\s*(?:\(.*\))?\s*\.$", st) or re.match(r"^#init\s+" + ident, st)
+            if m:
+                held.add(m.group(1))
+        for rule in T.rules_of(body).values():
+            right = rule.split("-o", 1)[1] if "-o" in rule else ""
+            held |= set(re.findall(ident + r"\s*(?:\(|\*|\.|$)", right.strip()))
+    return held
 
 
 def _receipt(moved, member, before, after, head):
@@ -999,7 +1022,7 @@ def judge(path, member, pack, root, config, cases=(), composition=None, unit=Non
     e["verdict"], e["reasons"] = verdict(e, member)
     if e.get("rules") and e.get("baseline") and not e.get("gate_error"):
         try:
-            e["reads_absent"] = _reads_absent(path, member, T.apply_pack(was, pack)[0], e["rules"])
+            e["reads_absent"] = _reads_absent(path, member, T.apply_pack(was, pack)[0], e["rules"], target)
         except Exception:  # noqa: BLE001 — an aside for the ruling, never a verdict
             pass
     # patterns open item 6: accepted with no candidate rule enabled says nothing of the rule's effect

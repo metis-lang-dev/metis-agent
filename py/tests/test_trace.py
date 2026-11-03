@@ -471,3 +471,19 @@ def test_a_new_session_ends_the_segment_and_the_next_replays_from_its_checkpoint
     for m in ALL:
         r = trace.replay(d, m, program(lv, m))
         assert r.ok, (m, r.divergence)
+
+
+@judged
+def test_a_premise_the_program_holds_is_not_a_reading_absent(tmp_path):
+    """loop-workspace (the architect's note 2, from nina's round-3 road ruling: `soft(brake_min_correct).` read as never carried): a fact,
+    a `bwd` declaration, an #init atom or a pred a rule of the unit or its includes produces is the program's, not the trace's; only a
+    premise nothing holds and no tick carries is absent."""
+    from metis_agent.trace import _reads_absent
+    d, lv, _ = judged_run(tmp_path)
+    unit = Path(program(lv, "cook_a"))
+    pack = "pred ghost : cook.\nstage act {\n  %% Never here.\n  serve_ghost [dyn] : held_soup * $self(S) * $ghost -o hand_free.\n}\n"
+    text = trace.apply_pack(unit.read_text(), pack)[0]
+    assert "self(cook_a)." in text and "bwd self(domain)." in (unit.parent.parent / "cook_domain.llp").read_text()
+    assert _reads_absent(d, "cook_a", text, ["serve_ghost"], unit) == ["ghost"]
+    ticks, _ = trace.timeline(d, "cook_a")
+    assert not any(trace.pred_of(a) == "self" for t in ticks for a in t.counts)    # no tick carries it: before the fix, it was "absent"
