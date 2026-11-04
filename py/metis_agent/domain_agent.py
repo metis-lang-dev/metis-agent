@@ -869,12 +869,18 @@ class DomainAgent:
         return []
 
     def refresh_card(self):
-        """The card re-read from the domain's directory (intent.yaml) and the mapper rebuilt on it, the
-        session standing: a host whose world grew a name (semantic-map step 3: a thing the map sees for
+        """The card re-read from the domain's directory (the one its manifest names, intent: {spec}, else
+        intent.yaml: a bundle run's generated card, alf-bundle s-b53cc7ab step 2) and the mapper rebuilt on it,
+        the session standing: a host whose world grew a name (semantic-map step 3: a thing the map sees for
         the first time; the host rewrote the card) — the person can name it now, no reload."""
         import yaml
         from .intent_domain import card, handle_names
-        f = Path(self.mod.CATALOG).parent / "intent.yaml"
+        d = Path(self.mod.CATALOG).parent
+        try:
+            named = ((yaml.safe_load((d / "domain.yaml").read_text()) or {}).get("intent") or {}).get("spec")
+        except (OSError, yaml.YAMLError, AttributeError):
+            named = None
+        f = d / (named or "intent.yaml")
         spec = yaml.safe_load(f.read_text()) or {}
         c = card(spec)
         self.mod.CARD, self.mod.INTENT = c, spec

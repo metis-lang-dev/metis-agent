@@ -439,3 +439,28 @@ def test_a_card_that_grew_is_read_again_without_a_reload(tmp_path, monkeypatch):
     assert rows == [{"kind": "dlg-card", "domain": "dog", "why": "the host's card grew"}] and reloaded == ["dog"]
     Live.card_changes(live)                                        # once: nothing grew since
     assert len(rows) == 1 and reloaded == ["dog"]
+
+
+def test_a_card_is_read_again_from_the_spec_the_manifest_names(tmp_path):
+    """A package whose manifest names a generated card (intent: {spec: intent/card.yaml}: a bundle run fills it, the
+    committed intent.yaml its template) is re-read from that card, not from intent.yaml."""
+    import shutil
+    import types
+
+    import yaml
+    from metis_agent.domain_agent import DomainAgent
+    shutil.copytree(Path(dog.CATALOG).parent, tmp_path / "dog")
+    d = tmp_path / "dog"
+    y = d / "domain.yaml"
+    m = yaml.safe_load(y.read_text())
+    m["intent"] = {"spec": "intent/card.yaml"}
+    y.write_text(yaml.safe_dump(m, sort_keys=False))
+    (d / "intent").mkdir(exist_ok=True)
+    spec = yaml.safe_load((d / "intent.yaml").read_text())
+    slot = next(s for s, v in (spec.get("values") or {}).items() if isinstance(v, dict) and v)
+    spec["values"][slot] = dict(spec["values"][slot], FILLED="filled")
+    (d / "intent" / "card.yaml").write_text(yaml.safe_dump(spec, sort_keys=False))
+    from metis_agent import intent_domain
+    ag = DomainAgent(types.SimpleNamespace(**intent_domain.build("dog", dir=d)))
+    ag.refresh_card()
+    assert ag.mod.INTENT["values"][slot]["FILLED"] == "filled"
