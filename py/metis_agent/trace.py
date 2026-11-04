@@ -698,44 +698,14 @@ def replay_session(path, member, program, candidate=None):
     return out
 
 
-STAND_IN = 0.5      # a stood-in weight port: strictly inside (0, 1), so every clause of a choice site on it (`p | ~p`) stays enabled
+STAND_IN = T.STAND_IN          # metispy's: a stood-in weight port, strictly inside (0, 1) (metis.trace says why)
+_force_recorded = T.force_recorded   # metispy's: the record's draw where the recorded rule is enabled, else the member's own
 
 
 def _open_stood_in(program, seed, weights):
-    """A session on PROGRAM (metispy's open_session), its WEIGHTS ports stood in when it declares any (the host that binds
-    them is not run in a replay)."""
-    if not weights:
-        return T.open_session(str(program), seed)
-    from metis.fw.registry import Registry
-    from metis.lang.repl import Repl as Shell
-    reg = Registry()
-    for w in weights:
-        reg.weight(w, STAND_IN)
-    set_here = "METIS_GROUND_BUDGET" not in os.environ
-    if set_here:
-        os.environ["METIS_GROUND_BUDGET"] = str(T.GROUND_BUDGET)
-    try:
-        return Shell(str(program), seed=seed, stdout=io.StringIO(), registry=reg)
-    finally:
-        if set_here:
-            del os.environ["METIS_GROUND_BUDGET"]
-
-
-def _force_recorded(sh, queue):
-    """A member whose weight ports the trace does not carry draws the record's choice: its next sampled firing is the
-    QUEUE's next rule when that rule is enabled (one draw of the stream spent, as the record spent it), else its own."""
-    own = sh._sample
-
-    def sample():
-        ws = sh._candidates()
-        if queue and ws:
-            hit = next((i for i, _ in ws if sh.events_tbl[i][2].name == queue[0]), None)
-            if hit is not None:
-                queue.pop(0)
-                sh.rng.unit()
-                return sh._fire(hit, "sampled", ws)
-        return own()
-    sh._sample = sample
+    """A session on PROGRAM, its WEIGHTS ports stood in when it declares any (metispy's open_session: the host that
+    binds them is not run in a replay)."""
+    return T.open_session(str(program), seed, weights)
 
 
 def _watch_enabled(sh, rules, feed, out):
