@@ -293,10 +293,13 @@ def build_turn(cfg, intents=None, catalog_=None, loaded=None):
 
 def build_grammar(cfg, intents):
     """The person turn's grammar: the intent domains' (Go IntentGrammar), or
-    the config's intent.grammar when no served domain has intent material."""
+    the config's intent.grammar when no served domain has intent material; None when the config names none either
+    (a hierarchy that serves itself, a judge's replay: no person turn is parsed; loop-prompt judge-session: a
+    config without intent: was a KeyError at the Live's start)."""
     if intents:
         return O.intent_grammar(intents)
-    return (ROOT / "py" / cfg["intent"]["grammar"]).read_text()
+    g = (cfg.get("intent") or {}).get("grammar")
+    return (ROOT / "py" / g).read_text() if g else None
 
 
 # ── the live loop (v3procs.go) ────────────────────────────────────────────────

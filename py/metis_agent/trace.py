@@ -595,6 +595,76 @@ def replay_composition(path, cfg, candidate=None):
     return out
 
 
+def is_session(head):
+    """A console REPL session's trace (metis-loop SessionTrace: live metis-loop-console, the REPL's takes and steps by
+    tool): never a Live's run, so it is replayed member alone (replay_session), not on a Live."""
+    return (head or {}).get("live") == getattr(T, "SESSION_LIVE", "metis-loop-console")
+
+
+class _K:
+    k = None
+
+
+def replay_session(path, member, program, candidate=None):
+    """A session's trace (loop-prompt judge-session): MEMBER alone over it on PROGRAM, as metispy's replay does it (each
+    tick's takes, beats and steps; no Live, no world, no director). No CANDIDATE: it must give the record (metis.trace
+    replay; .divergence the first). CANDIDATE ({"member", "rules", "at"}): open-loop from the first checkpoint, every
+    tick's recorded takes and beats applied and the candidate program's own firings drawn for its steps and beats,
+    compared with the record's (rows, first_enabled, at: the composition replay's fields). → CompositionReplay."""
+    out = CompositionReplay()
+    if not candidate:
+        r = T.replay(path, member, str(program))
+        out.ticks, out.divergence = r.ticks, (dict(r.divergence, member=member) if r.divergence else None)
+        return out
+    segs = T.read(path)
+    rules, want_at = set(candidate["rules"]), candidate.get("at") or {}
+    sh, events, k = None, {}, _K()
+    for seg in segs:
+        m = seg.header["members"].get(member)
+        if m is None:
+            raise T.TraceError("no member %r in the trace (it has: %s)" % (member, ", ".join(sorted(seg.header["members"]))))
+        commands, out_preds = seg.header.get("commands") or (), set(m.get("out") or ())
+        if sh is None or "cut" in seg.header:      # from the record's checkpoint at the start, and after a cut
+            sh = T.open_session(str(program), m.get("seed", 1))
+            T.restore_session(sh, seg.checkpoint["sessions"][member])
+            events = {ev.name: ev for _, _, ev in sh.events_tbl}
+            _watch_enabled(sh, rules, k, out)
+        for t in seg.ticks:
+            k.k, e = t["k"], t["members"].get(member)
+            out.ticks += 1
+            if e is None:
+                continue
+            seq = e.get("seq")
+            if seq is None:
+                if "why" not in e:
+                    continue
+                seq = [{"beat": [], "fired": []}]
+            fired, reload = [], False
+            for item in seq:
+                if "reload" in item:
+                    reload = True
+                    break
+                if "take" in item:
+                    T._apply(sh, item["take"])
+                elif "beat" in item:
+                    if item["beat"]:
+                        T._apply(sh, item["beat"])
+                    fired += T._fire_all(sh, item.get("fired") or [], item.get("left"))
+                elif "step" in item:
+                    for _ in item["step"]:
+                        if not sh._candidates():
+                            break
+                        fired.append(sh._sample())
+            outs = [x for name in fired if events.get(name) is not None for x in T.outputs(events[name], commands, out_preds)]
+            got = {"seq": [{"step": fired}], "out": outs}
+            out.rows += _differences({"k": t["k"], "members": {member: e}}, {"members": {member: got}})
+            if member in want_at.get(t["k"], ()):
+                out.at[(t["k"], member)] = {"counts": dict(sh.counts), "fired": fired, "out": [T.out_name(x) for x in outs]}
+            if reload:
+                break
+    return out
+
+
 def _watch_enabled(sh, rules, feed, out):
     """The first tick a candidate's rule is ENABLED, chosen or not: a clause merely enabled moves the sampler's stream."""
     cand = sh._candidates
@@ -708,8 +778,9 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
         raise T.TraceError("no member %r in the trace (it has: %s)" % (member, ", ".join(sorted(head["members"]))))
     times = [] if times is None else times
     _mark(times, "the baseline's replay")
+    session = is_session(head)                 # a console session's trace: its member alone, no Live (judge-session)
     with _catalog(root):                       # the root is the composition's, whatever the cwd's tree holds
-        base = replay_composition(path, config(Path(root)))
+        base = replay_session(path, member, C.get(member).program) if session else replay_composition(path, config(Path(root)))
     if not base.ok:
         return {"baseline": False, "divergence": base.divergence, "why": "the record does not replay on this toolchain: no candidate is judged on it"}
     _mark(times, "the goldens as they are")
@@ -767,7 +838,8 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
                 if c.get("at") is not None:
                     at.setdefault(int(c["at"]), set()).add(c.get("member") or member)
             _mark(times, "the candidate's replay")
-            run = replay_composition(path, cfg, {"member": member, "rules": rules, "at": at})
+            cand = {"member": member, "rules": rules, "at": at}
+            run = replay_session(path, member, C.get(member).program, cand) if session else replay_composition(path, cfg, cand)
             _mark(times, "the goldens on the candidate")
             moved = _moved(C, head, before_if, after_if)
             failed, ran = [], {}
