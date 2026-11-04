@@ -621,7 +621,12 @@ def replay_session(path, member, program, candidate=None):
     tick's takes, beats and steps; no Live, no world, no director). No CANDIDATE: it must give the record (metis.trace
     replay; .divergence the first). CANDIDATE ({"member", "rules", "at"}): open-loop from the first checkpoint, every
     tick's recorded takes and beats applied and the candidate program's own firings drawn for its steps and beats,
-    compared with the record's (rows, first_enabled, at: the composition replay's fields). → CompositionReplay."""
+    compared with the record's (rows, first_enabled, at: the composition replay's fields). → CompositionReplay.
+    A MEMBER with weight ports the trace does not carry is stood in (STAND_IN) and named .unjudged; its draws are
+    forced to the record's wherever the record's rule is enabled, the candidate's included: unlike replay_composition,
+    which leaves the candidate's own member to draw, a session has one member, so a row is left only where the
+    candidate disables the record's choice; a new rule it enables shows in first_enabled. The choices themselves are
+    not judged."""
     out = CompositionReplay()
     segs = T.read(path)
     weights = list((segs[0].header["members"].get(member) or {}).get("weights") or ())
