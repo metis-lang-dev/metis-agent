@@ -24,6 +24,7 @@ import copy
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -653,6 +654,41 @@ def _catalog(root):
     return _env(METIS_CATALOG=root)
 
 
+_DERIVED = re.compile(r"% DERIVED from (\S+)")
+
+
+def _remake_derived(copy_root, source):
+    """The units make generates from SOURCE (their first line "% DERIVED from SRC …": alfworld's tree/, the bundle's
+    one copy of the rules is the source), remade in the copy after the pack is written into SOURCE (loop-prompt,
+    the architect: a pack's unit= names the source, never the generated file). The generated directory is the make
+    target of the nearest Makefile above it (hier/Makefile's `tree`), with this python as $(PYTHON). → the remade
+    directories, relative to the copy; a make that fails is a TraceError with its words."""
+    source = Path(source).resolve()
+    copy_root = Path(copy_root).resolve()
+    dirs = set()
+    for f in copy_root.rglob("*.llp"):
+        try:
+            with open(f) as fh:
+                m = _DERIVED.match(fh.readline())
+        except OSError:
+            continue
+        if m and (f.parent / m.group(1)).resolve() == source:
+            dirs.add(f.parent)
+    made = []
+    for d in sorted(dirs):
+        mk = next((x for x in [d, *d.parents] if (x / "Makefile").is_file() and _under(x, copy_root) is not None), None)
+        if mk is None:
+            raise T.TraceError("%s is generated from %s, and no Makefile above it remakes it" % (d.relative_to(copy_root), source.name))
+        target = os.path.relpath(d, mk)
+        r = subprocess.run(["make", "-B", "-C", str(mk), target], env=dict(os.environ, PYTHON=sys.executable),
+                           capture_output=True, text=True)
+        if r.returncode:
+            raise T.TraceError("make %s in %s failed remaking the generated units from %s: %s"
+                               % (target, mk.relative_to(copy_root), source.name, (r.stderr or r.stdout).strip()[-800:]))
+        made.append(str(d.relative_to(copy_root)))
+    return made
+
+
 def _under(path, root):
     """PATH relative to ROOT, or None."""
     try:
@@ -738,6 +774,7 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
         new_env = {"METIS_CATALOG": copy_root}
         if in_root is not None:
             (copy_root / in_root).write_text(text)
+            remade = _remake_derived(copy_root, copy_root / in_root)   # a source's generated units follow it
         else:
             copy_home = Path(wd) / "home"
             shutil.copytree(home, copy_home, ignore=SKIP, symlinks=True)
@@ -808,7 +845,7 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
         return {"baseline": True, "rules": rules, "receipt": _receipt(moved, member, before_if, after_if, head),
                 "first_enabled": run.first_enabled, "first_fired_diff": first_fired, "first_out_diff": first_out,
                 "open_loop_after": first_out["k"] if first_out else None, "rows": rows, "members": by_member,
-                "moved": moved_names, "moved_diff": moved_diff, "lint": lint_rows, "consumers": links, "goldens": {"ok": not [x for x in failed if not x.get("not_judged")], "ran": ran, "failed": [x for x in failed if not x.get("not_judged")],
+                "moved": moved_names, "moved_diff": moved_diff, "remade": remade, "lint": lint_rows, "consumers": links, "goldens": {"ok": not [x for x in failed if not x.get("not_judged")], "ran": ran, "failed": [x for x in failed if not x.get("not_judged")],
                                                 "not_judged": [x for x in failed if x.get("not_judged")], "skipped": _skipped(skips, consumer_skips), "already_failing": sorted(["%s of %s, seed %s" % (f, m, x) for m, f, x in already] + ["%s of %s/%s, seed %s" % (f, c, m, x) for c, m, f, x in before_consumers])}, "cases": judged}
 
 
