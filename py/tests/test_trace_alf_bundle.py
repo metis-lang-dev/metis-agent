@@ -83,3 +83,40 @@ def test_a_candidate_on_grasp_is_diffed_not_refused():
     e = fired_diff(F / "one-turn", "grasp", (F / "grasp-candidate.llp").read_text(), ALF, lambda root: copy.deepcopy(c))
     assert e["baseline"] is True and e["rules"] == ["noted"] and e["unjudged"] == ["task"]
     assert e["first_enabled"]["rule"].startswith("noted") and e["rows"] and e["goldens"]["ok"]
+
+
+def test_a_none_wake_reads_the_world_before_the_ticks_delta():
+    """opus's review (1): on a tick the record's wake read `none`, the stand-in's wake test is the session against the
+    world as it stood before this tick's delta. The record's own session agrees with it (nothing, as recorded); a
+    session that differs from it in a world atom (a candidate that consumed one, or holds one the world does not) wakes."""
+    from metis.trace import read
+    from metis_agent.trace import Feed, TraceHost
+    segs = read(F / "one-turn")
+    feed = Feed(segs)
+    hit = None
+    for rec in segs[0].ticks:
+        feed.at(rec)
+        hit = next(((m, rec) for m, e in rec["members"].items() if e.get("why") == "none" and feed.prev.get(m)), None)
+        if hit:
+            break
+    assert hit, "a none tick with a world copy"
+    m, rec = hit
+    h = TraceHost(m, feed)
+    world = dict.fromkeys(feed.prev[m], 1)
+    assert h.sync(world) == []                                     # as the record: its session equalled that world
+    gone = sorted(world)[0]
+    assert h.sync({a: n for a, n in world.items() if a != gone}) == ["+%s" % gone]     # consumed by a candidate: it wakes
+    pred = gone.split("(")[0]
+    extra = next(a for a in sorted(feed.copies[m]) + ["%s(zz)" % pred] if a.split("(")[0] == pred and a not in world)
+    assert h.sync(dict(world, **{extra: 1})) == ["-%s" % extra]    # a world atom the world did not have: it wakes
+
+
+def test_deliver_gives_one_recorded_forward_per_call():
+    """opus's review (4): two forwards to one member in one tick are two calls, each its own recorded row."""
+    from metis_agent.trace import Feed, TraceHost
+    from metis.trace import read
+    feed = Feed(read(F / "one-turn"))
+    feed.at({"k": 99, "members": {"nav": {"seq": [{"take": ["+goto(p1)"], "by": "deliver"}, {"take": ["+goto(dest)"], "by": "deliver"}]}}})
+    h = TraceHost("director", feed)
+    assert h.deliver("nav", "goto(p1)") == ["+goto(p1)"] and h.deliver("nav", "goto(dest)") == ["+goto(dest)"]
+    assert h.deliver("nav", "goto(dest)") is None and h.deliver("grasp", "take(target)") is None

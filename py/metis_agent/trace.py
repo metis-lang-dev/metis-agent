@@ -367,15 +367,17 @@ class Feed:
     def __init__(self, segs):
         self.segs, self.k = segs, None
         self.copies = {m: dict(c) for m, c in (segs[0].checkpoint.get("copies") or {}).items()}
-        self.beats, self.whys, self.delivered = {}, {}, {}
+        self.beats, self.whys, self.delivered, self.prev = {}, {}, {}, {}
         self.weights = {m: list(h.get("weights") or ()) for m, h in segs[0].header["members"].items()}
 
     def at(self, rec):
         """The tick REC begins: the copies move to it, its members' beat inputs queue up."""
         self.k, self.beats = rec["k"], {}
         self.whys = {m: e.get("why") for m, e in rec["members"].items()}
-        self.delivered = {m: [x for i in e.get("seq", ()) if i.get("by") == "deliver" for x in i.get("take", ())]
+        # the rows the record took by deliver, one item per forward (Live.activation calls deliver once per forward)
+        self.delivered = {m: [list(i.get("take", ())) for i in e.get("seq", ()) if i.get("by") == "deliver"]
                           for m, e in rec["members"].items()}
+        self.prev = {m: dict(c) for m, c in self.copies.items()}   # the world before this tick's delta (a none wake's test)
         for m, e in rec["members"].items():
             c = e.get("copy")
             if c:
@@ -430,12 +432,21 @@ class TraceHost:
         return lines
 
     def sync(self, counts):
-        # the wake's test: its reading differs from what its session holds. A tick the record's wake read as `none` had
-        # nothing of the host's yet at the clock's decision: its beat's input came later in the tick (the director's
-        # arrival, relayed after the members beat, served by director_step), so the decision here reads nothing either
+        # the wake's test: its reading differs from what its session holds. On a tick the record's wake read as `none`,
+        # the clock's decision came before this tick's input (the director's arrival, relayed after the members beat,
+        # served by director_step): the test is the session against the world as it stood BEFORE this tick's delta —
+        # nothing for the record (its session equalled that world), the real host's test for a candidate (opus's review)
         if self.feed.whys.get(self.member) == "none":
-            return []
+            return self.before(counts)
         return self.next_lines()
+
+    def before(self, counts):
+        """The lines that would bring the session COUNTS to the world before this tick's delta, over the world's atoms
+        (the preds of that copy, and a candidate's world-private ones): none when they agree."""
+        was = self.feed.prev.get(self.member, {})
+        preds = {a.split("(")[0] for a in was} | set(self.world_preds)
+        held = {a for a, n in dict(counts).items() if n > 0 and a.split("(")[0] in preds}
+        return ["+%s" % a for a in sorted(set(was) - held)] + ["-%s" % a for a in sorted(held - set(was))]
 
     def on_event(self, name, args):
         if self.watched and name.split("[")[0] in self.watched and self.repl is not None:
@@ -463,9 +474,11 @@ class TraceHost:
         self.beat = snap.get("beat", 0)
 
     def deliver(self, domain, goal, tokens=()):
-        """A director's forward of GOAL to DOMAIN as one row on its live session: the rows the record took by deliver into
-        DOMAIN at this tick (what the world's host computed then); none recorded: None, so the Live re-instances."""
-        return list(self.feed.delivered.get(domain) or ()) or None
+        """A director's forward of GOAL to DOMAIN as one row on its live session: the next of the rows the record took by
+        deliver into DOMAIN at this tick, one per call (what the world's host computed then); none left: None, so the
+        Live re-instances."""
+        q = self.feed.delivered.get(domain) or []
+        return q.pop(0) if q else None             # one recorded forward per call
 
     def instance(self, domain, goal, tokens=()):
         """A director's next start of DOMAIN (a new game, a reset: alf-bundle step 3): the next instance of that member's
