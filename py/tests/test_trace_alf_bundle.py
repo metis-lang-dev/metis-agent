@@ -85,10 +85,11 @@ def test_a_candidate_on_grasp_is_diffed_not_refused():
     assert e["first_enabled"]["rule"].startswith("noted") and e["rows"] and e["goldens"]["ok"]
 
 
-def test_a_none_wake_reads_the_world_before_the_ticks_delta():
-    """opus's review (1): on a tick the record's wake read `none`, the stand-in's wake test is the session against the
-    world as it stood before this tick's delta. The record's own session agrees with it (nothing, as recorded); a
-    session that differs from it in a world atom (a candidate that consumed one, or holds one the world does not) wakes."""
+def test_a_none_wake_reads_what_a_candidate_moved():
+    """opus's review (1): on a tick the record's wake read `none`, the stand-in offers no recorded beat line at the clock's
+    decision (k 5's director), but it does say what a candidate's rules did to the world's atoms (touched): the real
+    host's reading still holds the world, so that member wakes. The record (no candidate, nothing touched) reads nothing,
+    whatever its session holds: the world's copy lags a member's own actions by a tick (the kitchen's cook_b at k 1)."""
     from metis.trace import read
     from metis_agent.trace import Feed, TraceHost
     segs = read(F / "one-turn")
@@ -96,19 +97,21 @@ def test_a_none_wake_reads_the_world_before_the_ticks_delta():
     hit = None
     for rec in segs[0].ticks:
         feed.at(rec)
-        hit = next(((m, rec) for m, e in rec["members"].items() if e.get("why") == "none" and feed.prev.get(m)), None)
+        hit = next(((m, rec) for m, e in rec["members"].items() if e.get("why") == "none" and feed.copies.get(m)), None)
         if hit:
             break
     assert hit, "a none tick with a world copy"
     m, rec = hit
     h = TraceHost(m, feed)
-    world = dict.fromkeys(feed.prev[m], 1)
-    assert h.sync(world) == []                                     # as the record: its session equalled that world
+    world = dict.fromkeys(feed.copies[m], 1)
     gone = sorted(world)[0]
-    assert h.sync({a: n for a, n in world.items() if a != gone}) == ["+%s" % gone]     # consumed by a candidate: it wakes
-    pred = gone.split("(")[0]
-    extra = next(a for a in sorted(feed.copies[m]) + ["%s(zz)" % pred] if a.split("(")[0] == pred and a not in world)
-    assert h.sync(dict(world, **{extra: 1})) == ["-%s" % extra]    # a world atom the world did not have: it wakes
+    assert h.sync({a: n for a, n in world.items() if a != gone}) == []   # the record: nothing moved by a candidate
+    h.touched = {gone}                                                   # a candidate's rule consumed it
+    assert h.sync({a: n for a, n in world.items() if a != gone}) == ["+%s" % gone]
+    extra = "%s(zz)" % gone.split("(")[0]
+    h.touched = {extra}                                                  # a candidate's rule made one the world lacks
+    assert h.sync(dict(world, **{extra: 1})) == ["-%s" % extra]
+    assert h.sync(world) == []                                           # agreed with the world: nothing
 
 
 def test_deliver_gives_one_recorded_forward_per_call():

@@ -367,7 +367,7 @@ class Feed:
     def __init__(self, segs):
         self.segs, self.k = segs, None
         self.copies = {m: dict(c) for m, c in (segs[0].checkpoint.get("copies") or {}).items()}
-        self.beats, self.whys, self.delivered, self.prev = {}, {}, {}, {}
+        self.beats, self.whys, self.delivered = {}, {}, {}
         self.weights = {m: list(h.get("weights") or ()) for m, h in segs[0].header["members"].items()}
 
     def at(self, rec):
@@ -377,7 +377,6 @@ class Feed:
         # the rows the record took by deliver, one item per forward (Live.activation calls deliver once per forward)
         self.delivered = {m: [list(i.get("take", ())) for i in e.get("seq", ()) if i.get("by") == "deliver"]
                           for m, e in rec["members"].items()}
-        self.prev = {m: dict(c) for m, c in self.copies.items()}   # the world before this tick's delta (a none wake's test)
         for m, e in rec["members"].items():
             c = e.get("copy")
             if c:
@@ -434,19 +433,23 @@ class TraceHost:
     def sync(self, counts):
         # the wake's test: its reading differs from what its session holds. On a tick the record's wake read as `none`,
         # the clock's decision came before this tick's input (the director's arrival, relayed after the members beat,
-        # served by director_step): the test is the session against the world as it stood BEFORE this tick's delta —
-        # nothing for the record (its session equalled that world), the real host's test for a candidate (opus's review)
+        # served by director_step), so the recorded beat lines are not offered there. What a candidate's own rules did
+        # to the world's atoms (touched, on_event) is: the real host's reading still holds what the world holds, so the
+        # member wakes and the world says it at its tick (opus's review; nothing for the record: it has no candidate)
         if self.feed.whys.get(self.member) == "none":
-            return self.before(counts)
+            return self.moved(counts)
         return self.next_lines()
 
-    def before(self, counts):
-        """The lines that would bring the session COUNTS to the world before this tick's delta, over the world's atoms
-        (the preds of that copy, and a candidate's world-private ones): none when they agree."""
-        was = self.feed.prev.get(self.member, {})
-        preds = {a.split("(")[0] for a in was} | set(self.world_preds)
-        held = {a for a, n in dict(counts).items() if n > 0 and a.split("(")[0] in preds}
-        return ["+%s" % a for a in sorted(set(was) - held)] + ["-%s" % a for a in sorted(held - set(was))]
+    def moved(self, counts):
+        """The lines that bring the world atoms a candidate's rules moved (touched) back to the world's copy: none when
+        nothing was moved, or it agrees. Not consumed here: the member's tick says them."""
+        copy_now, have, out = self.feed.copies.get(self.member, {}), dict(counts), []
+        for a in sorted(self.touched):
+            if a in copy_now and not have.get(a):
+                out.append("+%s" % a)
+            elif a not in copy_now and have.get(a):
+                out.append("-%s" % a)
+        return out
 
     def on_event(self, name, args):
         if self.watched and name.split("[")[0] in self.watched and self.repl is not None:
