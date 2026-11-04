@@ -1,0 +1,10 @@
+{
+ "game": "train/pick_and_place_simple-Tomato-None-Microwave-13",
+ "game_dir": "/home/axadmin/repo/perotheia-packages/.worlds/alfworld-data/json_2.1.1/train/pick_and_place_simple-Tomato-None-Microwave-13/trial_T20190908_125158_098734",
+ "started": "20261104T144011",
+ "bundle": "alfworld",
+ "run": "/tmp/claude-1000/-home-axadmin-repo-perotheia-packages-nina-speak/435af299-16cb-4b0a-aa58-ae8389d4cd79/scratchpad/one/.metis/demo",
+ "config": "/tmp/claude-1000/-home-axadmin-repo-perotheia-packages-nina-speak/435af299-16cb-4b0a-aa58-ae8389d4cd79/scratchpad/one/.metis/demo/.run/config.yaml",
+ "room": false,
+ "view": false
+}

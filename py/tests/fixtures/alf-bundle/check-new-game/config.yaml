@@ -1,0 +1,61 @@
+model: /home/axadmin/repo/perotheia-packages/.wt/metis-agent/go/models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf
+template: gemma4
+stop_words:
+- stop
+- halt
+- freeze
+- quiet
+v3:
+  prompt:
+  - ../go/grammar/v3-orchestrator.txt
+  catalog: &id001
+  - director
+  - task
+  - nav
+  - access
+  - grasp
+  - place
+  loaded:
+  - director
+  - task
+  serve: active
+  director: director
+  n_ctx: 16384
+  tick_ms: 300
+  journal: /tmp/claude-1000/-home-axadmin-repo-perotheia-packages-nina-speak/435af299-16cb-4b0a-aa58-ae8389d4cd79/scratchpad/check-bundle3/root-win/.run/journal.jsonl
+  world_map: /tmp/claude-1000/-home-axadmin-repo-perotheia-packages-nina-speak/435af299-16cb-4b0a-aa58-ae8389d4cd79/scratchpad/check-bundle3/root-win/world-map.json
+  games: /tmp/claude-1000/-home-axadmin-repo-perotheia-packages-nina-speak/435af299-16cb-4b0a-aa58-ae8389d4cd79/scratchpad/check-bundle3/root-win/games.json
+domains:
+  names: *id001
+  case: live
+  seed: 1
+  clocks:
+  - domain: director
+    n: 1
+  - domain: task
+    n: 1
+  - domain: nav
+    n: 1
+  - domain: access
+    n: 1
+  - domain: grasp
+    n: 1
+  - domain: place
+    n: 1
+  trace: true
+  records: /tmp/claude-1000/-home-axadmin-repo-perotheia-packages-nina-speak/435af299-16cb-4b0a-aa58-ae8389d4cd79/scratchpad/check-bundle3/root-win/.run/records
+  narrator_n_ctx: 8192
+  seat_n_ctx: 8192
+  tick: true
+ws:
+  addr: 127.0.0.1:8411
+  ui: /home/axadmin/repo/perotheia-packages/.wt/nina-alf2/web
+trace:
+  every: 200
+  ring: 6000
+  dir: /tmp/claude-1000/-home-axadmin-repo-perotheia-packages-nina-speak/435af299-16cb-4b0a-aa58-ae8389d4cd79/scratchpad/check-bundle3/root-win/traces/train-pick_and_place_simple-Tomato-None-Microwave-13-20261104T140621
+  commands:
+  - goto
+  - open
+  - take
+  - put

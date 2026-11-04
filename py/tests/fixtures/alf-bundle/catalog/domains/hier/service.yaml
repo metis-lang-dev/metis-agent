@@ -1,0 +1,37 @@
+# service — the bundle's service config (loop-prompt s-3591d53b, A3 of alf-bundle s-b53cc7ab): the Live a run of this
+# bundle takes, and the one the judge replays a trace on (pack_propose / propose.sh --config: the workspace face finds
+# it beside composition.yaml). The tree hierarchy of composition.yaml: the director over the five specialists, one beat
+# each, the tick protocol on; every member loaded and no orchestrator catalog (as road's: the hierarchy serves itself,
+# no model is asked to pick a card, no narrator, no consult seat: a replay needs none). Paths are metis-agent py/'s,
+# as its own configs'; no run's paths (journal, records, world map, games: a run's demo.py setup writes its own
+# config, this one is the bundle's). Beside composition.yaml, never named in it: a `service:` key there moves the
+# image (metisc hashes composition.yaml).
+model: ../go/models/gemma4/gemma-4-E2B-it-Q4_K_M.gguf
+template: gemma4
+stop_words: [stop, halt, freeze, quiet]
+intent:
+  grammar: ../go/grammar/e11-next.gbnf
+v3:
+  prompt: [../go/grammar/v3-orchestrator.txt]
+  catalog: []
+  loaded: [director, task, nav, access, grasp, place]
+  director: director
+  n_ctx: 16384
+  tick_ms: 300
+domains:
+  names: [director, task, nav, access, grasp, place]
+  case: live
+  seed: 1
+  clocks:
+    - {domain: director, n: 1}
+    - {domain: task, n: 1}
+    - {domain: nav, n: 1}
+    - {domain: access, n: 1}
+    - {domain: grasp, n: 1}
+    - {domain: place, n: 1}
+  tick: true
+  trace: true
+  narrate: null
+  consult: false
+  narrator_n_ctx: 8192
+  seat_n_ctx: 8192

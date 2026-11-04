@@ -1,0 +1,34 @@
+# utterance<TAB>intent<TAB>source<TAB>the goal atom expected (none for UNKNOWN)<TAB>the union's expectation when it is not this card's own: domain/VERB/atom alternatives joined by ' | ', the first the strict one. Reference game: train/pick_and_place_simple-Tomato-None-Microwave-13 (a kitchen: cabinet1-26, countertop1-3, drawer1-12, stoveburner1-4, fridge1, microwave1, sink1, toaster1, coffeemachine1, garbagecan1; tomato1-2 the targets)
+fetch the tomato to the fridge	FETCH	hand	fetch(tomato1, fridge1)	
+bring the tomato to the microwave	FETCH	hand	fetch(tomato1, microwave1)	
+put a tomato in the microwave	FETCH	hand	fetch(tomato1, microwave1)	task/FETCH/fetch(tomato1, microwave1) | place/PUT/put(tomato1, microwave1)
+get the tomato into the microwave	FETCH	hand	fetch(tomato1, microwave1)	task/FETCH/fetch(tomato1, microwave1) | place/PUT/put(tomato1, microwave1)
+move tomato 2 to the microwave	FETCH	hand	fetch(tomato2, microwave1)	task/FETCH/fetch(tomato2, microwave1) | place/PUT/put(tomato2, microwave1)
+bring the second tomato to the counter	FETCH	hand	fetch(tomato2, countertop1)	
+take the tomato to the sink	FETCH	hand	fetch(tomato1, sink1)	
+carry the tomato over to the fridge	FETCH	hand	fetch(tomato1, fridge1)	
+put the tomato away in the fridge	FETCH	hand	fetch(tomato1, fridge1)	task/FETCH/fetch(tomato1, fridge1) | place/PUT/put(tomato1, fridge1)
+go get the tomato and put it in the microwave	FETCH	hand	fetch(tomato1, microwave1)	
+find the tomato and bring it to counter 2	FETCH	hand	fetch(tomato1, countertop2)	
+i want a tomato in the microwave	FETCH	hand	fetch(tomato1, microwave1)	
+could you move the tomato to drawer 3	FETCH	hand	fetch(tomato1, drawer3)	
+deliver tomato 2 to the fridge	FETCH	hand	fetch(tomato2, fridge1)	
+bring a tomato over to the stove	FETCH	hand	fetch(tomato1, stoveburner1)	
+put the tomato on the third counter	FETCH	hand	fetch(tomato1, countertop3)	task/FETCH/fetch(tomato1, countertop3) | place/PUT/put(tomato1, countertop3)
+get me the tomato to the toaster	FETCH	hand	fetch(tomato1, toaster1)	
+move the tomato into cabinet 4	FETCH	hand	fetch(tomato1, cabinet4)	task/FETCH/fetch(tomato1, cabinet4) | place/PUT/put(tomato1, cabinet4)
+fetch the apple to the fridge	FETCH	hand	fetch(apple1, fridge1)	
+bring the mug to the sink	FETCH	hand	fetch(mug1, sink1)	
+put the egg in the microwave	FETCH	hand	fetch(egg1, microwave1)	task/FETCH/fetch(egg1, microwave1) | place/PUT/put(egg1, microwave1)
+go to the microwave	UNKNOWN	hand		nav/GO/goto(microwave1)
+pick up the tomato	UNKNOWN	hand		grasp/TAKE/take(tomato1)
+open the microwave	UNKNOWN	hand		access/OPEN/open(microwave1)
+where is the tomato	UNKNOWN	hand		
+what can you do	UNKNOWN	hand		
+what can I ask	UNKNOWN	hand		
+what's the time	CHITCHAT	hand		
+hello there	CHITCHAT	hand		
+okay I understood	CHITCHAT	hand		
+understand	CHITCHAT	hand		
+thanks a lot	CHITCHAT	hand		
+good job	CHITCHAT	hand		

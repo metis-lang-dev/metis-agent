@@ -334,7 +334,7 @@ def restore_agent(lv, st):
     lv._cancel_defer = list(st["cancel_defer"])
     lv._gen_q = [tuple(x) for x in st["gen_q"]]
     lv.off = set(st["off"])
-    if st.get("last_status") is not None:
+    if "last_status" in st:                         # None too: a new game's reset relays every status afresh
         lv._last_status = st["last_status"]
     if lv.director is not None and st.get("director"):
         lv.director.outcome = st["director"]["outcome"]
@@ -367,12 +367,15 @@ class Feed:
     def __init__(self, segs):
         self.segs, self.k = segs, None
         self.copies = {m: dict(c) for m, c in (segs[0].checkpoint.get("copies") or {}).items()}
-        self.beats = {}
+        self.beats, self.whys, self.delivered = {}, {}, {}
         self.weights = {m: list(h.get("weights") or ()) for m, h in segs[0].header["members"].items()}
 
     def at(self, rec):
         """The tick REC begins: the copies move to it, its members' beat inputs queue up."""
         self.k, self.beats = rec["k"], {}
+        self.whys = {m: e.get("why") for m, e in rec["members"].items()}
+        self.delivered = {m: [x for i in e.get("seq", ()) if i.get("by") == "deliver" for x in i.get("take", ())]
+                          for m, e in rec["members"].items()}
         for m, e in rec["members"].items():
             c = e.get("copy")
             if c:
@@ -427,7 +430,12 @@ class TraceHost:
         return lines
 
     def sync(self, counts):
-        return self.next_lines()                   # the wake's test: its reading differs from what its session holds
+        # the wake's test: its reading differs from what its session holds. A tick the record's wake read as `none` had
+        # nothing of the host's yet at the clock's decision: its beat's input came later in the tick (the director's
+        # arrival, relayed after the members beat, served by director_step), so the decision here reads nothing either
+        if self.feed.whys.get(self.member) == "none":
+            return []
+        return self.next_lines()
 
     def on_event(self, name, args):
         if self.watched and name.split("[")[0] in self.watched and self.repl is not None:
@@ -454,8 +462,16 @@ class TraceHost:
     def restore(self, snap):
         self.beat = snap.get("beat", 0)
 
-    def deliver(self, *a, **kw):
-        raise T.TraceError("%s: a director's deliver is not replayed yet (a goal through its host)" % self.member)
+    def deliver(self, domain, goal, tokens=()):
+        """A director's forward of GOAL to DOMAIN as one row on its live session: the rows the record took by deliver into
+        DOMAIN at this tick (what the world's host computed then); none recorded: None, so the Live re-instances."""
+        return list(self.feed.delivered.get(domain) or ()) or None
+
+    def instance(self, domain, goal, tokens=()):
+        """A director's next start of DOMAIN (a new game, a reset: alf-bundle step 3): the next instance of that member's
+        world stand-in, its program as it is, so the Live reloads it; the replay carries on from the record's checkpoint
+        after it (a new session's start is the checkpoint's, compared at the next segment). Not this host's own member."""
+        return domain != self.member and domain in (self.feed.segs[0].header.get("members") or {})
 
 
 class _StandIn:
@@ -535,6 +551,9 @@ def replay_composition(path, cfg, candidate=None):
     out.unjudged = unjudged
     with tempfile.TemporaryDirectory(prefix="trace-replay-") as wd:
         c = copy.deepcopy(cfg)
+        # a replay never builds a brain (alf-bundle step 3): no consult seat, no narrator, whatever the run's config says;
+        # the record's postings (the person's intents, the takes) are its inputs
+        c.setdefault("domains", {}).update(consult=False, narrate=None)
         commands = list(head.get("commands") or [])
         if candidate:                              # a new rule of a command's kind (brake_late beside brake_lon) is a command: its output must show
             kinds = {p.split("_")[0] for p in commands}
@@ -548,7 +567,7 @@ def replay_composition(path, cfg, candidate=None):
             if not candidate and head.get("image") and lv.image is not None and lv.image.hash != head["image"]:
                 raise T.TraceError("this trace is of image %s, this config's is %s: it does not replay across a relink" % (head["image"], lv.image.hash))
             out.live_changed = bool(head.get("live")) and head["live"] != _live_key()
-            for m, a in ags.items():
+            def prepare(m, a):
                 a.watch.blind = True               # a surprise is a reading against a world: none here (a run's stall shows as a divergence)
                 outer = getattr(a, "host", None)
                 inner = getattr(outer, "inner", outer)
@@ -557,6 +576,16 @@ def replay_composition(path, cfg, candidate=None):
                     if candidate and m == candidate["member"]:
                         inner.repl, inner.watched = a.repl, set(candidate["rules"])
                         inner.world_preds = {p for p, v in (lv.manifest(m).get("shared") or {}).items() if v == "world-private"}
+            for m, a in ags.items():
+                prepare(m, a)
+            was_reload = lv.reload
+
+            def reload(dom, *a, **kw):             # a member the director re-instances (a new game): the same replay's host
+                r = was_reload(dom, *a, **kw)
+                if dom in lv.agents.agents:
+                    prepare(dom, lv.agents.agents[dom])
+                return r
+            lv.reload = reload
             for m, st in segs[0].checkpoint["sessions"].items():
                 if m in ags:
                     T.restore_session(ags[m].repl, st)
@@ -580,8 +609,12 @@ def replay_composition(path, cfg, candidate=None):
                         out.divergence = bad
                         return out
                     out.checkpoints += 1
-                for rec in seg.ticks:
+                if i and "cut" in seg.header:      # a new game, a room entered (alf-bundle step 3): the world changed under the run,
+                    _restart(lv, ags, feed, tracer, seg)   # the replay carries on from the record's checkpoint after it
+                for j, rec in enumerate(seg.ticks):
                     for e in rec.get("ext", ()):
+                        if e.get("call") in ("new_game", "enter_room") and j == 0 and "cut" in seg.header:
+                            continue                       # its effect is the checkpoint just restored
                         _external(lv, e)
                     if rec.get("between"):                # what came between two ticks, before the checkpoint: its own line
                         got = {"k": rec["k"], "members": tracer.entries()}
@@ -1204,6 +1237,19 @@ def _sessions_differ(ags, seg):
     return None
 
 
+def _restart(lv, ags, feed, tracer, seg):
+    """The Live as the record's checkpoint at a cut (a new game's sessions, the world's copies, the agent's state): what a
+    restarted world's next instance starts at, read from the record, never run."""
+    ck = seg.checkpoint
+    for m, st in (ck.get("sessions") or {}).items():
+        if m in ags:
+            T.restore_session(ags[m].repl, st)
+    feed.copies = {m: dict(c) for m, c in (ck.get("copies") or {}).items()}
+    tracer.copies = {m: dict(c) for m, c in (ck.get("copies") or {}).items()}
+    if ck.get("agent"):
+        restore_agent(lv, ck["agent"])
+
+
 def _external(lv, e):
     """What came from outside the composition. A call runs as it ran; a take is taken; a person's intent and a world line are in the beats' recorded inputs."""
     if "call" in e:
@@ -1237,7 +1283,7 @@ def main(argv=None):
         return c
     if a.verb == "replay":
         r = replay_composition(a.trace, cfg)
-        print(json.dumps({"ok": r.ok, "ticks": r.ticks, "checkpoints": r.checkpoints, "divergence": r.divergence}))
+        print(json.dumps({"ok": r.ok, "ticks": r.ticks, "checkpoints": r.checkpoints, "divergence": r.divergence, "unjudged": r.unjudged}))
         return 0 if r.ok else 1
     print(json.dumps(fired_diff(a.trace, a.member, Path(a.candidate).read_text(), a.root, config, cases=a.case, composition=a.composition), indent=1))
     return 0

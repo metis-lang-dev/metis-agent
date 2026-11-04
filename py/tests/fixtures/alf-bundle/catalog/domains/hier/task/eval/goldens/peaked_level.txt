@@ -1,0 +1,11 @@
+N belief-read w_find truly
+N belief-read w_miss truly
+N belief-read w_take truly
+V first reach done within 14 = 41/60 ~ 0.68333333333333335 worlds 3 states 127
+V fetch reach done within 17 = 587/660 ~ 0.8893939393939394 worlds 3 states 142
+L fetch_risk(mid)
+L place_level(sure,target,p1)
+L place_level(unlikely,target,p2)
+L place_level(unlikely,target,p3)
+L place_level(sure,other,p0)
+rc 0

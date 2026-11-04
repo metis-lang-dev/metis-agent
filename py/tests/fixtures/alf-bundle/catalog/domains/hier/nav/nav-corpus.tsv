@@ -1,0 +1,31 @@
+# utterance<TAB>intent<TAB>source<TAB>the goal atom expected (none for UNKNOWN)<TAB>the union's expectation when it is not this card's own: domain/VERB/atom alternatives joined by ' | ', the first the strict one. Reference game: train/pick_and_place_simple-Tomato-None-Microwave-13 (a kitchen: cabinet1-26, countertop1-3, drawer1-12, stoveburner1-4, fridge1, microwave1, sink1, toaster1, coffeemachine1, garbagecan1; tomato1-2 the targets)
+go to the fridge	GO	hand	goto(fridge1)	
+walk to the microwave	GO	hand	goto(microwave1)	
+head over to drawer 5	GO	hand	goto(drawer5)	
+go to cabinet 12	GO	hand	goto(cabinet12)	
+take me to the sink	GO	hand	goto(sink1)	
+go to the toaster	GO	hand	goto(toaster1)	
+move over to the coffee maker	GO	hand	goto(coffeemachine1)	
+go to the trash can	GO	hand	goto(garbagecan1)	
+go to the third counter	GO	hand	goto(countertop3)	
+go to counter two	GO	hand	goto(countertop2)	
+walk to the stove	GO	hand	goto(stoveburner1)	
+go to burner 4	GO	hand	goto(stoveburner4)	
+go to the second drawer	GO	hand	goto(drawer2)	
+go over to cabinet number 20	GO	hand	goto(cabinet20)	
+visit the garbage bin	GO	hand	goto(garbagecan1)	
+can you go to the fridge	GO	hand	goto(fridge1)	
+go to the counter top	GO	hand	goto(countertop1)	
+get over to drawer ten	GO	hand	goto(drawer10)	
+go stand by the microwave	GO	hand	goto(microwave1)	
+go to the fridge to look for a tomato	GO	hand	goto(fridge1)	
+go to the first cabinet	GO	hand	goto(cabinet1)	
+approach the sink basin	GO	hand	goto(sink1)	
+open the fridge	UNKNOWN	hand		access/OPEN/open(fridge1)
+pick up the tomato	UNKNOWN	hand		grasp/TAKE/take(tomato1)
+put the mug on the counter	UNKNOWN	hand		place/PUT/put(mug1, countertop1)
+close the drawer	UNKNOWN	hand		
+what's in the fridge	UNKNOWN	hand		
+tell me a story	UNKNOWN	hand		
+turn on the light	UNKNOWN	hand		
+good morning	UNKNOWN	hand		

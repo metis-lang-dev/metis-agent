@@ -1,0 +1,118 @@
+# task's intents (alf-hierarchy step 2, opus): what the person asks the household agent to get
+# done — one verb, FETCH(object, receptacle), whose atom is the task domain's goal fetch(O, R): the
+# planner then asks the specialists (goto, open, take, put) one sub-goal at a time. A TEMPLATE:
+# world/gen_hier.py fills the `object` enum with the task's targets (target/1: the only objects
+# the task instance has) and `receptacle` with every receptacle, and keeps the examples whose
+# values the game has; a receptacle the task does not want is the program's refusal (not_dest → wrong_dest),
+# an object it does not move has no value here (UNKNOWN). The program: ../task_domain.llp.
+# What it cannot do (alf-tasks s-e9cc8fae step 2): a kind of ALFWorld's vocabulary this room lacks is FETCH's own
+# value (gen_hier fills the enums with them: the model spells the word it heard), and the host says it is not here
+# ("There is no shelf in this room."), as it says a fetch the world does not allow ("A tomato cannot go in or on a
+# drawer"); NOTASK is a chore of the other task families (heat, cool, clean, slice, examine, switch on). The
+# program says each in its own line; the agent only renders it.
+persona: |
+  You are a household robot. The person asks you to get something done with one object: bring
+  it somewhere, put it away, fetch it to a place. Map what they say to exactly one intent JSON
+  per utterance. Respond with only the JSON.
+
+verbs:
+  - {verb: FETCH, meaning: "get an object from wherever it is and put it in or on a receptacle (the whole errand)"}
+  - {verb: NOTASK, meaning: "an errand that changes an object instead of moving it: heat or cook, cool or chill, clean or wash or rinse, slice or cut, examine or look at under a light, switch or turn on"}
+  - {verb: CHITCHAT, meaning: "small talk, not an errand: an acknowledgement (okay, I understand, got it), thanks, a greeting, a comment, a question to you that asks for no errand (but what you can do is UNKNOWN)"}
+  - {verb: UNKNOWN, meaning: "an errand you cannot do here: one step on its own (just go, just open, just pick up), an object not in the schema, a question about where things are, a question about what you can do or what to ask (the world card answers it)"}
+
+slots:
+  object: {enum: []}
+  receptacle: {enum: []}
+  chore: {enum: []}
+
+guidance: |
+  Things are their kind and their number written together in capitals, no space: "tomato 2"
+  is TOMATO2, "drawer 3" is DRAWER3. A kind named without a number, or one the room has only
+  one of, is number 1: "the tomato" is TOMATO1, "the fridge" is FRIDGE1, "the counter" is
+  COUNTERTOP1, "the table" is DININGTABLE1. Bringing, fetching, moving, putting away, getting
+  an object TO a receptacle is FETCH, and so is "put X in R" when the person wants the whole
+  errand done. An object that is not in the schema's object list is UNKNOWN (never another
+  object in its place). Just going somewhere, just opening or just picking up is UNKNOWN here.
+  Words that ask for no errand at all (okay, understood, thanks, hello, how are you) are
+  CHITCHAT: the person is talking with you, the errand in progress goes on. A question about
+  what you can do or what they can ask is UNKNOWN: the world card answers it.
+  A kind with no number in the lists (LAPTOP, SHELF) is one this room does not have: when the
+  person names it, write it so, never another thing in its place. Heating, cooling, cleaning,
+  slicing, examining or switching something on is NOTASK with its chore (HEATING, COOLING, CLEANING, SLICING,
+  EXAMINING, SWITCHING), even when the object is here. Before FETCH, check that the
+  person's word is the object's kind: a laptop is never LETTUCE1, a book is never BOWL1. A kind
+  of two words is one word in capitals: a teddy bear is TEDDYBEAR, a pepper shaker PEPPERSHAKER,
+  a spray bottle SPRAYBOTTLE. When the person names no place ("bring me the egg"), leave the
+  receptacle out: the agent asks for it, never guesses one.
+
+examples:
+  - ["fetch the tomato to the fridge", {"intent":"FETCH","object":"TOMATO1","receptacle":"FRIDGE1"}]
+  - ["bring the tomato to the microwave", {"intent":"FETCH","object":"TOMATO1","receptacle":"MICROWAVE1"}]
+  - ["put a tomato in the microwave", {"intent":"FETCH","object":"TOMATO1","receptacle":"MICROWAVE1"}]
+  - ["move the second tomato to the table", {"intent":"FETCH","object":"TOMATO2","receptacle":"DININGTABLE1"}]
+  - ["get the mug onto the counter", {"intent":"FETCH","object":"MUG1","receptacle":"COUNTERTOP1"}]
+  - ["put the apple away in the fridge", {"intent":"FETCH","object":"APPLE1","receptacle":"FRIDGE1"}]
+  - ["bring the soap to the toilet", {"intent":"FETCH","object":"SOAPBOTTLE1","receptacle":"TOILET1"}]
+  - ["take the book to the desk", {"intent":"FETCH","object":"BOOK1","receptacle":"DESK1"}]
+  - ["move the pepper shaker to a shelf", {"intent":"FETCH","object":"PEPPERSHAKER1","receptacle":"SHELF"}]
+  - ["put the book on the bed", {"intent":"FETCH","object":"BOOK1","receptacle":"BED"}]
+  - ["put the book on the counter", {"intent":"FETCH","object":"BOOK","receptacle":"COUNTERTOP1"}]
+  - ["bring the soap to the toilet", {"intent":"FETCH","object":"SOAPBOTTLE1","receptacle":"TOILET"}]
+  - ["put the tomato in the fridge", {"intent":"FETCH","object":"TOMATO1","receptacle":"FRIDGE"}]
+  - ["put the laptop on the counter", {"intent":"FETCH","object":"LAPTOP","receptacle":"COUNTERTOP1"}]
+  - ["take the apple to the sink", {"intent":"FETCH","object":"APPLE","receptacle":"SINKBASIN1"}]
+  - ["bring the teddy bear to the fridge", {"intent":"FETCH","object":"TEDDYBEAR","receptacle":"FRIDGE1"}]
+  - ["move the spray bottle to the counter", {"intent":"FETCH","object":"SPRAYBOTTLE","receptacle":"COUNTERTOP1"}]
+  - ["put the remote on the sofa", {"intent":"FETCH","object":"REMOTECONTROL","receptacle":"SOFA1"}]
+  - ["bring me the egg", {"intent":"FETCH","object":"EGG1"}]
+  - ["fetch the mug", {"intent":"FETCH","object":"MUG1"}]
+  - ["heat the apple", {"intent":"NOTASK","chore":"HEATING"}]
+  - ["cook the potato in the microwave", {"intent":"NOTASK","chore":"HEATING"}]
+  - ["chill the wine", {"intent":"NOTASK","chore":"COOLING"}]
+  - ["wash the mug", {"intent":"NOTASK","chore":"CLEANING"}]
+  - ["slice the bread", {"intent":"NOTASK","chore":"SLICING"}]
+  - ["look at the book under the lamp", {"intent":"NOTASK","chore":"EXAMINING"}]
+  - ["turn on the lamp", {"intent":"NOTASK","chore":"SWITCHING"}]
+  - ["go to the fridge", {"intent":"UNKNOWN"}]
+  - ["pick up the tomato", {"intent":"UNKNOWN"}]
+  - ["open the microwave", {"intent":"UNKNOWN"}]
+  - ["where is the tomato", {"intent":"UNKNOWN"}]
+  - ["what can you do", {"intent":"UNKNOWN"}]
+  - ["okay I understood", {"intent":"CHITCHAT"}]
+  - ["thanks", {"intent":"CHITCHAT"}]
+  - ["hello there", {"intent":"CHITCHAT"}]
+  - ["what time is it", {"intent":"CHITCHAT"}]
+
+spoken:
+  heading: Spoken response (after the JSON)
+  text: |
+    After the JSON comes "Spoken response:" and one short sentence the robot says, in the first
+    person. Never JSON, never an intent name.
+  examples:
+    - ["fetch the tomato to the fridge", {"intent":"FETCH","object":"TOMATO1","receptacle":"FRIDGE1"}, "I'll get the tomato into the fridge."]
+    - ["bring the tomato to the microwave", {"intent":"FETCH","object":"TOMATO1","receptacle":"MICROWAVE1"}, "Bringing the tomato to the microwave."]
+    - ["take the book to the desk", {"intent":"FETCH","object":"BOOK1","receptacle":"DESK1"}, "Taking the book to the desk."]
+    - ["move the pepper shaker to a shelf", {"intent":"FETCH","object":"PEPPERSHAKER1","receptacle":"SHELF"}, "Let me see."]
+    - ["heat the apple", {"intent":"NOTASK","chore":"HEATING"}, "I can't heat things."]
+    - ["okay I understood", {"intent":"CHITCHAT"}, "Good."]
+    - ["thanks", {"intent":"CHITCHAT"}, "You're welcome."]
+
+# the slots the agent holds to the person's words (metis-agent's slot grounding, alf-tasks step 3): a value the
+# words never name is the model's guess — asked about, never dispatched; one FETCH needs and the words leave out, asked for
+grounded: [object, receptacle]
+
+map:
+  - {verb: FETCH, atom: "fetch({object:object},{receptacle:receptacle})", act: fetch}
+  - {verb: NOTASK, atom: "notask({chore:chore})", act: notask}
+values:
+  object: {}
+  receptacle: {}
+  chore: {}
+
+asks: []
+outcomes: {goto: progress, open: progress, take: progress, put: progress, done: done, stuck: refused, wrong_dest: refused,
+           nothing: refused, cannot: refused}
+alternatives:
+  max: 0
+  rules: {}

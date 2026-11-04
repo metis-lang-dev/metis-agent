@@ -1,0 +1,33 @@
+% DERIVED from ../access_domain.llp by world/gen_hier.py plain (make plain): the plain hierarchy's base; edit that file, never this one.
+% access_domain — opening things (alf-hierarchy step 1, the architect, 2026-10-22): the
+% receptacles that open as a specialist. Goal in: open(R); result out: accessible(R) when R
+% can be reached into (opened now, open already, or nothing to open), elsewhere(R) when the agent
+% is not at R. The task domain never asks whether R opens: this domain answers either way.
+catalog access_domain 1.
+provenance text "ALFWorld receptacle access as a lifted specialist: open what is closed, answer at once for the rest" "2026-10-22".
+layers (dyn).
+stages (act).
+types (receptacle location).   % completed by the instance that includes this file (spec 12)
+include "../iface/alfworld.llp".   % the family's crossing preds, declared once (tools/iface_gen.py)
+
+namespace access produce (dyn).
+
+pred recat(receptacle, location) : access.
+pred openable(receptacle) : access.
+pred notopenable(receptacle) : access.              % the complement: recat and both, the projection's (the map)
+
+pred at(location) : access.
+pred opened(receptacle) : access.
+pred closed(receptacle) : access.         % the complement for openable receptacles
+pred checked(receptacle) : access.
+
+stage act {
+  %% I open {R}.
+  open_closed [dyn] : open(R) * $at(L) * $recat(R, L) * $openable(R) * closed(R) -o opened(R) * checked(R) * accessible(R).
+  %% {R} is already open.
+  already_open [dyn] : open(R) * $at(L) * $recat(R, L) * $openable(R) * $opened(R) -o accessible(R).
+  %% {R} has nothing to open.
+  no_door [dyn] : open(R) * $at(L) * $recat(R, L) * $notopenable(R) -o accessible(R).
+  %% I am not at {R}.
+  not_here [dyn] : open(R) * $at(L) * $recat(R, L2) * L <> L2 -o elsewhere(R).
+}

@@ -1,0 +1,16 @@
+# the task's fetch under the one-tick instrument (spec16 s-b12d90f2 step 3; metis-lang spec/16 §2-§5): the certified form, its decision on place_level with static weights
+program: world_level.llp
+beliefs:
+  truly: {port: where, one: R}         # where the target is: exactly one place
+levels:
+  fetch_risk:                          # the fetch's failure risk within 17, the level the task reads
+    from: {evaluate: fetch}
+    at: [0.5, 0.9]
+    names: [high, mid, low]
+  place_level:                         # the where belief's level per place: the certified decision's input
+    from: {belief: where}
+    at: [0.3, 0.7]
+    names: [unlikely, maybe, sure]
+evaluate:
+  first: {reach: done, within: 14}     # the first place tried is the right one (14 events: the fetch, there, back)
+  fetch: {reach: done, within: 17}     # at most one wrong place (3 events each: go, absent, look elsewhere)

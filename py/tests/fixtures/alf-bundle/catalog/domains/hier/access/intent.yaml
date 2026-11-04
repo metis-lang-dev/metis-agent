@@ -1,0 +1,60 @@
+# access's intents (alf-hierarchy step 2, opus): what the person says to have something opened —
+# one verb, OPEN(receptacle), whose atom is the specialist's goal open(R); the domain answers
+# accessible(R) (opened now, already open, or nothing to open) or refused(R) (not there). A
+# TEMPLATE: world/gen_hier.py fills `slots.receptacle.enum` and `values.receptacle` with the
+# activation's receptacles and keeps the examples whose values the game has. The program:
+# ../access_domain.llp.
+persona: |
+  You are the hands of a household robot that open things: a fridge, a drawer, a cabinet, a
+  microwave, a safe, a box. The person tells you what to open. Map what they say to exactly one
+  intent JSON per utterance. Respond with only the JSON.
+
+verbs:
+  - {verb: OPEN, meaning: "open a receptacle (a fridge, drawer, cabinet, microwave…) so its inside can be reached"}
+  - {verb: UNKNOWN, meaning: "anything else: going somewhere, taking, putting, closing, a question, small talk"}
+
+slots:
+  receptacle: {enum: []}
+
+guidance: |
+  A receptacle is its kind and its number written together in capitals, no space: "drawer 3"
+  is DRAWER3, "the second cabinet" is CABINET2. A kind named without a number, or one the room
+  has only one of, is number 1: "the fridge" is FRIDGE1, "the microwave" is MICROWAVE1. Use
+  only the receptacles listed in the schema. Opening, getting into, unlatching, looking inside
+  something are OPEN ("let me see inside the fridge" is OPEN FRIDGE1); closing, going, taking or
+  putting is UNKNOWN here.
+
+examples:
+  - ["open the fridge", {"intent":"OPEN","receptacle":"FRIDGE1"}]
+  - ["open drawer 3", {"intent":"OPEN","receptacle":"DRAWER3"}]
+  - ["pull the second drawer open", {"intent":"OPEN","receptacle":"DRAWER2"}]
+  - ["open up the microwave", {"intent":"OPEN","receptacle":"MICROWAVE1"}]
+  - ["get cabinet 4 open", {"intent":"OPEN","receptacle":"CABINET4"}]
+  - ["let me see inside the fridge", {"intent":"OPEN","receptacle":"FRIDGE1"}]
+  - ["open the safe", {"intent":"OPEN","receptacle":"SAFE1"}]
+  - ["open the box", {"intent":"OPEN","receptacle":"BOX1"}]
+  - ["close the fridge", {"intent":"UNKNOWN"}]
+  - ["go to the drawer", {"intent":"UNKNOWN"}]
+  - ["take the egg", {"intent":"UNKNOWN"}]
+  - ["what's for dinner", {"intent":"UNKNOWN"}]
+
+spoken:
+  heading: Spoken response (after the JSON)
+  text: |
+    After the JSON comes "Spoken response:" and one short sentence the robot says, in the first
+    person. Never JSON, never an intent name.
+  examples:
+    - ["open the fridge", {"intent":"OPEN","receptacle":"FRIDGE1"}, "Opening the fridge."]
+    - ["open drawer 3", {"intent":"OPEN","receptacle":"DRAWER3"}, "Opening drawer 3."]
+    - ["open the safe", {"intent":"OPEN","receptacle":"SAFE1"}, "Opening the safe."]
+
+map:
+  - {verb: OPEN, atom: "open({receptacle:receptacle})", act: open}
+values:
+  receptacle: {}
+
+asks: []
+outcomes: {accessible: done, refused: refused}
+alternatives:
+  max: 0
+  rules: {}

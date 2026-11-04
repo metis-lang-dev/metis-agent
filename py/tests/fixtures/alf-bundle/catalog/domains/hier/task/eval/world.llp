@@ -1,0 +1,11 @@
+% world — the task alone under the one-tick instrument (spec16 s-b12d90f2 step 3; metis-lang spec/16 §3, the world
+% model): the task as installed (../task_plain.llp, the plain instance) and a world that answers its sub-goals by the belief fact. The task's
+% decision reads its SUPPORT, inrecep(O, R): every place the map asserts the target may be (the live host's view mode),
+% chosen among by the look port (@w look). Where the target IS is a separate world fact, truly(O, R), drawn by the
+% instrument from the where port (one R): the honest form of §3 — the decision never reads the truth, the world's
+% rules do. A goto(R) is answered reached(R) where the target truly is; elsewhere reached(R) * absent(O, R), the
+% place dropped from the support (the map's look: it does not try R again); open, take and put are answered at once.
+catalog task_world 1.
+provenance text "the task alone under the instrument, today's decision: go_for @w look over its support" "2026-10-25".
+include "../task_plain.llp".
+include "world_rules.llp".

@@ -1,0 +1,84 @@
+% director_domain — activation from context as a domain of its own (metis-agent docs/DIRECTOR.md;
+% alf-hierarchy step 3, the architect, 2026-10-22), LIFTED: the instance says which specialists
+% exist, which KINDS of atom each handles (handles/2, generated from the specialists' declared
+% ports), which kinds are results, which end the episode, which refusals detour (a specialist that
+% is elsewhere → the navigator) and how a second refusal escalates. The director never acts in the
+% world: it sees kinds (seen(K): an atom of kind K arrived — its arguments ride in the
+% orchestrator's frame, not here) and a specialist's idleness (idle(D)); its effects are the
+% agent's own verbs — wake(D), sleep(D), forward(D, K), ask(K), ended(K).
+%
+% One beat = one arrival. The orchestrator (or the driver, experiments/hier.py --director) puts
+% +seen(K) in, runs to quiescence, reads the effects out, and acts on them: forward(D, K) sends D
+% the atom of kind K whose frame it holds — the one just seen, or, after a detour, the one it
+% remembered for D.
+catalog director_domain 1.
+provenance text "the director: domain activation from the observed kinds, routing, detour and escalation as rules" "2026-10-22".
+layers (dyn).
+stages (act settle).   % settle: the tree's (director_tree_domain), a stale release after the beat
+types (domain kind).   % completed by the instance that includes this file (spec 12)
+
+namespace dir produce (dyn).
+
+% ── the instance's facts ──
+bwd specialist(domain).                   % a domain the director may wake and put to sleep
+bwd planner(domain).                      % the domain that is active throughout and takes the results
+bwd handles(domain, kind).                % D consumes atoms of kind K
+bwd result(kind).                         % a kind that is a specialist's answer
+bwd end(kind).                            % a kind that ends the episode (done, stuck, …)
+bwd finished(kind).                       % … of which the ones that are success: ended, no ask (the instance: done)
+bwd detour(kind, kind).                   % a refusal of kind K1 is answered by a goal of kind K2 to another specialist, once
+bwd escalate(kind, kind).                 % … and a second time becomes K3 for the planner
+bwd rename(kind, kind, kind).             % the orchestrator's frames: an atom of K1 forwarded as K2 is sent under the name K3 (elsewhere(R) → goto(R)); the rules never read it
+bwd nohandler(kind).                      % the complement: a kind nobody handles
+
+% ── the state ──
+pred active(domain) : dir.
+pred inactive(domain) : dir.
+pred attention(domain) : dir.             % exactly one: the domain the last atom went to
+pred sent(domain, kind) : dir.            % the goal D is working on (its frame is the orchestrator's)
+pred pending(domain, kind) : dir.         % a goal put aside for the detour
+pred fresh : dir.                         % no detour open
+pred rerouted : dir.                      % a detour is open: a second refusal escalates
+
+% ── the input port ──
+pred seen(kind) : dir.
+pred idle(domain) : dir.
+
+% ── the output port ──
+pred wake(domain) : dir.
+pred sleep(domain) : dir.
+pred forward(domain, kind) : dir.
+pred ask(kind) : dir.                     % the episode ended in a kind that needs the person
+pred ended(kind) : dir.
+
+stage act {
+  % ── activation by what is seen ──
+  %% {K} arrived: I wake {D} for it.
+  wake_for [dyn] : seen(K) * $handles(D, K) * $specialist(D) * inactive(D) * attention(D0) -o active(D) * wake(D) * forward(D, K) * sent(D, K) * attention(D).
+  %% {K} arrived: {D} is up, it gets it (no detour open: a result then belongs to the detour).
+  route [dyn] : seen(K) * $handles(D, K) * $active(D) * $planner(D) * $fresh * attention(D0) -o forward(D, K) * attention(D).
+  %% {K} arrived for {D}, which is busy: it gets it.
+  route_busy [dyn] : seen(K) * $handles(D, K) * $specialist(D) * $active(D) * attention(D0) -o forward(D, K) * sent(D, K) * attention(D).
+
+  % ── a specialist's answer frees it (the grace is the orchestrator's: idle arrives after linger beats) ──
+  %% {D} is idle: it sleeps.
+  sleep [dyn] : idle(D) * active(D) * $specialist(D) * sent(D, K) -o inactive(D) * sleep(D).
+  %% {D} is already asleep.
+  idle_gone [dyn] : idle(D) * $inactive(D) -o ().
+
+  % ── the detour: a specialist is elsewhere, the navigator takes it there, the goal waits ──
+  %% {S} cannot: {K1}. I send {D2} first ({K2}) and keep {K0} for {S}.
+  detour [dyn] : seen(K1) * $detour(K1, K2) * $handles(D2, K2) * sent(S, K0) * active(S) * inactive(D2) * fresh * attention(S) -o pending(S, K0) * inactive(S) * sleep(S) * active(D2) * wake(D2) * forward(D2, K2) * sent(D2, K2) * rerouted * attention(D2).
+  %% {D2} answered {K}: {S} gets {K0} back.
+  resume [dyn] : seen(K) * $result(K) * $sent(D2, K2) * pending(S, K0) * inactive(S) * rerouted * attention(D2) -o active(S) * wake(S) * forward(S, K0) * sent(S, K0) * fresh * attention(S).
+  %% {S} cannot again ({K1}): the planner hears {K3}.
+  escalate [dyn] : seen(K1) * $detour(K1, K2) * $escalate(K1, K3) * $planner(P) * sent(S, K0) * active(S) * rerouted * attention(S) -o forward(P, K3) * fresh * attention(P).
+
+  % ── the ends ──
+  %% {K}: the task is done.
+  finished [dyn] : seen(K) * $finished(K) -o ended(K).
+  %% {K}: the episode is over without the task done. I ask.
+  cornered [dyn] : seen(K) * $end(K) -o ended(K) * ask(K).
+  %% Nobody handles {K}: I ask.
+  unknown [dyn] : seen(K) * $nohandler(K) -o ask(K).
+}

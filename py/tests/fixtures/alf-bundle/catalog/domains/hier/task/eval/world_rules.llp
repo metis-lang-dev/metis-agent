@@ -1,0 +1,24 @@
+% world_rules — the world the task meets under the instrument (spec16 s-b12d90f2 step 3): included by world.llp
+% (today's task, @w look) and world_level.llp (the decision on a belief level with static weights).
+catalog task_world_rules 1.
+provenance text "the task's world under the instrument: goto, open, take and put answered by the belief fact" "2026-10-25".
+
+namespace world produce (dyn).
+pred truly(object, receptacle) : world.   % the belief fact: where the target is (drawn: one R by where)
+pred holding(object) : world.             % taken: no longer in its receptacle
+weight where(O, R) reads {truly(O, R)}.   % the map's belief, the truth's distribution (the case binds it as look)
+
+stage act {
+  %% I am at {R}: the target is here.
+  w_find [dyn] : goto(R) * $want(O) * $truly(O, R) -o reached(R).
+  %% I am at {R}: the target is not here.
+  w_miss [dyn] : goto(R) * $want(O) * $truly(O, R2) * R2 <> R * inrecep(O, R) -o reached(R) * absent(O, R).
+  %% I am at {R}, carrying it.
+  w_carry [dyn] : goto(R) * $carry(O) -o reached(R).
+  %% {R} is open.
+  w_open [dyn] : open(R) -o accessible(R).
+  %% I have taken {O}.
+  w_take [dyn] : take(O) * truly(O, R) -o taken(O) * holding(O).
+  %% {O} is in {R}.
+  w_put [dyn] : put(O, R) * holding(O) -o placed(O, R).
+}

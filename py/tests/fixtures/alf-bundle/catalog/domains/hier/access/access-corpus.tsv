@@ -1,0 +1,29 @@
+# utterance<TAB>intent<TAB>source<TAB>the goal atom expected (none for UNKNOWN)<TAB>the union's expectation when it is not this card's own: domain/VERB/atom alternatives joined by ' | ', the first the strict one. Reference game: train/pick_and_place_simple-Tomato-None-Microwave-13 (a kitchen: cabinet1-26, countertop1-3, drawer1-12, stoveburner1-4, fridge1, microwave1, sink1, toaster1, coffeemachine1, garbagecan1; tomato1-2 the targets)
+open the fridge	OPEN	hand	open(fridge1)	
+open the microwave	OPEN	hand	open(microwave1)	
+open drawer 4	OPEN	hand	open(drawer4)	
+open cabinet 7	OPEN	hand	open(cabinet7)	
+pull open the second drawer	OPEN	hand	open(drawer2)	
+open up cabinet twelve	OPEN	hand	open(cabinet12)	
+get the fridge door open	OPEN	hand	open(fridge1)	
+pop the microwave open	OPEN	hand	open(microwave1)	
+open the first cabinet	OPEN	hand	open(cabinet1)	
+open drawer number 11	OPEN	hand	open(drawer11)	
+can you open the fridge for me	OPEN	hand	open(fridge1)	
+let me look inside the microwave	OPEN	hand	open(microwave1)	
+open the cabinet	OPEN	hand	open(cabinet1)	
+open the drawer	OPEN	hand	open(drawer1)	
+unlatch cabinet 3	OPEN	hand	open(cabinet3)	
+swing open cabinet 26	OPEN	hand	open(cabinet26)	
+open the third drawer	OPEN	hand	open(drawer3)	
+please open the fridge	OPEN	hand	open(fridge1)	
+open drawer six	OPEN	hand	open(drawer6)	
+open cabinet 18	OPEN	hand	open(cabinet18)	
+close the microwave	UNKNOWN	hand		
+shut the fridge	UNKNOWN	hand		
+go to drawer 4	UNKNOWN	hand		nav/GO/goto(drawer4)
+take the tomato	UNKNOWN	hand		grasp/TAKE/take(tomato1)
+put the tomato in the microwave	UNKNOWN	hand		place/PUT/put(tomato1, microwave1) | task/FETCH/fetch(tomato1, microwave1)
+turn on the stove	UNKNOWN	hand		
+how hot is it	UNKNOWN	hand		
+thank you	UNKNOWN	hand		

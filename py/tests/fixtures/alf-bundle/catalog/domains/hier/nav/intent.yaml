@@ -1,0 +1,65 @@
+# nav's intents (alf-hierarchy step 2, opus): what the person says to send the household agent
+# somewhere — one verb, GO(receptacle), whose atom is the specialist's goal goto(R). A TEMPLATE:
+# world/gen_hier.py fills `slots.receptacle.enum` and `values.receptacle` with the activation's
+# receptacles (the game's handle names in capitals, FRIDGE1 for fridge1, as the mapper looks a
+# value up) and keeps the examples whose values the game has. The program: ../nav_domain.llp.
+persona: |
+  You are the legs of a household robot in one room of a house. The person tells you where to
+  go: a fridge, a drawer, a counter, a cabinet, a table, a shelf, a bed, a sink. Map what they
+  say to exactly one intent JSON per utterance. Respond with only the JSON.
+
+verbs:
+  - {verb: GO, meaning: "go to a receptacle (a fridge, drawer, cabinet, counter, table, shelf, sink…)"}
+  - {verb: UNKNOWN, meaning: "anything else: opening, taking, putting, a question, small talk"}
+
+slots:
+  receptacle: {enum: []}
+
+guidance: |
+  A receptacle is its kind and its number written together in capitals, no space: "drawer 3"
+  is DRAWER3, "the second cabinet" is CABINET2, "counter 2" is COUNTERTOP2. A kind named
+  without a number, or one the room has only one of, is number 1: "the fridge" is FRIDGE1,
+  "the sink" is SINK1, "the stove" is STOVEBURNER1, "the coffee maker" is COFFEEMACHINE1, "the
+  trash" or "the bin" is GARBAGECAN1, "the table" is DININGTABLE1 (a side table is SIDETABLE1,
+  a coffee table COFFEETABLE1). Use only the receptacles listed in the schema. Going is GO
+  whatever the person wants there ("go to the fridge to get milk" is GO FRIDGE1); opening,
+  taking or putting something is UNKNOWN here.
+
+examples:
+  - ["go to the fridge", {"intent":"GO","receptacle":"FRIDGE1"}]
+  - ["walk over to drawer 3", {"intent":"GO","receptacle":"DRAWER3"}]
+  - ["head to the second cabinet", {"intent":"GO","receptacle":"CABINET2"}]
+  - ["go to the counter", {"intent":"GO","receptacle":"COUNTERTOP1"}]
+  - ["move to the microwave", {"intent":"GO","receptacle":"MICROWAVE1"}]
+  - ["go to the sink", {"intent":"GO","receptacle":"SINK1"}]
+  - ["go to the bathtub", {"intent":"GO","receptacle":"BATHTUBBASIN1"}]
+  - ["go to the toilet", {"intent":"GO","receptacle":"TOILET1"}]
+  - ["go over to the bed", {"intent":"GO","receptacle":"BED1"}]
+  - ["go to the desk", {"intent":"GO","receptacle":"DESK1"}]
+  - ["go to shelf 2", {"intent":"GO","receptacle":"SHELF2"}]
+  - ["go to the sofa", {"intent":"GO","receptacle":"SOFA1"}]
+  - ["open the fridge", {"intent":"UNKNOWN"}]
+  - ["pick up the apple", {"intent":"UNKNOWN"}]
+  - ["what's the weather", {"intent":"UNKNOWN"}]
+
+spoken:
+  heading: Spoken response (after the JSON)
+  text: |
+    After the JSON comes "Spoken response:" and one short sentence the robot says, in the first
+    person. Never JSON, never an intent name.
+  examples:
+    - ["go to the fridge", {"intent":"GO","receptacle":"FRIDGE1"}, "Going to the fridge."]
+    - ["walk over to drawer 3", {"intent":"GO","receptacle":"DRAWER3"}, "On my way to drawer 3."]
+    - ["go to the toilet", {"intent":"GO","receptacle":"TOILET1"}, "Going to the toilet."]
+    - ["go over to the bed", {"intent":"GO","receptacle":"BED1"}, "Heading to the bed."]
+
+map:
+  - {verb: GO, atom: "goto({receptacle:receptacle})", act: go}
+values:
+  receptacle: {}
+
+asks: []
+outcomes: {reached: done}
+alternatives:
+  max: 0
+  rules: {}
