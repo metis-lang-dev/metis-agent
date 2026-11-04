@@ -181,6 +181,14 @@ jobs:
         with:
           repository: metis-lang-dev/metis-catalog
           path: metis-catalog
+      # the alfworld bundle's programs at the pin its fixture traces were recorded on (alf-bundle s-b53cc7ab step 3:
+      # tests/test_trace_alf_bundle.py replays them there; one copy of every rule file, so none is copied here)
+      - name: Checkout metis-worlds at the alf-bundle fixtures' pin (public sibling)
+        uses: actions/checkout@v4
+        with:
+          repository: metis-lang-dev/metis-worlds
+          path: metis-worlds
+          ref: db8efe163964b9c5e13cb591315926847b146641
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -211,5 +219,5 @@ jobs:
           echo "METIS_RDDL_PY=/tmp/gym/bin/python" >> "$GITHUB_ENV"
       - name: pytest py/tests
         working-directory: metis-agent/py
-        env: {METIS_AGENT_REQUIRE_GYM: '1'}
+        env: {METIS_AGENT_REQUIRE_GYM: '1', METIS_WORLDS: '${{ github.workspace }}/metis-worlds', METIS_AGENT_REQUIRE_WORLDS: '1'}
         run: python -m pytest -q tests

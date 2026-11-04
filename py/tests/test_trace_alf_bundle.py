@@ -6,19 +6,36 @@ clock decision reads no host input that arrived later in the tick, (c) a directo
 and a new game carried on from the record's checkpoint."""
 import copy
 import json
+import os
+import subprocess
 from pathlib import Path
 
 import pytest
 
 trace = pytest.importorskip("metis.trace")
-pytestmark = pytest.mark.skipif(not hasattr(trace, "STAND_IN"), reason="metispy before metis.trace's STAND_IN (a97d19a)")
-
 F = Path(__file__).parent / "fixtures" / "alf-bundle"
+PIN = "db8efe1"                                                   # metis-worlds: the bundle the runs had
+WORLDS = Path(os.environ.get("METIS_WORLDS") or Path(__file__).resolve().parents[3] / "metis-worlds")
+ALF = WORLDS / "alfworld"
+
+
+def _at_pin():
+    """None when WORLDS' alfworld bundle is the pin's, else why not (the replay is of those programs only)."""
+    if not (ALF / "domains" / "hier" / "composition.yaml").is_file():
+        return "no metis-worlds alfworld bundle at %s (METIS_WORLDS)" % WORLDS
+    r = subprocess.run(["git", "-C", str(WORLDS), "diff", "--quiet", PIN, "--", "alfworld/domains"], capture_output=True)
+    return None if r.returncode == 0 else "metis-worlds' alfworld/domains is not the pin %s's (%s)" % (PIN, (r.stderr or b"differs").decode().strip()[:120])
+
+
+WHY = _at_pin() or (None if hasattr(trace, "STAND_IN") else "metispy before metis.trace's STAND_IN (a97d19a)")
+if WHY and os.environ.get("METIS_AGENT_REQUIRE_WORLDS"):
+    raise RuntimeError("METIS_AGENT_REQUIRE_WORLDS: " + WHY)
+pytestmark = pytest.mark.skipif(bool(WHY), reason=WHY or "")
 
 
 @pytest.fixture(autouse=True)
 def _bundle_catalog(monkeypatch):
-    monkeypatch.setenv("METIS_CATALOG", str(F / "catalog"))       # the bundle's programs as they ran (db8efe1)
+    monkeypatch.setenv("METIS_CATALOG", str(ALF))                 # the bundle's programs as they ran (metis-worlds at the pin)
     monkeypatch.delenv("METIS_HOME", raising=False)               # its iface/ units are the standard ones
 
 
@@ -63,6 +80,6 @@ def test_the_check_run_replays_through_its_new_game():
 def test_a_candidate_on_grasp_is_diffed_not_refused():
     from metis_agent.trace import fired_diff
     c = config("one-turn")
-    e = fired_diff(F / "one-turn", "grasp", (F / "grasp-candidate.llp").read_text(), F / "catalog", lambda root: copy.deepcopy(c))
+    e = fired_diff(F / "one-turn", "grasp", (F / "grasp-candidate.llp").read_text(), ALF, lambda root: copy.deepcopy(c))
     assert e["baseline"] is True and e["rules"] == ["noted"] and e["unjudged"] == ["task"]
     assert e["first_enabled"]["rule"].startswith("noted") and e["rows"] and e["goldens"]["ok"]
