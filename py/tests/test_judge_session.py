@@ -109,7 +109,57 @@ def test_the_trace_host_stands_in_a_weight_port():
     feed = AT.Feed([Seg()])
     r = Reg()
     AT.TraceHost("task", feed).bind(r)
-    assert r.w == {"look": 1.0}
+    assert r.w == {"look": AT.STAND_IN} and 0 < AT.STAND_IN < 1
     r2 = Reg()
     AT.TraceHost("nav", feed).bind(r2)
     assert r2.w == {}
+
+
+WEIGHTED = """
+catalog picky 1.
+provenance text "a weight port for the session judge" "2026-11-04".
+layers (dyn).
+stages (main).
+type place {door sofa}.
+namespace g produce (dyn).
+pred want(place) : g.
+pred at(place) : g.
+pred ready : g.
+weight pick(P) reads {want(P)}.
+stage main {
+  %% I go to {P}, or I stay.
+  go [dyn] : want(P) -o (at(P) @w pick(P) | ready @w ~pick(P)).
+}
+#steps 20
+#seeds 1
+"""
+
+
+def test_a_session_of_a_member_with_a_weight_port(tmp_path):
+    """task's case (alfworld's weight look): the member's session opens with the port stood in, its draws are the
+    record's where the record's rule is enabled, and it is named unjudged; a candidate that disables the recorded rule
+    shows the difference."""
+    from metis.fw.registry import Registry
+    from metis.lang.repl import Repl as Shell
+    p = tmp_path / "picky.llp"
+    p.write_text(WEIGHTED)
+    reg = Registry().weight("pick", 0.5)
+    sh = Shell(str(p), seed=1, registry=reg)
+    names = sorted({sh.events_tbl[i][2].name for i in range(len(sh.events_tbl))})
+    second = [n for n in names if n.startswith("go") and "door" in n][-1]          # the clause the record chose
+    d = tmp_path / "t"
+    w = T.Segments(d, every=0)
+    head = {"members": {"m": {"key": T.program_key(p), "program": str(p), "seed": 1, "weights": ["pick"], "out": []}},
+            "commands": [], "live": "metis-loop-console", "clock": "command"}
+    w.open_segment(0, head, {"sessions": {"m": T.session_state(sh)}, "copies": {"m": {}}})
+    w.line({"k": 1, "members": {"m": {"why": "command", "seq": [{"take": ["+want(door)"], "by": "person"}]}}})
+    w.line({"k": 2, "members": {"m": {"why": "command", "seq": [{"step": [second], "by": "tool"}]}}})
+    w.close()
+    base = AT.replay_session(d, "m", p)
+    assert base.ok, base.divergence
+    assert base.unjudged == ["m"]
+    q = tmp_path / "cand.llp"
+    q.write_text(WEIGHTED.replace("go [dyn] : want(P) -o", "go [dyn] : want(P) * $ready -o"))
+    run = AT.replay_session(d, "m", q, {"member": "m", "rules": ["go"], "at": {}})
+    assert run.unjudged == ["m"]
+    assert run.rows == [{"k": 2, "member": "m", "fired": {"record": [second], "candidate": []}}], run.rows

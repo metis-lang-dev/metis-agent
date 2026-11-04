@@ -22,6 +22,7 @@ inputs, so the director's rules run and the agent's own relay code carries what 
 import contextlib
 import copy
 import hashlib
+import io
 import json
 import os
 import shutil
@@ -439,7 +440,7 @@ class TraceHost:
         # a weight port the trace does not carry (its value at each draw): stood in, so the program loads; the member's
         # choices are the record's (replay_composition forces them), and the ruling names it unjudged
         for w in self.feed.weights.get(self.member, ()):
-            reg.weight(w, 1.0)
+            reg.weight(w, STAND_IN)
 
     def pending(self):
         return False
@@ -622,23 +623,32 @@ def replay_session(path, member, program, candidate=None):
     tick's recorded takes and beats applied and the candidate program's own firings drawn for its steps and beats,
     compared with the record's (rows, first_enabled, at: the composition replay's fields). → CompositionReplay."""
     out = CompositionReplay()
-    if not candidate:
+    segs = T.read(path)
+    weights = list((segs[0].header["members"].get(member) or {}).get("weights") or ())
+    if not candidate and not weights:
         r = T.replay(path, member, str(program))
         out.ticks, out.divergence = r.ticks, (dict(r.divergence, member=member) if r.divergence else None)
         return out
-    segs = T.read(path)
-    rules, want_at = set(candidate["rules"]), candidate.get("at") or {}
-    sh, events, k = None, {}, _K()
+    if weights:                                    # its draws are the record's where the record's rule is enabled (unjudged)
+        out.unjudged = [member]
+        if not candidate and (segs[0].header["members"][member].get("key") or "") != T.program_key(program):
+            out.divergence = {"k": segs[0].k0, "member": member, "what": "key", "want": "the program the trace was written from", "got": str(program)}
+            return out
+    rules, want_at = set((candidate or {}).get("rules") or ()), (candidate or {}).get("at") or {}
+    sh, events, k, queue = None, {}, _K(), []
     for seg in segs:
         m = seg.header["members"].get(member)
         if m is None:
             raise T.TraceError("no member %r in the trace (it has: %s)" % (member, ", ".join(sorted(seg.header["members"]))))
         commands, out_preds = seg.header.get("commands") or (), set(m.get("out") or ())
         if sh is None or "cut" in seg.header:      # from the record's checkpoint at the start, and after a cut
-            sh = T.open_session(str(program), m.get("seed", 1))
+            sh = _open_stood_in(program, m.get("seed", 1), weights)
             T.restore_session(sh, seg.checkpoint["sessions"][member])
             events = {ev.name: ev for _, _, ev in sh.events_tbl}
-            _watch_enabled(sh, rules, k, out)
+            if rules:
+                _watch_enabled(sh, rules, k, out)
+            if weights:
+                _force_recorded(sh, queue)
         for t in seg.ticks:
             k.k, e = t["k"], t["members"].get(member)
             out.ticks += 1
@@ -650,6 +660,7 @@ def replay_session(path, member, program, candidate=None):
                     continue
                 seq = [{"beat": [], "fired": []}]
             fired, reload = [], False
+            queue[:] = _fired(e)
             for item in seq:
                 if "reload" in item:
                     reload = True
@@ -667,12 +678,42 @@ def replay_session(path, member, program, candidate=None):
                         fired.append(sh._sample())
             outs = [x for name in fired if events.get(name) is not None for x in T.outputs(events[name], commands, out_preds)]
             got = {"seq": [{"step": fired}], "out": outs}
-            out.rows += _differences({"k": t["k"], "members": {member: e}}, {"members": {member: got}})
+            rows = _differences({"k": t["k"], "members": {member: e}}, {"members": {member: got}})
+            if not candidate:                      # the baseline: it must give the record
+                if rows:
+                    r0 = rows[0]
+                    out.divergence = {"k": r0["k"], "member": member, "what": "fired" if "fired" in r0 else "out", **(r0.get("fired") or r0.get("out"))}
+                    return out
+                continue
+            out.rows += rows
             if member in want_at.get(t["k"], ()):
                 out.at[(t["k"], member)] = {"counts": dict(sh.counts), "fired": fired, "out": [T.out_name(x) for x in outs]}
             if reload:
                 break
     return out
+
+
+STAND_IN = 0.5      # a stood-in weight port: strictly inside (0, 1), so every clause of a choice site on it (`p | ~p`) stays enabled
+
+
+def _open_stood_in(program, seed, weights):
+    """A session on PROGRAM (metispy's open_session), its WEIGHTS ports stood in when it declares any (the host that binds
+    them is not run in a replay)."""
+    if not weights:
+        return T.open_session(str(program), seed)
+    from metis.fw.registry import Registry
+    from metis.lang.repl import Repl as Shell
+    reg = Registry()
+    for w in weights:
+        reg.weight(w, STAND_IN)
+    set_here = "METIS_GROUND_BUDGET" not in os.environ
+    if set_here:
+        os.environ["METIS_GROUND_BUDGET"] = str(T.GROUND_BUDGET)
+    try:
+        return Shell(str(program), seed=seed, stdout=io.StringIO(), registry=reg)
+    finally:
+        if set_here:
+            del os.environ["METIS_GROUND_BUDGET"]
 
 
 def _force_recorded(sh, queue):
