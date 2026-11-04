@@ -73,3 +73,43 @@ def test_a_composition_trace_is_not_a_session():
 def test_a_config_without_intent_builds_no_grammar():
     from metis_agent import service as S
     assert S.build_grammar({"v3": {}}, []) is None
+
+
+TWO = GROUND.replace("  go [dyn] : want(P) -o at(P).", "  go [dyn] : want(P) -o at(P).\n  %% I stay.\n  stay [dyn] : want(P) -o ready.")
+
+
+def test_a_stood_in_member_draws_the_records_choice(tmp_path):
+    """A composition member whose weight ports the trace does not carry: its port is stood in so it loads, and each of
+    its draws is the record's choice when that rule is enabled (one draw of the stream spent, as the record's)."""
+    p = tmp_path / "two.llp"
+    p.write_text(TWO)
+    for want in ("stay[P=door]", "go[P=door]"):
+        sh = T.open_session(str(p), 1)
+        T._apply(sh, ["+want(door)"])
+        q = [want]
+        AT._force_recorded(sh, q)
+        assert sh._sample() == want and q == []
+    sh = T.open_session(str(p), 1)
+    T._apply(sh, ["+want(door)"])
+    AT._force_recorded(sh, ["nope[P=door]"])                   # a recorded rule not enabled: the member's own draw
+    assert sh._sample() in ("go[P=door]", "stay[P=door]")
+
+
+def test_the_trace_host_stands_in_a_weight_port():
+    class Reg:
+        def __init__(self):
+            self.w = {}
+
+        def weight(self, n, b):
+            self.w[n] = b
+
+    class Seg:
+        header = {"members": {"task": {"weights": ["look"]}, "nav": {}}}
+        checkpoint = {}
+    feed = AT.Feed([Seg()])
+    r = Reg()
+    AT.TraceHost("task", feed).bind(r)
+    assert r.w == {"look": 1.0}
+    r2 = Reg()
+    AT.TraceHost("nav", feed).bind(r2)
+    assert r2.w == {}

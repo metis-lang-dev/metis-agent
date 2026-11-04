@@ -367,6 +367,7 @@ class Feed:
         self.segs, self.k = segs, None
         self.copies = {m: dict(c) for m, c in (segs[0].checkpoint.get("copies") or {}).items()}
         self.beats = {}
+        self.weights = {m: list(h.get("weights") or ()) for m, h in segs[0].header["members"].items()}
 
     def at(self, rec):
         """The tick REC begins: the copies move to it, its members' beat inputs queue up."""
@@ -435,7 +436,10 @@ class TraceHost:
                 self.touched |= {a for a in set(ev.consume) | set(ev.produce) if a.split("(")[0] in self.world_preds}
 
     def bind(self, reg):
-        pass
+        # a weight port the trace does not carry (its value at each draw): stood in, so the program loads; the member's
+        # choices are the record's (replay_composition forces them), and the ruling names it unjudged
+        for w in self.feed.weights.get(self.member, ()):
+            reg.weight(w, 1.0)
 
     def pending(self):
         return False
@@ -491,6 +495,7 @@ class CompositionReplay:
     def __init__(self):
         self.ticks, self.divergence, self.checkpoints = 0, None, 0
         self.rows, self.first_enabled, self.live_changed, self.at = [], None, False, {}
+        self.unjudged = []                         # members whose weight ports the trace does not carry: their choices the record's
 
     @property
     def ok(self):
@@ -519,14 +524,14 @@ def replay_composition(path, cfg, candidate=None):
     from . import service as S
     segs = T.read(path)
     head = segs[0].header
+    unjudged = sorted(m for m, h in head["members"].items() if h.get("weights"))
     for m, h in head["members"].items():
-        if h.get("weights"):
-            raise T.TraceError("%s declares weight ports (%s): a trace does not carry their values yet" % (m, ", ".join(h["weights"])))
         if h.get("steps_world"):
             raise T.TraceError("%s's host steps its world on a command: its beats are not replayed yet" % m)
     if head.get("protocol") and head["protocol"] != T.protocol_key():
         raise T.TraceError("this trace is of another protocol (%s, this toolchain's %s): it does not replay across a protocol change" % (head["protocol"], T.protocol_key()))
     feed, out = Feed(segs), CompositionReplay()
+    out.unjudged = unjudged
     with tempfile.TemporaryDirectory(prefix="trace-replay-") as wd:
         c = copy.deepcopy(cfg)
         commands = list(head.get("commands") or [])
@@ -554,6 +559,9 @@ def replay_composition(path, cfg, candidate=None):
             for m, st in segs[0].checkpoint["sessions"].items():
                 if m in ags:
                     T.restore_session(ags[m].repl, st)
+            chosen = {m: [] for m in unjudged if m in ags and not (candidate and m == candidate["member"])}   # the candidate's own draws are judged
+            for m in chosen:
+                _force_recorded(ags[m].repl, chosen[m])
             if segs[0].checkpoint.get("agent"):
                 restore_agent(lv, segs[0].checkpoint["agent"])
             lines, tracer = [], lv.tracer
@@ -578,6 +586,8 @@ def replay_composition(path, cfg, candidate=None):
                         got = {"k": rec["k"], "members": tracer.entries()}
                     else:
                         feed.at(rec)
+                        for m in chosen:                   # this tick's recorded choices, for the stood-in members
+                            chosen[m][:] = _fired(rec["members"].get(m, {}))
                         del lines[:]
                         lv.tick()
                         out.ticks += 1
@@ -663,6 +673,23 @@ def replay_session(path, member, program, candidate=None):
             if reload:
                 break
     return out
+
+
+def _force_recorded(sh, queue):
+    """A member whose weight ports the trace does not carry draws the record's choice: its next sampled firing is the
+    QUEUE's next rule when that rule is enabled (one draw of the stream spent, as the record spent it), else its own."""
+    own = sh._sample
+
+    def sample():
+        ws = sh._candidates()
+        if queue and ws:
+            hit = next((i for i, _ in ws if sh.events_tbl[i][2].name == queue[0]), None)
+            if hit is not None:
+                queue.pop(0)
+                sh.rng.unit()
+                return sh._fire(hit, "sampled", ws)
+        return own()
+    sh._sample = sample
 
 
 def _watch_enabled(sh, rules, feed, out):
@@ -879,6 +906,7 @@ def fired_diff(path, member, text, root, config, cases=(), seeds=(1, 2, 3), comp
             by_member.setdefault(r["member"], r["k"])
         return {"baseline": True, "rules": rules, "receipt": _receipt(moved, member, before_if, after_if, head),
                 "first_enabled": run.first_enabled, "first_fired_diff": first_fired, "first_out_diff": first_out,
+                "unjudged": list(getattr(run, "unjudged", []) or []),
                 "open_loop_after": first_out["k"] if first_out else None, "rows": rows, "members": by_member,
                 "moved": moved_names, "moved_diff": moved_diff, "lint": lint_rows, "consumers": links, "goldens": {"ok": not [x for x in failed if not x.get("not_judged")], "ran": ran, "failed": [x for x in failed if not x.get("not_judged")],
                                                 "not_judged": [x for x in failed if x.get("not_judged")], "skipped": _skipped(skips, consumer_skips), "already_failing": sorted(["%s of %s, seed %s" % (f, m, x) for m, f, x in already] + ["%s of %s/%s, seed %s" % (f, c, m, x) for c, m, f, x in before_consumers])}, "cases": judged}
