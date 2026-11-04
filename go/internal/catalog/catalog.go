@@ -96,10 +96,12 @@ func (m Manifest) Extensions() []string {
 
 // Keys are the manifest's keys (metispy's metis.catalog.manifests KEYS); any other is refused.
 // The interface's (spec/15: shared, status, world, resources, gating), the instrument's (spec/16:
-// beliefs, levels, evaluate) and actor are metispy's to check: Go reads them past.
+// beliefs, levels, evaluate), the lint's (patterns CHECKS.md §3, L7 and L9: safety, belief, commands;
+// checks-open s-17e557f0) and actor are metispy's to check: Go reads them past.
 var Keys = []string{"program", "extensions", "serves", "host", "intent", "clock", "reload", "records",
 	"display", "line", "voice", "agent", "actor", "pair", "partner_of", "notch",
-	"shared", "status", "world", "resources", "gating", "beliefs", "levels", "evaluate"}
+	"shared", "status", "world", "resources", "gating", "beliefs", "levels", "evaluate",
+	"safety", "belief", "commands"}
 
 // CheckManifest reads one domain.yaml by the loader's rules (py
 // check_manifest): a mapping of the known keys only, intent {spec} only,

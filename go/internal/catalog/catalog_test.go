@@ -95,7 +95,7 @@ func TestThePackageShape(t *testing.T) {
 	}
 	write("intent/toy.gbnf", "root ::= \"x\"")
 	for _, c := range []struct{ yaml, err string }{
-		{"name: toy\nprogram: toy.llp\n", "unknown key name (the package's keys: program, extensions, serves, host, intent, clock, reload, records, display, line, voice, agent, actor, pair, partner_of, notch, shared, status, world, resources, gating, beliefs, levels, evaluate)"},
+		{"name: toy\nprogram: toy.llp\n", "unknown key name (the package's keys: program, extensions, serves, host, intent, clock, reload, records, display, line, voice, agent, actor, pair, partner_of, notch, shared, status, world, resources, gating, beliefs, levels, evaluate, safety, belief, commands)"},
 		{"intent: {spec: intent.yaml, grammar: g.gbnf, prompt: p.txt}\n", "unknown intent keys grammar, prompt (intent is {spec}; the generated files sit at fixed names in intent/)"},
 		{"intent: intent.yaml\n", "intent is {spec: intent.yaml}"},
 		{"pair: kitchen\n", "pair is a list"},
@@ -107,6 +107,11 @@ func TestThePackageShape(t *testing.T) {
 		if err == nil || !strings.Contains(err.Error(), c.err) {
 			t.Fatalf("%q: want %q, got %v", c.yaml, c.err, err)
 		}
+	}
+	// the lint's keys (checks-open: metis-catalog's road manifests carry them) are read past, never refused
+	write("domain.yaml", "program: toy.llp\nsafety: [brake_lon]\nbelief: [seen_ahead]\ncommands: [accel, stop_lat]\n")
+	if _, err := Scan(d); err != nil {
+		t.Fatalf("the lint's keys refused: %v", err)
 	}
 	write("domain.yaml", "program: toy.llp\nintent: {spec: intent.yaml}\n")
 	ms, err = Scan(d)
