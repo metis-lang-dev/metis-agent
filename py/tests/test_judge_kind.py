@@ -30,3 +30,21 @@ def test_an_undeclared_predicate_on_an_ontological_record_names_the_missing_voca
     plain = {"verdict": "refused", "reasons": ["the gate: x"], "gate_error": "planner: undeclared predicate 'x' (persist)"}
     AT._vocabulary_refusal(plain, {"kind": "structural"})           # a structural record keeps the compiler's words
     assert plain["reasons"] == ["the gate: x"] and "why" not in plain
+
+
+def test_on_an_ontological_record_a_pack_may_not_bring_its_own_vocabulary():
+    """surprise-kinds 2d (nina's review): a pack accepted by the cascade on an ontological record is refused when it declares a
+    pred, type, namespace or bwd table of its own, or its rules read an atom no host states (reads_absent): law around the hole."""
+    pack = "pred emergency_behind : planner.\nstage progress {\n  yield_rear [dyn] : $busy * $emergency_behind * go -o ().\n}\n"
+    e = {"verdict": "accepted", "reasons": [], "rules": ["yield_rear"], "reads_absent": ["emergency_behind"]}
+    AT._ontological_guard(e, {"kind": "ontological"}, pack, None, "planner", "", None)
+    assert e["verdict"] == "refused" and e["why"] == "vocabulary"
+    assert "declares pred emergency_behind" in e["reasons"][0] and "no host states" in e["reasons"][1]
+    ok = {"verdict": "accepted", "reasons": [], "rules": ["yield_rear"], "reads_absent": []}
+    AT._ontological_guard(ok, {"kind": "ontological"}, "stage progress {\n  yield_rear [dyn] : $busy * go -o ().\n}\n", None, "planner", "", None)
+    assert ok["verdict"] == "accepted"                                          # clauses over a vocabulary the host states
+    same = dict(e, verdict="accepted", reasons=[])
+    AT._ontological_guard(same, {"kind": "structural"}, pack, None, "planner", "", None)
+    assert same["verdict"] == "accepted"                                        # a structural record: the cascade's verdict
+    assert AT._vocabulary_of("types (lkind).\nbwd off_route(lkind).\nnamespace x produce (dyn).") == [
+        ("types", "lkind"), ("bwd", "off_route"), ("namespace", "x")]

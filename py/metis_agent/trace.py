@@ -1199,6 +1199,41 @@ def _vocabulary_refusal(e, record):
         e["reasons"] = ["the vocabulary has no atom for %s; propose the predicate and its host contract" % ", ".join(atoms)]
 
 
+def _vocabulary_of(pack):
+    """The vocabulary a PACK declares itself: [(kind, name)] for its pred, type, types, namespace and bwd lines."""
+    import re
+    out = []
+    for line in pack.splitlines():
+        m = re.match(r"\s*(pred|types?|namespace|bwd)\s+\(?\s*([a-z_][a-z0-9_]*)", line)
+        if m:
+            out.append((m.group(1), m.group(2)))
+    return out
+
+
+def _ontological_guard(e, record, pack, path, member, was, target):
+    """surprise-kinds 2d (nina's review): on an ontological record the vocabulary is the host contract's, by hand with the
+    architect's word (spec 20 §5's first row); a pack that declares its own pred, type, namespace or bwd table, or whose rules
+    read an atom no host states (reads_absent), writes law around the hole: refused, naming them."""
+    if not record or record.get("kind") != "ontological" or e.get("verdict") != "accepted":
+        return
+    reasons = []
+    voc = _vocabulary_of(pack)
+    if voc:
+        reasons.append("on an ontological record the vocabulary is the host contract's (by hand, with the architect's word), not the "
+                       "pack's: it declares %s" % ", ".join("%s %s" % kv for kv in voc))
+    absent = e.get("reads_absent")
+    if absent is None and e.get("rules"):
+        try:
+            absent = e["reads_absent"] = _reads_absent(path, member, T.apply_pack(was, pack)[0], e["rules"], target)
+        except Exception:  # noqa: BLE001 — not computable: the declaration test alone decides
+            absent = None
+    if absent:
+        reasons.append("on an ontological record a pack reads only what a host states: its rules read %s, which no host states"
+                       % ", ".join(sorted(absent) if not isinstance(absent, str) else [absent]))
+    if reasons:
+        e["verdict"], e["why"], e["reasons"] = "refused", "vocabulary", reasons
+
+
 def judge(path, member, pack, root, config, cases=(), composition=None, unit=None, seeds=(1, 2, 3), consumers=(), budget=None, golden_budget=None, moved=(),
           record=None):
     """A hand-written PACK for MEMBER, with the same judgement a model's draft gets: the gate cascade (a duplicate, the link, the I-checks, the receipt with ei_key), every
@@ -1241,6 +1276,7 @@ def judge(path, member, pack, root, config, cases=(), composition=None, unit=Non
         x.pop("t0", None)
     e["verdict"], e["reasons"] = verdict(e, member)
     _vocabulary_refusal(e, record)
+    _ontological_guard(e, record, pack, path, member, was, target)
     if e.get("rules") and e.get("baseline") and not e.get("gate_error"):
         try:
             e["reads_absent"] = _reads_absent(path, member, T.apply_pack(was, pack)[0], e["rules"], target)
