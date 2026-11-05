@@ -1210,14 +1210,32 @@ def _vocabulary_of(pack):
     return out
 
 
+def _host_vocabulary_of(pack):
+    """What a PACK declares that only a host may state (nina's narrowing of 2d): its type/types and namespace declarations, and
+    each pred its rules read that no rule of the pack produces (the host-stated case). A bwd table, or a pred the pack's own
+    rules produce, is law-side (classes in the rules): allowed. → [(kind, name)]."""
+    import re
+    rules = re.findall(r"\[dyn\][^:]*:(.*?)\.\s*(?:%[^\n]*)?$", pack, re.M | re.S)
+    reads = " ".join(r.split("-o", 1)[0] for r in rules)
+    makes = " ".join(r.split("-o", 1)[1] if "-o" in r else "" for r in rules)
+    out = []
+    for kind, name in _vocabulary_of(pack):
+        if kind in ("type", "types", "namespace"):
+            out.append((kind, name))
+        elif kind == "pred" and re.search(r"\b%s\b" % re.escape(name), reads) and not re.search(r"\b%s\b" % re.escape(name), makes):
+            out.append((kind, name))
+    return out
+
+
 def _ontological_guard(e, record, pack, path, member, was, target):
-    """surprise-kinds 2d (nina's review): on an ontological record the vocabulary is the host contract's, by hand with the
-    architect's word (spec 20 §5's first row); a pack that declares its own pred, type, namespace or bwd table, or whose rules
-    read an atom no host states (reads_absent), writes law around the hole: refused, naming them."""
+    """surprise-kinds 2d (nina's reviews): on an ontological record the vocabulary is the host contract's, by hand with the
+    architect's word (spec 20 §5's first row); a pack that declares a type, a namespace, or a pred its rules read and none of its
+    rules produces (_host_vocabulary_of), or whose rules read an atom no host states (reads_absent), writes law around the hole:
+    refused, naming them. A bwd table and a pred the pack itself produces are classes in the rules: allowed."""
     if not record or record.get("kind") != "ontological" or e.get("verdict") != "accepted":
         return
     reasons = []
-    voc = _vocabulary_of(pack)
+    voc = _host_vocabulary_of(pack)
     if voc:
         reasons.append("on an ontological record the vocabulary is the host contract's (by hand, with the architect's word), not the "
                        "pack's: it declares %s" % ", ".join("%s %s" % kv for kv in voc))

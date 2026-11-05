@@ -48,3 +48,16 @@ def test_on_an_ontological_record_a_pack_may_not_bring_its_own_vocabulary():
     assert same["verdict"] == "accepted"                                        # a structural record: the cascade's verdict
     assert AT._vocabulary_of("types (lkind).\nbwd off_route(lkind).\nnamespace x produce (dyn).") == [
         ("types", "lkind"), ("bwd", "off_route"), ("namespace", "x")]
+
+
+
+def test_on_an_ontological_record_the_packs_bwd_tables_and_own_state_are_law_side():
+    """nina's narrowing: the lane-kind pack's bwd tables over a given type, and a pred the pack's rules produce, are classes in the
+    rules; a type, a namespace, or a pred read and produced by none of the pack's rules is a host's to state."""
+    lawside = ("bwd off_route(lkind).\noff_route(parking).\npred passing : planner.\nstage progress {\n"
+               "  start_pass [dyn] : $busy * $lead_slow * go -o passing.\n  end_pass [dyn] : $busy * passing * $own_kind(K) * off_route(K) -o ().\n}\n")
+    assert AT._host_vocabulary_of(lawside) == []
+    e = {"verdict": "accepted", "reasons": [], "rules": ["start_pass", "end_pass"], "reads_absent": []}
+    AT._ontological_guard(e, {"kind": "ontological"}, lawside, None, "planner", "", None)
+    assert e["verdict"] == "accepted"
+    assert AT._host_vocabulary_of("types (lkind).\nnamespace x produce (dyn).") == [("types", "lkind"), ("namespace", "x")]
