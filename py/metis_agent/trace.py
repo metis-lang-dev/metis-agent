@@ -1150,10 +1150,65 @@ def verdict(e, member):
     return "accepted", why
 
 
-def judge(path, member, pack, root, config, cases=(), composition=None, unit=None, seeds=(1, 2, 3), consumers=(), budget=None, golden_budget=None, moved=()):
+# ── the record's kind before the cascade (spec 20 §5, surprise-kinds s-7a02c2ac) ──
+JUDGED_KINDS = ("structural", "ontological")    # a pack answers these (ontological: the clauses over a vocabulary given by hand)
+_ROUTE = {                                       # spec 20 §5's rows, as metispy metis.surprise_kind.RESPONSE says them when it has them
+    "probabilistic": "the fold's bounds, a weight, a belief or a sensor parameter: a port value or a host parameter, a person's word; never a rule",
+    "computational": "the grounding form, a role count, a horizon or the budget itself (spec 14): the architect's",
+    "world": "a world capability (a net rebuild, a body the director carries): the world's owner, by hand; no proposal",
+    "evidential": "a sharper record: the columns it lacks (a truth snapshot, a second host, a longer window); no proposal",
+    "confusion": "the fragment kept with the person's words and the narration they rejected; the triage on the words decides",
+    "ontological": "new vocabulary: a pred with its namespace and host contract, by hand with the architect's word; then the clauses through the judge",
+}
+
+
+def kind_route(kind):
+    """Spec 20 §5's response for KIND, as a sentence (metispy's table when installed, this module's copy else)."""
+    try:
+        from metis.surprise_kind import RESPONSE
+        if kind in RESPONSE:
+            return RESPONSE[kind]
+    except ImportError:
+        pass
+    return _ROUTE.get(kind, "")
+
+
+def kind_gate(record):
+    """The record's kind before the cascade (spec 20 §5's routing rule: a pack answers a structural record, and the clauses over a
+    new vocabulary of an ontological one): None to judge it; else the refusal {status, why: "kind", kind, route}. A confusion
+    record goes by the kind its triage found on the person's words (`then`); a record with no kind is judged as before."""
+    if not record:
+        return None
+    kind = record.get("kind")
+    if kind == "confusion" and (record.get("then") or (record.get("evidence") or {}).get("then")) in JUDGED_KINDS:
+        kind = record.get("then") or record["evidence"]["then"]
+    if kind is None or kind in JUDGED_KINDS:
+        return None
+    return {"status": "refused", "why": "kind", "kind": kind, "route": kind_route(kind)}
+
+
+def _vocabulary_refusal(e, record):
+    """On an ontological record, a link that names an undeclared predicate is the expected outcome, said as the record's response:
+    the vocabulary has no atom for it; propose the predicate and its host contract (no nearest rule)."""
+    import re
+    if not record or record.get("kind") != "ontological" or not e.get("gate_error"):
+        return
+    atoms = sorted(set(re.findall(r"undeclared predicate '([^']+)'", e["gate_error"])))
+    if atoms:
+        e["why"], e["atoms"] = "vocabulary", atoms
+        e["reasons"] = ["the vocabulary has no atom for %s; propose the predicate and its host contract" % ", ".join(atoms)]
+
+
+def judge(path, member, pack, root, config, cases=(), composition=None, unit=None, seeds=(1, 2, 3), consumers=(), budget=None, golden_budget=None, moved=(),
+          record=None):
     """A hand-written PACK for MEMBER, with the same judgement a model's draft gets: the gate cascade (a duplicate, the link, the I-checks, the receipt with ei_key), every
     member's goldens and the surprises' CASES, the fired diff on the composition's replay. BUDGET: seconds for the whole of it; GOLDEN_BUDGET: for a run of one golden. → the evidence, with
-    "verdict" ("accepted", "refused", or "not judged": out of time, never a hang) and "reasons"; no world, no model."""
+    "verdict" ("accepted", "refused", or "not judged": out of time, never a hang) and "reasons"; no world, no model. RECORD (the surprise's, when
+    given): its kind is read before the cascade (kind_gate): not structural nor ontological → refused at once, with the kind and spec 20 §5's route."""
+    gate = kind_gate(record)
+    if gate is not None:
+        return dict(gate, member=member, verdict="refused", inert=False, times=[],
+                    reasons=["the record's kind is %s, not structural: no pack answers it. %s" % (gate["kind"], gate["route"])])
     from metis import catalog as C
     with _catalog(root):
         target = Path(unit).resolve() if unit else Path(C.get(member).program).resolve()
@@ -1185,6 +1240,7 @@ def judge(path, member, pack, root, config, cases=(), composition=None, unit=Non
     for x in e["times"]:
         x.pop("t0", None)
     e["verdict"], e["reasons"] = verdict(e, member)
+    _vocabulary_refusal(e, record)
     if e.get("rules") and e.get("baseline") and not e.get("gate_error"):
         try:
             e["reads_absent"] = _reads_absent(path, member, T.apply_pack(was, pack)[0], e["rules"], target)
