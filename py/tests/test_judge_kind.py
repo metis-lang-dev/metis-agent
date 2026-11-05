@@ -61,3 +61,32 @@ def test_on_an_ontological_record_the_packs_bwd_tables_and_own_state_are_law_sid
     AT._ontological_guard(e, {"kind": "ontological"}, lawside, None, "planner", "", None)
     assert e["verdict"] == "accepted"
     assert AT._host_vocabulary_of("types (lkind).\nnamespace x produce (dyn).") == [("types", "lkind"), ("namespace", "x")]
+
+
+LANE_KIND_CLAUSES = """stage progress {
+  change_pass [dyn] : $busy * $tick__grant(planner, controls) * $lead_slow * $adjacent(D) * $lane_kind(D, driving) * $settled(D) * $side_clear(D) * $zone_at(nextzone, C) * $roomy(C) * go -o ().
+  change_aside [dyn] : $busy * $tick__grant(planner, controls) * $lead_slow * $adjacent(D) * $lane_kind(D, K) * off_route(K) * other_side(D, E) * $lane_kind(E, X) * not_driving(X) * $settled(D) * $side_clear(D) * $zone_at(nextzone, C) * $roomy(C) * go -o ().
+  change_back [dyn] : $busy * $tick__grant(planner, controls) * $own_kind(K) * off_route(K) * $adjacent(D) * $lane_kind(D, driving) * $settled(D) * $side_clear(D) * $zone_at(nextzone, C) * $roomy(C) * go -o ().
+}
+bwd off_route(lkind).
+off_route(parking).
+off_route(bidirectional).
+bwd not_driving(lkind).
+not_driving(parking).
+not_driving(bidirectional).
+not_driving(none).
+bwd other_side(side, side).
+other_side(left, right).
+other_side(right, left).
+"""
+
+
+def test_the_lane_kind_packs_clauses_pass_on_their_ontological_record():
+    """463d7d (the lane stay, spec 20 §9's first row): with lkind, own_kind and lane_kind given by hand in the base (the host
+    contract), the pack's clauses and its bwd tables over lkind are law-side: the guard lets them through. Declaring the host's
+    own preds or the type in the pack itself would be refused: that vocabulary is the base's, by hand."""
+    e = {"verdict": "accepted", "reasons": [], "rules": ["change_pass", "change_aside", "change_back"], "reads_absent": []}
+    AT._ontological_guard(e, {"kind": "ontological", "id": "20261105T082838-463d7d"}, LANE_KIND_CLAUSES, None, "planner", "", None)
+    assert e["verdict"] == "accepted", e["reasons"]
+    with_host = "types (lkind).\npred own_kind(lkind) : planner.\npred lane_kind(side, lkind) : planner.\n" + LANE_KIND_CLAUSES
+    assert AT._host_vocabulary_of(with_host) == [("types", "lkind"), ("pred", "own_kind"), ("pred", "lane_kind")]
