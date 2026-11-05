@@ -815,6 +815,17 @@ def _catalog(root):
     return _env(METIS_CATALOG=root)
 
 
+def gate_words(x):
+    """The refusal's words for an error of the gate: its text, except a KeyError on a variable's name (gpt-oss F14: a
+    `<>` naming a variable no premise binds read "the gate: 'L2'", the KeyError's bare str): said as what it is."""
+    import re
+    if isinstance(x, KeyError) and len(x.args) == 1 and re.fullmatch(r"[A-Z][A-Za-z0-9_]*", str(x.args[0])):
+        v = x.args[0]
+        return ("unbound variable %s: no premise of the rule binds it (a `<>` or the head names %s, and no atom of the "
+                "body before `-o` reads it: bind it in a premise, e.g. $at(%s), or use a variable the body has)" % (v, v, v))
+    return str(x)[-600:]
+
+
 def _under(path, root):
     """PATH relative to ROOT, or None."""
     try:
@@ -1283,10 +1294,10 @@ def judge(path, member, pack, root, config, cases=(), composition=None, unit=Non
         stage = e["times"][-1]["stage"] if e["times"] else "its start"
         e["baseline"], e["not_judged"] = e.get("baseline", True), {"what": "budget", "seconds": budget, "stage": stage}
     except (T.TraceError, ValueError, LookupError) as x:      # the compiler's or the linker's words: a refusal, not an end
-        e["baseline"], e["gate_error"] = e.get("baseline", True), str(x)[-600:]
+        e["baseline"], e["gate_error"] = e.get("baseline", True), gate_words(x)
     except Exception as x:  # noqa: BLE001 — metis.lang's errors have their own types; the words are the refusal
         if type(x).__module__.startswith("metis"):
-            e["baseline"], e["gate_error"] = e.get("baseline", True), str(x)[-600:]
+            e["baseline"], e["gate_error"] = e.get("baseline", True), gate_words(x)
         else:
             raise
     _mark(e["times"], None)

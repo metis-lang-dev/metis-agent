@@ -487,3 +487,12 @@ def test_a_premise_the_program_holds_is_not_a_reading_absent(tmp_path):
     assert _reads_absent(d, "cook_a", text, ["serve_ghost"], unit) == ["ghost"]
     ticks, _ = trace.timeline(d, "cook_a")
     assert not any(trace.pred_of(a) == "self" for t in ticks for a in t.counts)    # no tick carries it: before the fix, it was "absent"
+
+
+def test_an_unbound_variable_is_said_as_one_not_a_bare_name():
+    """gpt-oss F14: a nav pack with `L <> L2` and no premise binding L2 was refused "the gate: 'L2'" (a KeyError's str)."""
+    from metis_agent.trace import gate_words
+    w = gate_words(KeyError("L2"))
+    assert w.startswith("unbound variable L2: no premise of the rule binds it") and "$at(L2)" in w
+    assert gate_words(KeyError("not a var")) == "'not a var'"            # any other KeyError keeps its words
+    assert gate_words(ValueError("lex error: 3:4: bad character '='")) == "lex error: 3:4: bad character '='"
