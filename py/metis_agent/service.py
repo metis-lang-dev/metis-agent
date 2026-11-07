@@ -2191,15 +2191,39 @@ class Live:
                 self.run_job(("tick",))
                 if getattr(self, "eager", False):         # the director moved: the next beat now, jobs first
                     next_tick = time.time()
+                elif getattr(self, "_was_held", False):    # held: a host's own pace is in its tick, not run; the loop waits HELD_PACE
+                    next_tick = max(next_tick, time.time() + self.HELD_PACE)   # (jobs still served: the page's play comes in)
             if next_watch is not None and now >= next_watch:
                 next_watch = now + 2.0
                 self.run_job(("watch",))
+
+    HELD_PACE = 0.1                     # s between the held clock's ticks (the frames' pace while a host holds the beat)
+
+    def beat_held(self):
+        """A host holds the beat (a host's `holds_beat()` face; loop-road-ui, the user 2026-11-07: "we simulate in lock step, not
+        realtime"): the road page's pause. While any served host holds it, the clock's tick is no beat: no member ticks, the
+        trace writes no row and its k stays (a paused page no longer spends the trace's ring); world lines are still served
+        (they are jobs of their own, stamped onto the next beat's row) and the hosts' frames still sent. Not across a process
+        split: the peer beats on its own clock."""
+        if self.proc_split is not None:
+            return False
+        for ag in (self.agents.agents.values() if hasattr(self.agents, "agents") else ()):
+            h = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+            f = getattr(h, "holds_beat", None)
+            if callable(f) and f():
+                return True
+        return False
 
     def run_job(self, job):
         k = job[0]
         try:
             if k == "tick":
-                self.tick()
+                self._was_held = self.beat_held()
+                if self._was_held:
+                    self.eager = False              # held: no eager next beat (it would spin, the frames flooding the page)
+                    self.world_frames()             # no beat, the page still answered (a scene, a mark said, a card)
+                else:
+                    self.tick()
             elif k == "watch":
                 self.watch_once()
             elif k == "person":

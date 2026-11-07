@@ -339,3 +339,41 @@ def test_no_world_frame_carries_a_role():
             shown = json.dumps(f)
             assert not roles.search(shown), (ev, shown)
     assert all(not roles.search(line) for _, line in said)
+
+
+def test_a_held_beat_is_no_tick_and_the_frames_still_go():
+    """A host's holds_beat() (the road page's pause; the user, 2026-11-07: lock step, not realtime): while any served host holds the beat,
+    the clock's tick is no beat — tick() (and the tracer that wraps it) is not called, so no member ticks and the trace's k stays —
+    but the hosts' frames still go; released, the next tick beats. Not across a process split."""
+    class Host:
+        hold = True
+
+        def holds_beat(self):
+            return self.hold
+
+        def frames(self):
+            return [{"ev": "world/scene", "k": 7}]
+    h = Host()
+    lv, frames, _ = stand_in(hosts={"road": h, "task": SimpleNamespace()})
+    ticks = []
+    lv.proc_split, lv.tick, lv.held = None, lambda: ticks.append(1), []   # Live.held is the held replies (a list): the face is beat_held
+    lv.beat_held = lambda: S.Live.beat_held(lv)
+    lv.world_frames = lambda: S.Live.world_frames(lv)
+    lv.eager = True                                                   # the director moved at the last beat
+    S.Live.run_job(lv, ("tick",))
+    assert ticks == [] and frames == [("world/scene", {"k": 7, "domain": "road"})]
+    assert lv.eager is False                                          # held: no eager next beat (it spun, flooding the page)
+    h.hold = False
+    S.Live.run_job(lv, ("tick",))
+    assert ticks == [1]
+    h.hold, lv.proc_split = True, object()
+    assert S.Live.beat_held(lv) is False                                   # a split's peer beats on its own clock
+
+
+def test_the_held_clock_keeps_a_pace_of_its_own():
+    """A road config ticks at 1 ms, its host pacing in its own tick (not run while held): the held loop waits HELD_PACE between
+    its ticks (2026-11-07 on the road page: ~1000 scene frames a second, the page's play starved)."""
+    import inspect
+    src = inspect.getsource(S.Live.run)
+    assert S.Live.HELD_PACE == 0.1 and 'elif getattr(self, "_was_held", False):' in src
+    assert "next_tick = max(next_tick, time.time() + self.HELD_PACE)" in src
