@@ -307,7 +307,12 @@ def build_grammar(cfg, intents):
 class Live:
     """The orchestrator and the domain agents of one process, driven by one
     agent thread (jobs: the clock's ticks, person turns, world lines, the
-    console's verbs, a deferred consult's answer), the consult on a worker."""
+    console's verbs, a deferred consult's answer), the consult on a worker.
+
+    Three flags of the clock, side by side (their names collided once):
+      eager      the director moved at the last beat: the next beat now, jobs first (run())
+      _was_held  the last clock tick was held (a host's holds_beat(): beat_held()): no beat, the loop waits HELD_PACE
+      held       not a flag: the held replies, a list released after the director's step (release_held)"""
 
     image = None                         # v3.image's (metis.catalog.image.Image), when the config names one
     proc_split, remote_status = None, {}     # a plan's process (metis_agent.split.Split) and its peer's statuses

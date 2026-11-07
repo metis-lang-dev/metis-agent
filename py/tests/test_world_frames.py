@@ -372,8 +372,27 @@ def test_a_held_beat_is_no_tick_and_the_frames_still_go():
 
 def test_the_held_clock_keeps_a_pace_of_its_own():
     """A road config ticks at 1 ms, its host pacing in its own tick (not run while held): the held loop waits HELD_PACE between
-    its ticks (2026-11-07 on the road page: ~1000 scene frames a second, the page's play starved)."""
-    import inspect
-    src = inspect.getsource(S.Live.run)
-    assert S.Live.HELD_PACE == 0.1 and 'elif getattr(self, "_was_held", False):' in src
-    assert "next_tick = max(next_tick, time.time() + self.HELD_PACE)" in src
+    its ticks (2026-11-07 on the road page: ~1000 scene frames a second, the page's play starved). Live.run on a stand-in whose
+    clock ticks are all held: consecutive held ticks at least HELD_PACE apart; released, the 1 ms clock again."""
+    import queue
+    import threading
+    import time
+    at, held = [], [True]
+    lv = SimpleNamespace(cfg={"v3": {"tick_ms": 1}}, stop=threading.Event(), started=threading.Event(), jobs=queue.Queue(),
+                         journal=SimpleNamespace(record=lambda r: None), HELD_PACE=S.Live.HELD_PACE, eager=False)
+    lv.started.set()
+
+    def run_job(job):
+        if job[0] != "tick":
+            return
+        at.append((time.monotonic(), held[0]))
+        lv._was_held = held[0]
+        if len(at) == 3:
+            held[0] = False                      # released: the clock's own 1 ms pace
+        if len(at) >= 8:
+            lv.stop.set()
+    lv.run_job = run_job
+    S.Live.run(lv)
+    gaps = [b[0] - a[0] for a, b in zip(at, at[1:])]
+    assert all(g >= S.Live.HELD_PACE * 0.95 for g in gaps[:3]), gaps      # each tick after a held one waits HELD_PACE
+    assert all(g < S.Live.HELD_PACE / 2 for g in gaps[4:]), gaps          # released: no wait of its own
