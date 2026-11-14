@@ -486,6 +486,11 @@ class TlsGateway(Gateway):
                         return
             except Exception as e:                      # the channel dropped: resume from the last seq, on a fresh channel
                 self.errors += 1
+                if "failed to connect" in str(e) and self.seq:
+                    # com was DOWN (the stack restarted: a new run, a new reply ring from seq 1): resume from 0, or the new
+                    # run's replies under the old run's last seq are never sent (the showcase, card 1 -> card 2)
+                    print("[road-gateway] the gateway was down: a new run, its replies from seq 0", flush=True)
+                    self.seq = 0
                 print("[road-gateway] reply stream: %s; again in %.1f s from seq %d" % (str(e)[:160], wait, self.seq), flush=True)
                 self._fresh()
             time.sleep(wait)

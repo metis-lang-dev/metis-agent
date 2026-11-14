@@ -440,3 +440,61 @@ def test_trace_gateway_names_a_stack_run_by_its_dir(tmp_path):
     d.mkdir(parents=True)
     (d / "seg-0.jsonl").write_text(json.dumps({"k0": 0, "image": "i", "checkpoint": None}) + "\n" + json.dumps({"k": 0, "t": 0, "members": {}}) + "\n")
     assert TraceGateway(str(d)).name == "road3_parked_in_lane"
+
+
+@pytest.mark.skipif(not __import__("os").path.isfile(CLIENT + "/road_client.py"), reason="bond001's road_client bundle not here")
+def test_tls_gateway_after_a_stack_restart_reads_the_new_run_from_seq_0():
+    """The showcase, card 1 -> card 2: the stack restarts, com comes back with a NEW reply ring (seq from 1). The client was at
+    seq 8; resuming 'since 8' would skip the new run's replies 1..8. A failed connect means com was down: read from 0."""
+    import socket
+    import sys
+    import time
+    from concurrent import futures
+
+    import grpc
+    sys.path.insert(0, CLIENT)
+    import road_client
+    C, G, Gg = road_client._stubs()
+    asked = []
+
+    def server(port, first_k):
+        class Gw(Gg.ComGatewayServicer):
+            def Stream(self, req, ctx):
+                asked.append(req.since_seq)
+                for seq in range(int(req.since_seq) + 1, 4):        # this run's ring: seq 1..3
+                    yield G.GwFrame(seq=seq, msg_type=req.msg_type, payload=C.RoadReply(
+                        seq=seq, json=json.dumps({"kind": "event", "k": first_k + seq})).SerializeToString())
+                while ctx.is_active():
+                    time.sleep(0.1)
+        s = grpc.server(futures.ThreadPoolExecutor(4))
+        Gg.add_ComGatewayServicer_to_server(Gw(), s)
+        s.add_insecure_port("127.0.0.1:%d" % port)
+        s.start()
+        return s
+
+    so = socket.socket()
+    so.bind(("127.0.0.1", 0))
+    port = so.getsockname()[1]
+    so.close()
+    from metis_agent.road_chat.gateway import TlsGateway
+    s1 = server(port, 100)
+    g = TlsGateway("127.0.0.1:%d" % port, None, client_dir=CLIENT)
+    got = []
+    g.subscribe(lambda r: got.append(r["k"]))
+    for _ in range(50):
+        if g.seq == 3:
+            break
+        time.sleep(0.1)
+    g.seq = 8                                                         # as if card 1 had gone on to seq 8
+    s1.stop(0)                                                        # the stack goes down ...
+    time.sleep(1.5)
+    s2 = server(port, 500)                                            # ... and a new run starts, its ring from seq 1
+    try:
+        for _ in range(100):
+            if 501 in got:
+                break
+            time.sleep(0.1)
+        assert [k for k in got if k >= 500] == [501, 502, 503] and 0 in asked
+    finally:
+        g.close()
+        s2.stop(0)
