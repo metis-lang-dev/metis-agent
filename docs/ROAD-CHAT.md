@@ -65,3 +65,24 @@ The GPU is shared with CARLA: nothing on it during a CARLA timing run (bond003, 
   "continue driving" → RESUME, "park the car in the garage" → STOP, "do a u-turn" → TURN LEFT, "drive at 200 km/h"
   → PACE BRISK. Candidates for the task intent.yaml's examples (its owner's change, not made here).
 - narration: 5/5 windows by the model, each passing the faithfulness check, 0.3–1.1 s.
+
+## P6: the pi sidecar (a vehicle's moment → a ruled rule candidate → the tester's gate)
+
+The pi sidecar is **metis-loop's backend** (`metis-loop --port 8772`) over a road workspace, a scratch copy of
+metis-worlds `road/domains` at the vehicle's image.pin with `METIS_HOME` = the family at its catalog.pin, so the
+judge replays the members the vehicle ran and an approved change is a branch for review. It starts pi itself over
+rpc (OpenRouter, a per-session `budget`; the session cap 4 USD is checked against the key's usage). viz embeds its
+CHAT (metis-loop's embed face, `?loop=http://HOST:8772`).
+
+```
+viz marker / tester "send event N to pi"
+  → chat sidecar POST /topi {n | ns0,ns1 | k0,k1, words, member?}
+      Read('trace', window) from the vehicle → <ws>/.metis/traces/veh-<run>-<image>-k<K0>-<K1>/ (seg + checkpoint)
+      → row {kind: topi, run, member, k0, k1, line: "/narrate RUN:MEMBER K0..K1 WORDS"}
+  → the loop CHAT: line → "mark N" (the rules' own words, 0 USD) → /disagree N WORDS → a confusion surprise
+  → /take: pi (paid) — surprise_next, trace_blame, rule_text, the case, pack_propose (the judge: gate cascade,
+    goldens, fired diff on the trace's replay) → the ruling → catalog_apply's gate → the tester confirms or refuses
+```
+
+Run (from the workspace): `cd $WS/metis-worlds/road && METIS_HOME=$WS/metis-catalog/domains/road metis-loop --port 8772`
+and the chat sidecar with `--pi-ws $WS/metis-worlds/road` (`--trace RUN_DIR` for a recorded vehicle run).
