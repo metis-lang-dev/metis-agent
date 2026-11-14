@@ -84,6 +84,8 @@ class ChatAgent:
         self.rows, self.subs = [], []
         self.seq = itertools.count(1)
         self.ids = itertools.count(1)
+        import secrets
+        self.session = secrets.token_hex(2)    # this process's tag on its intent ids
         self.intents = {}                      # id → {verb, args, words, status}
         self.marks = {}                        # n → {k0, k1, words}
         self.open_mark = None
@@ -134,7 +136,7 @@ class ChatAgent:
             return self.submit(verb, args, text, j=j, ms=ms)
 
     def submit(self, verb, args, words_said, j=None, ms=0.0, source=None):
-        iid = "c%d" % next(self.ids)
+        iid = "c%d-%s" % (next(self.ids), self.session)       # unique across sidecar restarts within one vehicle run
         it = {"id": iid, "domain": self.vocab.domain, "verb": verb, "args": args}
         self.intents[iid] = {"verb": verb, "args": args, "words": self.vocab.words(verb, args), "said": words_said, "status": "sent"}
         self.question = None                    # a new command closes an open question (DESIGN: bound answers)

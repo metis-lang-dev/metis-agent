@@ -498,3 +498,14 @@ def test_tls_gateway_after_a_stack_restart_reads_the_new_run_from_seq_0():
     finally:
         g.close()
         s2.stop(0)
+
+
+def test_intent_ids_differ_across_sidecar_processes(docs):
+    g = MockGateway(docs, hz=0)
+    a1 = ChatAgent(V, g, Mapper(None, V), Narrator(None), docs)
+    a2 = ChatAgent(V, g, Mapper(None, V), Narrator(None), docs)
+    a1.say("take it easy")
+    a2.say("take it easy")
+    i1 = [r["id"] for r in a1.rows if r["kind"] == "intent"][0]
+    i2 = [r["id"] for r in a2.rows if r["kind"] == "intent"][0]
+    assert i1.startswith("c1-") and i2.startswith("c1-") and i1 != i2
