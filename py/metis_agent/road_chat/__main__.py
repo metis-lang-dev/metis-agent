@@ -44,7 +44,7 @@ def build(args):
     info = {"model": None if llm is None else Path(args.model).name, "gateway": kind, "real": kind == "tls",
             "domain": vocab.domain,                 # the INTENT domain Submit names (RoadDomain checks "task")
             "vehicle_domain": "road",               # what the vehicle's replies say
-            **({"run": gw.name, "image": gw.image} if kind == "trace" else {})}
+            **({"run": gw.name, "image": gw.image, "trace": str(gw.dir)} if kind == "trace" else {})}
     return agent, info
 
 

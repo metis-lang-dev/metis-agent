@@ -342,7 +342,8 @@ class TraceGateway(Gateway):
         from pathlib import Path
         self.dir, self.domain = Path(run_dir), domain
         # the run's name: a stack run keeps its trace as <run>/road_trace, so the parent names it (two runs' windows never collide)
-        self.name = self.dir.parent.name if self.dir.name in ("road_trace", "trace") else self.dir.name
+        self.name = ("%s-%s" % (self.dir.parent.parent.name, self.dir.parent.name)   # ROAD_DEMO-parked_in_lane: two runs of one card differ
+                     if self.dir.name in ("road_trace", "trace") else self.dir.name)
         self.subs, self.marks = [], []
         self.rows, self.segs, self.ns_of = [], [], {}
         for f in sorted(self.dir.glob("seg-*.jsonl"), key=lambda p: int(p.stem.split("-")[1])):

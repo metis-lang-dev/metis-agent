@@ -439,7 +439,7 @@ def test_trace_gateway_names_a_stack_run_by_its_dir(tmp_path):
     d = tmp_path / "road3_parked_in_lane" / "road_trace"
     d.mkdir(parents=True)
     (d / "seg-0.jsonl").write_text(json.dumps({"k0": 0, "image": "i", "checkpoint": None}) + "\n" + json.dumps({"k": 0, "t": 0, "members": {}}) + "\n")
-    assert TraceGateway(str(d)).name == "road3_parked_in_lane"
+    assert TraceGateway(str(d)).name == "%s-road3_parked_in_lane" % tmp_path.name
 
 
 @pytest.mark.skipif(not __import__("os").path.isfile(CLIENT + "/road_client.py"), reason="bond001's road_client bundle not here")
@@ -509,3 +509,14 @@ def test_intent_ids_differ_across_sidecar_processes(docs):
     i1 = [r["id"] for r in a1.rows if r["kind"] == "intent"][0]
     i2 = [r["id"] for r in a2.rows if r["kind"] == "intent"][0]
     assert i1.startswith("c1-") and i2.startswith("c1-") and i1 != i2
+
+
+def test_a_point_event_is_narrated_with_what_led_to_it(chat):
+    """pascal p12: viz's road event STOP_AT at k 353 sent as k353..353: 'Nothing fired'. A point widens to [k-20, k+2]."""
+    a, g = chat
+    g.step(700)
+    a.narrate_window(k0=601, k1=601)                 # the cut-in's brake, a point
+    r = a.rows[-1]
+    assert "hard brake" in r["text"] and (r["k0"], r["k1"]) == (581, 603)
+    a.narrate_window(ns0=g.ns(601), ns1=g.ns(601))
+    assert "hard brake" in a.rows[-1]["text"]

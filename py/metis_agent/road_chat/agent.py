@@ -34,6 +34,18 @@ UNKNOWN_LINE = ("I can't do that. I can ask the car for a pace (easy, normal, br
                 "to stop or go on, to pass or follow the car ahead, to drive as usual, or tell you what is around.")
 CHITCHAT_LINE = "Okay."
 WHY_SECONDS = 8.0
+POINT_BEFORE, POINT_AFTER = 20, 2                 # a POINT event's window, in beats: what led to it and the decision itself
+POINT_BEFORE_NS, POINT_AFTER_NS = 3_000_000_000, 500_000_000
+
+
+def widen(k0, k1, ns0, ns1):
+    """A point (or a sliver) is not a stretch: narrate what led to it. k1 - k0 < 2 → [k0 - 20, k1 + 2];
+    ns1 - ns0 < 0.3 s → [ns0 - 3 s, ns1 + 0.5 s] (pascal's p12: 'narrate event r7 (road at k 353)' said nothing fired)."""
+    if ns0 is not None and ns1 is not None and ns1 - ns0 < 300_000_000:
+        return k0, k1, max(0, ns0 - POINT_BEFORE_NS), ns1 + POINT_AFTER_NS
+    if ns0 is None and k0 is not None and k1 is not None and k1 - k0 < 2:
+        return max(0, k0 - POINT_BEFORE), k1 + POINT_AFTER, ns0, ns1
+    return k0, k1, ns0, ns1
 
 
 class IntentLog:
@@ -322,6 +334,7 @@ class ChatAgent:
 
     def narrate_window(self, k0=None, k1=None, ns0=None, ns1=None, label="that stretch", n=None):
         import json
+        k0, k1, ns0, ns1 = widen(k0, k1, ns0, ns1)
         with self.lock:
             a = {"ns0": ns0, "ns1": ns1} if ns0 is not None else {"k0": k0, "k1": k1}
             try:
