@@ -31,7 +31,7 @@ PAGE = """<!doctype html><meta charset=utf-8><title>road chat</title>
 <script>
 const log=document.getElementById('log'),tk=new URLSearchParams(location.search).get('token'),
 ws=new WebSocket((location.protocol=='https:'?'wss://':'ws://')+location.host+'/ws'+(tk?'?token='+encodeURIComponent(tk):''));
-const show=r=>{if(r.quiet&&!r.text)return;const p=document.createElement('p');p.className=r.who+' '+r.kind;
+const show=r=>{if(r.quiet)return;const p=document.createElement('p');p.className=r.who+' '+r.kind;
 p.textContent=(r.who=='you'?'you: ':r.who+': ')+(r.text||(r.kind=='intent'?'→ '+r.verb+' '+JSON.stringify(r.args)+' ['+r.id+']':''));
 if(r.kind=='narration'&&r.source)p.title=JSON.stringify(r.lines);log.append(p);p.scrollIntoView()};
 ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type=='hello')m.rows.forEach(show);else if(m.type=='row')show(m.row)};

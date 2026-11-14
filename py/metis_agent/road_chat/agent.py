@@ -17,6 +17,19 @@ import time
 from . import page
 from .narrate import window_lines
 
+VEHICLE = ("member", "rule", "binding", "cmd", "seq_cmd", "image")    # a reply's own fields carried on its row (bond005, s-3b6bb035)
+
+
+def at(r):
+    """A reply's k and sim_ns: top level (RoadDomain, road core/domain.cc base_json) or under ref (DESIGN's shape)."""
+    ref = r.get("ref") or {}
+    return {"k": r.get("k", ref.get("k")), "sim_ns": r.get("sim_ns", ref.get("sim_ns"))}
+
+
+def own(r):
+    return {f: r[f] for f in VEHICLE if f in r}
+
+
 UNKNOWN_LINE = ("I can't do that. I can ask the car for a pace (easy, normal, brisk), a lane (left or right), "
                 "to stop or go on, to pass or follow the car ahead, to drive as usual, or tell you what is around.")
 CHITCHAT_LINE = "Okay."
@@ -144,7 +157,7 @@ class ChatAgent:
     def on_reply(self, r):
         with self.lock:
             kind = r.get("kind")
-            ref = r.get("ref") or {}
+            ref = at(r)
             if kind == "result":
                 iid, st = r.get("id"), r.get("status")
                 task = self.intents.get(iid, {})
@@ -164,18 +177,18 @@ class ChatAgent:
                 if st in ("refused", "expired") and r.get("reason") and r["reason"] not in text:
                     text = "%s (%s)" % (text, r["reason"])
                 return self.row("car", "reply", text, id=iid, status=st, reason=r.get("reason"),
-                                alternatives=r.get("alternatives") or [], k=ref.get("k"), sim_ns=ref.get("sim_ns"))
+                                alternatives=r.get("alternatives") or [], k=ref.get("k"), sim_ns=ref.get("sim_ns"), **own(r))
             if kind == "surprise":
                 k = ref.get("k")
                 self.row("car", "reply", r.get("text") or "Something happened that my rules did not expect.",
-                         status="surprise", record=r.get("record"), difference=r.get("difference"), k=k, sim_ns=ref.get("sim_ns"))
+                         status="surprise", record=r.get("record"), difference=r.get("difference"), k=k, sim_ns=ref.get("sim_ns"), **own(r))
                 self.question = {"kind": "surprise", "record": r.get("record"), "k": k}
                 return self.row("agent", "ask", "I did not expect that. What did you see? Say it in your words, or say 'mark' to mark it.",
                                 record=r.get("record"), k=k)
             if kind == "error":
                 return self.row("car", "error", r.get("text") or r.get("error") or "the car reported an error")
             if kind in ("event", "quiescence", "notice"):
-                return self.row("car", kind, r.get("text") or "", quiet=kind != "notice", k=ref.get("k"))
+                return self.row("car", kind, r.get("text") or "", quiet=kind != "notice", k=ref.get("k"), sim_ns=ref.get("sim_ns"), **own(r))
             return None
 
     def answer(self, text):

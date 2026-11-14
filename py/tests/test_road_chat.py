@@ -240,3 +240,24 @@ def test_token_and_intent_log(chat, tmp_path):
     assert subs[0]["ack"]["status"] == "accepted" and subs[0]["said"] == "take it easy" and subs[1]["said"] == "stop"
     a.say("Halt!")
     assert json.loads((tmp_path / "intents.jsonl").read_text().splitlines()[-1])["said"] == "Halt!"
+
+
+def test_rows_carry_the_vehicles_fields(chat):
+    """bond005 (s-3b6bb035): event and surprise rows carry member, rule, binding, cmd (+ sim_ns), as RoadDomain sends them."""
+    a, g = chat
+    g.step(700)
+    ev = [r for r in a.rows if r["kind"] == "event"]
+    brake = [r for r in ev if r.get("rule") == "guard"]
+    assert brake and brake[0]["member"] == "responder" and brake[0]["cmd"] == "STOP_AT" and brake[0]["binding"] == {"R": "a hard brake"}
+    assert all(r["sim_ns"] == g.ns(r["k"]) for r in ev) and [r["seq_cmd"] for r in ev] == sorted(r["seq_cmd"] for r in ev)
+    sur = [r for r in a.rows if r.get("status") == "surprise"]
+    assert sur and sur[0]["sim_ns"] is not None
+
+
+def test_reply_k_at_top_level():
+    """RoadDomain's replies carry k and sim_ns at the top level (no ref): read there."""
+    from metis_agent.road_chat.agent import at, own
+    assert at({"k": 5, "sim_ns": 500}) == {"k": 5, "sim_ns": 500}
+    assert at({"ref": {"k": 6, "sim_ns": 600}}) == {"k": 6, "sim_ns": 600}
+    assert own({"member": "planner", "rule": "accel", "binding": {}, "cmd": "KEEP", "seq_cmd": 3, "text": "x"}) == \
+        {"member": "planner", "rule": "accel", "binding": {}, "cmd": "KEEP", "seq_cmd": 3}

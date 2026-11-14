@@ -9,7 +9,8 @@ bond001's TLS gateway exist.
     g.mark(n, edge, k0, k1, words) → {"status"}                                          mark:N:start|stop|once|move
     g.now()                       → the vehicle's k (its tick count)
 
-A reply is DESIGN.md's generic reply, its ref carrying k and sim_ns ({"domain","kind","id","status","reason","alternatives","blocker","ref","text"});
+A reply is DESIGN.md's generic reply with k, sim_ns (top level, as road core/domain.cc, and in ref) and an event reply per
+new decision {member, rule, binding, cmd, seq_cmd, text} ({"domain","kind","id","status","reason","alternatives","blocker","ref","text"});
 `events` rows are {"k", "sim_ns", "member", "rule", "binding"}, the window as {k0, k1} or {ns0, ns1}.
 
 The mock's world is a two-lane road on a loop of LOOP ticks at HZ: a slow lead from k 100, a car beside on the left
@@ -27,6 +28,18 @@ WISH_TICKS = 10           # road_wishes.WISH_TICKS: planner beats a one-shot wis
 NORMAL, EASY, BRISK = 13.9, 6.0, 16.7
 STOPPED = 0.1
 TURN_REFUSED = "my route is set by the test, not by me"
+
+
+# a fired rule → the BehaviourCmd kind it decides (bond's DESIGN-v0 §2; the mock's own approximation of core/command)
+CMD = {"accel": "KEEP", "keep_limit": "KEEP", "keep_gap": "KEEP", "brake_target": "KEEP", "keep_lead": "FOLLOW",
+       "brake_follow": "FOLLOW", "yield_walker": "YIELD", "yield_zone": "YIELD", "brake_lon": "STOP_AT", "guard": "STOP_AT",
+       "change_oncoming": "PASS_OPPOSITE"}
+
+
+def cmd_of(rule, binding):
+    if rule.startswith("change") and rule != "change_oncoming":
+        return "CHANGE_L" if (binding or {}).get("D") == "left" else "CHANGE_R"
+    return CMD.get(rule)
 
 
 class Gateway:
@@ -68,7 +81,8 @@ class MockGateway(Gateway):
         self.wish = None                          # {"id", "side", "age", "kind": lane|pass}
         self.waiting = {}                         # id → (verb, args) awaiting their outcome
         self.lead_passed_until = -1
-        self.outbox = []                          # replies due: sent after the tick (an outcome never precedes its ack)
+        self.outbox = []
+        self.decision, self.seq_cmd = None, 0     # the last decision (cmd, member, rule, binding): a new one → an event reply                          # replies due: sent after the tick (an outcome never precedes its ack)
         self._run = hz > 0
         if self._run:
             self.thread = threading.Thread(target=self._loop, daemon=True, name="mock-gateway")
@@ -196,6 +210,12 @@ class MockGateway(Gateway):
         return {"easy": EASY, "brisk": BRISK}.get(self.pace, NORMAL)
 
     def _row(self, member, rule, binding=None):
+        cmd = cmd_of(rule, binding)
+        if cmd and (cmd, member, rule, tuple(sorted((binding or {}).items()))) != self.decision:   # core/domain.cc: an event per new decision
+            self.decision = (cmd, member, rule, tuple(sorted((binding or {}).items())))
+            self.seq_cmd += 1
+            self._emit({"kind": "event", "member": member, "rule": rule, "binding": dict(binding or {}), "cmd": cmd,
+                        "seq_cmd": self.seq_cmd, "text": bind(self.docs.get(member, {}).get(rule, rule), binding)})
         self.rows.append({"k": self.k, "sim_ns": self.ns(self.k), "member": member, "rule": rule, "binding": binding or {}})
         if len(self.rows) > 20000:
             del self.rows[:5000]
@@ -285,7 +305,8 @@ class MockGateway(Gateway):
                     "blocker": blocker, "ref": {"k": self.k}, "text": text})
 
     def _emit(self, r):
-        r.setdefault("domain", self.domain)
+        r.setdefault("domain", "road")              # as RoadDomain's replies say (its Submit takes domain "task")
+        r.update(k=self.k, sim_ns=self.ns(self.k), image="mock")   # top level, as core/domain.cc's base_json
         r.setdefault("ref", {}).update(k=self.k, sim_ns=self.ns(self.k))
         self.seq += 1
         r["seq"] = self.seq
