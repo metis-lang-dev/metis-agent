@@ -424,6 +424,8 @@ class TlsGateway(Gateway):
         if d and d not in sys.path:
             sys.path.insert(0, d)
         from road_client import RoadDomain
+        self._RoadDomain, self.certs = RoadDomain, certs
+        self.rd_lock = threading.Lock()
         self.rd = RoadDomain(target, certs=certs)
         self.target, self.domain, self.name = target, domain, "live"
         self.subs, self.seq, self.k, self.sim_ns, self.image = [], 0, 0, 0, None
@@ -441,11 +443,32 @@ class TlsGateway(Gateway):
     def close(self):
         self._run = False
 
+    def _fresh(self):
+        """A NEW channel: a gRPC channel that failed its first connect (com's port not open yet) keeps its cached failure
+        and never recovers (bond007, road_e2e_real2): every failure is answered by a fresh one."""
+        with self.rd_lock:
+            old, self.rd = self.rd, self._RoadDomain(self.target, certs=self.certs)
+        try:
+            old.ch.close()
+        except Exception:
+            pass
+
+    def _call(self, f):
+        """One call; on UNAVAILABLE (com not up, or the channel's cached failure) once more on a fresh channel."""
+        import grpc
+        try:
+            return f(self.rd)
+        except grpc.RpcError as e:
+            if e.code() != grpc.StatusCode.UNAVAILABLE:
+                raise
+            self._fresh()
+            return f(self.rd)
+
     def _stream(self):
         wait = 0.5
         while self._run:
             try:
-                for seq, body, _ in self.rd.replies(since=self.seq):
+                for seq, body, _ in self.rd.replies(since=self.seq):   # self.rd: the current channel (a fresh one after a failure)
                     self.seq = seq
                     wait = 0.5
                     if not isinstance(body, dict):
@@ -461,23 +484,24 @@ class TlsGateway(Gateway):
                             print("[road-gateway] subscriber: %r" % e, flush=True)
                     if not self._run:
                         return
-            except Exception as e:                      # the channel dropped: resume from the last seq
+            except Exception as e:                      # the channel dropped: resume from the last seq, on a fresh channel
                 self.errors += 1
                 print("[road-gateway] reply stream: %s; again in %.1f s from seq %d" % (str(e)[:160], wait, self.seq), flush=True)
+                self._fresh()
             time.sleep(wait)
             wait = min(5.0, wait * 2)
 
     def submit(self, it):
-        a = self.rd.submit(id=it["id"], domain=it.get("domain", self.domain), verb=it["verb"],
-                           args_json=json.dumps(it.get("args") or {}))
+        a = self._call(lambda rd: rd.submit(id=it["id"], domain=it.get("domain", self.domain), verb=it["verb"],
+                                            args_json=json.dumps(it.get("args") or {})))
         return {"id": a.id or it["id"], "status": a.status, "reason": a.reason}
 
     def read(self, tool, domain=None, **a):
-        out = self.rd.read(tool=tool, domain=domain or self.domain,
-                           args_json=json.dumps({k: v for k, v in a.items() if v is not None}))
+        out = self._call(lambda rd: rd.read(tool=tool, domain=domain or self.domain,
+                                            args_json=json.dumps({k: v for k, v in a.items() if v is not None})))
         return {"status": out.status, "output": out.output}
 
     def mark(self, n, edge, k0=None, k1=None, words="", ns0=None, ns1=None):
-        a = self.rd.mark(n=int(n or 0), edge=str(edge), k0=int(k0 or 0), k1=int(k1 or 0), words=words or "",
-                         ns0=int(ns0 or 0), ns1=int(ns1 or 0))
+        a = self._call(lambda rd: rd.mark(n=int(n or 0), edge=str(edge), k0=int(k0 or 0), k1=int(k1 or 0), words=words or "",
+                                          ns0=int(ns0 or 0), ns1=int(ns1 or 0)))
         return {"status": a.status, "reason": getattr(a, "reason", "")}

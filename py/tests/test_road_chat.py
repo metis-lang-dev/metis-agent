@@ -374,23 +374,30 @@ def test_tls_gateway_over_the_real_client(docs):
                 seq += 1
                 yield G.GwFrame(seq=seq, msg_type=req.msg_type, payload=C.RoadReply(seq=seq, json=json.dumps(body)).SerializeToString())
 
+    import socket
+    so = socket.socket()
+    so.bind(("127.0.0.1", 0))
+    port = so.getsockname()[1]
+    so.close()
+    from metis_agent.road_chat.gateway import TlsGateway
+    g = TlsGateway("127.0.0.1:%d" % port, None, client_dir=CLIENT)     # BEFORE the server listens (bond007's case: com not up yet)
+    import time
+    time.sleep(1.2)                                                     # its first connects fail: the cached failure
     srv = grpc.server(futures.ThreadPoolExecutor(4))
     Gg.add_ComGatewayServicer_to_server(Gw(), srv)
-    port = srv.add_insecure_port("127.0.0.1:0")
+    srv.add_insecure_port("127.0.0.1:%d" % port)
     srv.start()
     try:
-        from metis_agent.road_chat.gateway import TlsGateway
-        g = TlsGateway("127.0.0.1:%d" % port, None, client_dir=CLIENT)
         a = ChatAgent(V, g, Mapper(None, V), Narrator(None), docs)
         a.say("take it easy")
-        import time
-        for _ in range(50):
+        for _ in range(80):
             if any(r.get("status") == "done" for r in a.rows):
                 break
             time.sleep(0.1)
         done = [r for r in a.rows if r.get("status") == "done"]
         assert done and done[0]["k"] == 77 and done[0]["sim_ns"] == 7700000000 and done[0]["text"] == "I set the pace: easy."
         assert len(streams) >= 2 and g.now() == 77                  # resumed after the drop
+        assert g.errors >= 1                                        # it did fail first, and recovered
         assert json.loads(g.read("events", k0=1, k1=2)["output"]) == {"tool": "events", "args": {"k0": 1, "k1": 2}}
         a.mark_window(ns0=5, ns1=9, n=3)
         assert ("mark", 3, "move", 5, 9) in calls
