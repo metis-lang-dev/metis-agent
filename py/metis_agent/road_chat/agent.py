@@ -206,7 +206,7 @@ class ChatAgent:
 
     def narrate_mark(self, n):
         m = self.marks[n]
-        return self.narrate_window(k0=m["k0"], k1=m["k1"], label="event %d" % n, n=n)
+        return self.narrate_window(k0=m.get("k0"), k1=m.get("k1"), ns0=m.get("ns0"), ns1=m.get("ns1"), label="event %d" % n, n=n)
 
     def mark_window(self, k0=None, k1=None, ns0=None, ns1=None, words="", n=None):
         """viz: a window it holds (its replay bar, by sim_ns) marked on the vehicle and narrated."""

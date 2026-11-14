@@ -44,7 +44,7 @@ the lines lack, every line's reason and action leave a content word, a finished 
 
 ```bash
 export LD_LIBRARY_PATH=$HOME/.local/cuda-12.9/targets/x86_64-linux/lib      # libcudart for the CUDA llama-cpp-python
-py/.venv/bin/python -m metis_agent.road_chat --mock               # nice 19, Gemma on the GPU, http://127.0.0.1:8396/
+py/.venv/bin/python -m metis_agent.road_chat --mock               # nice 19, Gemma on the GPU, http://<host>:8396/ (all interfaces: no login, by ruling)
 py/.venv/bin/python -m metis_agent.road_chat --mock --no-model    # no GPU: the examples' table + the template narrator
 py/.venv/bin/python py/tools/road/score.py                        # the road corpus (89 rows, held out from the examples)
 py/.venv/bin/python py/tools/road/narr.py                         # narration over the mock's windows

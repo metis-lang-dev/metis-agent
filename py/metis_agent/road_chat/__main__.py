@@ -1,4 +1,4 @@
-"""python -m metis_agent.road_chat [--mock] [--no-model] [--host 127.0.0.1] [--port 8396]
+"""python -m metis_agent.road_chat [--mock] [--no-model] [--host 0.0.0.0] [--port 8396]
 
 The road CHAT sidecar: local Gemma (nice'd; --no-model: the template narrator and the examples' exact table), a
 gateway (--mock: MockGateway; the real one is bond001's TLS client, once it lands), the dialog panel's endpoint."""
@@ -43,7 +43,7 @@ def main(argv=None):
     ap.add_argument("--family-dir", default=None, help="the road family (default: metis-catalog domains/road)")
     ap.add_argument("--hz", type=int, default=10)
     ap.add_argument("--no-surprise", action="store_true")
-    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--host", default="0.0.0.0", help="all interfaces: the chat sidecar needs no login (pascal, 2026-11-14)")
     ap.add_argument("--port", type=int, default=8396)
     ap.add_argument("--cors", default="*")
     ap.add_argument("--nice", type=int, default=19)

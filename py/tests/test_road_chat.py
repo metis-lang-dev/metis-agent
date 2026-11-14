@@ -173,3 +173,13 @@ def test_endpoint(chat):
         finally:
             await c.close()
     asyncio.run(go())
+
+
+def test_explain_by_n_of_a_mark_made_by_ns(chat):
+    """bond005's bug (s-3b6bb035): a mark viz made by sim_ns, then explain n=2 with no k: read by ns, not int(None)."""
+    a, g = chat
+    g.step(700)
+    a.mark_window(ns0=g.ns(585), ns1=g.ns(640), words="cut-in", n=2)
+    a.narrate_mark(2)
+    r = a.rows[-1]
+    assert r["kind"] == "narration" and r["n"] == 2 and "hard brake" in r["text"]
