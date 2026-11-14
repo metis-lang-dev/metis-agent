@@ -1,0 +1,93 @@
+# the road CHAT corpus (road-chat s-3b6bb035, accept 1): what a tester says in the car / at the dialog panel, HELD OUT
+# from the task prompt's examples (none of these lines is one of them). expected: an intent JSON (the task grammar's
+# shape) or page:ACTION (the deterministic lines). group: pace lane turn stop go pass follow resume around chitchat
+# unknown page. Tab-separated: utterance	expected	group
+slow down	{"intent":"PACE","pace":"EASY"}	pace
+can you slow down please	{"intent":"PACE","pace":"EASY"}	pace
+drive more slowly	{"intent":"PACE","pace":"EASY"}	pace
+let's take it slow	{"intent":"PACE","pace":"EASY"}	pace
+relax, we're not in a hurry	{"intent":"PACE","pace":"EASY"}	pace
+ease off a little	{"intent":"PACE","pace":"EASY"}	pace
+go a bit faster	{"intent":"PACE","pace":"BRISK"}	pace
+speed up	{"intent":"PACE","pace":"BRISK"}	pace
+we're late, hurry	{"intent":"PACE","pace":"BRISK"}	pace
+step on it	{"intent":"PACE","pace":"BRISK"}	pace
+drive at normal speed	{"intent":"PACE","pace":"NORMAL"}	pace
+back to the usual speed	{"intent":"PACE","pace":"NORMAL"}	pace
+get into the left lane	{"intent":"LANE","side":"LEFT"}	lane
+switch lanes to the right	{"intent":"LANE","side":"RIGHT"}	lane
+change lane left	{"intent":"LANE","side":"LEFT"}	lane
+move over to the right lane	{"intent":"LANE","side":"RIGHT"}	lane
+can you go into the other lane on the left	{"intent":"LANE","side":"LEFT"}	lane
+right lane please	{"intent":"LANE","side":"RIGHT"}	lane
+take the left lane	{"intent":"LANE","side":"LEFT"}	lane
+turn right at the next junction	{"intent":"TURN","way":"RIGHT"}	turn
+take the next left	{"intent":"TURN","way":"LEFT"}	turn
+go straight at the intersection	{"intent":"TURN","way":"STRAIGHT"}	turn
+turn left	{"intent":"TURN","way":"LEFT"}	turn
+head right at the crossing	{"intent":"TURN","way":"RIGHT"}	turn
+straight ahead at the next junction	{"intent":"TURN","way":"STRAIGHT"}	turn
+stop now	page:intent	stop
+halt	page:intent	stop
+pull over	{"intent":"STOP"}	stop
+stop here please	{"intent":"STOP"}	stop
+can you stop the car	{"intent":"STOP"}	stop
+bring the car to a stop	{"intent":"STOP"}	stop
+brake and stop	{"intent":"STOP"}	stop
+go on	{"intent":"GO"}	go
+let's go	{"intent":"GO"}	go
+start driving again	{"intent":"GO"}	go
+you can move now	{"intent":"GO"}	go
+continue driving	{"intent":"GO"}	go
+off we go	{"intent":"GO"}	go
+overtake him	{"intent":"PASS"}	pass
+overtake the car in front	{"intent":"PASS"}	pass
+get around this truck	{"intent":"PASS"}	pass
+can we pass the slow car	{"intent":"PASS"}	pass
+go past that car	{"intent":"PASS"}	pass
+just follow the car in front	{"intent":"FOLLOW"}	follow
+stay in this lane	{"intent":"FOLLOW"}	follow
+keep behind the car ahead	{"intent":"FOLLOW"}	follow
+don't overtake	{"intent":"FOLLOW"}	follow
+stay where you are in the lane	{"intent":"FOLLOW"}	follow
+forget what i said	{"intent":"RESUME"}	resume
+drive normally again	{"intent":"RESUME"}	resume
+do your own thing	{"intent":"RESUME"}	resume
+never mind, drive as you would	{"intent":"RESUME"}	resume
+cancel my requests	{"intent":"RESUME"}	resume
+what's around	{"intent":"AROUND"}	around
+who is near us	{"intent":"AROUND"}	around
+is there anyone behind us	{"intent":"AROUND"}	around
+what do you see	{"intent":"AROUND"}	around
+any cars next to us	{"intent":"AROUND"}	around
+what's ahead of us	{"intent":"AROUND"}	around
+thank you	{"intent":"CHITCHAT"}	chitchat
+nice driving	{"intent":"CHITCHAT"}	chitchat
+okay	{"intent":"CHITCHAT"}	chitchat
+hello	{"intent":"CHITCHAT"}	chitchat
+good job	{"intent":"CHITCHAT"}	chitchat
+cool	{"intent":"CHITCHAT"}	chitchat
+open the window	{"intent":"UNKNOWN"}	unknown
+turn on the radio	{"intent":"UNKNOWN"}	unknown
+honk the horn	{"intent":"UNKNOWN"}	unknown
+park the car in the garage	{"intent":"UNKNOWN"}	unknown
+drive to the airport	{"intent":"UNKNOWN"}	unknown
+do a u-turn	{"intent":"UNKNOWN"}	unknown
+switch on the wipers	{"intent":"UNKNOWN"}	unknown
+how do you work	{"intent":"UNKNOWN"}	unknown
+drive at 200 km/h	{"intent":"UNKNOWN"}	unknown
+mark	page:mark	page
+mark it	page:mark	page
+mark this	page:mark	page
+end mark	page:endmark	page
+end mark, it braked too late	page:endmark	page
+stop the mark	page:endmark	page
+narrate event 2	page:narrate	page
+narrate it	page:narrate	page
+explain event 3	page:explain	page
+explain that	page:explain	page
+why did you brake	page:why	page
+why did the car stop there	page:why	page
+why didn't you change lanes	page:why	page
+what just happened	page:why	page
+what are you doing	page:status	page
