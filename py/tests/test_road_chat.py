@@ -165,6 +165,8 @@ def test_endpoint(chat):
             g.step(700)
             r = await (await c.post("/mark", json={"k0": 585, "k1": 640, "words": "cut-in"})).json()
             assert r["rows"][-1]["kind"] == "narration" and "hard brake" in r["rows"][-1]["text"]
+            r = await (await c.post("/explain", json={"ns0": g.ns(585), "ns1": g.ns(640)})).json()
+            assert r["rows"][-1]["kind"] == "narration" and "hard brake" in r["rows"][-1]["text"]
             rows = await (await c.get("/rows?since=0")).json()
             assert any(x["who"] == "car" for x in rows["rows"])
             await ws.close()

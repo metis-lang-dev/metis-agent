@@ -5,8 +5,9 @@
     POST /say      {"text"}      {"rows": [...]}                      the rows this line made (replies arrive later on /ws)
     POST /mark     {"k0","k1"} | {"ns0","ns1"}, "words"?, "n"?        a window marked on the vehicle and narrated → {"rows"}
     POST /narrate  {"k0","k1"} | {"ns0","ns1"} | {"n"}                 narrated only → {"rows"}
+    POST /explain  the same as /narrate (the rules' own reasons, no model beyond the narrator; pi's explain is P6)
     GET  /ws       server → {"type":"hello","rows":[…]} then {"type":"row","row":…} for every row;
-                   client → {"type":"say","text"} | {"type":"mark",…} | {"type":"narrate",…}
+                   client → {"type":"say","text"} | {"type":"mark",…} | {"type":"narrate"|"explain",…}
     GET  /         a bare test page
 
 A row: {"seq","t","who":you|agent|car|system,"kind":said|intent|reply|narration|ask|mark|error|event|quiescence|notice,
@@ -71,7 +72,7 @@ def make_app(agent, info=None, cors="*"):
             return await run(agent.say, str(b.get("text", "")))
         if t == "mark":
             return await run(agent.mark_window, words=str(b.get("words", "")), n=b.get("n"), **window(b))
-        if t == "narrate":
+        if t in ("narrate", "explain"):       # explain = the window's narration (the rules' reasons); pi's paid explain is P6
             if b.get("n") is not None and int(b["n"]) in agent.marks:
                 return await run(agent.narrate_mark, int(b["n"]))
             return await run(agent.narrate_window, **window(b))
