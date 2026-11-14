@@ -261,3 +261,14 @@ def test_reply_k_at_top_level():
     assert at({"ref": {"k": 6, "sim_ns": 600}}) == {"k": 6, "sim_ns": 600}
     assert own({"member": "planner", "rule": "accel", "binding": {}, "cmd": "KEEP", "seq_cmd": 3, "text": "x"}) == \
         {"member": "planner", "rule": "accel", "binding": {}, "cmd": "KEEP", "seq_cmd": 3}
+
+
+def test_roaddomain_event_shape(chat):
+    """road day0 f83c2db's event reply, as core/domain.cc emits it: k/sim_ns top level, ref {k, event}, cmd by name."""
+    a, g = chat
+    a.on_reply({"domain": "road", "kind": "event", "k": 42, "sim_ns": 4200000000, "image": "5ca79d5a6e01",
+                "ref": {"k": 42, "event": "keep_lead"}, "seq_cmd": 7, "cmd": "FOLLOW", "member": "planner",
+                "rule": "keep_lead", "binding": {}, "text": "The lead is slow and no lane is free: I follow it."})
+    r = a.rows[-1]
+    assert (r["kind"], r["k"], r["sim_ns"], r["cmd"], r["member"], r["rule"], r["seq_cmd"]) == \
+        ("event", 42, 4200000000, "FOLLOW", "planner", "keep_lead", 7)
