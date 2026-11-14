@@ -292,3 +292,27 @@ def test_trace_gateway_on_a_vehicle_run(docs):
     assert tr["image"] == "5ca79d5a6e01" and "seg-0.jsonl" in tr["files"] and "checkpoints/k0.json" in tr["files"]
     a.say("take it easy")
     assert "recorded run" in a.rows[-1]["text"]
+
+
+@pytest.mark.skipif(not __import__("os").path.isdir(VTRACE), reason="bond's RoadDomain traces not on this host")
+def test_to_pi_stores_the_window_as_a_run(docs, tmp_path):
+    from metis_agent.road_chat.gateway import TraceGateway
+    g = TraceGateway(VTRACE)
+    a = ChatAgent(V, g, Mapper(None, V), Narrator(None), docs, pi_ws=str(tmp_path))
+    a.mark_window(k0=15, k1=30, words="it stopped for the red light late", n=4)
+    r = a.to_pi(n=4)
+    assert r["kind"] == "topi" and r["member"] == "signals" and (r["k0"], r["k1"]) == (15, 30)
+    d = tmp_path / ".metis" / "traces" / r["run"]
+    assert (d / "seg-0.jsonl").is_file() and (d / "checkpoints" / "k0.json").is_file()
+    assert r["line"] == "/narrate %s:signals 15..30 it stopped for the red light late" % r["run"]
+
+
+def test_to_pi_refuses_a_path_outside_the_run(docs, tmp_path):
+    class Evil(MockGateway):
+        def read(self, tool, domain=None, **a):
+            if tool == "trace":
+                return {"status": "applied", "output": json.dumps({"k0": 0, "k1": 1, "image": "x", "files": {"../../escape": "x"}})}
+            return super().read(tool, domain, **a)
+    a = ChatAgent(V, Evil(docs, hz=0), Mapper(None, V), Narrator(None), docs, pi_ws=str(tmp_path))
+    r = a.to_pi(k0=0, k1=1)
+    assert r["kind"] == "error" and not (tmp_path / "escape").exists() and not (tmp_path / ".metis" / "escape").exists()

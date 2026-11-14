@@ -5,6 +5,9 @@
     POST /say      {"text"}      {"rows": [...]}                      the rows this line made (replies arrive later on /ws)
     POST /mark     {"k0","k1"} | {"ns0","ns1"}, "words"?, "n"?        a window marked on the vehicle and narrated → {"rows"}
     POST /narrate  {"k0","k1"} | {"ns0","ns1"} | {"n"}                 narrated only → {"rows"}
+    POST /topi     {"n"} | {"k0","k1"} | {"ns0","ns1"}, "words"?, "member"?   P6: the window's vehicle trace into the pi
+                   loop's workspace → {"rows": [{kind: topi, run, member, k0, k1, line}]}: send `line` (/narrate RUN:MEMBER
+                   K0..K1 WORDS) to the loop's CHAT, then /disagree N WORDS and /take there
     POST /explain  the same as /narrate (the rules' own reasons, no model beyond the narrator; pi's explain is P6)
     GET  /ws       server → {"type":"hello","rows":[…]} then {"type":"row","row":…} for every row;
                    client → {"type":"say","text"} | {"type":"mark",…} | {"type":"narrate"|"explain",…}
@@ -83,6 +86,8 @@ def make_app(agent, info=None, cors="*", token=None):
             return await run(agent.say, str(b.get("text", "")), source=source)
         if t == "mark":
             return await run(agent.mark_window, words=str(b.get("words", "")), n=b.get("n"), source=source, **window(b))
+        if t == "topi":
+            return await run(agent.to_pi, n=b.get("n"), words=str(b.get("words", "")), member=b.get("member"), source=source, **window(b))
         if t in ("narrate", "explain"):       # explain = the window's narration (the rules' reasons); pi's paid explain is P6
             if b.get("n") is not None and int(b["n"]) in agent.marks:
                 return await run(agent.narrate_mark, int(b["n"]))
@@ -162,10 +167,11 @@ def make_app(agent, info=None, cors="*", token=None):
     app.router.add_post("/mark", poster("mark"))
     app.router.add_post("/narrate", poster("narrate"))
     app.router.add_post("/explain", poster("explain"))
+    app.router.add_post("/topi", poster("topi"))
     async def preflight(req):
         return web.Response()
 
-    for p in ("/say", "/mark", "/narrate", "/explain"):
+    for p in ("/say", "/mark", "/narrate", "/explain", "/topi"):
         app.router.add_route("OPTIONS", p, preflight)
     app.router.add_get("/ws", ws_h)
     app.router.add_get("/", index)

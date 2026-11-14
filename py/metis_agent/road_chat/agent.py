@@ -75,9 +75,10 @@ class Mapper:
 
 
 class ChatAgent:
-    def __init__(self, vocab, gateway, mapper, narrator, docs, hz=10, intent_log=None):
+    def __init__(self, vocab, gateway, mapper, narrator, docs, hz=10, intent_log=None, pi_ws=None):
         """intent_log: a callable taking one dict (IntentLog), every intent and mark that reaches the vehicle, with its source."""
         self.log = intent_log or (lambda rec: None)
+        self.pi_ws = pi_ws                     # the pi loop's workspace (P6): a vehicle window is stored as one of its traces
         self.vocab, self.gw, self.mapper, self.narrator, self.docs, self.hz = vocab, gateway, mapper, narrator, docs, hz
         self.lock = threading.RLock()          # one generation at a time (the shared GPU) and one dialog
         self.rows, self.subs = [], []
@@ -251,6 +252,52 @@ class ChatAgent:
             return self.row("agent", "reply", status_line(st, self.intents), state=st)
         return self.row("agent", "error", "no page action %s" % a)
 
+    def to_pi(self, n=None, k0=None, k1=None, ns0=None, ns1=None, words="", member=None, source=None):
+        """P6: a window of the drive into the pi loop's workspace. The vehicle's trace of it (bond's Read 'trace': the
+        segments overlapping the window and their checkpoints) stored as .metis/traces/<run>/, the member from the window's
+        events (or as named), and the line for the loop's CHAT: /narrate RUN:MEMBER K0..K1 WORDS, then /disagree N WORDS
+        and /take there (metis-loop docs/CHAT.md). → a row {kind: topi, run, member, k0, k1, line}."""
+        import json
+        import re
+        from pathlib import Path
+        with self.lock:
+            self.source = source or {"via": "local"}
+            if not self.pi_ws:
+                return self.row("agent", "error", "no pi workspace is configured (--pi-ws)")
+            if n is not None:
+                m = self.marks.get(int(n))
+                if not m:
+                    return self.row("agent", "error", "there is no event %s" % n)
+                k0, k1, ns0, ns1 = m.get("k0"), m.get("k1"), m.get("ns0"), m.get("ns1")
+                words = words or m.get("words") or ""
+            a = {"ns0": ns0, "ns1": ns1} if ns0 is not None else {"k0": k0, "k1": k1}
+            a = {k: v for k, v in a.items() if v is not None}
+            try:
+                tr = self.gw.read("trace", self.vocab.domain, **a)
+                if tr.get("status") != "applied":
+                    return self.row("agent", "error", "the car gave no trace: %s" % tr.get("output"))
+                t = json.loads(tr["output"])
+                rows = json.loads(self.gw.read("events", self.vocab.domain, **a)["output"])
+            except Exception as e:
+                return self.row("agent", "error", "I can't get the drive's trace: %s." % e)
+            k0, k1 = int(t["k0"]), int(t["k1"])
+            member = member or _member_of(rows, self.docs) or "planner"
+            run = re.sub(r"[^A-Za-z0-9._-]", "_", "veh-%s-%s-k%d-%d" % (getattr(self.gw, "name", "live"), t.get("image") or "x", k0, k1))
+            d = Path(self.pi_ws) / ".metis" / "traces" / run
+            for rel, text in t["files"].items():
+                f = (d / rel).resolve()
+                if d.resolve() not in f.parents:              # a file name from the wire never leaves the run's directory
+                    return self.row("agent", "error", "the trace names a file outside its run: %s" % rel)
+                f.parent.mkdir(parents=True, exist_ok=True)
+                f.write_text(text)
+            said = " ".join((words or "").split()) or "the tester marked this"
+            line = "/narrate %s:%s %d..%d %s" % (run, member, k0, k1, said)
+            self.log({"event": "topi", "run": run, "member": member, "k0": k0, "k1": k1, "words": said, "source": self.source,
+                      "files": sorted(t["files"])})
+            return self.row("agent", "topi", "Event%s is in the pi loop's workspace as %s (%s, k %d..%d): send it on with the line." % (
+                " %s" % n if n else "", run, member, k0, k1), run=run, member=member, k0=k0, k1=k1, line=line,
+                then=["/disagree N WORDS", "/take"], files=sorted(t["files"]))
+
     def narrate_mark(self, n):
         m = self.marks[n]
         return self.narrate_window(k0=m.get("k0"), k1=m.get("k1"), ns0=m.get("ns0"), ns1=m.get("ns1"), label="event %d" % n, n=n)
@@ -280,6 +327,13 @@ class ChatAgent:
             text, source = self.narrator.say(lines)
             return self.row("agent", "narration", text, n=n, label=label, lines=[list(x) for x in lines], source=source,
                             k0=k0, k1=k1, ns0=ns0, ns1=ns1, ms=round((time.perf_counter() - t0) * 1e3, 1))
+
+
+def _member_of(rows, docs):
+    """The member a window is about: the one with the most documented firings (the planner or the responder, mostly)."""
+    from collections import Counter
+    c = Counter(r["member"] for r in rows if r["rule"] in docs.get(r["member"], {}) and r["member"] != "task")
+    return c.most_common(1)[0][0] if c else None
 
 
 def status_line(st, intents):
