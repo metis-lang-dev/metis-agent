@@ -106,7 +106,7 @@ class ChatAgent:
             self.row("you", "said", text)
             p = page.route(text)
             if p is not None:
-                return self.page(p)
+                return self.page(p, text)
             j, ms = self.mapper.map(text)
             parsed = self.vocab.parse(j)
             if parsed is None:
@@ -198,11 +198,11 @@ class ChatAgent:
     def next_mark(self):
         return max(list(self.marks) + [self.open_mark or 0]) + 1
 
-    def page(self, p):
+    def page(self, p, said=""):
         a = p["action"]
         if a == "intent":
             verb, args = self.vocab.parse(p["j"])
-            return self.submit(verb, args, "stop")
+            return self.submit(verb, args, said or "stop")
         if a == "mark":
             if self.open_mark:
                 return self.row("agent", "reply", "Event %d is still open: say 'end mark' to close it." % self.open_mark)

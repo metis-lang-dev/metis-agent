@@ -237,4 +237,6 @@ def test_token_and_intent_log(chat, tmp_path):
     subs = [r for r in recs if r["event"] == "submit"]
     assert [s["intent"]["verb"] for s in subs] == ["PACE", "STOP"]
     assert [s["source"]["via"] for s in subs] == ["http", "ws"] and all(s["source"]["peer"] for s in subs)
-    assert subs[0]["ack"]["status"] == "accepted" and subs[0]["said"] == "take it easy"
+    assert subs[0]["ack"]["status"] == "accepted" and subs[0]["said"] == "take it easy" and subs[1]["said"] == "stop"
+    a.say("Halt!")
+    assert json.loads((tmp_path / "intents.jsonl").read_text().splitlines()[-1])["said"] == "Halt!"
