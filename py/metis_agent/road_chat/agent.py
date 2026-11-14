@@ -23,6 +23,24 @@ CHITCHAT_LINE = "Okay."
 WHY_SECONDS = 8.0
 
 
+class IntentLog:
+    """Every intent and mark that reaches the vehicle, with its source, one JSON line each (append, flushed)."""
+    def __init__(self, path):
+        import os
+        self.path = path
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        self.f = open(path, "a", buffering=1)
+
+    def __call__(self, rec):
+        import json
+        rec = {"t": round(time.time(), 3), **rec}
+        self.f.write(json.dumps(rec, default=str) + "\n")
+        if rec.get("event") == "submit":
+            it, src = rec["intent"], rec.get("source") or {}
+            print("[road-chat] intent %s %s %s from %s %s -> %s" % (it["id"], it["verb"], json.dumps(it["args"]), src.get("via"),
+                  src.get("peer", ""), (rec.get("ack") or {}).get("status")), flush=True)
+
+
 class Mapper:
     """The intent pass: the task's generated prompt as the system turn (primed once), the utterance, one JSON under the
     task's grammar, greedy (the service's pass 1). llm None: the vocab's own examples, exact, else UNKNOWN."""
@@ -44,7 +62,9 @@ class Mapper:
 
 
 class ChatAgent:
-    def __init__(self, vocab, gateway, mapper, narrator, docs, hz=10):
+    def __init__(self, vocab, gateway, mapper, narrator, docs, hz=10, intent_log=None):
+        """intent_log: a callable taking one dict (IntentLog), every intent and mark that reaches the vehicle, with its source."""
+        self.log = intent_log or (lambda rec: None)
         self.vocab, self.gw, self.mapper, self.narrator, self.docs, self.hz = vocab, gateway, mapper, narrator, docs, hz
         self.lock = threading.RLock()          # one generation at a time (the shared GPU) and one dialog
         self.rows, self.subs = [], []
@@ -76,8 +96,10 @@ class ChatAgent:
         return [r for r in self.rows if r["seq"] > seq]
 
     # ── the person ──
-    def say(self, text):
+    def say(self, text, source=None):
+        """source: who said it ({"via": ws|http|local, "peer", "ua"}): logged with every intent it makes."""
         with self.lock:
+            self.source = source or {"via": "local"}
             text = (text or "").strip()
             if not text:
                 return None
@@ -97,17 +119,21 @@ class ChatAgent:
                                 j=j, verb=verb, ms=round(ms, 1), source="local")
             return self.submit(verb, args, text, j=j, ms=ms)
 
-    def submit(self, verb, args, words_said, j=None, ms=0.0):
+    def submit(self, verb, args, words_said, j=None, ms=0.0, source=None):
         iid = "c%d" % next(self.ids)
         it = {"id": iid, "domain": self.vocab.domain, "verb": verb, "args": args}
         self.intents[iid] = {"verb": verb, "args": args, "words": self.vocab.words(verb, args), "said": words_said, "status": "sent"}
         self.question = None                    # a new command closes an open question (DESIGN: bound answers)
         self.row("agent", "intent", "", id=iid, verb=verb, args=args, j=j, ms=round(ms, 1))
+        src = source or getattr(self, "source", None) or {"via": "local"}
         try:
             ack = self.gw.submit(it)
         except Exception as e:
             self.intents[iid]["status"] = "failed"
+            self.log({"event": "submit", "intent": it, "said": words_said, "j": j, "source": src, "ack": {"status": "failed", "reason": str(e)}})
             return self.row("agent", "error", "I can't reach the car: %s." % e, id=iid)
+        self.log({"event": "submit", "intent": it, "said": words_said, "j": j, "source": src,
+                  "ack": {"status": ack.get("status"), "reason": ack.get("reason")}})
         self.intents[iid]["status"] = ack.get("status")
         if ack.get("status") != "accepted":     # refused at the door: spoken now, nothing will follow
             return self.row("agent", "reply", "I can't ask for %s: %s." % (self.intents[iid]["words"], ack.get("reason") or "refused"),
@@ -124,6 +150,9 @@ class ChatAgent:
                 task = self.intents.get(iid, {})
                 if task:
                     task["status"] = st
+                    if st != "progress":
+                        self.log({"event": "outcome", "id": iid, "status": st, "reason": r.get("reason"),
+                                  "k": ref.get("k"), "sim_ns": ref.get("sim_ns")})
                 text = (r.get("text") or "").strip()
                 words = task.get("words", "that")
                 if st in ("refused", "expired", "failed") and not text:
@@ -155,12 +184,17 @@ class ChatAgent:
         k = q.get("k") or self.gw.now()
         self.marks[n] = {"k0": k, "k1": k, "words": text, "record": q.get("record")}
         try:
-            self.gw.mark(n, "once:surprise", k, k, "surprise #%s: %s" % (q.get("record"), text))
+            self.gw_mark(n, "once:surprise", k, k, "surprise #%s: %s" % (q.get("record"), text))
         except Exception as e:
             return self.row("agent", "error", "I could not pass that on: %s." % e)
         return self.row("agent", "reply", "Thank you: I noted it with surprise #%s as event %d." % (q.get("record"), n), mark=n)
 
     # ── marks and narration ──
+    def gw_mark(self, n, edge, k0, k1, words, source=None):
+        src = source or getattr(self, "source", None) or {"via": "local"}
+        self.log({"event": "mark", "n": n, "edge": edge, "k0": k0, "k1": k1, "words": words, "source": src})
+        return self.gw.mark(n, edge, k0, k1, words)
+
     def next_mark(self):
         return max(list(self.marks) + [self.open_mark or 0]) + 1
 
@@ -175,7 +209,7 @@ class ChatAgent:
             n, k0 = self.next_mark(), self.gw.now()
             self.open_mark = n
             self.marks[n] = {"k0": k0, "k1": None, "words": ""}
-            self.gw.mark(n, "start", k0, None, "")
+            self.gw_mark(n, "start", k0, None, "")
             return self.row("agent", "mark", "Marked: event %d begins." % n, n=n, k0=k0, edge="start")
         if a == "endmark":
             n = self.open_mark
@@ -184,7 +218,7 @@ class ChatAgent:
             m = self.marks[n]
             m["k1"], m["words"] = self.gw.now(), p.get("words") or ""
             self.open_mark = None
-            self.gw.mark(n, "stop", m["k0"], m["k1"], m["words"])
+            self.gw_mark(n, "stop", m["k0"], m["k1"], m["words"])
             self.row("agent", "mark", "Event %d ends." % n, n=n, k0=m["k0"], k1=m["k1"], edge="stop", words=m["words"])
             return self.narrate_mark(n)
         if a in ("narrate", "explain"):
@@ -208,12 +242,13 @@ class ChatAgent:
         m = self.marks[n]
         return self.narrate_window(k0=m.get("k0"), k1=m.get("k1"), ns0=m.get("ns0"), ns1=m.get("ns1"), label="event %d" % n, n=n)
 
-    def mark_window(self, k0=None, k1=None, ns0=None, ns1=None, words="", n=None):
+    def mark_window(self, k0=None, k1=None, ns0=None, ns1=None, words="", n=None, source=None):
         """viz: a window it holds (its replay bar, by sim_ns) marked on the vehicle and narrated."""
         with self.lock:
+            self.source = source or {"via": "local"}
             n = n or self.next_mark()
             self.marks[n] = {"k0": k0, "k1": k1, "ns0": ns0, "ns1": ns1, "words": words}
-            self.gw.mark(n, "move", k0, k1, words)
+            self.gw_mark(n, "move", k0, k1, words)
             self.row("agent", "mark", "Event %d marked." % n, n=n, k0=k0, k1=k1, ns0=ns0, ns1=ns1, edge="move", words=words)
             return self.narrate_window(k0=k0, k1=k1, ns0=ns0, ns1=ns1, label="event %d" % n, n=n)
 

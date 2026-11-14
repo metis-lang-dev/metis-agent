@@ -44,11 +44,19 @@ the lines lack, every line's reason and action leave a content word, a finished 
 
 ```bash
 export LD_LIBRARY_PATH=$HOME/.local/cuda-12.9/targets/x86_64-linux/lib      # libcudart for the CUDA llama-cpp-python
-py/.venv/bin/python -m metis_agent.road_chat --mock               # nice 19, Gemma on the GPU, http://<host>:8396/ (all interfaces: no login, by ruling)
+py/.venv/bin/python -m metis_agent.road_chat --mock               # nice 19, Gemma on the GPU, http://127.0.0.1:8396/
 py/.venv/bin/python -m metis_agent.road_chat --mock --no-model    # no GPU: the examples' table + the template narrator
 py/.venv/bin/python py/tools/road/score.py                        # the road corpus (89 rows, held out from the examples)
 py/.venv/bin/python py/tools/road/narr.py                         # narration over the mock's windows
 ```
+**Access** (pascal's security ruling, s-3b6bb035): the sidecar submits intents to the vehicle, so it listens on
+127.0.0.1 only by default, with no token. Another interface needs `--remote --host ADDR`, and then a per-session token
+(random at each start, printed or written 0600 to `--token-file`) on EVERY request: header `X-Road-Chat-Token`,
+`Authorization: Bearer`, or `?token=` (the browser's ws: `ws://HOST:8396/ws?token=…`); a CORS preflight passes
+without it. A non-loopback `--host` without `--remote` refuses to start. Every intent and mark that reaches the
+vehicle is logged with its source (`{via: ws|http|local, peer, ua, origin}`), the ack and the outcome by id:
+`--intent-log`, default `~/.local/state/road_chat/intents-<start>.jsonl`.
+
 The GPU is shared with CARLA: nothing on it during a CARLA timing run (bond003, s-ed11aa23).
 
 ## Results (2026-11-14, Gemma 4 E2B Q4_K_M, the 4090 laptop beside CARLA)

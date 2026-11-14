@@ -183,3 +183,58 @@ def test_explain_by_n_of_a_mark_made_by_ns(chat):
     a.narrate_mark(2)
     r = a.rows[-1]
     assert r["kind"] == "narration" and r["n"] == 2 and "hard brake" in r["text"]
+
+
+def test_access_rules(tmp_path):
+    """pascal's security ruling: loopback by default; another interface only with --remote, and then a token."""
+    import argparse
+
+    from metis_agent.road_chat.__main__ import check_access
+
+    class AP:
+        def error(self, msg):
+            raise SystemExit(msg)
+    ns = lambda **kw: argparse.Namespace(**{"host": "127.0.0.1", "remote": False, "token_file": None, **kw})
+    assert check_access(ns(), AP()) is None
+    with pytest.raises(SystemExit, match="not loopback"):
+        check_access(ns(host="0.0.0.0"), AP())
+    tf = tmp_path / "tok"
+    tok = check_access(ns(host="0.0.0.0", remote=True, token_file=str(tf)), AP())
+    assert len(tok) >= 24 and tf.read_text().strip() == tok and (tf.stat().st_mode & 0o777) == 0o600
+    assert tok != check_access(ns(host="0.0.0.0", remote=True), AP())       # per session
+
+
+def test_token_and_intent_log(chat, tmp_path):
+    from aiohttp.test_utils import TestClient, TestServer
+
+    from metis_agent.road_chat.agent import IntentLog
+    from metis_agent.road_chat.server import make_app
+    a, g = chat
+    a.log = IntentLog(str(tmp_path / "intents.jsonl"))
+
+    async def go():
+        c = TestClient(TestServer(make_app(a, {}, token="s3cret")))
+        await c.start_server()
+        try:
+            assert (await c.post("/say", json={"text": "take it easy"})).status == 401
+            assert (await c.get("/health")).status == 401
+            assert (await c.post("/say", json={"text": "take it easy"}, headers={"X-Road-Chat-Token": "wrong"})).status == 401
+            assert (await c.options("/say")).status == 200                  # the preflight
+            r = await c.post("/say", json={"text": "take it easy"}, headers={"X-Road-Chat-Token": "s3cret"})
+            assert r.status == 200
+            ws = await c.ws_connect("/ws?token=s3cret")
+            await ws.receive()
+            await ws.send_str(json.dumps({"type": "say", "text": "stop"}))
+            await ws.receive()
+            await ws.close()
+            assert (await c.get("/ws")).status == 401
+        finally:
+            await c.close()
+    asyncio.run(go())
+    import time
+    time.sleep(0.2)
+    recs = [json.loads(x) for x in (tmp_path / "intents.jsonl").read_text().splitlines()]
+    subs = [r for r in recs if r["event"] == "submit"]
+    assert [s["intent"]["verb"] for s in subs] == ["PACE", "STOP"]
+    assert [s["source"]["via"] for s in subs] == ["http", "ws"] and all(s["source"]["peer"] for s in subs)
+    assert subs[0]["ack"]["status"] == "accepted" and subs[0]["said"] == "take it easy"

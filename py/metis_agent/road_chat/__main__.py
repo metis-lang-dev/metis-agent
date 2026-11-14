@@ -1,12 +1,19 @@
-"""python -m metis_agent.road_chat [--mock] [--no-model] [--host 0.0.0.0] [--port 8396]
+"""python -m metis_agent.road_chat [--mock] [--no-model] [--port 8396] [--remote --host ADDR [--token-file F]]
 
 The road CHAT sidecar: local Gemma (nice'd; --no-model: the template narrator and the examples' exact table), a
-gateway (--mock: MockGateway; the real one is bond001's TLS client, once it lands), the dialog panel's endpoint."""
+gateway (--mock: MockGateway; the real one is bond001's TLS client, once it lands), the dialog panel's endpoint.
+
+Access (pascal's security ruling, s-3b6bb035): 127.0.0.1 only by default, no token. Another interface only with
+--remote, and then a per-session token (random at each start; printed, and written 0600 to --token-file) on every
+request. Every intent and mark that reaches the vehicle is logged with its source (--intent-log, JSON lines)."""
 import argparse
+import ipaddress
 import os
+import secrets
+import time
 from pathlib import Path
 
-from .agent import ChatAgent, Mapper
+from .agent import ChatAgent, IntentLog, Mapper
 from .gateway import MockGateway
 from .narrate import Narrator, load_docs
 from .vocab import Vocab
@@ -27,7 +34,7 @@ def build(args):
         gw = MockGateway(docs, hz=args.hz, surprises=not args.no_surprise)
     else:
         raise SystemExit("the real gateway client is not here yet (bond001's contracts/clients/road_client.py): use --mock")
-    agent = ChatAgent(vocab, gw, Mapper(llm, vocab), Narrator(narr_llm), docs, hz=args.hz)
+    agent = ChatAgent(vocab, gw, Mapper(llm, vocab), Narrator(narr_llm), docs, hz=args.hz, intent_log=IntentLog(args.intent_log))
     info = {"model": None if llm is None else Path(args.model).name, "gateway": "mock" if args.mock else "tls", "domain": vocab.domain}
     return agent, info
 
@@ -43,19 +50,56 @@ def main(argv=None):
     ap.add_argument("--family-dir", default=None, help="the road family (default: metis-catalog domains/road)")
     ap.add_argument("--hz", type=int, default=10)
     ap.add_argument("--no-surprise", action="store_true")
-    ap.add_argument("--host", default="0.0.0.0", help="all interfaces: the chat sidecar needs no login (pascal, 2026-11-14)")
+    ap.add_argument("--host", default="127.0.0.1", help="127.0.0.1 (default); any other address needs --remote")
+    ap.add_argument("--remote", action="store_true", help="allow a non-loopback --host; every request then needs the session token")
+    ap.add_argument("--token-file", default=None, help="--remote: write the session token here (mode 0600) for the dialog's config")
+    ap.add_argument("--intent-log", default=None, help="JSON lines: every intent and mark with its source "
+                    "(default ~/.local/state/road_chat/intents-<start>.jsonl)")
     ap.add_argument("--port", type=int, default=8396)
     ap.add_argument("--cors", default="*")
     ap.add_argument("--nice", type=int, default=19)
     args = ap.parse_args(argv)
+    token = check_access(args, ap)
+    if not args.intent_log:
+        args.intent_log = str(Path.home() / ".local" / "state" / "road_chat" / time.strftime("intents-%Y%m%d-%H%M%S.jsonl"))
     if args.nice:
         os.nice(args.nice)
     agent, info = build(args)
     from aiohttp import web
 
     from .server import make_app
-    print("[road-chat] %s on http://%s:%d (model %s, gateway %s)" % (info["domain"], args.host, args.port, info["model"], info["gateway"]))
-    web.run_app(make_app(agent, info, cors=args.cors), host=args.host, port=args.port, print=None)
+    print("[road-chat] %s on http://%s:%d (model %s, gateway %s); intents logged to %s" % (
+        info["domain"], args.host, args.port, info["model"], info["gateway"], args.intent_log), flush=True)
+    if token:
+        print("[road-chat] REMOTE: every request needs the session token (header X-Road-Chat-Token or ?token=)%s" % (
+            ": written to %s" % args.token_file if args.token_file else ": %s" % token), flush=True)
+    web.run_app(make_app(agent, info, cors=args.cors, token=token), host=args.host, port=args.port, print=None)
+
+
+def loopback(host):
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def check_access(args, ap):
+    """→ the session token (None on loopback). A non-loopback host without --remote is refused."""
+    if loopback(args.host):
+        if args.remote:
+            ap.error("--remote with a loopback --host: give the address to listen on")
+        return None
+    if not args.remote:
+        ap.error("--host %s is not loopback: the sidecar submits intents to the vehicle; add --remote "
+                 "(and every request then needs the session token)" % args.host)
+    token = secrets.token_urlsafe(24)
+    if args.token_file:
+        fd = os.open(args.token_file, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, "w") as f:
+            f.write(token + "\n")
+    return token
 
 
 if __name__ == "__main__":
