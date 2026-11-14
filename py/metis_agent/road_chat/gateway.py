@@ -341,7 +341,8 @@ class TraceGateway(Gateway):
     def __init__(self, run_dir, domain="task"):
         from pathlib import Path
         self.dir, self.domain = Path(run_dir), domain
-        self.name = self.dir.name
+        # the run's name: a stack run keeps its trace as <run>/road_trace, so the parent names it (two runs' windows never collide)
+        self.name = self.dir.parent.name if self.dir.name in ("road_trace", "trace") else self.dir.name
         self.subs, self.marks = [], []
         self.rows, self.segs, self.ns_of = [], [], {}
         for f in sorted(self.dir.glob("seg-*.jsonl"), key=lambda p: int(p.stem.split("-")[1])):

@@ -406,3 +406,30 @@ def test_window_seconds_from_sim_ns(docs):
             {"k": 338, "sim_ns": 60300000000, "member": "responder", "rule": "brake_lon", "binding": {"R": "brake min"}}]
     L = window_lines(rows, docs, 330)
     assert [t for t, _, _ in L] == [0.0, 1.5]
+
+
+def test_to_pi_never_writes_over_another_run(docs, tmp_path):
+    class G(MockGateway):
+        body = "a"
+        name = "road_trace"
+        def read(self, tool, domain=None, **a):
+            if tool == "trace":
+                return {"status": "applied", "output": json.dumps({"k0": 1, "k1": 2, "image": "x", "files": {"seg-0.jsonl": self.body}})}
+            return super().read(tool, domain, **a)
+    g = G(docs, hz=0)
+    a = ChatAgent(V, g, Mapper(None, V), Narrator(None), docs, pi_ws=str(tmp_path))
+    assert a.to_pi(k0=1, k1=2)["kind"] == "topi"
+    assert a.to_pi(k0=1, k1=2)["kind"] == "topi"           # the same files again: fine
+    G.body = "b"
+    r = a.to_pi(k0=1, k1=2)
+    assert r["kind"] == "error" and "not written over" in r["text"]
+    run = [p for p in (tmp_path / ".metis" / "traces").iterdir()][0]
+    assert (run / "seg-0.jsonl").read_text() == "a"
+
+
+def test_trace_gateway_names_a_stack_run_by_its_dir(tmp_path):
+    from metis_agent.road_chat.gateway import TraceGateway
+    d = tmp_path / "road3_parked_in_lane" / "road_trace"
+    d.mkdir(parents=True)
+    (d / "seg-0.jsonl").write_text(json.dumps({"k0": 0, "image": "i", "checkpoint": None}) + "\n" + json.dumps({"k": 0, "t": 0, "members": {}}) + "\n")
+    assert TraceGateway(str(d)).name == "road3_parked_in_lane"

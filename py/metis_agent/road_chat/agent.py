@@ -286,6 +286,10 @@ class ChatAgent:
             member = member or _member_of(rows, self.docs) or "planner"
             run = re.sub(r"[^A-Za-z0-9._-]", "_", "veh-%s-%s-k%d-%d" % (getattr(self.gw, "name", "live"), t.get("image") or "x", k0, k1))
             d = Path(self.pi_ws) / ".metis" / "traces" / run
+            if d.exists() and any(d.iterdir()):          # never written over: the same window of the same run is the same files
+                same = all((d / rel).is_file() and (d / rel).read_text() == text for rel, text in t["files"].items())
+                if not same:
+                    return self.row("agent", "error", "the pi workspace has another trace named %s: not written over" % run)
             for rel, text in t["files"].items():
                 f = (d / rel).resolve()
                 if d.resolve() not in f.parents:              # a file name from the wire never leaves the run's directory
