@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 from .agent import ChatAgent, IntentLog, Mapper
-from .gateway import MockGateway, TraceGateway
+from .gateway import MockGateway, TlsGateway, TraceGateway
 from .narrate import Narrator, load_docs
 from .vocab import Vocab
 
@@ -34,8 +34,10 @@ def build(args):
         gw = MockGateway(docs, hz=args.hz, surprises=not args.no_surprise)
     elif args.trace:
         gw = TraceGateway(args.trace)
+    elif args.gateway:
+        gw = TlsGateway(args.gateway, args.certs, client_dir=args.client_dir)
     else:
-        raise SystemExit("the real gateway client is not here yet (bond001's contracts/clients/road_client.py): use --mock or --trace RUN_DIR")
+        raise SystemExit("a gateway: --gateway HOST:7720 --certs DIR (the real one), --mock, or --trace RUN_DIR")
     agent = ChatAgent(vocab, gw, Mapper(llm, vocab), Narrator(narr_llm), docs, hz=args.hz, intent_log=IntentLog(args.intent_log),
                       pi_ws=args.pi_ws)
     kind = "mock" if args.mock else "trace" if args.trace else "tls"
@@ -49,6 +51,9 @@ def build(args):
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="road_chat")
     ap.add_argument("--mock", action="store_true", help="the MockGateway (the vehicle emulated)")
+    ap.add_argument("--gateway", default=None, help="the REAL vehicle: Theia com's mTLS gateway, HOST:7720")
+    ap.add_argument("--certs", default=None, help="--gateway: the staged mTLS set (ca.crt, client.crt, client.key)")
+    ap.add_argument("--client-dir", default=None, help="--gateway: road_client.py + road_bundle/ (else $ROAD_CLIENT_DIR)")
     ap.add_argument("--trace", default=None, help="a RECORDED vehicle run (RoadDomain's trace dir): narrate and send it to pi, no intents")
     ap.add_argument("--pi-ws", default=None, help="P6: the pi loop's workspace (a road catalog dir; its .metis/traces gets the windows sent)")
     ap.add_argument("--no-model", action="store_true", help="no LLM: the template narrator, the examples' table")

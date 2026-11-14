@@ -171,9 +171,9 @@ class MockGateway(Gateway):
                 return {"status": "applied", "output": "why %s: (mock) no derivation kept" % a.get("atom")}
             return {"status": "failed", "output": "no tool %s" % tool}
 
-    def mark(self, n, edge, k0=None, k1=None, words=""):
+    def mark(self, n, edge, k0=None, k1=None, words="", ns0=None, ns1=None):
         with self.lock:
-            self.marks.append({"n": n, "edge": edge, "k0": k0, "k1": k1, "words": words, "at": self.k})
+            self.marks.append({"n": n, "edge": edge, "k0": k0, "k1": k1, "ns0": ns0, "ns1": ns1, "words": words, "at": self.k})
             return {"status": "applied"}
 
     # ── the emulated vehicle ──
@@ -380,8 +380,8 @@ class TraceGateway(Gateway):
     def submit(self, it):
         return {"id": it.get("id"), "status": "refused", "reason": "this is a recorded run: it takes no intents"}
 
-    def mark(self, n, edge, k0=None, k1=None, words=""):
-        self.marks.append({"n": n, "edge": edge, "k0": k0, "k1": k1, "words": words})
+    def mark(self, n, edge, k0=None, k1=None, words="", ns0=None, ns1=None):
+        self.marks.append({"n": n, "edge": edge, "k0": k0, "k1": k1, "ns0": ns0, "ns1": ns1, "words": words})
         return {"status": "applied"}
 
     def window(self, a):
@@ -406,3 +406,77 @@ class TraceGateway(Gateway):
         if tool == "state":
             return {"status": "applied", "output": json.dumps({"run": self.name, "k": self.k_last, "image": self.image, "recorded": True})}
         return {"status": "failed", "output": "no tool %s (state | events | trace)" % tool}
+
+
+class TlsGateway(Gateway):
+    """The REAL gateway: bond001's typed client (contracts clients/road_client.py, its RoadDomain over Theia com's mTLS
+    ComGateway, port 7720) to bond's RoadDomain. ROAD_CLIENT_DIR (or client_dir) holds road_client.py with its
+    road_bundle/ protos beside it; certs = the stack's staged mTLS set (ca.crt, client.crt, client.key).
+
+    The reply stream runs on a thread: every reply to the subscribers, resumed from the last gateway seq after a
+    drop (backoff to 5 s); now() = the last reply's k (the vehicle's beat)."""
+
+    def __init__(self, target, certs, client_dir=None, domain="task"):
+        import os
+        import sys
+        d = client_dir or os.environ.get("ROAD_CLIENT_DIR")
+        if d and d not in sys.path:
+            sys.path.insert(0, d)
+        from road_client import RoadDomain
+        self.rd = RoadDomain(target, certs=certs)
+        self.target, self.domain, self.name = target, domain, "live"
+        self.subs, self.seq, self.k, self.sim_ns, self.image = [], 0, 0, 0, None
+        self.errors = 0
+        self._run = True
+        self.thread = threading.Thread(target=self._stream, daemon=True, name="road-gateway-replies")
+        self.thread.start()
+
+    def subscribe(self, cb):
+        self.subs.append(cb)
+
+    def now(self):
+        return self.k
+
+    def close(self):
+        self._run = False
+
+    def _stream(self):
+        wait = 0.5
+        while self._run:
+            try:
+                for seq, body, _ in self.rd.replies(since=self.seq):
+                    self.seq = seq
+                    wait = 0.5
+                    if not isinstance(body, dict):
+                        continue
+                    ref = body.get("ref") or {}
+                    self.k = int(body.get("k", ref.get("k", self.k)) or self.k)
+                    self.sim_ns = int(body.get("sim_ns", self.sim_ns) or self.sim_ns)
+                    self.image = body.get("image") or self.image
+                    for cb in list(self.subs):
+                        try:
+                            cb(dict(body))
+                        except Exception as e:
+                            print("[road-gateway] subscriber: %r" % e, flush=True)
+                    if not self._run:
+                        return
+            except Exception as e:                      # the channel dropped: resume from the last seq
+                self.errors += 1
+                print("[road-gateway] reply stream: %s; again in %.1f s from seq %d" % (str(e)[:160], wait, self.seq), flush=True)
+            time.sleep(wait)
+            wait = min(5.0, wait * 2)
+
+    def submit(self, it):
+        a = self.rd.submit(id=it["id"], domain=it.get("domain", self.domain), verb=it["verb"],
+                           args_json=json.dumps(it.get("args") or {}))
+        return {"id": a.id or it["id"], "status": a.status, "reason": a.reason}
+
+    def read(self, tool, domain=None, **a):
+        out = self.rd.read(tool=tool, domain=domain or self.domain,
+                           args_json=json.dumps({k: v for k, v in a.items() if v is not None}))
+        return {"status": out.status, "output": out.output}
+
+    def mark(self, n, edge, k0=None, k1=None, words="", ns0=None, ns1=None):
+        a = self.rd.mark(n=int(n or 0), edge=str(edge), k0=int(k0 or 0), k1=int(k1 or 0), words=words or "",
+                         ns0=int(ns0 or 0), ns1=int(ns1 or 0))
+        return {"status": a.status, "reason": getattr(a, "reason", "")}

@@ -316,3 +316,85 @@ def test_to_pi_refuses_a_path_outside_the_run(docs, tmp_path):
     a = ChatAgent(V, Evil(docs, hz=0), Mapper(None, V), Narrator(None), docs, pi_ws=str(tmp_path))
     r = a.to_pi(k0=0, k1=1)
     assert r["kind"] == "error" and not (tmp_path / "escape").exists() and not (tmp_path / ".metis" / "escape").exists()
+
+
+CLIENT = "/bigdata/work/bond008/roadclient"
+
+
+@pytest.mark.skipif(not __import__("os").path.isfile(CLIENT + "/road_client.py"), reason="bond001's road_client bundle not here")
+def test_tls_gateway_over_the_real_client(docs):
+    """TlsGateway through bond001's road_client (contracts af4bc54) against an in-process ComGateway servicer built from
+    the same protos (insecure: TLS is bond001's gate): Submit/Read/Mark by wire type, the reply stream with k at the top
+    level, a dropped stream resumed from the last seq."""
+    import queue
+    import sys
+    import threading
+    from concurrent import futures
+
+    import grpc
+    sys.path.insert(0, CLIENT)
+    import road_client
+    C, G, Gg = road_client._stubs()
+    feed, calls, streams = queue.Queue(), [], []
+
+    class Gw(Gg.ComGatewayServicer):
+        def Call(self, req, ctx):
+            calls.append(req.req_type)
+            if req.req_type == "system_contracts_RoadIntent":
+                it = C.RoadIntent()
+                it.ParseFromString(req.payload)
+                ok = it.domain == "task" and it.verb in ("PACE", "STOP")
+                if ok:
+                    feed.put({"domain": "road", "kind": "result", "id": it.id, "status": "done", "k": 77, "sim_ns": 7700000000,
+                              "ref": {"k": 77}, "text": "I set the pace: easy."})
+                ack = C.RoadAck(id=it.id, status="accepted" if ok else "refused", reason="" if ok else "unknown verb")
+                return G.GwReply(status=0, payload=ack.SerializeToString())
+            if req.req_type == "system_contracts_RoadRead":
+                rd = C.RoadRead()
+                rd.ParseFromString(req.payload)
+                out = C.RoadReadOut(status="applied", output=json.dumps({"tool": rd.tool, "args": json.loads(rd.args_json or "{}")}))
+                return G.GwReply(status=0, payload=out.SerializeToString())
+            if req.req_type == "system_contracts_RoadMark":
+                m = C.RoadMark()
+                m.ParseFromString(req.payload)
+                calls.append(("mark", m.n, m.edge, m.ns0, m.ns1))
+                return G.GwReply(status=0, payload=C.RoadAck(status="accepted").SerializeToString())
+            return G.GwReply(status=3, error="not allowlisted")
+
+        def Stream(self, req, ctx):
+            streams.append(req.since_seq)
+            seq = req.since_seq
+            if len(streams) == 1:            # the first stream drops at once: the client must resume
+                return
+            while ctx.is_active():
+                try:
+                    body = feed.get(timeout=0.2)
+                except queue.Empty:
+                    continue
+                seq += 1
+                yield G.GwFrame(seq=seq, msg_type=req.msg_type, payload=C.RoadReply(seq=seq, json=json.dumps(body)).SerializeToString())
+
+    srv = grpc.server(futures.ThreadPoolExecutor(4))
+    Gg.add_ComGatewayServicer_to_server(Gw(), srv)
+    port = srv.add_insecure_port("127.0.0.1:0")
+    srv.start()
+    try:
+        from metis_agent.road_chat.gateway import TlsGateway
+        g = TlsGateway("127.0.0.1:%d" % port, None, client_dir=CLIENT)
+        a = ChatAgent(V, g, Mapper(None, V), Narrator(None), docs)
+        a.say("take it easy")
+        import time
+        for _ in range(50):
+            if any(r.get("status") == "done" for r in a.rows):
+                break
+            time.sleep(0.1)
+        done = [r for r in a.rows if r.get("status") == "done"]
+        assert done and done[0]["k"] == 77 and done[0]["sim_ns"] == 7700000000 and done[0]["text"] == "I set the pace: easy."
+        assert len(streams) >= 2 and g.now() == 77                  # resumed after the drop
+        assert json.loads(g.read("events", k0=1, k1=2)["output"]) == {"tool": "events", "args": {"k0": 1, "k1": 2}}
+        a.mark_window(ns0=5, ns1=9, n=3)
+        assert ("mark", 3, "move", 5, 9) in calls
+        assert g.submit({"id": "x", "domain": "task", "verb": "FLY"})["status"] == "refused"
+        g.close()
+    finally:
+        srv.stop(0)

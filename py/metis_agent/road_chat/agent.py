@@ -204,9 +204,11 @@ class ChatAgent:
         return self.row("agent", "reply", "Thank you: I noted it with surprise #%s as event %d." % (q.get("record"), n), mark=n)
 
     # ── marks and narration ──
-    def gw_mark(self, n, edge, k0, k1, words, source=None):
+    def gw_mark(self, n, edge, k0, k1, words, source=None, ns0=None, ns1=None):
         src = source or getattr(self, "source", None) or {"via": "local"}
-        self.log({"event": "mark", "n": n, "edge": edge, "k0": k0, "k1": k1, "words": words, "source": src})
+        self.log({"event": "mark", "n": n, "edge": edge, "k0": k0, "k1": k1, "ns0": ns0, "ns1": ns1, "words": words, "source": src})
+        if ns0 is not None or ns1 is not None:
+            return self.gw.mark(n, edge, k0, k1, words, ns0=ns0, ns1=ns1)
         return self.gw.mark(n, edge, k0, k1, words)
 
     def next_mark(self):
@@ -308,7 +310,7 @@ class ChatAgent:
             self.source = source or {"via": "local"}
             n = n or self.next_mark()
             self.marks[n] = {"k0": k0, "k1": k1, "ns0": ns0, "ns1": ns1, "words": words}
-            self.gw_mark(n, "move", k0, k1, words)
+            self.gw_mark(n, "move", k0, k1, words, ns0=ns0, ns1=ns1)
             self.row("agent", "mark", "Event %d marked." % n, n=n, k0=k0, k1=k1, ns0=ns0, ns1=ns1, edge="move", words=words)
             return self.narrate_window(k0=k0, k1=k1, ns0=ns0, ns1=ns1, label="event %d" % n, n=n)
 
@@ -321,6 +323,9 @@ class ChatAgent:
                 rows = json.loads(out["output"]) if out.get("status") == "applied" else []
             except Exception as e:
                 return self.row("agent", "error", "I can't read the drive's events: %s." % e)
+            if not isinstance(rows, list):                  # an answer of another shape: no rows, never a crash
+                rows = []
+            rows = [r for r in rows if isinstance(r, dict) and {"k", "member", "rule"} <= set(r)]
             base = k0 if k0 is not None else (rows[0]["k"] if rows else None)
             lines = window_lines(rows, self.docs, base, self.hz)
             t0 = time.perf_counter()

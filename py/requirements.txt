@@ -18,3 +18,5 @@ pluggy==1.6.0
 Pygments==2.21.0
 PyYAML==6.0.3
 aiohttp==3.14.5
+grpcio==1.85.1  # road_chat --gateway: bond001's road_client (contracts) over Theia com's mTLS gateway
+grpcio-tools  # road_client generates its stubs from the contract's protos
