@@ -74,6 +74,7 @@ def main(argv=None):
     ap.add_argument("--nice", type=int, default=19)
     args = ap.parse_args(argv)
     token = check_access(args, ap)
+    check_port(args.host, args.port, ap)
     if not args.intent_log:
         args.intent_log = str(Path.home() / ".local" / "state" / "road_chat" / time.strftime("intents-%Y%m%d-%H%M%S.jsonl"))
     if args.nice:
@@ -88,6 +89,20 @@ def main(argv=None):
         print("[road-chat] REMOTE: every request needs the session token (header X-Road-Chat-Token or ?token=)%s" % (
             ": written to %s" % args.token_file if args.token_file else ": %s" % token), flush=True)
     web.run_app(make_app(agent, info, cors=args.cors, token=token), host=args.host, port=args.port, print=None)
+
+
+def check_port(host, port, ap):
+    """The port is free BEFORE the model loads: a taken port fails at once and says so (else /health on it answers
+    for whoever holds it, and the model loads for nothing)."""
+    import socket
+    s = socket.socket()
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        s.bind((host, port))
+    except OSError as e:
+        ap.error("port %s:%d is taken (%s): another process serves it; give --port" % (host, port, e.strerror))
+    finally:
+        s.close()
 
 
 def loopback(host):
