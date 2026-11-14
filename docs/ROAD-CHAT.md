@@ -47,7 +47,8 @@ export LD_LIBRARY_PATH=$HOME/.local/cuda-12.9/targets/x86_64-linux/lib      # li
 py/.venv/bin/python -m metis_agent.road_chat --mock               # nice 19, Gemma on the GPU, http://127.0.0.1:8396/
 py/.venv/bin/python -m metis_agent.road_chat --mock --no-model    # no GPU: the examples' table + the template narrator
 py/.venv/bin/python -m metis_agent.road_chat --gateway VEHICLE:7720 --certs <ws>/dist/manifest/<machine>/certs \
-    --client-dir DIR             # the REAL vehicle: DIR = contracts clients/road_client.py + road_bundle/ (its protos)
+    --client-dir DIR             # the REAL vehicle: DIR = contracts clients/road_client.py + road_bundle/ (its protos);
+                                 # PORT = 7720 + 100*INST on an isolated stack (theia 82ee9b5: INST 7 -> 8420), 7720 on the default one
 py/.venv/bin/python -m metis_agent.road_chat --trace RUN/road_trace --pi-ws $WS/metis-worlds/road   # a recorded run
 py/.venv/bin/python py/tools/road/score.py                        # the road corpus (89 rows, held out from the examples)
 py/.venv/bin/python py/tools/road/narr.py                         # narration over the mock's windows
