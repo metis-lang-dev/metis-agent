@@ -138,10 +138,11 @@ def make_app(agent, info=None, cors="*"):
     app.router.add_post("/say", poster("say"))
     app.router.add_post("/mark", poster("mark"))
     app.router.add_post("/narrate", poster("narrate"))
+    app.router.add_post("/explain", poster("explain"))
     async def preflight(req):
         return web.Response()
 
-    for p in ("/say", "/mark", "/narrate"):
+    for p in ("/say", "/mark", "/narrate", "/explain"):
         app.router.add_route("OPTIONS", p, preflight)
     app.router.add_get("/ws", ws_h)
     app.router.add_get("/", index)
