@@ -56,6 +56,8 @@ def window_lines(rows, docs, k0=None, hz=10):
     if not rows:
         return []
     k0 = rows[0]["k"] if k0 is None else k0
+    by_ns = all(r.get("sim_ns") is not None for r in rows)   # the vehicle's own clock (on CARLA a beat is not 1/hz s)
+    ns0 = rows[0]["sim_ns"] if by_ns else None
     out, last = [], {}
     for r in rows:
         if r["rule"] not in docs.get(r["member"], {}):     # bookkeeping (the director's grants, decide, back): no %% line, not said
@@ -65,7 +67,8 @@ def window_lines(rows, docs, k0=None, hz=10):
             continue
         last[r["member"]] = key
         doc = docs[r["member"]][r["rule"]]
-        out.append((round((r["k"] - k0) / hz, 1), r["member"], bind(doc, r.get("binding"))))
+        t = (r["sim_ns"] - ns0) / 1e9 if by_ns else (r["k"] - k0) / hz
+        out.append((round(t, 1), r["member"], bind(doc, r.get("binding"))))
     if len(out) > MAX_LINES:                      # the first and the last kept: what it began with, how it ended
         out = out[:MAX_LINES // 2] + out[-(MAX_LINES - MAX_LINES // 2):]
     return out

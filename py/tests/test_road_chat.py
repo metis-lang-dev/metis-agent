@@ -398,3 +398,11 @@ def test_tls_gateway_over_the_real_client(docs):
         g.close()
     finally:
         srv.stop(0)
+
+
+def test_window_seconds_from_sim_ns(docs):
+    """On CARLA RoadDomain beats on EgoState (~0.18 s a beat): the seconds come from sim_ns, not k/hz."""
+    rows = [{"k": 330, "sim_ns": 58822275919, "member": "planner", "rule": "keep_lead", "binding": {}},
+            {"k": 338, "sim_ns": 60300000000, "member": "responder", "rule": "brake_lon", "binding": {"R": "brake min"}}]
+    L = window_lines(rows, docs, 330)
+    assert [t for t, _, _ in L] == [0.0, 1.5]
