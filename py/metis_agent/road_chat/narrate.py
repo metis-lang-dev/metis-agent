@@ -51,18 +51,20 @@ def load_docs(task_dir, family_dir=None):
 
 def window_lines(rows, docs, k0=None, hz=10):
     """The window's changes: a run of the same (member, rule, binding) is one line at its first k; a rule with no %%
-    line is said by its name."""
+    line (the director's bookkeeping, a member's decide/back) is not said."""
     rows = sorted(rows, key=lambda r: r["k"])
     if not rows:
         return []
     k0 = rows[0]["k"] if k0 is None else k0
     out, last = [], {}
     for r in rows:
+        if r["rule"] not in docs.get(r["member"], {}):     # bookkeeping (the director's grants, decide, back): no %% line, not said
+            continue
         key = (r["rule"], tuple(sorted((r.get("binding") or {}).items())))
         if last.get(r["member"]) == key:
             continue
         last[r["member"]] = key
-        doc = docs.get(r["member"], {}).get(r["rule"]) or r["rule"].replace("_", " ")
+        doc = docs[r["member"]][r["rule"]]
         out.append((round((r["k"] - k0) / hz, 1), r["member"], bind(doc, r.get("binding"))))
     if len(out) > MAX_LINES:                      # the first and the last kept: what it began with, how it ended
         out = out[:MAX_LINES // 2] + out[-(MAX_LINES - MAX_LINES // 2):]

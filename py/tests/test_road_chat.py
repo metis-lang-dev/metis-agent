@@ -272,3 +272,23 @@ def test_roaddomain_event_shape(chat):
     r = a.rows[-1]
     assert (r["kind"], r["k"], r["sim_ns"], r["cmd"], r["member"], r["rule"], r["seq_cmd"]) == \
         ("event", 42, 4200000000, "FOLLOW", "planner", "keep_lead", 7)
+
+
+VTRACE = "/bigdata/work/bond/road/vtrace/red_light"
+
+
+@pytest.mark.skipif(not __import__("os").path.isdir(VTRACE), reason="bond's RoadDomain traces not on this host")
+def test_trace_gateway_on_a_vehicle_run(docs):
+    """A RoadDomain-written run (road b5af822): its events narrated (bookkeeping left out), its trace window served as
+    bond's Read 'trace' answers it, no intents taken."""
+    from metis_agent.road_chat.gateway import TraceGateway
+    g = TraceGateway(VTRACE)
+    a = ChatAgent(V, g, Mapper(None, V), Narrator(None), docs)
+    a.narrate_window(k0=0, k1=199)
+    t = a.rows[-1]["text"]
+    assert "The light ahead is red: I stop before its line" in t or "the light ahead is red: I stop before its line" in t
+    assert "decide" not in t and "grant" not in t
+    tr = json.loads(g.read("trace", k0=10, k1=30)["output"])
+    assert tr["image"] == "5ca79d5a6e01" and "seg-0.jsonl" in tr["files"] and "checkpoints/k0.json" in tr["files"]
+    a.say("take it easy")
+    assert "recorded run" in a.rows[-1]["text"]

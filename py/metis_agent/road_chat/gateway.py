@@ -318,3 +318,91 @@ class MockGateway(Gateway):
                 cb(dict(r))
             except Exception as e:  # a subscriber's fault never stops the vehicle
                 print("[mock-gateway] subscriber: %r" % e)
+
+
+def parse_fired(name):
+    """'change_home[D=right]' → ('change_home', {'D': 'right'})."""
+    if "[" not in name:
+        return name, {}
+    rule, _, rest = name.partition("[")
+    b = {}
+    for kv in rest.rstrip("]").split(","):
+        k, _, v = kv.partition("=")
+        if k:
+            b[k.strip()] = v.strip()
+    return rule, b
+
+
+class TraceGateway(Gateway):
+    """A RECORDED vehicle run as the gateway (road day0 b5af822 writes it: seg-<k0>.jsonl + checkpoints/k<k>.json,
+    metispy's trace format): Read events and trace windows from it, so the chat narrates and pi rules the run viz
+    replays. It takes no intents (a recorded run cannot be driven) and sends no replies; now() is its last k."""
+
+    def __init__(self, run_dir, domain="task"):
+        from pathlib import Path
+        self.dir, self.domain = Path(run_dir), domain
+        self.name = self.dir.name
+        self.subs, self.marks = [], []
+        self.rows, self.segs, self.ns_of = [], [], {}
+        for f in sorted(self.dir.glob("seg-*.jsonl"), key=lambda p: int(p.stem.split("-")[1])):
+            lines = f.read_text().splitlines()
+            head = json.loads(lines[0])
+            ks = []
+            for line in lines[1:]:
+                r = json.loads(line)
+                k = int(r["k"])
+                ks.append(k)
+                ns = int(round(float(r.get("t", k / HZ)) * 1e9))
+                self.ns_of[k] = ns
+                for m, v in (r.get("members") or {}).items():
+                    for s in v.get("seq") or []:
+                        for name in s.get("fired") or []:
+                            rule, b = parse_fired(name)
+                            self.rows.append({"k": k, "sim_ns": ns, "member": m, "rule": rule, "binding": b})
+            self.segs.append({"file": f.name, "k0": int(head.get("k0", ks[0] if ks else 0)), "k1": max(ks) if ks else 0,
+                              "checkpoint": head.get("checkpoint"), "image": head.get("image")})
+        self.image = self.segs[0]["image"] if self.segs else None
+        self.k_last = max(self.ns_of) if self.ns_of else 0
+
+    def subscribe(self, cb):
+        self.subs.append(cb)
+
+    def now(self):
+        return self.k_last
+
+    def ns(self, k):
+        return self.ns_of.get(k, int(k * 1e9 / HZ))
+
+    def k_of(self, ns):
+        ks = [k for k, n in self.ns_of.items() if n <= int(ns)]
+        return max(ks) if ks else 0
+
+    def submit(self, it):
+        return {"id": it.get("id"), "status": "refused", "reason": "this is a recorded run: it takes no intents"}
+
+    def mark(self, n, edge, k0=None, k1=None, words=""):
+        self.marks.append({"n": n, "edge": edge, "k0": k0, "k1": k1, "words": words})
+        return {"status": "applied"}
+
+    def window(self, a):
+        if "ns0" in a or "ns1" in a:
+            return self.k_of(a.get("ns0", 0)), self.k_of(a.get("ns1", self.ns(self.k_last)))
+        return int(a.get("k0", 0)), int(a.get("k1", self.k_last))
+
+    def read(self, tool, domain=None, **a):
+        if tool == "events":
+            k0, k1 = self.window(a)
+            return {"status": "applied", "output": json.dumps([r for r in self.rows if k0 <= r["k"] <= k1])}
+        if tool == "trace":           # bond's Read 'trace': the segments overlapping the window, with their checkpoints
+            k0, k1 = self.window(a)
+            files = {}
+            for s in self.segs:
+                if s["k1"] < k0 or s["k0"] > k1:
+                    continue
+                files[s["file"]] = (self.dir / s["file"]).read_text()
+                if s["checkpoint"]:
+                    files[s["checkpoint"]] = (self.dir / s["checkpoint"]).read_text()
+            return {"status": "applied", "output": json.dumps({"k0": k0, "k1": k1, "image": self.image, "files": files})}
+        if tool == "state":
+            return {"status": "applied", "output": json.dumps({"run": self.name, "k": self.k_last, "image": self.image, "recorded": True})}
+        return {"status": "failed", "output": "no tool %s (state | events | trace)" % tool}

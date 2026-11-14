@@ -14,7 +14,7 @@ import time
 from pathlib import Path
 
 from .agent import ChatAgent, IntentLog, Mapper
-from .gateway import MockGateway
+from .gateway import MockGateway, TraceGateway
 from .narrate import Narrator, load_docs
 from .vocab import Vocab
 
@@ -32,16 +32,23 @@ def build(args):
         narr_llm = llm.sibling(args.n_ctx)
     if args.mock:
         gw = MockGateway(docs, hz=args.hz, surprises=not args.no_surprise)
+    elif args.trace:
+        gw = TraceGateway(args.trace)
     else:
-        raise SystemExit("the real gateway client is not here yet (bond001's contracts/clients/road_client.py): use --mock")
+        raise SystemExit("the real gateway client is not here yet (bond001's contracts/clients/road_client.py): use --mock or --trace RUN_DIR")
     agent = ChatAgent(vocab, gw, Mapper(llm, vocab), Narrator(narr_llm), docs, hz=args.hz, intent_log=IntentLog(args.intent_log))
-    info = {"model": None if llm is None else Path(args.model).name, "gateway": "mock" if args.mock else "tls", "domain": vocab.domain}
+    kind = "mock" if args.mock else "trace" if args.trace else "tls"
+    info = {"model": None if llm is None else Path(args.model).name, "gateway": kind, "real": kind == "tls",
+            "domain": vocab.domain,                 # the INTENT domain Submit names (RoadDomain checks "task")
+            "vehicle_domain": "road",               # what the vehicle's replies say
+            **({"run": gw.name, "image": gw.image} if kind == "trace" else {})}
     return agent, info
 
 
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="road_chat")
     ap.add_argument("--mock", action="store_true", help="the MockGateway (the vehicle emulated)")
+    ap.add_argument("--trace", default=None, help="a RECORDED vehicle run (RoadDomain's trace dir): narrate and send it to pi, no intents")
     ap.add_argument("--no-model", action="store_true", help="no LLM: the template narrator, the examples' table")
     ap.add_argument("--model", default=str(MODEL))
     ap.add_argument("--n-ctx", type=int, default=4096)
