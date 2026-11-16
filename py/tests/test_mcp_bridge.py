@@ -168,11 +168,13 @@ def test_feed_ws_pushes_frames(ws_root):
 ROAD = os.environ.get("METIS_TEST_ROAD") or str(__import__("pathlib").Path(__file__).resolve().parents[3] / "metis-worlds" / "road")
 
 
-def test_through_the_server_enable_inbox_answer_disable(tmp_path):
-    """The bridge's tools in the MCP server (bond's claude-plugin): bridge_enable on a copy of the road workspace, the road UI's
-    surprise and question over HTTP, bridge_inbox lists both, bridge_answer answers, the feed carries it, bridge_disable."""
+def test_through_the_server_ide_open_explain_answer_close(tmp_path):
+    """The /ide tools in the MCP server on a copy of the road workspace: ide_open publishes the lockfile (no token in
+    the answer), a UI backend pairs and signals a surprise and a question (SURPRISE-INTERFACE §4), explain_list lists
+    the question, explain_answer answers, the spec feed carries the answer, ide_close removes the lockfile."""
     from pathlib import Path
 
+    from metis_agent.runtime.client import get, post
     from tests.mcp_client import Client
     if not (Path(ROAD) / ".metis" / "traces").is_dir():
         pytest.skip("no metis-worlds/road workspace with traces beside metis-agent")
@@ -185,23 +187,28 @@ def test_through_the_server_enable_inbox_answer_disable(tmp_path):
             err, text = r
             assert not err, text
             return json.loads(text)
-        assert j(c.call("bridge_status"))["on"] is False                  # dormant by default
-        st = j(c.call("bridge_enable", port=0))
-        assert st["on"] and "token" in st and "?metis=" in st["page"]
-
-        class B:                                                        # the HTTP calls as the page makes them
-            port, token = st["port"], st["token"]
-        code, r = call(B, "/surprise", {"run": "vrun", "window": [10, 30], "words": "late for the red light", "member": "signals", "n": 2})
-        assert code == 200
-        code, q = call(B, "/explain", {"run": "vrun", "window": [10, 30], "words": "why so late?", "n": 2})
-        inbox = j(c.call("bridge_inbox"))
-        assert [x["ref"] for x in inbox["questions"]] == [q["ref"]] and r["id"] in [x["id"] for x in inbox["surprises"]]
-        assert c.call("bridge_answer", ref="nope", text="x")[0] is True  # a refusal in words
-        j(c.call("bridge_answer", ref=q["ref"], text="The light was red and you could still stop."))
-        assert j(c.call("bridge_inbox"))["questions"] == []
-        code, f = call(B, "/feed")
-        assert any(x["kind"] == "answer" and x["ref"] == q["ref"] for x in f["rows"])
-        assert j(c.call("bridge_disable"))["on"] is False
+        assert j(c.call("ide_status"))["on"] is False                     # dormant by default
+        st = j(c.call("ide_open"))
+        assert st["on"] and "token" not in st and st["lockfile"]
+        lk = json.loads(Path(st["lockfile"]).read_text())
+        url, tok = lk["url"], lk["token"]
+        env = lambda t, n, **f: {"v": 1, "seq": n, "ts": "t", "type": t, "from": "ui:test", **f}    # noqa: E731
+        assert post(url + "/signal", tok, env("hello", 1))[0] == 200
+        assert post(url + "/signal", tok, env("explain.request", 2, id="q1", mode="explain",
+                                              about={"run": "vrun", "k0": 10, "k1": 30}, words="why so late?"))[0] == 200
+        assert [x["ref"] for x in j(c.call("explain_list"))["requests"]] == ["q1"]
+        assert c.call("explain_answer", id="nope", text="x")[0] is True  # a refusal in words
+        j(c.call("explain_answer", id="q1", text="The light was red and you could still stop."))
+        assert j(c.call("explain_list"))["requests"] == []
+        end = time.time() + 10
+        while time.time() < end:
+            rows = [json.loads(l) for l in get(url + "/feed?since=0", tok).splitlines()]
+            if any(r["type"] == "explain.answer" and r["id"] == "q1" for r in rows):
+                break
+            time.sleep(0.2)
+        else:
+            raise AssertionError("no explain.answer on the ide feed")
+        assert j(c.call("ide_close"))["on"] is False and not Path(st["lockfile"]).exists()
     finally:
         c.close()
 
