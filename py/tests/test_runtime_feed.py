@@ -212,3 +212,25 @@ def test_a_newer_runtime_of_the_name_replaces_the_older(ws_root):
         c.close()
         b.stop()
         a.stop()
+
+
+def test_a_finding_on_a_shared_trace_keeps_its_window_there_and_signals_its_run(tmp_path):
+    """An embedding whose runtime runs share one trace (the road UI's service: one Live, a run per scenario start): a finding names
+    its TRACE apart from its run; the window is kept from the trace, surprise.new names the run (and the trace)."""
+    import os
+    import shutil
+    from metis_agent.runtime.feed import RuntimeFeed
+    src = "/bigdata/work/bond/road/vtrace/red_light"
+    if not os.path.isdir(src):
+        import pytest
+        pytest.skip("the recorded trace is not on this host")
+    root = tmp_path / "ws"
+    (root / "domains").mkdir(parents=True)
+    shutil.copytree(src, root / ".metis" / "traces" / "svc")
+    feed = RuntimeFeed(root, "emb")
+    feed.run_started("scenario-1-20261116T000000Z", "traces/svc", {})
+    sid = feed.finding({"kind": "watch", "k": 50, "words": "x", "member": "planner", "trace": "svc"}, now=True)
+    assert sid
+    new = [s for s in feed.after(0) if s["type"] == "surprise.new"][-1]
+    assert new["run"] == "scenario-1-20261116T000000Z" and new["trace"] == "traces/svc"
+    assert feed.ws.surprise(sid)["trace"].startswith("traces/svc-")
