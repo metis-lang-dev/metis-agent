@@ -313,6 +313,7 @@ class Live:
       eager      the director moved at the last beat: the next beat now, jobs first (run())
       _was_held  the last clock tick was held (a host's holds_beat(): beat_held()): no beat, the loop waits HELD_PACE
       held       not a flag: the held replies, a list released after the director's step (release_held)"""
+    current = None                             # the newest Live of this process (a host plugin's handle on it)
 
     image = None                         # v3.image's (metis.catalog.image.Image), when the config names one
     proc_split, remote_status = None, {}     # a plan's process (metis_agent.split.Split) and its peer's statuses
@@ -464,6 +465,10 @@ class Live:
         self.stop = threading.Event()
         self.beat = 0
         self.tracer = None
+        # a runtime's finding sink (RUNTIME-INTERFACE §4, runtime.run): a member's `surprise` reply (the kernel watch)
+        # becomes a finding {kind: watch, k: the trace's tick, member, words, record, difference}; off unless set
+        self.on_finding = None
+        Live.current = self                    # the process's newest Live: an embedding host (road_host) sets its on_finding
         if cfg.get("trace") is not None:       # a reader around the tick (metis_agent.trace), off unless the config asks; a key it cannot honour stops the start
             from .trace import attach
             self.tracer = attach(self, cfg["trace"])
@@ -1760,12 +1765,24 @@ class Live:
                 self.pend = []
                 continue
             self.journal.record(w)
+            if r.kind == "surprise" and self.on_finding is not None:
+                self.watch_finding(w)
             try:
                 self.o.handle(inb, self.gbnf, self.stop_words)
             except Exception as e:  # noqa: BLE001
                 log.exception("[v3] handle: %s", e)
             add(self.pend)
             self.pend = []
+
+    def watch_finding(self, w):
+        """The kernel watch's surprise as a runtime finding (on_finding), at the trace's tick (the one being written)."""
+        try:
+            k = self.tracer.k if self.tracer is not None else self.beat
+            self.on_finding({"kind": "watch", "k": int(k), "member": w.get("domain"),
+                             "words": w.get("text") or "the member's watch was surprised",
+                             "record": w.get("record"), "difference": w.get("difference")})
+        except Exception as e:  # noqa: BLE001 (a finding sink must not stop the tick)
+            log.warning("[v3] on_finding: %s", e)
 
     # the person's turn (v3service.go utterance)
 
