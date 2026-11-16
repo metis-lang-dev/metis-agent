@@ -125,7 +125,10 @@ small scenario runner maps (task, seed) to its Live config and calls `Run.go`.
   not a finding). In the TICK form the check runs at the member's NEXT tick (Watch.begin), over the atoms its own
   fired events consumed or produced since its checkpoint, as they are PRESENT in the reading: an atom ADDED that the
   program does not hold is compared, an atom DROPPED from the reading never is. A member that is not ticked again
-  after its command (done, its task over) is never checked on that command's effect.
+  after its command (done, its task over: ALFWorld's grasp) is never checked on that command's effect. Proven live
+  (metis-agent tests/test_runtime_run.py, test_a_kernel_watch_surprise_is_a_finding_live): on the kitchen, cook_a
+  (ticked again after each command) reads hand_free still there after its take: surprise (unmodeled) -> its reply ->
+  Live.handle_due -> on_finding -> a `watch` finding {member cook_a, k 4, record} -> feed.finding.
 - **A run per scenario start:** an embedding service (the page's one long Live) still calls `run_started` /
   `run_ended` per scenario start, each with its unique run name, not one run per service lifetime.
 - **The route of a page's request** (an embedded service): the page talks only to its backend; the backend sends an
