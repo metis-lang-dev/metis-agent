@@ -23,14 +23,20 @@ wheelchair world speak it unchanged.
 
 Both may be on at once on one workspace (one agent on a headless runner and on a UI). ONE message format for both.
 
-**Exclusivity (the user):** a plugin session holds at most ONE `/ide` connection and at most ONE runtime connection;
-each acceptor is exclusive: a runtime accepts ONE plugin at a time, a UI backend pairs with ONE plugin at a time.
-Making sure of that is the user's side: no arbitration, no multi-client fan-out. A second attempt is REFUSED with
-words naming the current holder (`409 {error: "runtime road-1 is attached to plugin:3711364 since 15:02; disconnect
-it first"}`); a `/connect-runtime` while one is attached says so too (disconnect first, never a silent replace).
+**The runtime multiplexes (the user):** a runtime accepts SEVERAL clients at once (a UI backend and a Claude agent's
+plugin, and more), each its own connection. It fans its feed out to all of them, and fans one client's
+`surprise.taken` / `ruled` / `applied`, `catalog.changed` / `world.changed` and `explain.answer` out to the OTHER
+clients, so the page sees what the agent does on the runtime's surprises. Control stays safe by one rule: one run at a
+time; a `run.request` while a run is on is `409 {error: words}` naming the run and its requester.
 
-**Fan-out is the backend's:** a UI backend relays the plugin's `surprise.*`, `explain.answer`, `catalog.changed`,
-`world.changed` to its own page(s) over its own socket; the page never sees the plugin's token or URL.
+**What stays single (the user):** a plugin session holds at most ONE runtime connection and at most ONE `/ide`
+connection; a UI backend pairs with ONE plugin under `/ide`. A second attempt is REFUSED with words naming the current
+holder (`409 {error: "this plugin is attached to runtime road since 15:02 (plugin:3711364); runtime_disconnect first"}`;
+`409 {error: "the ide endpoint is paired with ui:road-backend since 15:04; it disconnects first"}`); never a silent
+replace. No arbitration logic beyond that: keeping it so is the user's side.
+
+**Fan-out to a page is the backend's:** a UI backend relays the signals it receives (from the plugin under `/ide`, or
+from the runtime it is a client of) to its own page(s) over its own socket; the page never sees a token or a peer's URL.
 
 ## 2. Discovery
 
