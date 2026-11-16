@@ -1,4 +1,4 @@
-# The Metis surprise interface (spec v1.1: signed off by bond004 and bond008 with amendments, reviewed by pascal, the user's rules folded in; metis-plugin s-df4ff191)
+# The Metis surprise interface (spec v1.2: the runtime multiplexes; signed off by bond004 and bond008 with amendments, reviewed by pascal, the user's rules folded in; metis-plugin s-df4ff191)
 
 ## 0. The layering (the user, 2026-11-16): payload in the workspace, signals on top
 

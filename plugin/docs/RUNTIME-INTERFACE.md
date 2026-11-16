@@ -1,4 +1,4 @@
-# The Metis runtime interface (spec v1.2: signed off by bond004 and bond008, their amendments in; metis-plugin s-df4ff191)
+# The Metis runtime interface (spec v1.3: signed off by bond004 and bond008, their amendments in, pascal's flush rule; metis-plugin s-df4ff191)
 
 The RUNTIME side of [SURPRISE-INTERFACE.md](SURPRISE-INTERFACE.md): what serves the feed that `/connect-runtime`
 attaches to, implemented ONCE in metis-agent for every workspace's runtime. A domain brings only a small HOST (§3);
@@ -93,11 +93,12 @@ A finding is `{kind, k, words, slug?, member?, k0?, k1?, ...}` (domain keys kept
 |---|---|---|
 | `run_started(run, trace, spec, request?)` | the Live and the Tracer are made (trace dir in the workspace: `traces/<run>`, `config.yaml` beside it) | `run.started` |
 | `tick(k)` | each tick (rate-limited status) | `status` (to sockets only, not the backlog) |
-| `finding(f, now=False)` | the host's `findings(k)`, a kernel watch surprise, `end_findings` | queued (nothing yet) |
+| `finding(f, now=False)` | the host's `findings(k)`, a kernel watch surprise | queued until its window is closed (below) |
+| `segment_closed(k_last)` | the Tracer closed a segment at a checkpoint (every `trace.every` ticks) | every queued finding with `k1 <= k_last` WRITTEN, then `surprise.new` each |
 | `finding(f, now=True)` | a PERSON's mark in an embedded run (its window is already in the trace when the person ends it; `keep_window` copies the closed segments and the open one up to its last line) | written at once, then `surprise.new` |
 | `request(type, body)` | an embedded service's page asks (`explain.request`, mode explain / narrate) | to its runtime clients -> `{delivered: n}` |
 | `narration(n)` | the Live's `emit("narration", n)` (deterministic narration: the runtime's own) | `narration` (optional, for UIs) |
-| `run_ended(run, reason, summary?, error?)` | the tracer is CLOSED | first every queued finding WRITTEN, then `surprise.new` each, then `run.ended` |
+| `run_ended(run, reason, summary?, error?)` | the tracer is CLOSED | the findings still queued and `end_findings` WRITTEN, then `surprise.new` each, then `run.ended` |
 
 - **The trace** is the runtime's: it sets `config["trace"]["dir"] = <workspace>/.metis/traces/<run>` and keeps every
   other key the host put in `config["trace"]` (road: `every: 200, ring: 0, commands: <its world commands>`).
@@ -105,7 +106,10 @@ A finding is `{kind, k, words, slug?, member?, k0?, k1?, ...}` (domain keys kept
   host whose world counts its own ticks maps them (road: 1:1, checked in its host's test).
 - **Run names** are unique: `<stem>-<UTC stamp>` (`stem` from the host; never a reused trace dir: a restart's run
   rewriting old segments is the bug bond008 found).
-- **Findings are written only after the trace closes** (`keep_window` cannot copy a window the writer still holds):
+- **A host finding is written as soon as its window is closed** (`keep_window` cannot copy a window the writer still
+  holds): once the Tracer has closed the segment holding its `k1`, so within one checkpoint interval (road:
+  `every: 200` ticks) of `k1`; a finding whose window reaches past the run's last closed segment, and `end_findings`,
+  at the run's end. A person's mark in an embedded run is written at once (`now=True`). Each through
   `Workspace.drop_window(run, k0, k1, words, key, member=f.member, kind=f.kind, k=f.k, source="runtime:<name>")`,
   key `<run>:<kind>[:<slug>]:<k>`; the member by `member_of` when the finding names none.
 - **The kernel watch:** a member's `surprise` reply (domain_agent: record, difference) is a finding
@@ -118,8 +122,6 @@ A finding is `{kind, k, words, slug?, member?, k0?, k1?, ...}` (domain keys kept
   `surprise.new` on both; the plugin de-dups by id. The key is the producer's: `<run>:mark:<n>:<k0>-<k1>` for a page
   mark, `<run>:<kind>[:<slug>]:<k>` for a host finding.
 - **Run names, both drivers alike:** `<stem>-<UTC stamp>` (the embedded road service aligns to it).
-- **A long run** may flush at its checkpoints: findings whose window lies before the tracer's last closed segment
-  may be written early (optional, v1.1).
 
 ## 5. The wire (exactly SURPRISE-INTERFACE.md's, from the runtime's side)
 
@@ -166,7 +168,8 @@ args: [-m, metis_agent.runtime, --workspace, "{workspace}", --host, "alf_runtime
 - feed: discovery written/removed; token refused; two clients (a UI + a plugin) both get the feed and the plugin's
   `surprise.ruled` reaches the UI and not back to the plugin; `run.request` while running 409 with words; resume by seq.
 - run: a stub host (a tiny bundle + a host with one planted finding) -> run.started, the trace in the workspace, the
-  finding written AFTER close with its key and kept window, surprise.new, run.ended done; a stop -> stopped; a host
+  finding written AFTER its segment closed with its key and kept window, surprise.new, run.ended done; in a LONG stub
+  run (several checkpoints), an early finding's `surprise.new` arrives BEFORE `run.ended` (within one interval of its k1); a stop -> stopped; a host
   raising -> error with words.
 - the proofs (§ the subject): headless only (road card, ALFWorld task), interactive only, both on one workspace
   (no duplicate surprise).
