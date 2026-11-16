@@ -5,7 +5,7 @@ separate from the runtime); what the run needs from the domain is its host (runt
 
     r = Run(workspace, host, feed).go(config, ticks, stem, spec=None, env=None)   -> {run, trace, reason, summary, error}
 
-- the run's name: <stem>-<UTC stamp> (never a reused trace dir); config.trace.dir = <workspace>/.metis/traces/<run>
+- the run's name: <stem>-<UTC stamp>, -2, -3 ... for a second start in the same second (never a reused trace dir); config.trace.dir = <workspace>/.metis/traces/<run>
   (the host's other trace keys kept), config.yaml beside it (the run's config minus trace and journal: the judge
   replays on it); the run's own journal (a temp file: a config file's default is another run's)
 - ENV applied (and restored after); host.prepare(cfg, run, trace_dir) just before the Live is made; host.start(live, cfg)
@@ -72,7 +72,10 @@ class Run:
     def begin(self, config, stem, spec=None, env=None):
         """The Live made, the host started, run_started. -> True, or False with out.reason 'error' (finish says it)."""
         cfg = json.loads(json.dumps(config, default=str))          # the run's own copy
-        run = run_name(stem)
+        run, n = run_name(stem), 1
+        while (self.ws / ".metis" / "traces" / run).exists():     # two starts in one second: <name>-2, -3, ...
+            n += 1
+            run = "%s-%d" % (run_name(stem), n)
         self.tdir = self.ws / ".metis" / "traces" / run
         trace = "traces/" + run
         cfg["trace"] = dict(cfg.get("trace") or {}, dir=str(self.tdir))

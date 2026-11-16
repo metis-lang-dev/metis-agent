@@ -98,3 +98,16 @@ def test_the_lives_watch_hook():
                     "record": {"r": 1}, "difference": {"d": 2}}]
     fake.on_finding = lambda f: 1 / 0                                    # a failing sink never stops the tick
     S.Live.watch_finding(fake, {"domain": "cook_a"})
+
+
+def test_two_starts_in_one_second_get_two_names(tmp_path):
+    from metis_agent.runtime.run import Run, run_name
+    stem = "kitchen-1"
+    taken = run_name(stem)
+    (tmp_path / "ws" / ".metis" / "traces" / taken).mkdir(parents=True)
+    r = Run(tmp_path / "ws", RH.Kitchen(), StubFeed())
+    assert r.begin(RH.kitchen_config(1), stem), r.out
+    try:
+        assert r.out["run"] != taken and r.out["run"].startswith(stem + "-")       # never the existing trace dir
+    finally:
+        r.finish("done")
