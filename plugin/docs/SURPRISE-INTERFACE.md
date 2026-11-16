@@ -114,7 +114,7 @@ Deterministic narration stays the runtime's own (no signal); `explain` / `narrat
 the window (`keep_window`, the copy NAMED BY THE KEY, never by a mere event number: a re-run numbers its marks from 1
 again), takes the run's `config.yaml`, finds the member when not given (`Workspace.member_of(trace, k0, k1)`: the member
 with the most worded firings in the window, never the director: the image's `direct` role), and writes the surprise
-with `key=`: `{member, trace: "traces/<run>-<key slug>", window: [k0, k1], k, words, config, source, kind?}`.
+with `key=`: `{member, trace: "traces/<run>-<key slug>", window: [k0, k1], k, words, config, source, finding?}` (`finding`: the producer's kind of finding, collision, violation, rule, end, mark; the record's own `kind` stays spec 20's surprise kind).
 
 **Watching files:** a backend MAY watch the domains / its host's files itself (for when no plugin is attached); when
 both a backend's watch and the plugin's `catalog.changed` / `world.changed` fire, the plugin's (with its commit) wins
