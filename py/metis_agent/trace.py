@@ -389,12 +389,16 @@ class Feed:
 
 
 class TraceHost:
-    """A member's world, from the trace: its reading the recorded copy, its tick the lines it applied. A rule fired is no command to anything."""
+    """A member's world, from the trace: its reading the recorded copy, its tick the lines it applied. A rule fired is no command to anything.
+    A world line (a page's: the road page's run:, mark:, watching) is taken as the live host took it: the agent's sync after it answers
+    with the tick's recorded take by world (metis-plugin step 6: a re-run's new world, taken at once, read as 'change')."""
     beat, due, script, last = 0, (), {}, None
     done = False
     outer = None
     repl = None
     watched = ()
+    world_takes = ()
+    in_world = False
 
     def __init__(self, member, feed):
         self.member, self.feed = member, feed
@@ -431,6 +435,9 @@ class TraceHost:
         return lines
 
     def sync(self, counts):
+        if self.in_world:                          # the agent's sync right after a world line: what the live world gave it then
+            self.in_world = False
+            return list(self.world_takes.pop(0)) if self.world_takes else []
         # the wake's test: its reading differs from what its session holds. On a tick the record's wake read as `none`,
         # the clock's decision came before this tick's input (the director's arrival, relayed after the members beat,
         # served by director_step), so the recorded beat lines are not offered there. What a candidate's own rules did
@@ -468,7 +475,9 @@ class TraceHost:
         return False
 
     def world(self, lines):
-        raise T.TraceError("a world line reached a trace host")
+        """A recorded world line, served again: the world is the record, so nothing moves here; the agent's sync that follows takes
+        the record's take by world for this tick (world_takes, set by _external)."""
+        self.in_world = True
 
     def snapshot(self):
         return {"beat": self.beat}
@@ -631,7 +640,7 @@ def replay_composition(path, cfg, candidate=None):
                     for e in rec.get("ext", ()):
                         if e.get("call") in ("new_game", "enter_room") and j == 0 and "cut" in seg.header:
                             continue                       # its effect is the checkpoint just restored
-                        _external(lv, e)
+                        _external(lv, e, rec)
                     if rec.get("between"):                # what came between two ticks, before the checkpoint: its own line
                         got = {"k": rec["k"], "members": tracer.entries()}
                     else:
@@ -1387,14 +1396,25 @@ def _restart(lv, ags, feed, tracer, seg):
         restore_agent(lv, ck["agent"])
 
 
-def _external(lv, e):
-    """What came from outside the composition. A call runs as it ran; a take is taken; a person's intent and a world line are in the beats' recorded inputs."""
+def _external(lv, e, rec=None):
+    """What came from outside the composition. A call runs as it ran; a take is taken; a world line is served again on its domain, whose
+    trace host answers the agent's sync with the tick's recorded take by world (the live host's reading after it); a person's intent is
+    in the beats' recorded inputs."""
     if "call" in e:
         if e["call"] in ("new_game", "enter_room"):
             raise T.TraceError("the run's %s is not replayed yet: its world changed under it" % e["call"])
         getattr(lv, e["call"])(*e.get("args", ()), **e.get("kw", {}))
     elif e.get("kind") == "take":
         lv.serve_line(e["line"], "take")
+    elif e.get("kind") == "world" and isinstance(e.get("line"), dict) and e["line"].get("domain"):
+        d = e["line"]["domain"]
+        ag = getattr(lv.agents, "agents", {}).get(d)
+        inner = getattr(getattr(ag, "host", None), "inner", getattr(ag, "host", None))
+        if not isinstance(inner, TraceHost):
+            return
+        seq = (((rec or {}).get("members") or {}).get(d) or {}).get("seq") or ()
+        inner.world_takes = [list(i["take"]) for i in seq if "take" in i and i.get("by") == "world"]
+        lv.serve_line(e["line"], "world")
 
 
 def main(argv=None):
