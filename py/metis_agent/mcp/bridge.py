@@ -1,0 +1,439 @@
+"""The /metis-ui endpoint (plugin/docs/SURPRISE-INTERFACE.md v1.3 §1-§4): the plugin's side a UI BACKEND pairs with, on
+loopback with a token, published by a lockfile (.metis/ui/<pid>.json). With the session's hub: GET /feed (the plugin's
+signals: taken / ruled / applied / answers / catalog.changed, as a WebSocket or JSON lines) and POST /signal (the
+backend's hello, surprise.new, explain.request, payload); ONE backend paired at a time, a second refused naming the
+holder. Without a hub (the legacy page of step 4): POST /surprise /explain /event and GET /feed /feed/ws as before,
+written through the SDK's one producer path (drop_window). Domain-free."""
+import asyncio
+import hashlib
+import hmac
+import json
+import os
+import secrets
+import subprocess
+import threading
+import time
+from collections import Counter
+from pathlib import Path
+
+DEFAULT_PORT = 8790
+POLL_S, CATALOG_S = 1.0, 2.0
+WHO = "world"                    # the bridge writes as the world (a UI backend is the world's face); metispy's WHO has it
+FEED_KINDS = ("surprise", "take", "retake", "try", "ruling", "applied", "answer", "explain")
+
+
+def _ws(root):
+    from metis.catalog import workspace as W
+    return W.workspace(str(root))
+
+
+def catalog_files(root, family=None):
+    """The files whose change is a catalog change: the workspace's domains (programs, manifests, units, compositions)
+    and the family the members include (METIS_HOME), never .metis/ or a build dir."""
+    out = []
+    for base in [Path(root) / "domains", Path(family)] if family else [Path(root) / "domains"]:
+        if not base.is_dir():
+            continue
+        for p in sorted(base.rglob("*")):
+            if p.is_file() and p.suffix in (".llp", ".yaml", ".yml") and not any(
+                    part in ("build", ".metis", "__pycache__", "records", "goldens") for part in p.relative_to(base).parts):
+                out.append(p)
+    return out
+
+
+def snapshot(files):
+    """{path: sha256 of its bytes}: content, not mtime (a checkout that rewrites a file unchanged is no change)."""
+    snap = {}
+    for p in files:
+        try:
+            snap[str(p)] = hashlib.sha256(p.read_bytes()).hexdigest()[:16]
+        except OSError:
+            continue
+    return snap
+
+
+def changed(a, b):
+    return sorted(set(k for k in set(a) | set(b) if a.get(k) != b.get(k)))
+
+
+def git_head(path):
+    try:
+        return subprocess.run(["git", "-C", str(path), "rev-parse", "--short", "HEAD"], capture_output=True, text=True,
+                              timeout=5).stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def member_of(ws, run, k0, k1):
+    """The member a window is about: metispy's Workspace.member_of (the surprise interface §6, never the director)."""
+    return ws.member_of(run, k0, k1)
+
+
+class Bridge:
+    def __init__(self, root, family=None, cors="*", hub=None):
+        """root: a callable -> the workspace root (the server's, switchable), or a path; family: the dir the members'
+        units are included from (default $METIS_HOME), watched with the workspace's domains."""
+        self.root = root if callable(root) else (lambda r=str(root): r)
+        self.family = family if family is not None else os.environ.get("METIS_HOME")
+        self.cors = cors
+        self.hub = hub                       # the surprise interface (iface.Hub): /feed + /signal + the lockfile = /metis-ui
+        self.lockfile = None
+        self.feeds = Counter()               # open spec feeds, per paired name
+        self.thread = self.loop = self.runner = None
+        self.port = self.token = None
+        self.since = None
+        self.counts = Counter()
+        self.base = self.cat = None          # the catalog's snapshot at the start / the last change seen
+        self.cat_rows = []                   # catalog frames, with the journal length at which each was seen
+
+    # ── the switch ──
+    def start(self, port=DEFAULT_PORT, token=None, host="127.0.0.1"):
+        if self.thread:
+            return self.status()
+        if host not in ("127.0.0.1", "localhost", "::1"):
+            raise ValueError("the bridge listens on loopback only, not %s" % host)
+        self.token = token or secrets.token_urlsafe(24)
+        self.base = self.cat = snapshot(catalog_files(self.root(), self.family))
+        self.cat_root, self.cat_rows = str(self.root()), []
+        ready, err = threading.Event(), []
+
+        def run():
+            self.loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self.loop)
+            try:
+                self.loop.run_until_complete(self._serve(host, port))
+            except Exception as e:                          # the port taken, …: start() says so
+                err.append(e)
+                ready.set()
+                return
+            ready.set()
+            self.loop.run_forever()
+
+        self.thread = threading.Thread(target=run, daemon=True, name="metis-bridge")
+        self.thread.start()
+        ready.wait(10)
+        if err:
+            self.thread = None
+            raise RuntimeError("the bridge did not start on %s:%s: %s" % (host, port, err[0]))
+        self.since = time.time()
+        if self.hub is not None:
+            self.hub.ui_on = True
+            self.hub.ensure_pump()
+            d = Path(self.root()) / ".metis" / "ui"
+            d.mkdir(parents=True, exist_ok=True)
+            self.lockfile = d / ("%d.json" % os.getpid())
+            self.lockfile.write_text(json.dumps({"url": "http://127.0.0.1:%d" % self.port, "token": self.token, "pid": os.getpid(),
+                                                 "workspace": str(Path(self.root()).resolve()), "protocol": 1,
+                                                 "started": time.strftime("%Y-%m-%dT%H:%M:%S")}) + "\n")
+        return self.status()
+
+    def stop(self):
+        if not self.thread:
+            return self.status()
+        fut = asyncio.run_coroutine_threadsafe(self.runner.cleanup(), self.loop)
+        try:
+            fut.result(10)
+        finally:
+            self.loop.call_soon_threadsafe(self.loop.stop)
+            self.thread.join(10)
+            self.thread = self.loop = self.runner = None
+            self.port = self.token = None
+            if self.lockfile is not None:
+                self.lockfile.unlink(missing_ok=True)
+                self.lockfile = None
+            if self.hub is not None:
+                self.hub.ui_on = False
+                self.hub.unpair()
+        return self.status()
+
+    def status(self):
+        on = bool(self.thread)
+        return {"on": on, "root": str(self.root()), "port": self.port if on else None,
+                "lockfile": str(self.lockfile) if self.lockfile else None,
+                "paired": (self.hub.paired if self.hub is not None else None),
+                "url": ("http://127.0.0.1:%d" % self.port) if on else None, "token": self.token if on else None,
+                "since": self.since if on else None, "counts": dict(self.counts), "last_error": getattr(self, "last_error", None)}
+
+    # ── IN ──
+    def surprise(self, b):
+        ws = _ws(self.root())
+        run, win = str(b.get("run") or ""), b.get("window")
+        if not run:
+            raise ValueError("a surprise names its run (the page's trace)")
+        if not (isinstance(win, list) and len(win) == 2 and all(isinstance(x, int) for x in win) and win[0] <= win[1]):
+            raise ValueError("window: [k0, k1], two ticks, k0 <= k1")
+        words = " ".join(str(b.get("words") or "").split())
+        if not words:
+            raise ValueError("a surprise carries the tester's words (what they saw)")
+        if not ws.path("trace", run=run).is_dir():
+            raise ValueError("no trace %s in the workspace %s" % (run, ws.root))
+        n = b.get("n")
+        key = str(b.get("key") or "%s:mark:%s:%d-%d" % (run, n if n not in (None, "") else "-", win[0], win[1]))
+        page = {k: b[k] for k in ("n", "kind", "scenario", "seed", "t0", "t1") if b.get(k) not in (None, "")}
+        try:
+            sid = ws.drop_window(run, win[0], win[1], words, key, member=str(b.get("member") or "") or None, kind="mark",
+                                 source=str(b.get("source") or "ui"), who=WHO, page=page)
+        except ValueError as e:
+            raise ValueError(str(e))
+        rec = ws.surprise(sid)
+        trace, member = rec.get("trace"), rec.get("member")
+        self.counts["surprise"] += 1
+        return {"id": sid, "trace": trace, "member": member}
+
+    def explain(self, b):
+        ws = _ws(self.root())
+        win = b.get("window")
+        ref = "x%s-%s" % (time.strftime("%Y%m%dT%H%M%S"), secrets.token_hex(2))
+        row = ws.journal(WHO, "explain", ref=ref, run=str(b.get("run") or ""), window=win, member=b.get("member"),
+                         words=" ".join(str(b.get("words") or "").split()), n=b.get("n"), source=str(b.get("source") or "ui"))
+        self.counts["explain"] += 1
+        return {"ref": ref, "ts": row["ts"]}
+
+    def event(self, b):
+        ws = _ws(self.root())
+        keep = {k: b[k] for k in ("n", "edge", "k0", "k1", "run", "words", "kind", "t0", "t1") if b.get(k) not in (None, "")}
+        if "n" not in keep or "edge" not in keep:
+            raise ValueError("an event has its number n and its edge")
+        ws.journal(WHO, "event", source=str(b.get("source") or "ui"), **keep)
+        self.counts["event"] += 1
+        return {"ok": True}
+
+    # ── OUT ──
+    def catalog_check(self):
+        """A catalog change since the bridge's start (or the last one seen): a frame, kept with the journal's length. A
+        workspace switch (the server's workspace_open) is a new base, not a change."""
+        if getattr(self, "cat_root", None) != str(self.root()):
+            self.cat_root, self.cat, self.cat_rows = str(self.root()), snapshot(catalog_files(self.root(), self.family)), []
+            return None
+        now = snapshot(catalog_files(self.root(), self.family))
+        moved = changed(self.cat, now)
+        if not moved:
+            return None
+        self.cat = now
+        root = Path(self.root())
+        fr = {"kind": "catalog", "changed": [os.path.relpath(p, root) for p in moved][:50], "count": len(moved),
+              "at": time.strftime("%Y-%m-%dT%H:%M:%S"), "head": git_head(root),
+              "family_head": git_head(self.family) if self.family else None}
+        self.cat_rows.append((len(_ws(root).events()), fr))
+        return fr
+
+    def feed(self, since=0):
+        ws = _ws(self.root())
+        rows = ws.events(0)
+        since = max(0, int(since or 0))
+        out = []
+        for i, r in enumerate(rows[since:], since):
+            fr = self.frame(ws, r)
+            if fr:
+                out.append(dict(fr, seq=i + 1))
+        for at, fr in self.cat_rows:                       # the catalog frames, in their place among the rows
+            if at >= since:
+                out.append(dict(fr, seq=at))
+        out.sort(key=lambda f: f["seq"])
+        return {"rows": out, "next": len(rows)}
+
+    def frame(self, ws, r):
+        k = r.get("kind")
+        if k not in FEED_KINDS:
+            return None
+        if k == "answer":
+            return {"kind": "answer", "ref": r.get("ref"), "text": r.get("text", "")}
+        if k == "explain":
+            return {"kind": "explain", "ref": r.get("ref"), "n": r.get("n"), "status": "asked"}
+        sid = r.get("id") or r.get("surprise")
+        if isinstance(sid, list):
+            sid = sid[0] if sid else None
+        if not sid:
+            return None
+        try:
+            rec = ws.surprise(sid)
+        except Exception:
+            rec = {}
+        page = rec.get("page") or {}
+        st = {"surprise": "open", "take": "taken", "retake": "taken", "try": "tried", "ruling": "ruled",
+              "applied": "applied"}[k]
+        fr = {"kind": "surprise", "id": sid, "n": page.get("n"), "status": st, "member": rec.get("member")}
+        if r.get("verdict"):
+            fr["verdict"] = r["verdict"]
+        if k in ("ruling", "try") and r.get("ruling"):
+            fr["ruling"] = r["ruling"]
+        if k == "applied":
+            fr.update({x: r[x] for x in ("domain", "unit", "commit", "branch") if r.get(x)})
+        return fr
+
+    # ── the app ──
+    def authorized(self, req):
+        got = req.headers.get("X-Metis-Token") or req.query.get("token") or ""
+        auth = req.headers.get("Authorization", "")
+        if not got and auth.startswith("Bearer "):
+            got = auth[len("Bearer "):]
+        return bool(self.token) and hmac.compare_digest(got.encode(), self.token.encode())
+
+    async def _serve(self, host, port):
+        from aiohttp import WSMsgType, web
+
+        @web.middleware
+        async def gate(req, handler):
+            if req.method == "OPTIONS":
+                resp = web.Response()
+            elif not self.authorized(req):
+                self.counts["refused"] += 1
+                resp = web.json_response({"ok": False, "error": "the bridge's token is required"}, status=401)
+            else:
+                try:
+                    resp = await handler(req)
+                except ValueError as e:                     # a refusal in words: counted, and the last one kept for ui_status
+                    self.counts["refused_" + req.path.strip("/")] += 1
+                    self.last_error = {"path": req.path, "error": str(e), "at": time.strftime("%H:%M:%S")}
+                    resp = web.json_response({"ok": False, "error": str(e)}, status=400)
+            if self.cors:
+                resp.headers["Access-Control-Allow-Origin"] = self.cors
+                resp.headers["Access-Control-Allow-Headers"] = "content-type, x-metis-token, authorization"
+                resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+            return resp
+
+        app = web.Application(middlewares=[gate])
+        lp = asyncio.get_running_loop()
+
+        def poster(fn):
+            async def h(req):
+                try:
+                    b = await req.json()
+                except ValueError:
+                    raise ValueError("a JSON body")
+                if not isinstance(b, dict):
+                    raise ValueError("a JSON object")
+                return web.json_response({"ok": True, **(await lp.run_in_executor(None, fn, b))})
+            return h
+
+        async def feed(req):
+            return web.json_response(await lp.run_in_executor(None, self.feed, req.query.get("since", 0)))
+
+        async def status(req):
+            return web.json_response(self.status() | {"token": None})
+
+        async def feed_ws(req):
+            ws = web.WebSocketResponse(heartbeat=20)
+            await ws.prepare(req)
+            since = int(req.query.get("since", 0) or 0)
+            last_cat = 0.0
+            try:
+                while not ws.closed:
+                    if time.monotonic() - last_cat >= CATALOG_S:
+                        await lp.run_in_executor(None, self.catalog_check)
+                        last_cat = time.monotonic()
+                    got = await lp.run_in_executor(None, self.feed, since)
+                    for fr in got["rows"]:
+                        await ws.send_str(json.dumps(fr))
+                    since = max(since, got["next"])
+                    try:
+                        m = await ws.receive(timeout=POLL_S)
+                        if m.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.ERROR):
+                            break
+                    except asyncio.TimeoutError:
+                        pass
+            finally:
+                await ws.close()
+            return ws
+
+        async def preflight(req):
+            return web.Response()
+
+        app.router.add_post("/surprise", poster(self.surprise))
+        app.router.add_post("/explain", poster(self.explain))
+        app.router.add_post("/event", poster(self.event))
+        async def sig_feed(req):
+            """The spec's feed (§4): the plugin's signals after ?since=; a WebSocket when asked for one, else JSON lines."""
+            since = int(req.query.get("since", 0) or 0)
+            if req.headers.get("Upgrade", "").lower() != "websocket":
+                rows = self.hub.out.after(since)
+                return web.Response(text="".join(json.dumps(r) + "\n" for r in rows), content_type="application/x-ndjson")
+            ws = web.WebSocketResponse(heartbeat=20)
+            await ws.prepare(req)
+            who = None
+            try:
+                while not ws.closed:
+                    if who is None and self.hub.paired:
+                        who = self.hub.paired["name"]
+                        self.feeds[who] += 1
+                    for r in await lp.run_in_executor(None, self.hub.out.after, since, POLL_S):
+                        await ws.send_str(json.dumps(r))
+                        since = max(since, r["seq"])
+                    try:
+                        m = await ws.receive(timeout=0.05)
+                        if m.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.ERROR):
+                            break
+                    except asyncio.TimeoutError:
+                        pass
+            finally:
+                await ws.close()
+                if who is not None:
+                    self.feeds[who] -= 1
+                    if self.feeds[who] <= 0:                 # the paired backend's last feed closed: the pairing ends
+                        self.hub.unpair(who)
+            return ws
+
+        async def signal(req):
+            try:
+                b = await req.json()
+            except ValueError:
+                raise ValueError("a JSON body: one signal envelope")
+            if not isinstance(b, dict):
+                raise ValueError("a JSON object: one signal envelope")
+            frm = str(b.get("from") or "")
+            if b.get("type") == "hello":
+                try:
+                    p = self.hub.pair(frm or str(b.get("name") or "ui:?"))
+                except PermissionError as e:
+                    self.counts["refused_pair"] += 1
+                    return web.json_response({"ok": False, "error": str(e)}, status=409)
+                return web.json_response({"ok": True, "v": 1, "type": "hello", "name": self.hub.emitter.name,
+                                          "workspace": str(Path(self.root()).resolve()), "protocol": 1, "paired": p})
+            if self.hub.paired and frm and frm != self.hub.paired["name"]:
+                return web.json_response({"ok": False, "error": "the ui endpoint is paired with %s since %s; it disconnects first"
+                                          % (self.hub.paired["name"], self.hub.paired["since"])}, status=409)
+            if b.get("type") == "bye":
+                self.hub.unpair(frm)
+                return web.json_response({"ok": True})
+            self.counts["signal"] += 1
+            via = "ui:%s@%s" % (frm or "?", (self.hub.paired or {}).get("since"))     # a re-paired backend counts from 1
+            return web.json_response(await lp.run_in_executor(None, self.hub.signal_in, b, via))
+
+        if self.hub is not None:
+            app.router.add_get("/feed", sig_feed)
+            app.router.add_post("/signal", signal)
+            app.router.add_route("OPTIONS", "/signal", preflight)
+        else:
+            app.router.add_get("/feed", feed)
+        app.router.add_get("/feed/ws", feed_ws)
+        app.router.add_get("/status", status)
+        for p in ("/surprise", "/explain", "/event"):
+            app.router.add_route("OPTIONS", p, preflight)
+        self.runner = web.AppRunner(app)
+        await self.runner.setup()
+        site = web.TCPSite(self.runner, host, port)
+        await site.start()
+        self.port = site._server.sockets[0].getsockname()[1]
+
+
+def main(argv=None):
+    """python -m metis_agent.mcp.bridge [--root DIR] [--port 8790]: the bridge on its own, for a UI backend's test without
+    the MCP server (the server hosts it otherwise)."""
+    import argparse
+    ap = argparse.ArgumentParser(prog="metis-bridge")
+    ap.add_argument("--root", default=os.environ.get("METIS_WORKSPACE") or os.getcwd())
+    ap.add_argument("--port", type=int, default=DEFAULT_PORT)
+    ap.add_argument("--token", default=None)
+    a = ap.parse_args(argv)
+    b = Bridge(a.root)
+    st = b.start(port=a.port, token=a.token)
+    print("[metis-bridge] %s on %s, token %s" % (st["root"], st["url"], st["token"]), flush=True)
+    try:
+        while True:
+            time.sleep(3600)
+    except KeyboardInterrupt:
+        b.stop()
+
+
+if __name__ == "__main__":
+    main()

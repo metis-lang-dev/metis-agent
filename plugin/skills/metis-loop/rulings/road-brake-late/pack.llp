@@ -1,0 +1,4 @@
+stage safety {
+  %% The zone ahead comes too late to stop for at my pace: I ease off, {R}.
+  brake_late [dyn] : $busy * $tick__grant(planner, controls) * $late(nextzone) * $soft(R) * now -o ().
+}

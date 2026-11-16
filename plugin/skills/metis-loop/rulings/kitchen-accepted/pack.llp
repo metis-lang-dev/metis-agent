@@ -1,0 +1,5 @@
+pred plated_late : cook.
+stage act {
+  %% My second grant's soup is served and I say so.
+  serve_late [dyn] : held_soup * order * $self(S) * $tick__gen(S, pot, g2) -o hand_free * plated_late.
+}

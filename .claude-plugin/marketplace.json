@@ -1,0 +1,7 @@
+{
+  "name": "metis-agent",
+  "owner": {"name": "perotheia-packages"},
+  "plugins": [
+    {"name": "metis", "source": "./plugin", "description": "Metis workspaces in Claude Code: surprises, traces, catalog, compile, lint, the gate, the REPL"}
+  ]
+}

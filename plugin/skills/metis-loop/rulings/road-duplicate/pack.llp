@@ -1,0 +1,4 @@
+stage safety {
+  %% The same reading, another name.
+  yield_again [dyn] : $busy * $tick__grant(planner, controls) * $zone_at(nextzone, C) * $closing_in(C) * $zprio(nextzone, P) * $yields_to(P) * $conflict(nextzone) * $zbusy(nextzone) * now -o ().
+}

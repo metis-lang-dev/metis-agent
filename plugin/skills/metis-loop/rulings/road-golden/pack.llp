@@ -1,0 +1,5 @@
+pred went_on : planner.
+stage progress {
+  %% I go on, by a rule beside the ones that say how.
+  go_on [dyn] : go -o went_on.
+}
