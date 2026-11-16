@@ -20,7 +20,7 @@ def workspace_status(ses):
     if ses.ws is None:
         return {"workspace": None, "say": "no workspace: start Claude Code inside one, or /metis-workspace <path>"}
     ws = ses.ws
-    return {"workspace": str(ws.root), "found_by": ses.how, "bundle": ws.bundle(), "surprises": _by_status(ws),
+    return {"workspace": str(ws.root), "found_by": ses.how, "home": os.environ.get("METIS_HOME"), "bundle": ws.bundle(), "surprises": _by_status(ws),
             "loops": ws.loops(), "events": len(ws.events()), "traces": len(ws.traces())}
 
 
@@ -33,9 +33,11 @@ def workspace_context(ses, patterns=None):
 
 
 @tool("workspace_open", "Switch this session to the workspace at PATH (or the one PATH stands in) and reload: the tools "
-      "then read and write there. Takes this session held go back.", {"path": s("a directory")}, ["path"])
-def workspace_open(ses, path):
-    ws = ses.open(path)
+      "then read and write there. Takes this session held go back. HOME: the family's units this workspace builds against "
+      "(METIS_HOME), when it pins its own version of a family; none: the server's own.",
+      {"path": s("a directory"), "home": s("a family's units directory (METIS_HOME) for this workspace")}, ["path"])
+def workspace_open(ses, path, home=None):
+    ses.open(path, home=home)
     return workspace_status(ses)
 
 

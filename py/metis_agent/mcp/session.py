@@ -31,8 +31,12 @@ class Session:
             os.environ["METIS_CATALOG"] = str(ws.root)  # as open(): metispy's catalog root for every verb run from here
         return self.ws
 
-    def open(self, path, how="workspace_open"):
-        """Root the session in the workspace at PATH (or the one PATH stands in): refused when there is none."""
+    HOME0 = os.environ.get("METIS_HOME")    # the family the server was started with (the default of every workspace)
+
+    def open(self, path, how="workspace_open", home=None):
+        """Root the session in the workspace at PATH (or the one PATH stands in): refused when there is none. HOME: the
+        family's units for this workspace (METIS_HOME: a workspace may pin its own version of a family); none: the
+        server's own."""
         p = Path(os.path.expanduser(str(path))).resolve()
         if not p.is_dir():
             raise ValueError("%s: no such directory" % p)
@@ -40,8 +44,18 @@ class Session:
         if ws is None or not ((ws.root / ".metis").is_dir() or ws._composition() is not None):
             raise ValueError("%s is not a Metis workspace (no .metis/ and no domains/composition.yaml in it or above): "
                              "workspace_create makes one" % p)
+        if home:
+            h = Path(os.path.expanduser(str(home))).resolve()
+            if not h.is_dir():
+                raise ValueError("home %s: no such directory (a family's units: METIS_HOME)" % h)
         self.release()
         self.ws, self.how = ws, how
+        if home:
+            os.environ["METIS_HOME"] = str(h)
+        elif self.HOME0 is not None:
+            os.environ["METIS_HOME"] = self.HOME0
+        else:
+            os.environ.pop("METIS_HOME", None)
         os.environ["METIS_CATALOG"] = str(ws.root)      # metispy's catalog root for every verb run from here
         for cb in self.on_switch:
             cb()

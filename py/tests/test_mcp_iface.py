@@ -220,3 +220,16 @@ def test_runner_start_gives_the_runner_cuda_and_prepends_its_paths(ses, tmp_path
     env = json.loads(out.read_text())
     assert env["LD_LIBRARY_PATH"].split(":")[0] == str(lib)
     assert env["PYTHONPATH"].startswith("/road/world:") and env["PYTHONPATH"] != "/road/world"
+
+
+def test_a_workspace_may_build_against_its_own_family(ses, tmp_path):
+    """workspace_open(path, home): METIS_HOME for this workspace (a pinned version of a family); without it the server's."""
+    fam = tmp_path / "family"
+    fam.mkdir()
+    before = os.environ.get("METIS_HOME")
+    st = call(ses, "workspace_open", path=str(ses.ws.root), home=str(fam))
+    assert st["home"] == str(fam) and os.environ["METIS_HOME"] == str(fam)
+    st = call(ses, "workspace_open", path=str(ses.ws.root))
+    assert st["home"] == ses.HOME0 and os.environ.get("METIS_HOME") == before
+    with pytest.raises(ValueError, match="no such directory"):
+        call(ses, "workspace_open", path=str(ses.ws.root), home=str(tmp_path / "nope"))
