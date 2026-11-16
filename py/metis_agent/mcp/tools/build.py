@@ -126,19 +126,21 @@ def pack_propose(ses, id, pack, cases=None, unit=None, minutes=30):
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-@tool("replay_check", "The judge's baseline replay of a trace (metis-agent trace.replay_composition on the bundle's service "
-      "config): OK when the composition on the real Live gives the record tick for tick, else the first divergence. Run it "
+@tool("replay_check", "The judge's baseline replay of a trace (metis-agent trace.replay_composition on the trace's own "
+      "config.yaml, the run's, else the bundle's service config): OK when the composition on the real Live gives the record tick for tick, else the first divergence. Run it "
       "before a pack on a new trace: the judge refuses a trace that does not replay.", {"trace": s("traces/<run>")}, ["trace"])
 def replay_check(ses, trace):
     ws = ses.need()
     b = ws.bundle()
-    if not b or not b.get("config"):
-        raise ToolError("no service config beside the bundle's composition")
+    tdir = Path(trace_path(ws, trace))
+    config = tdir / "config.yaml" if (tdir / "config.yaml").is_file() else Path(b["config"]) if b and b.get("config") else None
+    if config is None:
+        raise ToolError("no service config: neither the trace's config.yaml nor one beside the bundle's composition")
     code = ("import json, sys, yaml\n"
             "from metis_agent.trace import replay_composition\n"
             "r = replay_composition(sys.argv[1], yaml.safe_load(open(sys.argv[2])))\n"
             "print(json.dumps(r.divergence, default=str))\n")
-    p = subprocess.run([sys.executable, "-c", code, trace_path(ws, trace), str(b["config"])], cwd=str(ws.root),
+    p = subprocess.run([sys.executable, "-c", code, str(tdir), str(config)], cwd=str(ws.root),
                        capture_output=True, text=True, timeout=1800, env=_cuda_env())
     if p.returncode != 0:
         raise ToolError("the replay failed (exit %d): %s" % (p.returncode, (p.stderr or p.stdout).strip()[-1500:]))

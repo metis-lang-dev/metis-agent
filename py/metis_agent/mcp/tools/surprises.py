@@ -61,9 +61,10 @@ def surprise_take(ses, id=None):
       "person's words, and the reading (atoms the model missed or got wrong). Its window is kept past the writer's ring.",
       {"member": s("the member it is about"), "trace": s("traces/<run>"), "k0": i("the window's first tick"),
        "k1": i("the window's last tick"), "k": i("the tick of the surprise (default k1)"), "words": s("the person's words"),
-       "atoms": arr("the reading: atoms observed (as the trace writes them)"), "kind": s("the surprise's kind, when known")},
+       "atoms": arr("the reading: atoms observed (as the trace writes them)"), "kind": s("the surprise's kind, when known"),
+       "config": s("the service config the judge replays it on (default: the trace's own config.yaml when it has one)")},
       ["member", "atoms"])
-def surprise_drop(ses, member, atoms, trace=None, k0=None, k1=None, k=None, words=None, kind=None):
+def surprise_drop(ses, member, atoms, trace=None, k0=None, k1=None, k=None, words=None, kind=None, config=None):
     ws = hold(ses)
     rec = {"member": member, "atoms": list(atoms), "who": "claude"}
     if trace:
@@ -77,6 +78,10 @@ def surprise_drop(ses, member, atoms, trace=None, k0=None, k1=None, k=None, word
         rec["words"] = words
     if kind:
         rec["kind"] = kind
+    if config:
+        rec["config"] = config
+    elif trace and (ws.state / rec["trace"] / "config.yaml").is_file():
+        rec["config"] = str((ws.state / rec["trace"] / "config.yaml").relative_to(ws.root))   # the run's own: the judge replays on it
     sid = ws.drop_surprise(rec, who="claude")
     return {"id": sid, "surprise": ws.surprise(sid)}
 
