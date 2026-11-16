@@ -1,4 +1,4 @@
-# The Metis runtime interface (spec v1.3: signed off by bond004 and bond008, their amendments in, pascal's flush rule; metis-plugin s-df4ff191)
+# The Metis runtime interface (spec v1.4: + host.prepare; signed off by bond004 and bond008, their amendments in, pascal's flush rule; metis-plugin s-df4ff191)
 
 The RUNTIME side of [SURPRISE-INTERFACE.md](SURPRISE-INTERFACE.md): what serves the feed that `/connect-runtime`
 attaches to, implemented ONCE in metis-agent for every workspace's runtime. A domain brings only a small HOST (§3);
@@ -73,6 +73,8 @@ class RuntimeHost:
         ENV is applied in the child BEFORE the Live is made (road: METIS_ROAD_RUN, COMMONROAD_CACHE).
         A spec it cannot run: raise ValueError(words) (the runtime answers the request 400 with them)."""
 
+    def prepare(self, cfg, run, trace_dir) -> None:  # in the run's child, just BEFORE the Live is made: the run's name and
+                                                     # trace dir are known only now (road: its run spec file names the trace dir)
     def start(self, live, cfg) -> None:   # after the Live is made (road: watch.blind on its members, the world shared)
     def findings(self, live, k) -> list:  # per tick: the domain's findings a kernel cannot see (road: collision, RSS violation)
     def done(self, live, k) -> bool:      # the run ends by itself (road: arrived / held)
