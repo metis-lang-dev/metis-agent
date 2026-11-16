@@ -44,10 +44,23 @@ model.
    first enabled (and BESIDE what), the first fired difference, "what this record identifies" (TARGET: `not
    identified` means the pack does not change the surprise's tick: amend the rule that fired there), the goldens.
 7. **Apply, when the person says so.** `catalog_apply` (the judge's own merge of the accepted pack, committed on a
-   branch `metis/<id>` in the checkout that holds the unit, never main), then `bundle_build`. The road UI sees the
+   branch `metis/<id>` in the checkout that holds the unit, never main), then `bundle_build`. An attached UI or runtime sees the
    journal's `applied` / `built` rows and offers "catalog changed: reload". Tell the person the branch and commit.
 
-Keep the person's view current: a one-line `journal` note at each step (the road UI's feed shows it).
+Keep the person's view current: a one-line `journal` note at each step (an attached UI's feed shows it).
+
+## Where surprises come from: the two modes (plugin/docs/SURPRISE-INTERFACE.md)
+
+- **Headless** (`/connect-runtime <name>`): the workspace's scenario runner (`runner_start` with its arguments, e.g. a
+  card) serves each run as the runtime `<name>`; `runtime_connect <name>` follows it run after run. The loop is
+  run -> WAIT -> work: `wait_signals` with types `surprise.new`, `run.ended`, `explain.request` (timeout up to 600 s;
+  pass `since` = the last `next` so nothing between waits is missed), then work each new surprise with the cycle
+  above, then wait again. Never poll in a loop of your own; `wait_signals` blocks until a signal is there.
+- **Interactive** (`/ide`): `ide_open`; a person's UI backend pairs and sends the person's marks as surprises and
+  their explain / narrate requests. Wait the same way; answer a request with `explain_answer` (explain: which rules
+  decided on which facts; narrate: your own words over the window).
+- Both may be on at once; a surprise has one id, the inbox holds it once. Your takes, rulings, applies and answers
+  reach every attached peer as signals by themselves (from your journal rows): no tool call to send them.
 
 ## Rules of the road
 

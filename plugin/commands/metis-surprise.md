@@ -16,7 +16,7 @@ write a rule):
 4. If no pack answers it (evidence, a host's fact, another member's): `surprise_rule` with the ruling and the verdict
    (e.g. evidential), saying whose it is.
 5. An ACCEPTED ruling is applied only when the person says so: then `catalog_apply` (the judge's merge, committed on a
-   branch, never main) and `bundle_build`. Tell the person the branch and the commit, and that the road UI shows
+   branch, never main) and `bundle_build`. Tell the person the branch and the commit, and that an attached UI or runtime shows
    "catalog changed: reload".
 
-Keep the person informed in short lines as you go; `journal` a one-line note at each step for the road UI's feed.
+Keep the person informed in short lines as you go; `journal` a one-line note at each step (an attached UI's feed shows it).

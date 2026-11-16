@@ -37,7 +37,7 @@ def _loop_dir():
 
 
 @tool("bundle_build", "Build the workspace's bundle (the Metis compilation into its image): make where its composition is "
-      "(its Makefile), else metisc build . there. The image hash before and after; journaled 'built' so the road UI sees "
+      "(its Makefile), else metisc build . there. The image hash before and after; journaled 'built' so an attached UI sees "
       "the catalog changed.")
 def bundle_build(ses):
     ws = hold(ses)

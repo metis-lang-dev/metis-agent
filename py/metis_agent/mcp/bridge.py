@@ -1,29 +1,9 @@
-"""The Metis bridge (metis-plugin s-df4ff191, design step 4): the road UI's way into the workspace Claude Code works in,
-hosted by the plugin's MCP server and DORMANT until it is enabled. It holds no state of its own: what comes IN is written
-into the workspace through metispy's Workspace SDK (its journal kept), and what goes OUT is read back from that journal.
-
-    b = Bridge(root=lambda: server_root)        the server's current workspace (a switch re-roots the bridge)
-    b.start(port=8790) -> {"url", "port", "token"}    loopback only; a fresh token at every start (or the one given)
-    b.status() / b.stop()
-
-IN (the road UI -> the workspace; every request carries the token):
-  POST /surprise {run, window: [k0, k1], words, member?, kind?, n?, scenario?, seed?}
-        the window of the page's own trace (traces/<run> in the same workspace) kept as traces/<run>-mark-<n> (or -w<k0>-<k1>),
-        then drop_surprise(who="world") -> {id, trace, member}. member: as given, else the member with the most worded
-        firings in the window.
-  POST /explain {run, window, words, member?, n?}   a QUESTION for Claude Code: a journal row (kind "explain", its ref);
-        Claude Code answers through the server's bridge_answer(ref, text) (a journal row kind "answer", ref, text)
-  POST /event {n, edge, k0?, k1?, run?, words?}    a record only: a journal row (kind "event")
-
-OUT (the workspace -> the road UI):
-  GET /feed?since=N   {rows: [frame...], next: N'} over the journal's rows from N, one frame per row that matters:
-        {kind: "surprise", id, n?, status: open|taken|ruled|applied, verdict?, ruling?}
-        {kind: "answer", ref, text}
-        {kind: "catalog", changed: [paths], at}            the catalog changed on disk: the road UI offers a reload
-  GET /feed/ws        the same frames pushed (the journal polled each second, the catalog every two)
-  GET /status         {on, root, port, since, counts}
-
-Never: a write outside the workspace's .metis/ (the SDK's own), a model call, a non-loopback socket."""
+"""The /ide endpoint (plugin/docs/SURPRISE-INTERFACE.md v1.3 §1-§4): the plugin's side a UI BACKEND pairs with, on
+loopback with a token, published by a lockfile (.metis/ide/<pid>.json). With the session's hub: GET /feed (the plugin's
+signals: taken / ruled / applied / answers / catalog.changed, as a WebSocket or JSON lines) and POST /signal (the
+backend's hello, surprise.new, explain.request, payload); ONE backend paired at a time, a second refused naming the
+holder. Without a hub (the legacy page of step 4): POST /surprise /explain /event and GET /feed /feed/ws as before,
+written through the SDK's one producer path (drop_window). Domain-free."""
 import asyncio
 import hashlib
 import hmac
@@ -38,7 +18,7 @@ from pathlib import Path
 
 DEFAULT_PORT = 8790
 POLL_S, CATALOG_S = 1.0, 2.0
-WHO = "world"                    # the bridge writes as the world (the road UI is the world's face); metispy's WHO has it
+WHO = "world"                    # the bridge writes as the world (a UI backend is the world's face); metispy's WHO has it
 FEED_KINDS = ("surprise", "take", "retake", "try", "ruling", "applied", "answer", "explain")
 
 
@@ -302,7 +282,7 @@ class Bridge:
             else:
                 try:
                     resp = await handler(req)
-                except ValueError as e:                     # a refusal in words: counted, and the last one kept for bridge_status
+                except ValueError as e:                     # a refusal in words: counted, and the last one kept for ide_status
                     self.counts["refused_" + req.path.strip("/")] += 1
                     self.last_error = {"path": req.path, "error": str(e), "at": time.strftime("%H:%M:%S")}
                     resp = web.json_response({"ok": False, "error": str(e)}, status=400)
@@ -437,7 +417,7 @@ class Bridge:
 
 
 def main(argv=None):
-    """python -m metis_agent.mcp.bridge [--root DIR] [--port 8790]: the bridge on its own, for a road UI test without
+    """python -m metis_agent.mcp.bridge [--root DIR] [--port 8790]: the bridge on its own, for a UI backend's test without
     the MCP server (the server hosts it otherwise)."""
     import argparse
     ap = argparse.ArgumentParser(prog="metis-bridge")

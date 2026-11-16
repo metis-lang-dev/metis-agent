@@ -184,8 +184,8 @@ class Hub:
 
     # inbound
     def signal_in(self, sig, via):
-        """One signal from a peer: de-duplicated into the inbox; an explain.request journaled (bridge_inbox lists it,
-        bridge_answer answers it); a payload written, then signalled on as the receiver's own."""
+        """One signal from a peer: de-duplicated into the inbox; an explain.request journaled (explain_list lists it,
+        explain_answer answers it); a payload written, then signalled on as the receiver's own."""
         if not isinstance(sig, dict) or not sig.get("type"):
             raise ValueError("a signal is a JSON object with a type")
         if int(sig.get("v") or PROTOCOL) > PROTOCOL:

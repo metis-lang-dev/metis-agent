@@ -3,7 +3,7 @@ name: metis-workspace
 description: >
   The Metis workspace format and how to work in one with the metis MCP tools - what lives where (the bundle,
   domains/, .metis/ with surprises, traces, marks, journal, rulings, packs, locks), a surprise's lifecycle (open,
-  taken, ruled, tries), how the road UI and the backend see changes (the journal), switching workspaces, and starting
+  taken, ruled, tries), how a UI backend and a runtime see changes (the journal), switching workspaces, and starting
   a fresh domain from zero (workspace_create, bundle_build, repl_open, domain_open). Use when the person asks about a
   workspace, sets or switches one, or starts a new domain.
 ---
@@ -14,7 +14,7 @@ A workspace is a directory (format `metis-workspace/1`, metispy `metis.catalog.w
 
 - `domains/composition.yaml`: the BUNDLE (its members, the director, the world's ports); each member a package
   `domains/<member>/` (`domain.yaml`, `<member>.llp`, extensions, `intent.yaml`, `cases/`). A family's shared units
-  come by name from `METIS_HOME` (the road family: metis-catalog `domains/road`). `domains/build/`: the image
+  come by name from `METIS_HOME` (a family's catalog directory). `domains/build/`: the image
   (`<name>.image.v-<hash>`), made by `bundle_build`; STALE when a source changed since.
 - `.metis/` (git-ignored, written only through the SDK): `surprises/<id>.json` (+ `.taken`), `traces/<run>/`
   (metis.trace segments + checkpoints, `marks.jsonl`, `config.yaml`), `rulings/<id>.json|.md` and `rulings/tries/`,
@@ -23,7 +23,7 @@ A workspace is a directory (format `metis-workspace/1`, metispy `metis.catalog.w
 
 ## The surprise's lifecycle
 
-`open` (dropped: by the road UI through the bridge, by the backend, or by you with `surprise_drop` from a trace
+`open` (dropped: by a UI backend or a runtime through the surprise interface, or by you with `surprise_drop` from a trace
 window) -> `taken` (`surprise_take`: this session's until it is ruled or the session ends) -> `ruled` (`pack_propose`
 writes the gate's ruling; `surprise_rule` writes one without a pack). A refusal before the last try is a TRY
 (`tries`): the surprise stays taken. An accepted ruling is applied by `catalog_apply` and rebuilt by `bundle_build`.
@@ -32,8 +32,8 @@ One brain per workspace: your writes hold the `claude` lock, and are refused whi
 
 ## What the others see
 
-The road UI and the backend read the JOURNAL: `events` with the count you have read gives what is new (a dropped
-surprise, a take, a ruling, `applied`, `built`). After an apply and a build the road UI shows "catalog changed:
+A UI backend and a runtime hear it as SIGNALS (the plugin's own, from the JOURNAL): `events` with the count you have read gives what is new (a dropped
+surprise, a take, a ruling, `applied`, `built`). After an apply and a build an attached UI shows "catalog changed:
 reload"; the person reloads. Your one-line `journal` notes are its feed.
 
 ## Switching and finding

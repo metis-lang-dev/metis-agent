@@ -15,7 +15,7 @@ The server needs a python with metispy (`metis`) importable: `METIS_PYTHON`, els
 `python3`. Pass through your environment as needed:
 
 - `METIS_WORKSPACE`: the workspace (else the one Claude Code's directory stands in; `/metis-workspace <path>` switches)
-- `METIS_HOME`: a family's shared units (the road family: metis-catalog `domains/road`)
+- `METIS_HOME`: a family's shared units (e.g. a family's catalog directory)
 - `METISC`: metisc (else on PATH, else the sibling metis-lang `src/metisc`)
 - `METIS_LOOP_DIR`: metis-loop (its judge `pi/propose.sh`; else the sibling checkout)
 

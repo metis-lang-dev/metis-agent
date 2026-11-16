@@ -136,7 +136,7 @@ def workspace_create(ses, path, domain, template="minimal"):
                                          "domains/%s/%s.llp" % (domain, domain)], **workspace_status(ses)}
 
 
-@tool("journal", "Append one row {ts, who: claude, kind, ...} to the workspace's journal (the shared log the road UI and the "
+@tool("journal", "Append one row {ts, who: claude, kind, ...} to the workspace's journal (the shared log a UI backend, a runtime and the "
       "backend read).", {"kind": s("the row's kind, e.g. note, plan, applied"),
                          "fields": {"type": "object", "description": "the row's other fields (pointers, words)"}}, ["kind"])
 def journal(ses, kind, fields=None):
