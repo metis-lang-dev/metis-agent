@@ -1,4 +1,4 @@
-# The Metis runtime interface (spec v1.1: bond004's amendments in; bond008's sign-off pending; metis-plugin s-df4ff191)
+# The Metis runtime interface (spec v1.2: signed off by bond004 and bond008, their amendments in; metis-plugin s-df4ff191)
 
 The RUNTIME side of [SURPRISE-INTERFACE.md](SURPRISE-INTERFACE.md): what serves the feed that `/connect-runtime`
 attaches to, implemented ONCE in metis-agent for every workspace's runtime. A domain brings only a small HOST (§3);
@@ -54,7 +54,7 @@ What is new: one package `metis_agent/runtime/` (§2) and one host face (§3).
 | `run.py` | the child driver: resolve the spec through the host, a fresh Live with the Tracer into `traces/<run>`, tick until done / stop / `ticks`, collect findings, close the tracer, report | bond004 |
 | `__main__.py` | `python -m metis_agent.runtime --workspace W --host MODULE:CLASS [--name N] [--port P] [--config YAML]` | bond004 |
 | `host.py` | `RuntimeHost`: the base class of §3 (defaults: no findings, `run_config` from a config file) | bond004 |
-| `ide_client.py` (beside it, `metis_agent/ide_client.py`) | the UI backend's client of the plugin's `/ide` endpoint (discovery by lockfile, hello, write-then-signal via `drop_window`, explain, take) | bond008 |
+| `ide_client.py` | the UI backend's client of the plugin's `/ide` endpoint (discovery by lockfile, hello, write-then-signal via `drop_window`, explain, take) | bond008 |
 
 ## 3. The host face: ONE small class per domain (`RuntimeHost`)
 
@@ -93,7 +93,9 @@ A finding is `{kind, k, words, slug?, member?, k0?, k1?, ...}` (domain keys kept
 |---|---|---|
 | `run_started(run, trace, spec, request?)` | the Live and the Tracer are made (trace dir in the workspace: `traces/<run>`, `config.yaml` beside it) | `run.started` |
 | `tick(k)` | each tick (rate-limited status) | `status` (to sockets only, not the backlog) |
-| `finding(f)` | the host's `findings(k)`, a kernel watch surprise, `end_findings` | queued (nothing yet) |
+| `finding(f, now=False)` | the host's `findings(k)`, a kernel watch surprise, `end_findings` | queued (nothing yet) |
+| `finding(f, now=True)` | a PERSON's mark in an embedded run (its window is already in the trace when the person ends it; `keep_window` copies the closed segments and the open one up to its last line) | written at once, then `surprise.new` |
+| `request(type, body)` | an embedded service's page asks (`explain.request`, mode explain / narrate) | to its runtime clients -> `{delivered: n}` |
 | `narration(n)` | the Live's `emit("narration", n)` (deterministic narration: the runtime's own) | `narration` (optional, for UIs) |
 | `run_ended(run, reason, summary?, error?)` | the tracer is CLOSED | first every queued finding WRITTEN, then `surprise.new` each, then `run.ended` |
 
@@ -109,6 +111,13 @@ A finding is `{kind, k, words, slug?, member?, k0?, k1?, ...}` (domain keys kept
 - **The kernel watch:** a member's `surprise` reply (domain_agent: record, difference) is a finding
   `{kind: "watch", k, member: <its domain>, words: the difference in words, record}`; the runtime hooks it where the
   Live receives replies (one hook in `service.Live`, no domain code).
+- **The route of a page's request** (an embedded service): the page talks only to its backend; the backend sends an
+  explain / narrate request through its ide client when one is connected, else through `feed.request` to its runtime
+  clients (a plugin attached by `/connect-runtime`), else answers the page in words (`delivered: 0`).
+- **One key, two paths:** under `/ide` and `/connect-runtime` at once, an embedded service signals the same record's
+  `surprise.new` on both; the plugin de-dups by id. The key is the producer's: `<run>:mark:<n>:<k0>-<k1>` for a page
+  mark, `<run>:<kind>[:<slug>]:<k>` for a host finding.
+- **Run names, both drivers alike:** `<stem>-<UTC stamp>` (the embedded road service aligns to it).
 - **A long run** may flush at its checkpoints: findings whose window lies before the tracer's last closed segment
   may be written early (optional, v1.1).
 
