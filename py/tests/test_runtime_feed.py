@@ -1,4 +1,4 @@
-"""RuntimeFeed + RuntimeClient (plugin/docs/RUNTIME-INTERFACE.md v1.4 §7): discovery written and removed, the token,
+"""RuntimeFeed + RuntimeClient (plugin/docs/RUNTIME-INTERFACE.md v1.5 §7): discovery written and removed, the token,
 two clients multiplexed (a UI's and a plugin's: both get the feed, the plugin's ruled reaches the UI and not back), a
 finding written after its segment closed and signalled BEFORE run.ended in a long run, the rest at the run's end, one
 key one record, resume by seq. Domain-free: a stub producer over one recorded trace; no SUMO, no model."""
@@ -30,7 +30,7 @@ def put_trace(root, run):
 
 
 class Host:
-    name, domain, spec_keys, window = "stub", "stub", ["seed"], (20, 5)
+    name, domain, window = "stub", "stub", (20, 5)
 
 
 def wait_for(pred, timeout=10):
@@ -62,7 +62,7 @@ def test_discovery_and_token(ws_root):
             get(info["url"] + "/feed", "wrong")
         assert e.value.code == 401
         rows = [json.loads(l) for l in get(info["url"] + "/feed", info["token"]).splitlines()]
-        assert rows[0]["type"] == "hello" and rows[0]["spec_keys"] == ["seed"]
+        assert rows[0]["type"] == "hello" and rows[0]["capabilities"] == ["explain"]
     finally:
         f.stop()
     assert runtimes(ws_root) == []
@@ -147,7 +147,8 @@ def test_one_key_one_record_and_resume_by_seq(ws_root, feed):
 def test_refusals_in_words(ws_root, feed):
     info = feed.info()
     url, tok = info["url"] + "/signal", info["token"]
-    assert post(url, tok, {"type": "run.request", "from": "plugin:1", "spec": {}})[0] == 400       # no driver
+    st, body = post(url, tok, {"type": "run.request", "from": "plugin:1", "spec": {}})          # no run control (v1.5)
+    assert st == 200 and body["ignored"] == "run.request"
     st, body = post(url, tok, {"v": 9, "type": "hello", "from": "plugin:1"})
     assert st == 400 and "protocol" in body["error"]
     st, body = post(url, tok, {"type": "something.new", "from": "plugin:1"})
@@ -157,3 +158,57 @@ def test_refusals_in_words(ws_root, feed):
     rows = [json.loads(l) for l in get(info["url"] + "/feed", tok).splitlines()]
     ref = next(r for r in rows if r["type"] == "finding.refused")
     assert ref["key"] == "nope:x:5" and ref["error"]
+
+
+def test_named_reattach_with_no_command(ws_root):
+    """Runtime A of name N ends, runtime B of name N starts: the client's feed continues (B's signals arrive)."""
+    got = []
+    c = RuntimeClient(ws_root, "plugin:1", on_signal=got.append)
+    st = c.connect("road")                                   # none live yet: it waits for the name
+    assert st["follow"] and not st["attached"]
+    a = RuntimeFeed(ws_root, "road", Host())
+    a.start(port=0)
+    try:
+        wait_for(lambda: c.attached)
+        put_trace(ws_root, "ra")
+        a.run_started("ra", "traces/ra", {"card": 1})
+        wait_for(lambda: any(s["type"] == "run.started" and s["run"] == "ra" for s in got))
+        a.run_ended("ra", "done")
+    finally:
+        a.stop(linger=0.5)                                    # it lingers: the client drains run.ended first
+    wait_for(lambda: any(s["type"] == "run.ended" and s["run"] == "ra" for s in got))
+    wait_for(lambda: any(s["type"] == "runtime.detached" for s in got))
+    b = RuntimeFeed(ws_root, "road", Host())
+    b.start(port=0)
+    try:
+        wait_for(lambda: sum(s["type"] == "runtime.attached" for s in got) == 2)
+        put_trace(ws_root, "rb")
+        b.run_started("rb", "traces/rb", {"card": 2})
+        wait_for(lambda: any(s["type"] == "run.started" and s["run"] == "rb" for s in got))
+        assert c.status()["url"] == b.info()["url"] and "plugin:1" in b.state()["clients"]
+        assert c.send("surprise.taken", id="x")[0] == 200
+    finally:
+        c.close()
+        b.stop()
+    types = [s["type"] for s in got if s["type"] in ("runtime.attached", "runtime.detached", "run.started", "run.ended")]
+    assert types == ["runtime.attached", "run.started", "run.ended", "runtime.detached", "runtime.attached", "run.started"]
+
+
+def test_a_newer_runtime_of_the_name_replaces_the_older(ws_root):
+    got = []
+    a = RuntimeFeed(ws_root, "road", Host())
+    a.start(port=0)
+    c = RuntimeClient(ws_root, "plugin:1", on_signal=got.append)
+    c.connect("road")
+    b = RuntimeFeed(ws_root, "road", Host())
+    try:
+        time.sleep(1.1)                                       # a later 'started'
+        b.start(port=0)
+        wait_for(lambda: c.status()["url"] == b.info()["url"])
+        assert [s["reason"] for s in got if s["type"] == "runtime.detached"] == ["replaced"]
+        a.stop()                                              # the older one's stop leaves the newer's file
+        assert [r["url"] for r in runtimes(ws_root)] == [b.info()["url"]]
+    finally:
+        c.close()
+        b.stop()
+        a.stop()

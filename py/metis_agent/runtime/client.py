@@ -2,8 +2,11 @@
 UI backend that subscribes to a runtime. Domain-free.
 
     c = RuntimeClient(workspace, "plugin:123", on_signal=fn)     fn(sig) for every signal of the feed, in order
-    c.connect("road" | "http://127.0.0.1:P#TOKEN")              hello; the feed read by a thread (resumed by seq;
-                                                                a lost connection re-reads .metis/runtimes/<name>.json)
+    c.connect("road" | "http://127.0.0.1:P#TOKEN")              hello; the feed read by a thread (resumed by seq)
+    By NAME, the client FOLLOWS the name (RUNTIME-INTERFACE v1.5 §5): with none live it waits for one; when its runtime
+    ends (file gone or replaced, pid dead, feed unreachable) it attaches to the next live runtime of the name by itself
+    (hello again, since 0) and tells its owner with local signals runtime.detached {name, reason} / runtime.attached
+    {name, url, run}. By URL it does not follow.
     c.send(type, **fields) -> (http status, body)               one envelope (its own seq) to POST /signal
     c.close()                                                   bye
 
@@ -71,86 +74,130 @@ class RuntimeClient:
         self.root, self.me, self.on_signal, self.poll = str(root), str(name), on_signal, float(poll)
         self.seq = itertools.count(1)
         self.name = self.url = self.token = None
+        self.follow = False                  # attached by name: re-attach to the next runtime of the name
+        self.attached = False
         self.since, self.hello, self.error, self.connected_at = 0, None, None, None
         self.stop_ev = threading.Event()
         self.thread = None
 
-    def resolve(self, target=None):
-        """TARGET: a runtime's name, 'http://host:port#token', or None (the one live runtime of the workspace)."""
+    def live_of(self, name):
+        """The newest live runtime of NAME in the workspace, or None."""
+        live = [r for r in runtimes(self.root) if r.get("alive") and r.get("name") == name]
+        return max(live, key=lambda r: str(r.get("started") or "")) if live else None
+
+    def connect(self, target=None, wait=True):
+        """TARGET: a runtime's NAME (followed), 'http://host:port#token' (not followed), or None (the one live runtime's
+        name). With WAIT and none of the name live, the client waits for one (status: attached false)."""
         if target and str(target).startswith("http"):
             url, _, token = str(target).partition("#")
             if not token:
                 raise ValueError("a runtime URL needs its token: <url>#<token> (or name a runtime of .metis/runtimes/)")
-            return {"name": url, "url": url, "token": token}
-        live = [r for r in runtimes(self.root) if r.get("alive")]
-        if target:
-            rec = next((r for r in live if r.get("name") == target), None)
-            if rec is None:
-                raise ValueError("no runtime %s serving %s (live: %s)" % (target, self.root,
-                                 ", ".join(r["name"] for r in live) or "none"))
-            return rec
-        if len(live) != 1:
-            raise ValueError("%s runtimes serve %s (%s): name one" % (len(live) or "no", self.root,
-                             ", ".join(r["name"] for r in live) or "none"))
-        return live[0]
-
-    def connect(self, target=None):
-        rec = self.resolve(target)
-        self.name, self.url, self.token = rec["name"], rec["url"].rstrip("/"), rec["token"]
-        st, body = self.send("hello", name=self.me, workspace=self.root, protocol=PROTOCOL)
-        if st >= 400:
-            raise ValueError("runtime %s refused %s: %s" % (self.name, self.me, body.get("error") or st))
-        self.hello, self.connected_at = body, _now()
+            self.name, self.follow = url, False
+            self._attach({"name": url, "url": url, "token": token})
+        else:
+            if not target:
+                live = sorted({r["name"] for r in runtimes(self.root) if r.get("alive")})
+                if len(live) != 1:
+                    raise ValueError("%s runtimes serve %s (%s): name one" % (len(live) or "no", self.root,
+                                     ", ".join(live) or "none"))
+                target = live[0]
+            self.name, self.follow = str(target), True
+            rec = self.live_of(self.name)
+            if rec is None and not wait:
+                raise ValueError("no runtime %s serving %s" % (self.name, self.root))
+            if rec is not None:
+                self._attach(rec)
         self.stop_ev.clear()
         self.thread = threading.Thread(target=self._run, daemon=True, name="metis-runtime-client")
         self.thread.start()
         return self.status()
 
+    def _attach(self, rec):
+        url, token = rec["url"].rstrip("/"), rec["token"]
+        st, body = post(url + "/signal", token, self.envelope("hello", name=self.me, workspace=self.root, protocol=PROTOCOL))
+        if st >= 400:
+            raise ValueError("runtime %s refused %s: %s" % (rec.get("name"), self.me, body.get("error") or st))
+        self.url, self.token, self.since = url, token, 0
+        self.hello, self.connected_at, self.attached, self.error = body, _now(), True, None
+        self.pid = rec.get("pid")
+        self._local("runtime.attached", name=self.name, url=url, run=rec.get("run"))
+
+    def _local(self, type, **fields):
+        if self.on_signal is not None:
+            try:
+                self.on_signal({"v": PROTOCOL, "seq": None, "ts": _now(), "type": type, "from": "local:%s" % self.me, **fields})
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _detach(self, reason):
+        if self.attached:
+            self.attached = False
+            self._local("runtime.detached", name=self.name, reason=reason)
+
+    def _still_ours(self):
+        """By name: is the runtime we read still the name's live one? -> None (yes) or the reason it is not."""
+        rec = self.live_of(self.name)
+        if rec is None:
+            return "ended"
+        if rec["url"].rstrip("/") != self.url:
+            return "replaced"
+        return None
+
     def envelope(self, type, **fields):
         return {"v": PROTOCOL, "seq": next(self.seq), "ts": _now(), "type": type, "from": self.me, **fields}
 
     def send(self, type, **fields):
-        if not self.url:
-            raise ValueError("not connected to a runtime")
+        if not self.url or not self.attached:
+            raise ValueError("not attached to a runtime%s" % (" (waiting for %s)" % self.name if self.follow else ""))
         return post(self.url + "/signal", self.token, self.envelope(type, **fields))
 
-    def _rediscover(self):
-        for r in runtimes(self.root):
-            if r.get("name") == self.name and r.get("alive"):
-                if r["url"].rstrip("/") != self.url:          # a restarted runtime: its own seqs, from the start
-                    self.since = 0
-                self.url, self.token = r["url"].rstrip("/"), r["token"]
+    def _read(self):
+        text = get("%s/feed?since=%d&client=%s" % (self.url, self.since, urllib.request.quote(self.me)), self.token)
+        for line in text.splitlines():
+            if not line.strip():
+                continue
+            sig = json.loads(line)
+            self.since = max(self.since, int(sig.get("seq") or 0))
+            if self.on_signal is not None:
                 try:
-                    self.send("hello", name=self.me, workspace=self.root, protocol=PROTOCOL)
+                    self.on_signal(sig)
                 except Exception:  # noqa: BLE001
                     pass
-                return True
-        return False
 
     def _run(self):
         while not self.stop_ev.is_set():
-            try:
-                text = get("%s/feed?since=%d&client=%s" % (self.url, self.since, urllib.request.quote(self.me)), self.token)
-                self.error = None
-                for line in text.splitlines():
-                    if not line.strip():
-                        continue
-                    sig = json.loads(line)
-                    self.since = max(self.since, int(sig.get("seq") or 0))
-                    if self.on_signal is not None:
+            if self.attached:
+                try:
+                    self._read()
+                    self.error = None
+                except Exception as e:  # noqa: BLE001
+                    self.error = str(e)
+                    if not self.follow:
+                        pass                                   # by URL: keep trying the same one
+                    elif self._still_ours():
+                        self._detach(self._still_ours())
+                if self.attached and self.follow:
+                    why = self._still_ours()
+                    if why:
                         try:
-                            self.on_signal(sig)
+                            self._read()                       # drain what the old one still lingers with
                         except Exception:  # noqa: BLE001
                             pass
-            except Exception as e:  # noqa: BLE001  (a lost connection: re-discover, retry)
-                self.error = str(e)
-                self._rediscover()
+                        self._detach(why)
+            if not self.attached and self.follow:
+                rec = self.live_of(self.name)
+                if rec is not None:
+                    try:
+                        self._attach(rec)
+                        continue
+                    except Exception as e:  # noqa: BLE001
+                        self.error = str(e)
             self.stop_ev.wait(self.poll)
 
     def close(self):
         self.stop_ev.set()
         try:
-            if self.url:
+            if self.url and self.attached:
                 self.send("bye")
         except Exception:  # noqa: BLE001
             pass
@@ -158,5 +205,6 @@ class RuntimeClient:
             self.thread.join(5)
 
     def status(self):
-        return {"name": self.name, "url": self.url, "since": self.since, "connected_at": self.connected_at,
-                "error": self.error, "alive": bool(self.thread and self.thread.is_alive())}
+        return {"name": self.name, "follow": self.follow, "attached": self.attached, "url": self.url if self.attached else None,
+                "since": self.since, "connected_at": self.connected_at, "error": self.error,
+                "alive": bool(self.thread and self.thread.is_alive())}

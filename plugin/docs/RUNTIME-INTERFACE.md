@@ -1,4 +1,4 @@
-# The Metis runtime interface (spec v1.5: the user's ruling: scenario running SEPARATE from the runtime, runtimes NAMED with re-attach; signed off by bond004 and bond008 up to v1.4; metis-plugin s-df4ff191)
+# The Metis runtime interface (spec v1.5.1: the watch hook's handle Live.current; the user's ruling: scenario running SEPARATE from the runtime, runtimes NAMED with re-attach; signed off by bond004 and bond008 up to v1.4; metis-plugin s-df4ff191)
 
 The RUNTIME side of [SURPRISE-INTERFACE.md](SURPRISE-INTERFACE.md): what serves the feed that `/connect-runtime`
 attaches to, implemented ONCE in metis-agent for every workspace's runtime. A domain brings only a small HOST (§3);
@@ -115,8 +115,10 @@ small scenario runner maps (task, seed) to its Live config and calls `Run.go`.
   key `<run>:<kind>[:<slug>]:<k>`; the member by `member_of` when the finding names none.
 - **The kernel watch, in the Live (generic, shared by every driver):** a member's `surprise` reply (domain_agent:
   record, difference) is a finding `{kind: "watch", k, member: <its domain>, words: the difference in words, record}`;
-  `service.Live` calls `live.on_finding(f)` when it gets one (default None: off), at the trace's k. `Run` and an
-  embedding service set `live.on_finding = feed.finding`. No domain code.
+  `service.Live` calls `live.on_finding(f)` when it gets one (default None: off), at the trace's k; a sink that raises
+  is logged, never stops the tick. `Run` sets it itself; an embedding host that has no handle on its Live (a host
+  plugin inside the agent) reaches it as `service.Live.current` (the process's newest Live) and sets
+  `Live.current.on_finding = feed.finding`. No domain code.
 - **A run per scenario start:** an embedding service (the page's one long Live) still calls `run_started` /
   `run_ended` per scenario start, each with its unique run name, not one run per service lifetime.
 - **The route of a page's request** (an embedded service): the page talks only to its backend; the backend sends an

@@ -1,11 +1,11 @@
 """RuntimeFeed: the feed ONE runtime serves (plugin/docs/RUNTIME-INTERFACE.md v1.3, SURPRISE-INTERFACE.md v1.2).
 
-    feed = RuntimeFeed(workspace, name, host=None, driver=None, domain=None)
+    feed = RuntimeFeed(workspace, name, host=None, domain=None)
     feed.start(port=0) -> {url, ...}          serves on loopback with a fresh token; .metis/runtimes/<name>.json written
-    feed.stop()                               the discovery file removed
+    feed.stop(linger=0)                       after LINGER seconds (attached clients drain), the discovery file removed
 
 The PRODUCER API (both drivers call it; nothing else does):
-    run_started(run, trace, spec, request=None)   run.started
+    run_started(run, trace, spec=None)            run.started
     tick(k)                                       status (sockets only, at most once a second)
     finding(f, now=False)                         queued until its window is closed; now=True: written at once (a person's mark)
     segment_closed(k_last)                        every queued finding with k1 <= k_last written, then surprise.new each
@@ -16,8 +16,8 @@ The PRODUCER API (both drivers call it; nothing else does):
 
 The wire: GET /feed?since=&client= (WebSocket, or the backlog as JSON lines), POST /signal (one envelope), GET /status;
 Bearer token. Several clients at once (multiplexing): the runtime's signals go to all; a client's feedback is fanned out
-to the OTHER clients. Control: run.request -> driver.start(id, spec) (400 with its words, 409 while a run is on),
-run.stop -> driver.stop(). Payload first, then the signal: a finding is written through the SDK's drop_window."""
+to the OTHER clients. No run control (the user: scenario running is the domain's scenario runner's). Runtimes are
+NAMED: .metis/runtimes/<name>.json, one live per name. Payload first, then the signal: drop_window, then surprise.new."""
 import asyncio
 import itertools
 import json
@@ -56,19 +56,19 @@ def _ws(workspace):
 
 
 class RuntimeFeed:
-    def __init__(self, workspace, name, host=None, driver=None, domain=None, spec_keys=None):
+    def __init__(self, workspace, name, host=None, domain=None):
         self.ws = _ws(workspace)
         self.name = str(name)
-        self.host, self.driver = host, driver
+        self.host = host
         self.domain = domain or getattr(host, "domain", None)
-        self.spec_keys = list(spec_keys if spec_keys is not None else getattr(host, "spec_keys", []) or [])
         self.window = tuple(getattr(host, "window", (40, 10)) or (40, 10))
         self.me = "runtime:%s" % self.name
         self.seq = itertools.count(1)
         self.backlog, self.cond = [], threading.Condition()
         self.queues = {}                     # an open socket -> (its client name, its asyncio queue)
         self.clients = {}                    # name -> {since, hello}
-        self.run = self.run_spec = self.requester = None
+        self.run = self.run_spec = None
+        self.started = None
         self.k, self.last_status = None, 0.0
         self.counts = Counter()
         self.pending = []                    # queued findings of the current run
@@ -105,12 +105,13 @@ class RuntimeFeed:
             return [s for s in self.backlog if s["seq"] > int(since) and not (client and s.get("from") == client)]
 
     # ── the producer API ──
-    def run_started(self, run, trace, spec, request=None):
+    def run_started(self, run, trace, spec=None):
         with self.lock:
             self.run, self.run_spec, self.k = run, spec, None
             self.pending = []
             self.counts = Counter()
-        self.emit("run.started", run=run, trace=trace, spec=spec, **({"request": request} if request else {}))
+        self.emit("run.started", run=run, trace=trace, spec=spec or {})
+        self._discover()
         self.status(force=True)
 
     def tick(self, k):
@@ -154,7 +155,7 @@ class RuntimeFeed:
         self.emit("run.ended", run=run, reason=reason, **({"summary": summary} if summary is not None else {}),
                   **({"error": str(error)} if error else {}), surprises=[i for i in ids if i])
         with self.lock:
-            self.run = self.run_spec = self.requester = None
+            self.run = self.run_spec = None
         self.status(force=True)
         return ids
 
@@ -227,16 +228,6 @@ class RuntimeFeed:
         if t == "bye":
             self.clients.pop(who, None)
             return 200, {"ok": True}
-        if t == "run.request":
-            return self._run_request(sig, who)
-        if t == "run.stop":
-            if self.driver is None or not self.driver.running:
-                return 409, {"ok": False, "error": "no run is on"}
-            want = sig.get("run")
-            if want and want != self.run:
-                return 409, {"ok": False, "error": "run %s is not the run on (%s)" % (want, self.run)}
-            self.driver.stop()
-            return 200, {"ok": True, "run": self.run}
         if t in FEEDBACK:
             if t == "world.changed":
                 self.restart_needed = True
@@ -248,24 +239,9 @@ class RuntimeFeed:
             return 200, {"ok": True}
         return 200, {"ok": True, "ignored": t}           # unknown types are ignored (forward compatible)
 
-    def _run_request(self, sig, who):
-        if self.driver is None:
-            return 400, {"ok": False, "error": "this runtime runs no runs of its own (an embedded service: its page starts them)"}
-        if self.driver.running:
-            return 409, {"ok": False, "error": "run %s is on (asked by %s at %s); run.stop it first"
-                         % (self.run or "(starting)", self.requester and self.requester[0], self.requester and self.requester[1])}
-        try:
-            self.requester = (who, now())
-            run = self.driver.start(sig.get("id"), sig.get("spec") or {})
-        except ValueError as e:
-            self.requester = None
-            return 400, {"ok": False, "error": str(e)}
-        return 200, {"ok": True, "run": run}
-
     def hello(self):
         return {"v": PROTOCOL, "type": "hello", "from": self.me, "name": self.name, "domain": self.domain,
-                "workspace": str(self.ws.root), "protocol": PROTOCOL, "spec_keys": self.spec_keys,
-                "capabilities": (["run", "stop"] if self.driver is not None else []) + ["explain"]}
+                "workspace": str(self.ws.root), "protocol": PROTOCOL, "capabilities": ["explain"]}
 
     # ── the server ──
     def start(self, port=0, token=None, host="127.0.0.1"):
@@ -294,25 +270,42 @@ class RuntimeFeed:
         if err:
             self.thread = None
             raise RuntimeError("the runtime %s did not start on %s:%s: %s" % (self.name, host, port, err[0]))
+        self.started = now()
+        self._discover()
+        self.emit("hello", **{k: v for k, v in self.hello().items() if k not in ("v", "type", "from")})
+        return self.info()
+
+    def _discover(self):
+        """The NAMED discovery file (one live runtime per name: a new one of the name replaces it), with the run on."""
+        if not self.port:
+            return
         d = self.ws.state / "runtimes"
         d.mkdir(parents=True, exist_ok=True)
         self.discovery = d / ("%s.json" % slug(self.name))
-        tmp = self.discovery.with_suffix(".tmp")
+        tmp = d / (".%s.%d.tmp" % (slug(self.name), os.getpid()))
         tmp.write_text(json.dumps({"name": self.name, "url": "http://127.0.0.1:%d" % self.port, "token": self.token,
                                    "pid": os.getpid(), "domain": self.domain, "workspace": str(self.ws.root),
-                                   "protocol": PROTOCOL, "started": now()}) + "\n")
+                                   "protocol": PROTOCOL, "started": self.started, "run": self.run}) + "\n")
         os.replace(tmp, self.discovery)
-        self.emit("hello", **{k: v for k, v in self.hello().items() if k not in ("v", "type", "from")})
-        return self.info()
 
     def info(self):
         return {"name": self.name, "url": ("http://127.0.0.1:%d" % self.port) if self.port else None, "token": self.token,
                 "discovery": str(self.discovery) if self.discovery else None, **self.state()}
 
-    def stop(self):
+    def stop(self, linger=0.0):
+        """Stop serving: after LINGER seconds (an attached client drains the feed), the discovery file removed (only if it
+        is still this runtime's: a newer runtime of the name may have replaced it), the server shut."""
+        if linger:
+            time.sleep(float(linger))
         if self.discovery is not None:
-            self.discovery.unlink(missing_ok=True)
+            try:
+                rec = json.loads(self.discovery.read_text())
+                if rec.get("url") == "http://127.0.0.1:%d" % (self.port or 0) and rec.get("pid") == os.getpid():
+                    self.discovery.unlink()
+            except (OSError, ValueError):
+                pass
             self.discovery = None
+
         if not self.thread:
             return
         fut = asyncio.run_coroutine_threadsafe(self.runner.cleanup(), self.loop)
