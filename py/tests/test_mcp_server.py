@@ -143,3 +143,27 @@ def test_a_fresh_domain_runs_in_the_domain_agent(fresh):
     assert out[0].get("clock") == "ready"
     out = j(cl.call("domain_read", tool="state"))
     assert any(m.get("tool") == "state" and "off" in m.get("output", "") for m in out)
+
+
+# ── the judge's environment (metis-plugin step 6): the server finds libcudart itself ──
+
+def test_the_judges_env_puts_the_cuda_lib_on_the_path(tmp_path, monkeypatch):
+    from metis_agent.mcp.tools import build
+    (tmp_path / "libcudart.so.12").write_text("")
+    monkeypatch.setenv("CUDA_LIB", str(tmp_path))
+    monkeypatch.delenv("LD_LIBRARY_PATH", raising=False)
+    assert build._cuda_env()["LD_LIBRARY_PATH"] == str(tmp_path)
+
+
+SCRATCH_RUN = Path("/bigdata/work/bond/plugin/scratch/road/.metis/traces/plugin-lb")
+
+
+@pytest.mark.skipif(not SCRATCH_RUN.is_dir(), reason="no recorded replayable trace on this host")
+def test_replay_check_runs_with_no_ld_library_path_in_the_servers_env():
+    env = {k: v for k, v in os.environ.items() if k != "LD_LIBRARY_PATH"}
+    cl = Client(root=SCRATCH_RUN.parents[2], env={"LD_LIBRARY_PATH": ""})
+    try:
+        err, text = cl.call("replay_check", trace="traces/plugin-lb")
+        assert not err and text.startswith("OK"), text
+    finally:
+        cl.close()
