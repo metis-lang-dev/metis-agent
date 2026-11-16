@@ -109,5 +109,5 @@ def main(argv=None):
                 _answer(msg)
     finally:
         SESSION.release()
-        SESSION.hub.runner_stop()            # no orphan scenario runner after the session
+        SESSION.hub.runner_stop(everywhere=True)     # no orphan scenario runner after the session
     return 0

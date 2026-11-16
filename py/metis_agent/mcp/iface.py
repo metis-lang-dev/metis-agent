@@ -175,7 +175,7 @@ class Hub:
         self.emitter = Emitter()
         self.inbox, self.out = Inbox(), Outbox(self.emitter)
         self.runtime = None                 # RuntimeConn
-        self.runners = {}                   # name -> the scenario runner process this session started (runner.yaml)
+        self.runners = []                   # the scenario runner processes this session started (runner.yaml), each with its root
         self.paired = None                  # {name, since}: the UI backend paired under /metis-ui
         self.pump_at, self.pump_root = None, None
         self.cat = None
@@ -272,8 +272,9 @@ class Hub:
         if self.runtime is not None:
             raise ValueError("this plugin is attached to runtime %s since %s (%s); runtime_disconnect first"
                              % (self.runtime.name, self.runtime.connected_at or "-", self.emitter.name))
-        if target is None and self.runners:
-            target = list(self.runners)[-1]                    # the runner this session started: its name
+        mine = [p for p in self.runners if p.root == str(ws.root)]
+        if target is None and mine:
+            target = mine[-1].name                              # the runner this session started here: its name
         box = {}
         c = RuntimeClient(ws.root, self.emitter.name, on_signal=lambda sig: self._from_runtime(sig, box))
         box["c"] = c
@@ -300,6 +301,13 @@ class Hub:
             from ..runtime.client import post
             post(c.url + "/signal", c.token, sig)
 
+    def switched(self):
+        """A workspace switch: the old workspace's connections are gone (release), and so is its inbox: signals belong
+        to the workspace they came from. The outbox and the runners stay (a runner keeps its own workspace)."""
+        with self.inbox.cond:
+            self.inbox = Inbox()
+        self.pump_root = None
+
     def disconnect(self):
         if self.runtime is None:
             return {"connected": False}
@@ -313,18 +321,29 @@ class Hub:
 
     # the headless scenario runners this session started (runner.yaml)
     def runner_start(self, args=(), python=None):
-        name, p = start_runner(self.ses.need(), python or os.environ.get("METIS_PYTHON") or "python3", args)
-        self.runners[name] = p
+        ws = self.ses.need()
+        name, p = start_runner(ws, python or os.environ.get("METIS_PYTHON") or "python3", args)
+        p.name, p.root = name, str(ws.root)
+        self.runners.append(p)
         return self.runner_status()
 
-    def runner_status(self):
-        return {n: {"pid": p.pid, "running": p.poll() is None, "code": p.returncode, "argv": p.argv, "log": p.log,
-                    "started": p.started} for n, p in self.runners.items()}
-
-    def runner_stop(self, name=None):
+    def runner_status(self, everywhere=False):
+        """The runners this session started in THIS workspace (the latest of each name), or in every one."""
+        root = str(self.ses.ws.root) if self.ses.ws is not None else None
         out = {}
-        for n, p in list(self.runners.items()):
-            if name and n != name:
+        for p in self.runners:
+            if everywhere or p.root == root:
+                out[p.name if not everywhere else "%s @ %s" % (p.name, p.root)] = {
+                    "pid": p.pid, "running": p.poll() is None, "code": p.returncode, "argv": p.argv, "log": p.log,
+                    "started": p.started}
+        return out
+
+    def runner_stop(self, name=None, everywhere=False):
+        """Stop the runners this session started (in this workspace, or EVERYWHERE: at the session's end)."""
+        root = str(self.ses.ws.root) if self.ses.ws is not None else None
+        out = {}
+        for p in self.runners:
+            if (name and p.name != name) or not (everywhere or p.root == root):
                 continue
             if p.poll() is None:
                 p.terminate()
@@ -332,7 +351,7 @@ class Hub:
                     p.wait(20)
                 except Exception:  # noqa: BLE001
                     p.kill()
-            out[n] = p.returncode
+            out[p.name] = p.returncode
         return out
 
     # the /metis-ui pairing (the bridge asks)

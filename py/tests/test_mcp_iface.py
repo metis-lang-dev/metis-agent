@@ -49,7 +49,7 @@ def ses(tmp_path):
     s.open(root)
     yield s
     s.release()
-    s.hub.runner_stop()
+    s.hub.runner_stop(everywhere=True)
     from metis_agent.mcp.tools.bridge import _B
     _B.clear()
 
@@ -233,3 +233,23 @@ def test_a_workspace_may_build_against_its_own_family(ses, tmp_path):
     assert st["home"] == ses.HOME0 and os.environ.get("METIS_HOME") == before
     with pytest.raises(ValueError, match="no such directory"):
         call(ses, "workspace_open", path=str(ses.ws.root), home=str(tmp_path / "nope"))
+
+
+def test_a_switch_starts_a_fresh_inbox_and_runners_stay_with_their_workspace(ses, tmp_path):
+    """Signals belong to the workspace they came from; a runner is listed (and stopped) with its own workspace."""
+    import sys
+    ses.hub.signal_in({"v": 1, "seq": 1, "type": "surprise.new", "from": "runtime:x", "id": "a"}, "runtime:x@u")
+    assert len(call(ses, "signals")["signals"]) == 1
+    (ses.ws.root / "runner.yaml").write_text("name: sleeper\ncommand: '{python}'\nargs: ['-c', 'import time; time.sleep(30)']\n")
+    os.environ["METIS_PYTHON"] = sys.executable
+    call(ses, "runner_start")
+    first = ses.ws.root
+    other = tmp_path / "other"
+    (other / "domains").mkdir(parents=True)
+    (other / ".metis").mkdir()
+    call(ses, "workspace_open", path=str(other))
+    assert call(ses, "signals")["signals"] == [] and call(ses, "runner_status") == {}
+    assert list(ses.hub.runner_status(everywhere=True))[0].startswith("sleeper @ ")
+    call(ses, "workspace_open", path=str(first))
+    assert call(ses, "runner_status")["sleeper"]["running"]
+    assert call(ses, "runner_stop") == {"sleeper": -15}

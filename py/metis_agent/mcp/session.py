@@ -57,6 +57,7 @@ class Session:
         else:
             os.environ.pop("METIS_HOME", None)
         os.environ["METIS_CATALOG"] = str(ws.root)      # metispy's catalog root for every verb run from here
+        self.hub.switched()
         for cb in self.on_switch:
             cb()
         return ws
