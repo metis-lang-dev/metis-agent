@@ -141,7 +141,7 @@ class Bridge:
             raise ValueError("the bridge listens on loopback only, not %s" % host)
         self.token = token or secrets.token_urlsafe(24)
         self.base = self.cat = snapshot(catalog_files(self.root(), self.family))
-        self.cat_rows = []
+        self.cat_root, self.cat_rows = str(self.root()), []
         ready, err = threading.Event(), []
 
         def run():
@@ -233,7 +233,11 @@ class Bridge:
 
     # ── OUT ──
     def catalog_check(self):
-        """A catalog change since the bridge's start (or the last one seen): a frame, kept with the journal's length."""
+        """A catalog change since the bridge's start (or the last one seen): a frame, kept with the journal's length. A
+        workspace switch (the server's workspace_open) is a new base, not a change."""
+        if getattr(self, "cat_root", None) != str(self.root()):
+            self.cat_root, self.cat, self.cat_rows = str(self.root()), snapshot(catalog_files(self.root(), self.family)), []
+            return None
         now = snapshot(catalog_files(self.root(), self.family))
         moved = changed(self.cat, now)
         if not moved:

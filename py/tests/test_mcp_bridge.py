@@ -163,3 +163,44 @@ def test_feed_ws_pushes_frames(ws_root):
         assert fr["kind"] == "surprise" and fr["status"] == "open" and fr["n"] == 7
     finally:
         b.stop()
+
+
+ROAD = os.environ.get("METIS_TEST_ROAD") or str(__import__("pathlib").Path(__file__).resolve().parents[3] / "metis-worlds" / "road")
+
+
+def test_through_the_server_enable_inbox_answer_disable(tmp_path):
+    """The bridge's tools in the MCP server (bond's claude-plugin): bridge_enable on a copy of the road workspace, the road UI's
+    surprise and question over HTTP, bridge_inbox lists both, bridge_answer answers, the feed carries it, bridge_disable."""
+    from pathlib import Path
+
+    from tests.mcp_client import Client
+    if not (Path(ROAD) / ".metis" / "traces").is_dir():
+        pytest.skip("no metis-worlds/road workspace with traces beside metis-agent")
+    dst = tmp_path / "road"
+    shutil.copytree(ROAD, dst, ignore=shutil.ignore_patterns(".venv-cr", "__pycache__", ".pytest_cache", "loop"), symlinks=True)
+    shutil.copytree(VTRACE, dst / ".metis" / "traces" / "vrun")
+    c = Client(root=dst)
+    try:
+        def j(r):
+            err, text = r
+            assert not err, text
+            return json.loads(text)
+        assert j(c.call("bridge_status"))["on"] is False                  # dormant by default
+        st = j(c.call("bridge_enable", port=0))
+        assert st["on"] and "token" in st and "?metis=" in st["page"]
+
+        class B:                                                        # the HTTP calls as the page makes them
+            port, token = st["port"], st["token"]
+        code, r = call(B, "/surprise", {"run": "vrun", "window": [10, 30], "words": "late for the red light", "member": "signals", "n": 2})
+        assert code == 200
+        code, q = call(B, "/explain", {"run": "vrun", "window": [10, 30], "words": "why so late?", "n": 2})
+        inbox = j(c.call("bridge_inbox"))
+        assert [x["ref"] for x in inbox["questions"]] == [q["ref"]] and r["id"] in [x["id"] for x in inbox["surprises"]]
+        assert c.call("bridge_answer", ref="nope", text="x")[0] is True  # a refusal in words
+        j(c.call("bridge_answer", ref=q["ref"], text="The light was red and you could still stop."))
+        assert j(c.call("bridge_inbox"))["questions"] == []
+        code, f = call(B, "/feed")
+        assert any(x["kind"] == "answer" and x["ref"] == q["ref"] for x in f["rows"])
+        assert j(c.call("bridge_disable"))["on"] is False
+    finally:
+        c.close()
