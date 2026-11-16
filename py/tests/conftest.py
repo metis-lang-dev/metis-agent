@@ -22,3 +22,20 @@ def _fresh_domain_modules():
     yield
     for k in [k for k in sys.modules if k.startswith("metis_agent.domains.") or k.endswith("_host")]:
         sys.modules.pop(k, None)
+
+
+_SESSION_ENV = ("METIS_CATALOG", "METIS_HOME", "METIS_WORKSPACE", "METIS_PYTHON", "CUDA_LIB", "PYTHONPATH")
+
+
+@pytest.fixture(autouse=True)
+def _session_env_restored():
+    """The Metis plugin's Session sets the workspace's METIS_CATALOG (and a workspace's METIS_HOME) in os.environ, as
+    the server process wants; a test that opens one in-process must not leave it to the next test file (it did: 46
+    package and service tests failed after the plugin's tests in one run)."""
+    before = {k: os.environ.get(k) for k in _SESSION_ENV}
+    yield
+    for k, v in before.items():
+        if v is None:
+            os.environ.pop(k, None)
+        else:
+            os.environ[k] = v
