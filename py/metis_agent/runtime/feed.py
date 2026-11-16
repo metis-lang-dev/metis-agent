@@ -164,6 +164,8 @@ class RuntimeFeed:
             raise ValueError("a finding is {kind, k, words, ...}: %r" % (f,))
         f = dict(f)
         f["run"] = f.get("run") or self.run
+        f["trace"] = f.get("trace") or f["run"]          # the trace that holds its window: the run's own, unless an embedding's
+                                                          # runs share one trace (the road UI's service: one Live, a run per scenario start)
         k = int(f["k"] if f.get("k") is not None else f["k1"])
         pre, post = self.window
         f["k"] = k
@@ -176,18 +178,18 @@ class RuntimeFeed:
     def _write(self, f):
         """Payload first (the SDK's one producer path), then surprise.new. A refusal is said on the feed, never lost."""
         try:
-            last = self._last_k(f["run"])
+            last = self._last_k(f["trace"])
             k1 = min(f["k1"], last) if last is not None else f["k1"]
-            extra = {x: v for x, v in f.items() if x not in ("run", "k0", "k1", "words", "key", "member", "kind", "k", "slug")}
-            sid = self.ws.drop_window(f["run"], f["k0"], max(f["k0"], k1), f.get("words") or f["kind"], f["key"],
+            extra = {x: v for x, v in f.items() if x not in ("run", "trace", "k0", "k1", "words", "key", "member", "kind", "k", "slug")}
+            sid = self.ws.drop_window(f["trace"], f["k0"], max(f["k0"], k1), f.get("words") or f["kind"], f["key"],
                                       member=f.get("member"), kind=f["kind"], k=f["k"], source=self.me, who="world", **extra)
         except Exception as e:  # noqa: BLE001
             log.warning("[runtime] finding %s not written: %s", f.get("key"), e)
-            self.emit("finding.refused", key=f.get("key"), run=f.get("run"), error=str(e))
+            self.emit("finding.refused", key=f.get("key"), run=f.get("run"), trace=f.get("trace"), error=str(e))
             return None
         rec = self.ws.surprise(sid)
         self.emit("surprise.new", id=sid, ref=".metis/surprises/%s.json" % sid, key=f["key"], kind=f["kind"],
-                  member=rec.get("member"), run=f["run"], window=rec.get("window"))
+                  member=rec.get("member"), run=f["run"], trace="traces/" + f["trace"], window=rec.get("window"))
         return sid
 
     def _last_k(self, run):
