@@ -43,27 +43,38 @@ TEMPLATE_README = """# {domain}
 
 A Metis workspace (metis-workspace/1), made by the metis plugin's workspace_create.
 
-- `domains/composition.yaml`: the bundle (its members); `domains/{domain}/`: the first member's package
-  (`domain.yaml`, `{domain}.llp`).
+- `domains/composition.yaml`: the bundle (its members, the director generated at link, the world's ports);
+  `domains/capacity.llp`: the domain and resource types every member shares; `domains/{domain}/`: the first
+  member's package (`domain.yaml`, `{domain}.llp`).
 - `.metis/`: the loop's state (surprises, traces, journal, rulings, packs): written through the tools, git-ignored.
 
 Build with the plugin's `bundle_build`; try rules at once with `repl_open` / `repl_eval`.
 """
 
+TEMPLATE_CAPACITY = """% capacity — the {domain} bundle's members and resources (a fresh workspace: one member, one resource).
+catalog {domain}_capacity 1.
+provenance text "the {domain} bundle's members and resources" "{date}".
+type domain {{{domain}}}.
+type resource {{hand}}.
+"""
+
 TEMPLATE_LLP = """% {domain} — the first member's program (a fresh workspace: one stage, one rule to start from).
 catalog {domain} 1.
 provenance text "{domain}: a fresh domain" "{date}".
-stages (act).
 layers (dyn).
+stages (act).
+include "../capacity.llp".
+include "iface/protocol_domain.llp".
 namespace {domain} produce (dyn).
-pred idle : {domain}.
-pred busy : {domain}.
-pred start : {domain}.
+%% the world's: the switch is pressed (a fact the host states)
+pred press : {domain}.
+pred off : {domain}.
+pred on : {domain}.
 stage act {{
-  %% Asked to start: I start.
-  begin [dyn] : idle * start -o busy.
+  %% The switch is pressed while I am off: I turn on.
+  turn_on [dyn] : off * $press -o on.
 }}
-#init idle 1
+#init off 1
 #steps 4
 #seeds 1
 """
@@ -71,12 +82,22 @@ stage act {{
 TEMPLATE_DOMAIN = """# {domain}: the member's manifest
 display: {domain}
 line: "{domain}: a fresh domain"
+voice: third
 program: {domain}.llp
+clock: {{beats: 1}}
+shared: {{tick__stop: in}}
+status: {{success: [], failure: []}}
 """
 
-TEMPLATE_COMPOSITION = """# composition — the {domain} bundle: its members (a fresh workspace: one member).
+TEMPLATE_COMPOSITION = """# composition — the {domain} bundle (a fresh workspace: one member, its director generated at link).
 name: {domain}
+capacity: capacity.llp
+protocol: iface/protocol_domain.llp
 specialists: [{domain}]
+direct: tree_director
+world: {{out: [tick__stop, press], in: [turn_on]}}
+resources: {{hand: 1}}
+response: 3
 """
 
 
@@ -101,6 +122,7 @@ def workspace_create(ses, path, domain, template="minimal"):
     (p / "domains" / domain).mkdir(parents=True, exist_ok=True)
     (p / "README.md").write_text(TEMPLATE_README.format(**fill))
     (p / "domains" / "composition.yaml").write_text(TEMPLATE_COMPOSITION.format(**fill))
+    (p / "domains" / "capacity.llp").write_text(TEMPLATE_CAPACITY.format(**fill))
     (p / "domains" / domain / "domain.yaml").write_text(TEMPLATE_DOMAIN.format(**fill))
     (p / "domains" / domain / ("%s.llp" % domain)).write_text(TEMPLATE_LLP.format(**fill))
     inside = subprocess.run(["git", "-C", str(p), "rev-parse", "--is-inside-work-tree"], capture_output=True, text=True)
@@ -110,7 +132,7 @@ def workspace_create(ses, path, domain, template="minimal"):
     ws = ses.open(p, how="workspace_create")
     ws.made()
     ws.journal("claude", "create", domain=domain, template=template)
-    return {"created": str(p), "files": ["README.md", "domains/composition.yaml", "domains/%s/domain.yaml" % domain,
+    return {"created": str(p), "files": ["README.md", "domains/composition.yaml", "domains/capacity.llp", "domains/%s/domain.yaml" % domain,
                                          "domains/%s/%s.llp" % (domain, domain)], **workspace_status(ses)}
 
 

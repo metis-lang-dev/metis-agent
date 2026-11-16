@@ -14,6 +14,7 @@ class Session:
         self.taken = set()               # surprises this session took (released at exit unless ruled)
         self.last_member = ""            # the member of the surprise taken last (rule_text's default)
         self.repl = None                 # the open REPL (tools/repl.py)
+        self.domain = None               # the open domain agent (tools/domain.py)
         self.on_switch = []              # callbacks after a switch (the server's list_changed)
 
     def start(self, root=None):
@@ -60,12 +61,14 @@ class Session:
             except Exception:  # noqa: BLE001
                 pass
         self.taken.clear()
-        if self.repl is not None:
-            try:
-                self.repl.close()
-            except Exception:  # noqa: BLE001
-                pass
-            self.repl = None
+        for attr in ("repl", "domain"):
+            child = getattr(self, attr, None)
+            if child is not None:
+                try:
+                    child.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                setattr(self, attr, None)
 
 
 SESSION = Session()

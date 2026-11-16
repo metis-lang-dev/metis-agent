@@ -90,3 +90,56 @@ def test_open_switches_and_says_so(c, road, tmp_path):
     c.call("workspace_open", path=str(road / "domains"))       # inside the workspace: the one it stands in
     assert any(n.get("method") == "notifications/tools/list_changed" for n in c.notes)
     assert j(c.call("workspace_status"))["found_by"] == "workspace_open"
+
+
+# ── step 3: catalog, build, REPL, domain, a fresh workspace ──
+
+def test_the_rules_of_a_member_come_from_its_units_the_family_included(c):
+    err, sig = c.call("units", member="planner")
+    assert not err and "(own)" in sig and "(shared)" in sig
+    err, text = c.call("rule_text", names=["keep_lead"], member="planner")
+    assert not err and "keep_lead [dyn]" in text and "%%" in text
+    err, text = c.call("search", query="lead_standing oncoming", member="planner")
+    assert not err and "change_oncoming" in text
+
+
+def test_the_road_bundle_builds_to_its_image(c):
+    if not os.environ.get("METISC") and not shutil.which("metisc"):
+        pytest.skip("no metisc (METISC)")
+    r = j(c.call("bundle_build"))
+    assert r["code"] == 0 and r["image"]
+
+
+@pytest.fixture
+def fresh(tmp_path):
+    cl = Client(root=ROAD)
+    err, text = cl.call("workspace_create", path=str(tmp_path / "lamp_ws"), domain="lamp")
+    assert not err, text
+    yield cl, tmp_path / "lamp_ws"
+    cl.close()
+
+
+def test_a_fresh_workspace_builds_runs_in_the_repl_and_commits_on_a_branch(fresh):
+    if not os.environ.get("METISC") and not shutil.which("metisc"):
+        pytest.skip("no metisc (METISC)")
+    cl, ws = fresh
+    st = j(cl.call("workspace_status"))
+    assert st["workspace"] == str(ws) and "lamp" in st["bundle"]["members"]
+    b = j(cl.call("bundle_build"))
+    assert b["code"] == 0 and b["image"], b
+    assert not cl.call("repl_open", member="lamp")[0]
+    cl.call("repl_eval", op="do", arg="+press")
+    err, out = cl.call("repl_eval", op="run")
+    assert not err and "turn_on" in out
+    err, out = cl.call("catalog_edit", path="domains/lamp/lamp.llp", old="I turn on.", new="I turn the lamp on.")
+    assert not err, out
+    r = j(cl.call("catalog_commit", paths=["domains/lamp/lamp.llp"], message="lamp: words", topic="words"))
+    assert r["branch"] == "metis/words" and r["commit"]
+
+
+def test_a_fresh_domain_runs_in_the_domain_agent(fresh):
+    cl, ws = fresh
+    out = j(cl.call("domain_open", domain="lamp"))
+    assert out[0].get("clock") == "ready"
+    out = j(cl.call("domain_read", tool="state"))
+    assert any(m.get("tool") == "state" and "off" in m.get("output", "") for m in out)

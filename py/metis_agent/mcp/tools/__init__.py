@@ -1,2 +1,2 @@
 """The tool groups (the design's table): importing registers them."""
-from . import workspace, surprises, traces  # noqa: F401
+from . import workspace, surprises, traces, catalog, build, repl, domain  # noqa: F401
