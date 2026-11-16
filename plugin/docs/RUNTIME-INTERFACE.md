@@ -1,4 +1,4 @@
-# The Metis runtime interface (spec v1.4: + host.prepare; signed off by bond004 and bond008, their amendments in, pascal's flush rule; metis-plugin s-df4ff191)
+# The Metis runtime interface (spec v1.5: the user's ruling: scenario running SEPARATE from the runtime, runtimes NAMED with re-attach; signed off by bond004 and bond008 up to v1.4; metis-plugin s-df4ff191)
 
 The RUNTIME side of [SURPRISE-INTERFACE.md](SURPRISE-INTERFACE.md): what serves the feed that `/connect-runtime`
 attaches to, implemented ONCE in metis-agent for every workspace's runtime. A domain brings only a small HOST (§3);
@@ -17,61 +17,60 @@ no domain has server or client code of its own (the user's ruling, 2026-11-16).
 
 What is new: one package `metis_agent/runtime/` (§2) and one host face (§3).
 
-## 1. Roles and processes
+## 1. Roles and processes (the user: scenario running is SEPARATE from the runtime)
 
 ```
              plugin (Claude Code)          UI backend (e.g. the road page's service)
-                  │  client                      │  client (and, under /ide, the plugin's ide client)
+                  │  /connect-runtime <name>     │  client (and, under /ide, the plugin's ide client)
                   ▼                              ▼
    ┌────────── RuntimeFeed (metis_agent/runtime/feed.py) ──────────┐
-   │ discovery file · token · client registry · fan-out · control  │
+   │ named discovery file · token · client registry · fan-out      │
    │ the producer API: run_started / tick / finding / run_ended    │
    └───────────────▲───────────────────────────▲───────────────────┘
-                   │ headless driver            │ embedded driver
-        metis_agent/runtime/run.py        a service that runs its own Live
-        (a CHILD process per run:         (the road page's service: its Live in
-         a fresh Live + Tracer + host)     process, the page glue its own)
+                   │ Run loop (run.py)          │ an embedding service
+        the domain's SCENARIO RUNNER       the road UI backend = the interactive
+        (headless: road `python -m          scenario runner: its own Live in process,
+         road.runner --card X`; ALFWorld's   the feed embedded, the page glue its own
+         own small runner (task, seed))
 ```
 
-- **The feed is one object, `RuntimeFeed(workspace, name, host)`**, with two drivers that feed it through the same
-  producer API (§4): the HEADLESS driver (`python -m metis_agent.runtime`) starts each run as a child process; an
-  EMBEDDING service (one that already runs a Live, like the road page's service) calls the API itself. Either way the
-  clients see one feed.
-- **The headless runtime runs each run in a CHILD process** (`metis_agent.runtime.run`): a fresh Live, so a
-  `catalog.changed` needs no restart (the next run loads the catalog afresh); a stop is a clean kill; a crash is
-  `run.ended {reason: error, error: words}`, not a dead runtime. The child reports to its parent on stdout as JSON
-  lines (`tick`, `finding`, `narration`, `ended`); the parent is the feed.
-- **A service that is both a runtime and a UI backend** (the road page's) embeds the feed (headless
-  `/connect-runtime` works on it with no page open) AND, when a page is open and `/ide` is on, is an ide client
-  (bond008's `metis_agent/ide_client.py`). A finding reaching the plugin by both paths carries one key: one record (SDK §5).
+- **The runtime is feed + findings + feedback only.** It does not start, stop or choose runs: no `run.request`, no
+  `run.stop`, no driver, no `run_config`. A run IS a runtime (or a span of one): whoever runs it serves the feed.
+- **Run control belongs to the domain's SCENARIO RUNNER**, in the domain's repo: interactive = the UI backend
+  (embeds the runtime; the page starts runs), headless = a CLI without the page (road: `python -m road.runner --card
+  ID [--name road]`). The agent starts the headless runner itself (Bash, or `runner_start`: the workspace's
+  `runner.yaml` command with its args, §6).
+- **Runtimes are NAMED.** A runner serves its runs under one name (road: `road`), one runtime per run (or one per
+  session: the runner's choice); the plugin's `/connect-runtime road` attaches to the newest live runtime of that
+  name and RE-ATTACHES by itself when it ends and a new one of the name appears (§5): the agent's feed continues from
+  run to run with no command.
+- **A service that is both a runtime and a UI backend** (the road page's) embeds the feed (`/connect-runtime` works
+  on it with no page open) AND, when a page is open and `/ide` is on, is an ide client (`ide_client.py`). A finding
+  reaching the plugin by both paths carries one key: one record (SDK §5).
 
-## 2. The package `metis_agent/runtime/`
+## 2. The package `metis_agent/runtime/` (domain-free)
 
 | module | what | owner |
 |---|---|---|
-| `feed.py` | `RuntimeFeed`: the HTTP/WS server (`GET /feed`, `POST /signal`, `GET /status`), loopback + token, the discovery file, the client registry and fan-out, control (`run.request` / `run.stop`, one run at a time), write-then-signal of findings, `status` | bond |
-| `client.py` | `RuntimeClient`: connect by name / URL+token, resume by seq, re-discovery, send; used by the plugin (`/connect-runtime`) and by any UI backend that subscribes to a runtime | bond |
-| `run.py` | the child driver: resolve the spec through the host, a fresh Live with the Tracer into `traces/<run>`, tick until done / stop / `ticks`, collect findings, close the tracer, report | bond004 |
-| `__main__.py` | `python -m metis_agent.runtime --workspace W --host MODULE:CLASS [--name N] [--port P] [--config YAML]` | bond004 |
-| `host.py` | `RuntimeHost`: the base class of §3 (defaults: no findings, `run_config` from a config file) | bond004 |
+| `feed.py` | `RuntimeFeed(workspace, name, host)`: the HTTP/WS server (`GET /feed`, `POST /signal`, `GET /status`), loopback + token, the named discovery file, the client registry and fan-out, write-then-signal of findings, `status` | bond |
+| `client.py` | `RuntimeClient`: attach by NAME (the newest live one; re-attach to the next of that name) or URL+token, resume by seq, send; used by the plugin (`/connect-runtime`) and any UI backend that subscribes to a runtime | bond |
+| `run.py` | `Run(workspace, host, feed).go(config, ticks, stem, env=None) -> {run, reason, summary}`: the in-process run loop: env applied, `host.prepare`, a fresh Live with the Tracer into `traces/<stem>-<UTC stamp>`, `host.start`, per tick `host.findings(live, k)` at the trace's k and `host.done`, `segment_closed` when the Tracer opens a segment, the kernel watch hook, the tracer closed, `host.summary` / `end_findings`, `feed.run_ended`. It calls only the producer API; any scenario runner (road's headless, ALFWorld's, the road UI backend) may use it | bond004 |
+| `host.py` | `RuntimeHost`: the base class of §3 (every method a no-op default) | bond004 |
 | `ide_client.py` | the UI backend's client of the plugin's `/ide` endpoint (discovery by lockfile, hello, write-then-signal via `drop_window`, explain, take) | bond008 |
+
+The scenario runners live with their domains: road `metis-worlds road/runner/` (`python -m road.runner`, its
+`RoadRuntime` host: bond004), the road UI backend (bond008), ALFWorld's small runner (task, seed).
 
 ## 3. The host face: ONE small class per domain (`RuntimeHost`)
 
-Declared in the workspace's `runner.yaml` (`host: road_runtime_host:RoadRuntime`), loaded from the workspace's
-python path. Every method has a default; a domain overrides what it needs.
+What a RUN needs from its domain, not how a card becomes a run (that is the scenario runner's). The runner makes it
+and hands it to `RuntimeFeed` and `Run`. Every method has a default; a domain overrides what it needs.
 
 ```python
 class RuntimeHost:
     name = "runtime"                    # the runtime's name (discovery file, `from: runtime:<name>`)
     domain = None                       # the bundle's domain, for hello
-    spec_keys = []                      # the keys its run spec reads (hello.spec_keys): road [card, scenario, seed, host, ticks, site]
     window = (40, 10)                   # ticks before / after a finding's k: its kept window [k-pre, k+post], clamped to the run
-
-    def run_config(self, spec, workspace) -> dict:
-        """The run's Live config for SPEC: {config: {...the Live config...}, ticks: N, stem: "name-seed", env?: {...}}.
-        ENV is applied in the child BEFORE the Live is made (road: METIS_ROAD_RUN, COMMONROAD_CACHE).
-        A spec it cannot run: raise ValueError(words) (the runtime answers the request 400 with them)."""
 
     def prepare(self, cfg, run, trace_dir) -> None:  # in the run's child, just BEFORE the Live is made: the run's name and
                                                      # trace dir are known only now (road: its run spec file names the trace dir)
@@ -86,14 +85,14 @@ class RuntimeHost:
 A finding is `{kind, k, words, slug?, member?, k0?, k1?, ...}` (domain keys kept in the record). Its window is
 `[k0, k1]` when given, else `host.window` around `k`.
 
-**ALFWorld** needs no findings at all to prove the feed: the kernel watch's surprises (§4) are its findings, and its
-`run_config` maps its spec (`task`, `seed`) to its Live config.
+**ALFWorld** needs no findings at all to prove the feed: the kernel watch's surprises (§4) are its findings; its
+small scenario runner maps (task, seed) to its Live config and calls `Run.go`.
 
-## 4. The producer API (what both drivers call) and the sources
+## 4. The producer API (what `Run` and an embedding service call) and the sources
 
 | call | when | signal out |
 |---|---|---|
-| `run_started(run, trace, spec, request?)` | the Live and the Tracer are made (trace dir in the workspace: `traces/<run>`, `config.yaml` beside it) | `run.started` |
+| `run_started(run, trace, spec)` | the Live and the Tracer are made (trace dir in the workspace: `traces/<run>`, `config.yaml` beside it) | `run.started` |
 | `tick(k)` | each tick (rate-limited status) | `status` (to sockets only, not the backlog) |
 | `finding(f, now=False)` | the host's `findings(k)`, a kernel watch surprise | queued until its window is closed (below) |
 | `segment_closed(k_last)` | the Tracer closed a segment at a checkpoint (every `trace.every` ticks) | every queued finding with `k1 <= k_last` WRITTEN, then `surprise.new` each |
@@ -114,21 +113,30 @@ A finding is `{kind, k, words, slug?, member?, k0?, k1?, ...}` (domain keys kept
   at the run's end. A person's mark in an embedded run is written at once (`now=True`). Each through
   `Workspace.drop_window(run, k0, k1, words, key, member=f.member, kind=f.kind, k=f.k, source="runtime:<name>")`,
   key `<run>:<kind>[:<slug>]:<k>`; the member by `member_of` when the finding names none.
-- **The kernel watch:** a member's `surprise` reply (domain_agent: record, difference) is a finding
-  `{kind: "watch", k, member: <its domain>, words: the difference in words, record}`; the runtime hooks it where the
-  Live receives replies (one hook in `service.Live`, no domain code).
+- **The kernel watch, in the Live (generic, shared by every driver):** a member's `surprise` reply (domain_agent:
+  record, difference) is a finding `{kind: "watch", k, member: <its domain>, words: the difference in words, record}`;
+  `service.Live` calls `live.on_finding(f)` when it gets one (default None: off), at the trace's k. `Run` and an
+  embedding service set `live.on_finding = feed.finding`. No domain code.
+- **A run per scenario start:** an embedding service (the page's one long Live) still calls `run_started` /
+  `run_ended` per scenario start, each with its unique run name, not one run per service lifetime.
 - **The route of a page's request** (an embedded service): the page talks only to its backend; the backend sends an
   explain / narrate request through its ide client when one is connected, else through `feed.request` to its runtime
   clients (a plugin attached by `/connect-runtime`), else answers the page in words (`delivered: 0`).
 - **One key, two paths:** under `/ide` and `/connect-runtime` at once, an embedded service signals the same record's
   `surprise.new` on both; the plugin de-dups by id. The key is the producer's: `<run>:mark:<n>:<k0>-<k1>` for a page
   mark, `<run>:<kind>[:<slug>]:<k>` for a host finding.
-- **Run names, both drivers alike:** `<stem>-<UTC stamp>` (the embedded road service aligns to it).
+- **Run names, every runner alike:** `<stem>-<UTC stamp>` (the embedded road service aligns to it).
 
 ## 5. The wire (exactly SURPRISE-INTERFACE.md's, from the runtime's side)
 
-- Discovery: `<workspace>/.metis/runtimes/<name>.json {name, url, token, pid, domain, workspace, protocol: 1,
-  started}`, written when it serves, removed at exit.
+- Discovery, NAMED: `<workspace>/.metis/runtimes/<name>.json {name, url, token, pid, domain, workspace, protocol: 1,
+  started, run?}`, written when it serves, removed at its stop. One live runtime per name at a time (a new one of the
+  name replaces the file); a dead pid's file is stale.
+- **Re-attach (the user):** a client attached by NAME follows the name: when its runtime ends (the file gone, or the
+  pid dead, or the feed unreachable) it waits for the next live runtime of that name and attaches to it by itself
+  (hello again, `since` from 0: a new runtime has its own seqs), and says so to its owner as a local signal
+  `runtime.attached {name, url, run?}` / `runtime.detached {name, reason}`. A client attached by URL does not follow.
+- A runtime that ends LINGERS a short while (road: a few seconds) after `run.ended` so an attached client drains it.
 - `GET /feed?since=<seq>`: WebSocket (signals as they come, backlog first) or plain GET (the backlog as JSON lines).
   The backlog holds every signal but `status` (sockets only).
 - `POST /signal`: one envelope in. `hello` registers the client (`from` is its name); `bye` or the last socket closing
@@ -138,40 +146,47 @@ A finding is `{kind, k, words, slug?, member?, k0?, k1?, ...}` (domain keys kept
   session's own one-runtime limit). The runtime's own signals go to all; a client's
   `surprise.taken/ruled/applied`, `catalog.changed`, `world.changed`, `explain.answer` are fanned out to the OTHER
   clients (and kept in the backlog with their `from`).
-- **Control:** `run.request {id, spec}` -> `200 {ok, run}` and `run.started {request: id}`; while a run is on:
-  `409 {error: "run <run> is on (asked by <client> at <ts>); run.stop it first"}`; a spec the host refuses:
-  `400 {error: <the host's words>}`. `run.stop {id, run?}` -> the child killed, `run.ended {reason: stopped}`.
-- `catalog.changed` from a client: the next run loads the catalog afresh (headless: nothing to do; embedded: the
-  service's own reload). `world.changed`: the runtime says it in its `status` (`restart_needed: true`) and restarts
-  between runs when it is the headless one.
+- `catalog.changed` from a client: relayed; the next run (a fresh Live) loads the catalog afresh; an embedding service
+  may reload at once (its own choice). `world.changed`: the runtime says it in its `status` (`restart_needed: true`);
+  the scenario runner restarts before its next run.
 - `explain.request` from a UI client is fanned out to the plugin(s) like any feedback; a runtime with no plugin client
   answers the request `200 {ok, delivered: 0}` and the UI says it in words.
 
-## 6. runner.yaml (the plugin starts THE generic runtime with the domain's host)
+## 6. runner.yaml (how the agent starts a workspace's HEADLESS scenario runner)
+
+`runner.yaml` at the workspace's root: `{name, command, args, env?, cwd?}`; `{workspace}` and `{python}` filled in, and
+the agent's own arguments (a card, a task) appended. The runner serves its runs as the runtime NAME; the plugin
+attaches with `/connect-runtime <name>` (before or after: it waits for the name).
 
 ```yaml
-# metis-worlds/road/runner.yaml
+# metis-worlds/road/runner.yaml (bond004)
 name: road
 command: "{python}"
-args: [-m, metis_agent.runtime, --workspace, "{workspace}", --host, "road_runtime_host:RoadRuntime", --port, "{port}"]
-env: {METIS_HOME: ../../metis-catalog/domains/road, PYTHONPATH: "{workspace}/runtime"}
-ready_s: 30
+args: [-m, road.runner, --workspace, "{workspace}", --name, road]     # + --card ID | --cards a,b,c | --scenario S ...
+cwd: ..
+env: {METIS_HOME: ../../metis-catalog/domains/road}
 ```
 
 ```yaml
 # metis-worlds/alfworld/runner.yaml
 name: alfworld
 command: "{python}"
-args: [-m, metis_agent.runtime, --workspace, "{workspace}", --host, "alf_runtime_host:AlfRuntime", --port, "{port}"]
+args: [-m, alfworld.runner, --workspace, "{workspace}", --name, alfworld]   # + --task T --seed N
 ```
 
 ## 7. Tests (each owner's, all domain-free in metis-agent)
 
 - feed: discovery written/removed; token refused; two clients (a UI + a plugin) both get the feed and the plugin's
-  `surprise.ruled` reaches the UI and not back to the plugin; `run.request` while running 409 with words; resume by seq.
+  `surprise.ruled` reaches the UI and not back to the plugin; resume by seq; RE-ATTACH: runtime A of name N ends,
+  runtime B of name N starts, the client's feed continues (B's signals arrive) with no command.
 - run: a stub host (a tiny bundle + a host with one planted finding) -> run.started, the trace in the workspace, the
   finding written AFTER its segment closed with its key and kept window, surprise.new, run.ended done; in a LONG stub
-  run (several checkpoints), an early finding's `surprise.new` arrives BEFORE `run.ended` (within one interval of its k1); a stop -> stopped; a host
-  raising -> error with words.
+  run (several checkpoints), an early finding's `surprise.new` arrives BEFORE `run.ended` (within one interval of its
+  k1); a host raising -> run.ended error with words.
+- CONFORMANCE (bond: `py/tests/runtime_conformance.py` + `test_runtime_conformance.py`): ONE check every driver must
+  pass, given an adapter `{start(stem), advance(ticks), mark(k0, k1, words), plant(kind, k, words), end()}` over a stub
+  world: `run_started` -> a planted host finding written + `surprise.new` within one checkpoint of its k1 (before
+  `run_ended`) -> a mark `finding(now=True)` written at once -> `run_ended` with the rest; two scenario starts = two
+  runs with unique names. The `Run` loop runs it (bond004) and road_host's embedding runs it (bond008).
 - the proofs (§ the subject): headless only (road card, ALFWorld task), interactive only, both on one workspace
   (no duplicate surprise).

@@ -1,4 +1,4 @@
-# The Metis surprise interface (spec v1.2: the runtime multiplexes; signed off by bond004 and bond008 with amendments, reviewed by pascal, the user's rules folded in; metis-plugin s-df4ff191)
+# The Metis surprise interface (spec v1.3: scenario running separate, named runtimes with re-attach; the runtime multiplexes; signed off by bond004 and bond008 with amendments, reviewed by pascal, the user's rules folded in; metis-plugin s-df4ff191)
 
 ## 0. The layering (the user, 2026-11-16): payload in the workspace, signals on top
 
@@ -18,7 +18,7 @@ wheelchair world speak it unchanged.
 
 | mode | command | who serves | who connects |
 |---|---|---|---|
-| headless | `/connect-runtime <url \| runtime name \| runner spec>` | the RUNTIME (a world runner: feed + control) | the PLUGIN (starts the runner first when given a spec) |
+| headless | `/connect-runtime <runtime name \| url#token>` | the RUNTIME (feed + findings + feedback; a run IS a runtime, started by the domain's scenario runner) | the PLUGIN (by name: the newest live runtime of the name, re-attached to the next one by itself) |
 | interactive | `/ide` | the PLUGIN (its endpoint, published by a lockfile) | a UI BACKEND (e.g. the road UI's service); the page talks only to its own backend |
 
 Both may be on at once on one workspace (one agent on a headless runner and on a UI). ONE message format for both.
@@ -26,8 +26,9 @@ Both may be on at once on one workspace (one agent on a headless runner and on a
 **The runtime multiplexes (the user):** a runtime accepts SEVERAL clients at once (a UI backend and a Claude agent's
 plugin, and more), each its own connection. It fans its feed out to all of them, and fans one client's
 `surprise.taken` / `ruled` / `applied`, `catalog.changed` / `world.changed` and `explain.answer` out to the OTHER
-clients, so the page sees what the agent does on the runtime's surprises. Control stays safe by one rule: one run at a
-time; a `run.request` while a run is on is `409 {error: words}` naming the run and its requester.
+clients, so the page sees what the agent does on the runtime's surprises. The runtime takes no run control: starting
+and stopping runs is the domain's SCENARIO RUNNER's (the UI backend interactively; a headless CLI the agent starts,
+RUNTIME-INTERFACE §1, §6).
 
 **What stays single (the user):** a plugin session holds at most ONE runtime connection and at most ONE `/ide`
 connection; a UI backend pairs with ONE plugin under `/ide`. A second attempt is REFUSED with words naming the current
@@ -70,9 +71,9 @@ Every message, both directions, both modes:
 
 | type | fields | meaning |
 |---|---|---|
-| `hello` | `name, domain, workspace, protocol, capabilities: [run, stop, explain], spec_keys?: [...]` | first message of a connection; `spec_keys`: the keys the runtime's own run spec reads |
+| `hello` | `name, domain, workspace, protocol, capabilities: [explain]` | first message of a connection |
 | `status` | `state: idle\|running, run?, tick?, counts?: {kind: n}` | heartbeat, on change or every few seconds; `counts`: the findings so far |
-| `run.started` / `run.ended` | `run, request?, trace: "traces/<run>", spec, summary?, reason?: done\|stopped\|error, error?` | a run's edges; `request` the `run.request` id it answers; the trace and its `config.yaml` are on disk when `run.ended` is sent |
+| `run.started` / `run.ended` | `run, trace: "traces/<run>", spec, summary?, reason?: done\|stopped\|error, error?, surprises?` | a run's edges (spec: what the scenario runner ran, for reading only); the trace and its `config.yaml` are on disk when `run.ended` is sent |
 | `surprise.new` | `id, ref: ".metis/surprises/<id>.json", key, kind?, member?` | a surprise WRITTEN by the sender (SDK `drop_surprise`, its window kept); `key` the finding's identity (§5) |
 | `event.new` | `ref?, run, k0, k1, words?` | a marked or observed event, journaled |
 | `explain.request` | `id, mode: explain\|narrate, about: {surprise?: id, run?, k0?, k1?}, words?` | the person asks why (`explain`), or for the agent's own words over a window (`narrate`); the plugin answers. A backend with NO plugin attached answers its page at once with words ("no Claude Code is attached: /ide in it"), never silence |
@@ -87,8 +88,6 @@ Every message, both directions, both modes:
 | `catalog.changed` | `paths, commit?` | rules changed: reload (the next run loads the catalog afresh) |
 | `world.changed` | `paths, commit?` | the world's host code changed: restart |
 | `explain.answer` | `id, text` | the answer to an `explain.request` |
-| `run.request` | `id, spec: {...}` | headless control: start a run (`run.started` answers with `request: id`). The SPEC IS THE RUNTIME'S OWN, opaque to the plugin (the road runtime reads card, scenario, seed, host, ticks, site; an ALFWorld runner its own keys: `hello.spec_keys`). One run at a time: a request while running is `409 {error: words}` |
-| `run.stop` | `id, run?` | stop a run |
 
 A peer that serves (the runtime under `/connect-runtime`, the plugin under `/ide`) exposes:
 `GET /feed?since=<seq>` (WebSocket: its signals as they come; plain GET: the backlog as JSON lines) and
@@ -128,33 +127,16 @@ the text.
 
 ## 7. The plugin's tools and commands (its side)
 
-- `/connect-runtime <name|url|runner>` -> `runtime_connect`: reads `.metis/runtimes/`, or STARTS the workspace's
-  declared runner (below), connects to its feed, keeps it (a feed thread) until `runtime_disconnect`.
-  `runtime_list`, `runtime_status`, `run_request(spec)`, `run_stop(run?)`.
+- `/connect-runtime <name|url#token>` -> `runtime_connect`: attaches by NAME to the newest live runtime of the name
+  (`.metis/runtimes/<name>.json`), or waits for one; when it ends, re-attaches to the next runtime of the name by
+  itself (`runtime.attached` / `runtime.detached` come into the inbox as the plugin's own local signals); a URL does not
+  follow. Kept until `runtime_disconnect`. `runtime_list`, `runtime_status`.
+- `runner_start(args)`: runs the workspace's headless scenario runner (`runner.yaml`, RUNTIME-INTERFACE §6) with the
+  agent's arguments (a card, a task) as a background process; `runner_status` / `runner_stop`. (Bash does the same.)
 - **The wake-up:** `wait_signals(types?, timeout_s)` blocks until a matching signal arrives (or the timeout) and
   returns them: the headless agent's run -> wait -> work loop (skill `metis-loop`) waits on it, never polls.
 
-**Where a workspace declares its runner:** `runner.yaml` at the workspace's root (committed with the domains; the state
-under `.metis/` is not): `{name, command, args, env?, cwd?, ready_s?}`; `{workspace}`, `{port}` and `{python}` are filled
-in by the plugin; the runner writes its `.metis/runtimes/<name>.json` when it serves. Two examples:
-
-```yaml
-# metis-worlds/road/runner.yaml: the road world runtime (bond004)
-name: road
-command: "{python}"
-args: [runtime/road_runtime.py, --workspace, "{workspace}", --port, "{port}"]
-env: {METIS_HOME: ../../metis-catalog/domains/road}
-```
-
-```yaml
-# metis-worlds/alfworld/runner.yaml: an ALFWorld runner (same contract, its own run spec keys)
-name: alfworld
-command: "{python}"
-args: [runtime/alf_runtime.py, --workspace, "{workspace}", --port, "{port}"]
-```
-- `/ide` -> `ide_open` / `ide_close` / `ide_status`: the endpoint (today's bridge, generalized) + the lockfile.
-- Both feed one inbox: `events()` and `surprise_list()` see what arrived; every surprise tool call that changes a
-  surprise's state signals it on every open connection.
+**Where a workspace declares its runner:** `runner.yaml` at its root: RUNTIME-INTERFACE.md §6 (the road and ALFWorld examples).
 
 ## 8. Errors and versions
 
