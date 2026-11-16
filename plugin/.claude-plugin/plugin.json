@@ -1,0 +1,7 @@
+{
+  "name": "metis",
+  "version": "0.1.0",
+  "description": "Metis in Claude Code: work a Metis workspace's surprises, traces and catalog (rules, compile, lint, the gate, the REPL) through the metis MCP server, with the loop, language and workspace skills and the /metis-* commands.",
+  "author": {"name": "perotheia-packages"},
+  "keywords": ["metis", "rules", "surprises", "catalog", "llp"]
+}

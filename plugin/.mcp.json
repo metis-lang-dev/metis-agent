@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "metis": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/metis-mcp",
+      "args": []
+    }
+  }
+}

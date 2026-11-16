@@ -1,0 +1,8 @@
+stage safety {
+  %% The zone ahead is not mine to take, I cannot see its road, and I am too fast or have no room to go on: I stop before it.
+  yield_hidden [dyn] : $busy * $tick__grant(planner, controls) * $zone_at(nextzone, C) * $closing_in(C) * $zprio(nextzone, P) * $yields_to(P) * $conflict(nextzone) * $road_hidden(nextzone) * $inch_no(nextzone) * now -o ().
+  %% I still cannot see that road, and there is room: I go on at a walk to where I can; never up to the crossing lane.
+  inch_hidden [dyn] : $busy * $tick__grant(planner, controls) * $zprio(nextzone, P) * $yields_to(P) * $conflict(nextzone) * $road_hidden(nextzone) * $inch_room(nextzone) * now -o ().
+  %% I cannot see my own way as far as I would need to stop: I ease off, {R}.
+  brake_unseen [dyn] : $busy * $tick__grant(planner, controls) * $unseen_ahead * $soft(R) * now -o ().
+}

@@ -1,0 +1,6 @@
+$ python -m metis.trace blame traces/k --member cook_a --k 4 --atoms "hand_free,held_soup 0,pot_onion" --program domains/kitchen_pot/cook_a/cook_a.llp
+verdict: this package's
+whose                            atom       want  have  last_k  last_by  last_what
+the member's rule                hand_free  1     0     4       rule     fetch_onion
+nobody's: it holds as it should  held_soup  0     0     4       rule     serve[S=cook_a]
+the member's rule                pot_onion  1     0     4       rule     start[S=cook_a]

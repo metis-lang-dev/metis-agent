@@ -1,0 +1,5 @@
+drop fetch_onion.
+stage act {
+  %% I take an onion for my order, while I wait for nothing.
+  fetch_onion [dyn] : $order * hand_free * $pot_space * $self(S) * $calm(S) -o held_onion.
+}

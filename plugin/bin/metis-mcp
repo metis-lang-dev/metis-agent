@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# metis-mcp — start the Metis MCP server (python -m metis_agent.mcp) for Claude Code.
+#   The python: $METIS_PYTHON, else metis-agent's own venv beside this plugin (py/.venv), else python3; it needs metispy
+#   (metis) importable. The server roots itself in $METIS_WORKSPACE, else the workspace Claude Code's directory stands in;
+#   /metis-workspace <path> switches. METIS_HOME (a family's units), METISC (metisc), METIS_LOOP_DIR (metis-loop: the
+#   judge) are passed through from your environment.
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYDIR="$(cd "$HERE/../../py" && pwd)"
+PY="${METIS_PYTHON:-}"
+[ -z "$PY" ] && [ -x "$PYDIR/.venv/bin/python" ] && PY="$PYDIR/.venv/bin/python"
+[ -z "$PY" ] && PY="$(command -v python3)"
+export PYTHONPATH="$PYDIR${PYTHONPATH:+:$PYTHONPATH}"
+exec "$PY" -m metis_agent.mcp "$@"

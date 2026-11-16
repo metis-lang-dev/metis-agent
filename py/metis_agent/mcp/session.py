@@ -26,6 +26,7 @@ class Session:
         ws = W.find(os.getcwd())
         if ws is not None:
             self.ws, self.how = ws, "cwd"
+            os.environ["METIS_CATALOG"] = str(ws.root)  # as open(): metispy's catalog root for every verb run from here
         return self.ws
 
     def open(self, path, how="workspace_open"):
