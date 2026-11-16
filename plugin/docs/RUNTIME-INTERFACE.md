@@ -1,4 +1,4 @@
-# The Metis runtime interface (spec v1.6: the ui names (/metis-ui, .metis/ui/, ui_client.py); the watch hook's handle Live.current; the user's ruling: scenario running SEPARATE from the runtime, runtimes NAMED with re-attach; signed off by bond004 and bond008 up to v1.4; metis-plugin s-df4ff191)
+# The Metis runtime interface (spec v1.6.1: the watch's measured limits (§4); v1.6: the ui names (/metis-ui, .metis/ui/, ui_client.py); the watch hook's handle Live.current; the user's ruling: scenario running SEPARATE from the runtime, runtimes NAMED with re-attach; signed off by bond004 and bond008 up to v1.4; metis-plugin s-df4ff191)
 
 The RUNTIME side of [SURPRISE-INTERFACE.md](SURPRISE-INTERFACE.md): what serves the feed that `/metis-runtime`
 attaches to, implemented ONCE in metis-agent for every workspace's runtime. A domain brings only a small HOST (§3);
@@ -119,6 +119,13 @@ small scenario runner maps (task, seed) to its Live config and calls `Run.go`.
   is logged, never stops the tick. `Run` sets it itself; an embedding host that has no handle on its Live (a host
   plugin inside the agent) reaches it as `service.Live.current` (the process's newest Live) and sets
   `Live.current.on_finding = feed.finding`. No domain code.
+- **What raises a watch finding (measured, multi-domain proof, 2026-11-16):** only a reading the member's served
+  program gives ZERO probability (`surprise_record` kind `unmodeled`) becomes a member's `surprise` reply and so a
+  `watch` finding; a reading another path explains is a belief change, a low-probability one a `rare` event (logged,
+  not a finding). In the TICK form the check runs at the member's NEXT tick (Watch.begin), over the atoms its own
+  fired events consumed or produced since its checkpoint, as they are PRESENT in the reading: an atom ADDED that the
+  program does not hold is compared, an atom DROPPED from the reading never is. A member that is not ticked again
+  after its command (done, its task over) is never checked on that command's effect.
 - **A run per scenario start:** an embedding service (the page's one long Live) still calls `run_started` /
   `run_ended` per scenario start, each with its unique run name, not one run per service lifetime.
 - **The route of a page's request** (an embedded service): the page talks only to its backend; the backend sends an
