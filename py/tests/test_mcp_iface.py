@@ -198,3 +198,25 @@ def test_a_blocking_wait_does_not_hold_the_other_calls(ses):
         assert all(t < 3 for i, t in order if i != 900) and order[-1][1] >= 4.5, order
     finally:
         c.close()
+
+
+def test_runner_start_gives_the_runner_cuda_and_prepends_its_paths(ses, tmp_path, monkeypatch):
+    """A runner that makes a Live loads llama_cpp: runner_start puts CUDA's libcudart on its LD_LIBRARY_PATH (as the
+    judge's replay); a runner.yaml PATH / PYTHONPATH entry is prepended to the session's, not a replacement."""
+    import sys
+    lib = tmp_path / "cuda"
+    lib.mkdir()
+    (lib / "libcudart.so.12").write_text("")
+    monkeypatch.setenv("CUDA_LIB", str(lib))
+    monkeypatch.setenv("PYTHONPATH", os.environ.get("PYTHONPATH", "") or "/x")
+    out = tmp_path / "env.json"
+    script = tmp_path / "show_env.py"
+    script.write_text("import json, os, sys; json.dump({k: os.environ.get(k) for k in ('LD_LIBRARY_PATH', 'PYTHONPATH')}, open(sys.argv[1], 'w'))")
+    (ses.ws.root / "runner.yaml").write_text("name: envr\ncommand: '{python}'\nargs: [%s, %s]\nenv: {PYTHONPATH: /road/world}\n"
+                                             % (json.dumps(str(script)), json.dumps(str(out))))
+    monkeypatch.setenv("METIS_PYTHON", sys.executable)
+    call(ses, "runner_start")
+    wait_for(lambda: out.is_file() and out.read_text(), timeout=20)
+    env = json.loads(out.read_text())
+    assert env["LD_LIBRARY_PATH"].split(":")[0] == str(lib)
+    assert env["PYTHONPATH"].startswith("/road/world:") and env["PYTHONPATH"] != "/road/world"

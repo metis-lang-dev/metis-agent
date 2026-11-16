@@ -94,7 +94,12 @@ def start_runner(ws, python, args=()):
     fill = {"workspace": str(ws.root), "python": python}
     extra = shlex.split(args) if isinstance(args, str) else [str(a) for a in args or ()]
     argv = [str(spec["command"]).format(**fill)] + [str(a).format(**fill) for a in spec.get("args") or []] + extra
-    env = {**os.environ, **{k: str(v).format(**fill) for k, v in (spec.get("env") or {}).items()}}
+    from .tools.build import _cuda_env          # a runner that makes a Live loads llama_cpp: CUDA's libcudart on the path
+    base = _cuda_env()
+    env = {**base, **{k: str(v).format(**fill) for k, v in (spec.get("env") or {}).items()}}
+    for k in ("PATH", "PYTHONPATH", "LD_LIBRARY_PATH"):        # a runner.yaml entry PREPENDS to these, '{env}' not needed
+        if k in (spec.get("env") or {}) and base.get(k) and not str(spec["env"][k]).endswith(":"):
+            env[k] = env[k] + ":" + base[k]
     cwd = str((ws.root / spec["cwd"]).resolve()) if spec.get("cwd") else str(ws.root)
     d = ws.state / "runtimes"
     d.mkdir(parents=True, exist_ok=True)
