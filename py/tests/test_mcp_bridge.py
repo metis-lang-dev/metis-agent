@@ -59,11 +59,11 @@ def test_surprise_in_and_its_life_out(ws_root):
     try:
         code, r = call(b, "/surprise", {"run": "run1", "window": [10, 30], "words": "it stopped late for the red light",
                                           "member": "signals", "n": 4, "kind": "mark", "scenario": "red_light", "seed": 1})
-        assert code == 200 and r["member"] == "signals" and r["trace"] == "traces/run1-mark-4"
+        assert code == 200 and r["member"] == "signals" and r["trace"] == "traces/run1-mark-4-k10-30"
         ws = W.workspace(str(ws_root))
         rec = ws.surprise(r["id"])
         assert rec["status"] == "open" and rec["window"] == [10, 30] and rec["page"]["n"] == 4 and rec["who"] == "world"
-        assert (ws_root / ".metis" / "traces" / "run1-mark-4").is_dir()
+        assert (ws_root / ".metis" / "traces" / "run1-mark-4-k10-30").is_dir()
         # the same event sent again: the kept window is reused, a new surprise is not refused
         assert call(b, "/surprise", {"run": "run1", "window": [10, 30], "words": "again", "member": "signals", "n": 4})[0] == 200
         # Claude Code takes and rules it (the server's tools, here the SDK), then applies: the feed says so
@@ -220,3 +220,19 @@ def test_the_inferred_member_is_never_the_director(ws_root, monkeypatch):
                         "yield_red", "guard_red", "drive", "accel", "keep_limit")}, raising=False)
     m = B.member_of(W.workspace(str(ws_root)), "run1", 0, 199)
     assert m and "director" not in m
+
+
+def test_a_rerun_mark_with_the_same_number_keeps_its_own_window(ws_root):
+    """Step 6 live: a re-run on the same trace numbered its marks from 1 again; its #1 must keep ITS ticks, not the first #1's copy.
+    A refusal is counted and kept in the status (it reached the bridge, in words)."""
+    b = Bridge(ws_root, family="")
+    b.start(port=0)
+    try:
+        c1, r1 = call(b, "/surprise", {"run": "run1", "window": [10, 30], "words": "first #1", "member": "signals", "n": 1})
+        c2, r2 = call(b, "/surprise", {"run": "run1", "window": [100, 150], "words": "the re-run's #1", "member": "signals", "n": 1})
+        assert c1 == c2 == 200 and r1["trace"] != r2["trace"] and r2["trace"].endswith("-mark-1-k100-150")
+        assert call(b, "/surprise", {"run": "run1", "window": [5, 1], "words": "x", "n": 9})[0] == 400
+        st = b.status()
+        assert st["counts"].get("refused_surprise") == 1 and "k0 <= k1" in st["last_error"]["error"]
+    finally:
+        b.stop()
