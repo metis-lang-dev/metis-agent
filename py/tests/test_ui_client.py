@@ -1,6 +1,6 @@
-"""metis_agent.runtime.ide_client (metis-plugin s-df4ff191, the surprise interface v1.1, RUNTIME-INTERFACE v1.2): a UI backend's client
-of the Metis plugin's /ide endpoint, domain-free.
-Against a stand-in plugin (its /feed WebSocket, /signal, its lockfile in .metis/ide/): discovery, hello, a person's surprise WRITTEN
+"""metis_agent.runtime.ui_client (metis-plugin s-df4ff191, the surprise interface v1.1, RUNTIME-INTERFACE v1.2): a UI backend's client
+of the Metis plugin's /metis-ui endpoint, domain-free.
+Against a stand-in plugin (its /feed WebSocket, /signal, its lockfile in .metis/ui/): discovery, hello, a person's surprise WRITTEN
 into the workspace first and then signalled, the same finding twice one surprise (the finding key), an explain refused in words with
 no plugin attached, the plugin's signals taken for the page, a restarted plugin found again."""
 import asyncio
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from metis_agent.runtime import ide_client as road_ide  # noqa: E402
+from metis_agent.runtime import ui_client as road_ide  # noqa: E402
 
 VTRACE = "/bigdata/work/bond/road/vtrace/red_light"
 
@@ -61,7 +61,7 @@ class Plugin:
             site = web.TCPSite(self.runner, "127.0.0.1", 0)
             await site.start()
             self.port = site._server.sockets[0].getsockname()[1]
-            d = self.root / ".metis" / "ide"
+            d = self.root / ".metis" / "ui"
             d.mkdir(parents=True, exist_ok=True)
             self.lock = d / ("%d.json" % os.getpid())
             self.lock.write_text(json.dumps({"url": "http://127.0.0.1:%d" % self.port, "token": self.token, "pid": os.getpid(),
@@ -99,7 +99,7 @@ def root(tmp_path):
 
 
 def test_no_plugin_a_surprise_is_written_and_an_explain_refused(root):
-    c = road_ide.IdeClient(str(root), name="test-ui", domain="test", member_of=lambda ws, run, k0, k1: "signals").start()
+    c = road_ide.UiClient(str(root), name="test-ui", domain="test", member_of=lambda ws, run, k0, k1: "signals").start()
     r = c.surprise("run1", 10, 30, "late for the red light", "run1:mark:1:10-30", member="signals")
     assert r["signalled"] is False and (root / ".metis" / "surprises" / ("%s.json" % r["id"])).is_file()
     with pytest.raises(ValueError, match="no Claude Code is attached"):
@@ -109,7 +109,7 @@ def test_no_plugin_a_surprise_is_written_and_an_explain_refused(root):
 
 def test_with_a_plugin_hello_surprise_signals_and_dedup(root):
     p = Plugin(root)
-    c = road_ide.IdeClient(str(root), name="test-ui", domain="test", member_of=lambda ws, run, k0, k1: "signals").start()
+    c = road_ide.UiClient(str(root), name="test-ui", domain="test", member_of=lambda ws, run, k0, k1: "signals").start()
     try:
         assert wait(lambda: c.status()["connected"]) and wait(lambda: any(g["type"] == "hello" for g in p.got))
         hello = next(g for g in p.got if g["type"] == "hello")
@@ -128,7 +128,7 @@ def test_with_a_plugin_hello_surprise_signals_and_dedup(root):
         p.queue += [{"type": "surprise.taken", "id": r["id"]}, {"type": "explain.answer", "id": x["id"], "text": "The light was red."},
                     {"type": "catalog.changed", "paths": ["domains/planner/planner.llp"]}]
         got = []
-        assert wait(lambda: (got.extend(c.take()) or len([m for m in got if m.get("type") != "ide.connected"]) >= 3))
+        assert wait(lambda: (got.extend(c.take()) or len([m for m in got if m.get("type") != "ui.connected"]) >= 3))
         types = [m["type"] for m in got]
         assert "surprise.taken" in types and "explain.answer" in types and "catalog.changed" in types
     finally:
@@ -138,7 +138,7 @@ def test_with_a_plugin_hello_surprise_signals_and_dedup(root):
 
 def test_a_restarted_plugin_is_found_again(root):
     p = Plugin(root, token="first")
-    c = road_ide.IdeClient(str(root), name="test-ui").start()
+    c = road_ide.UiClient(str(root), name="test-ui").start()
     try:
         assert wait(lambda: c.status()["connected"])
         url1 = c.status()["url"]
@@ -152,6 +152,6 @@ def test_a_restarted_plugin_is_found_again(root):
 
 
 def test_a_finding_needs_its_key(root):
-    c = road_ide.IdeClient(str(root), name="test-ui")
+    c = road_ide.UiClient(str(root), name="test-ui")
     with pytest.raises(ValueError, match="key"):
         c.surprise("run1", 10, 30, "words", "")

@@ -1,6 +1,6 @@
 """The surprise interface, the plugin's side (plugin/docs/SURPRISE-INTERFACE.md v1.1): one envelope, the signals both
 ways, an INBOX that every connection feeds (wait_signals blocks on it), and the plugin's one RUNTIME connection
-(/connect-runtime: its feed read by a thread, control and feedback posted to it). The /ide endpoint is the bridge
+(/metis-runtime: its feed read by a thread, control and feedback posted to it). The /metis-ui endpoint is the bridge
 (bridge.py), which posts what its paired UI backend sends into the same inbox and serves the plugin's signals.
 
 Payload vs signals: the workspace holds the payload (written through metispy's SDK by its producer); a signal carries
@@ -115,7 +115,7 @@ OUT_OF_ROW = {"take": "surprise.taken", "retake": "surprise.taken", "try": "surp
 
 
 class Outbox:
-    """The plugin's signals, in order (served on the /ide feed by seq; posted to the runtime as they are made)."""
+    """The plugin's signals, in order (served on the /metis-ui feed by seq; posted to the runtime as they are made)."""
 
     def __init__(self, emitter):
         self.emitter, self.rows, self.cond = emitter, [], threading.Condition()
@@ -163,7 +163,7 @@ def signal_of_row(r):
 
 class Hub:
     """The session's interface state: the inbox (both connections feed it), the outbox, at most ONE runtime connection
-    and the /ide endpoint's pairing (the bridge), and the pump that turns the session's journal rows into signals."""
+    and the /metis-ui endpoint's pairing (the bridge), and the pump that turns the session's journal rows into signals."""
 
     def __init__(self, ses):
         self.ses = ses
@@ -171,7 +171,7 @@ class Hub:
         self.inbox, self.out = Inbox(), Outbox(self.emitter)
         self.runtime = None                 # RuntimeConn
         self.runners = {}                   # name -> the scenario runner process this session started (runner.yaml)
-        self.paired = None                  # {name, since}: the UI backend paired under /ide
+        self.paired = None                  # {name, since}: the UI backend paired under /metis-ui
         self.pump_at, self.pump_root = None, None
         self.cat = None
         self.lock = threading.Lock()
@@ -222,7 +222,7 @@ class Hub:
             self.pump_thread.start()
 
     def active(self):
-        return self.runtime is not None or self.paired is not None or getattr(self, "ide_on", False)
+        return self.runtime is not None or self.paired is not None or getattr(self, "ui_on", False)
 
     def _pump(self):
         while self.active():
@@ -330,10 +330,10 @@ class Hub:
             out[n] = p.returncode
         return out
 
-    # the /ide pairing (the bridge asks)
+    # the /metis-ui pairing (the bridge asks)
     def pair(self, name):
         if self.paired and self.paired["name"] != name:
-            raise PermissionError("the ide endpoint is paired with %s since %s; it disconnects first"
+            raise PermissionError("the ui endpoint is paired with %s since %s; it disconnects first"
                                   % (self.paired["name"], self.paired["since"]))
         if not self.paired:
             self.paired = {"name": name, "since": now()}

@@ -1,9 +1,12 @@
 """The MCP server over stdio: JSON-RPC 2.0, one message a line (the MCP stdio transport). initialize, ping,
 tools/list, tools/call; notifications/tools/list_changed after a workspace switch. Logging goes to stderr only
-(stdout is the protocol)."""
+(stdout is the protocol). Each tools/call runs on its own thread, so a blocking wait (wait_signals) never holds the
+others up; the tools that read or write the session's workspace run one at a time (one lock), the waits and the
+read-only interface views without it."""
 import argparse
 import json
 import sys
+import threading
 import traceback
 
 from . import registry
@@ -13,9 +16,15 @@ PROTOCOL = "2025-06-18"
 SERVER = {"name": "metis", "version": "0.1.0"}
 
 
+OUT_LOCK = threading.Lock()           # one message a line, never two interleaved
+TOOL_LOCK = threading.Lock()          # the session's tools, one at a time
+FREE = {"wait_signals", "signals", "runtime_status", "ui_status", "runner_status"}   # no lock: a wait, or a read of the hub
+
+
 def _send(msg):
-    sys.stdout.write(json.dumps(msg, ensure_ascii=False, default=str) + "\n")
-    sys.stdout.flush()
+    with OUT_LOCK:
+        sys.stdout.write(json.dumps(msg, ensure_ascii=False, default=str) + "\n")
+        sys.stdout.flush()
 
 
 def log(*a):
@@ -27,7 +36,11 @@ def _call(name, args):
     if t is None:
         return {"content": [{"type": "text", "text": "no tool %r" % name}], "isError": True}
     try:
-        out = t["fn"](SESSION, **(args or {}))
+        if name in FREE:
+            out = t["fn"](SESSION, **(args or {}))
+        else:
+            with TOOL_LOCK:
+                out = t["fn"](SESSION, **(args or {}))
         return {"content": [{"type": "text", "text": registry.render(out) if out is not None else "(done)"}], "isError": False}
     except (registry.ToolError, ValueError, KeyError, FileNotFoundError) as e:
         return {"content": [{"type": "text", "text": "%s: %s" % (name, e)}], "isError": True}
@@ -57,6 +70,18 @@ def handle(msg):
     raise LookupError(method)
 
 
+def _answer(msg):
+    try:
+        res = handle(msg)
+        if msg.get("id") is not None:
+            _send({"jsonrpc": "2.0", "id": msg["id"], "result": res})
+    except LookupError as e:
+        _send({"jsonrpc": "2.0", "id": msg.get("id"), "error": {"code": -32601, "message": "no method %s" % e}})
+    except Exception as e:  # noqa: BLE001
+        log(traceback.format_exc())
+        _send({"jsonrpc": "2.0", "id": msg.get("id"), "error": {"code": -32603, "message": str(e)}})
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="python -m metis_agent.mcp", description=__doc__)
     ap.add_argument("--root", help="the workspace (else $METIS_WORKSPACE, else the cwd's)")
@@ -78,15 +103,10 @@ def main(argv=None):
             except json.JSONDecodeError:
                 _send({"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "parse error"}})
                 continue
-            try:
-                res = handle(msg)
-                if msg.get("id") is not None:
-                    _send({"jsonrpc": "2.0", "id": msg["id"], "result": res})
-            except LookupError as e:
-                _send({"jsonrpc": "2.0", "id": msg.get("id"), "error": {"code": -32601, "message": "no method %s" % e}})
-            except Exception as e:  # noqa: BLE001
-                log(traceback.format_exc())
-                _send({"jsonrpc": "2.0", "id": msg.get("id"), "error": {"code": -32603, "message": str(e)}})
+            if msg.get("method") == "tools/call":
+                threading.Thread(target=_answer, args=(msg,), daemon=True, name="metis-call").start()
+            else:
+                _answer(msg)
     finally:
         SESSION.release()
         SESSION.hub.runner_stop()            # no orphan scenario runner after the session

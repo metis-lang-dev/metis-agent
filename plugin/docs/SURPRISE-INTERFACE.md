@@ -1,4 +1,4 @@
-# The Metis surprise interface (spec v1.3: scenario running separate, named runtimes with re-attach; the runtime multiplexes; signed off by bond004 and bond008 with amendments, reviewed by pascal, the user's rules folded in; metis-plugin s-df4ff191)
+# The Metis surprise interface (spec v1.4: /metis-ui and /metis-runtime (were /ide and /connect-runtime, which collided with Claude Code's own /ide); scenario running separate, named runtimes with re-attach; the runtime multiplexes; signed off by bond004 and bond008 with amendments, reviewed by pascal, the user's rules folded in; metis-plugin s-df4ff191)
 
 ## 0. The layering (the user, 2026-11-16): payload in the workspace, signals on top
 
@@ -18,8 +18,8 @@ wheelchair world speak it unchanged.
 
 | mode | command | who serves | who connects |
 |---|---|---|---|
-| headless | `/connect-runtime <runtime name \| url#token>` | the RUNTIME (feed + findings + feedback; a run IS a runtime, started by the domain's scenario runner) | the PLUGIN (by name: the newest live runtime of the name, re-attached to the next one by itself) |
-| interactive | `/ide` | the PLUGIN (its endpoint, published by a lockfile) | a UI BACKEND (e.g. the road UI's service); the page talks only to its own backend |
+| headless | `/metis-runtime <runtime name \| url#token>` | the RUNTIME (feed + findings + feedback; a run IS a runtime, started by the domain's scenario runner) | the PLUGIN (by name: the newest live runtime of the name, re-attached to the next one by itself) |
+| interactive | `/metis-ui` | the PLUGIN (its endpoint, published by a lockfile) | a UI BACKEND (e.g. the road UI's service); the page talks only to its own backend |
 
 Both may be on at once on one workspace (one agent on a headless runner and on a UI). ONE message format for both.
 
@@ -30,21 +30,21 @@ clients, so the page sees what the agent does on the runtime's surprises. The ru
 and stopping runs is the domain's SCENARIO RUNNER's (the UI backend interactively; a headless CLI the agent starts,
 RUNTIME-INTERFACE §1, §6).
 
-**What stays single (the user):** a plugin session holds at most ONE runtime connection and at most ONE `/ide`
-connection; a UI backend pairs with ONE plugin under `/ide`. A second attempt is REFUSED with words naming the current
+**What stays single (the user):** a plugin session holds at most ONE runtime connection and at most ONE `/metis-ui`
+connection; a UI backend pairs with ONE plugin under `/metis-ui`. A second attempt is REFUSED with words naming the current
 holder (`409 {error: "this plugin is attached to runtime road since 15:02 (plugin:3711364); runtime_disconnect first"}`;
-`409 {error: "the ide endpoint is paired with ui:road-backend since 15:04; it disconnects first"}`); never a silent
+`409 {error: "the ui endpoint is paired with ui:road-backend since 15:04; it disconnects first"}`); never a silent
 replace. No arbitration logic beyond that: keeping it so is the user's side.
 
-**Fan-out to a page is the backend's:** a UI backend relays the signals it receives (from the plugin under `/ide`, or
+**Fan-out to a page is the backend's:** a UI backend relays the signals it receives (from the plugin under `/metis-ui`, or
 from the runtime it is a client of) to its own page(s) over its own socket; the page never sees a token or a peer's URL.
 
 ## 2. Discovery
 
 - A RUNTIME writes `<workspace>/.metis/runtimes/<name>.json` while it serves: `{name, url, token, pid, domain,
-  workspace, protocol: 1, started}`; removed at its exit (a dead pid's file is stale). `/connect-runtime <name>`
+  workspace, protocol: 1, started}`; removed at its exit (a dead pid's file is stale). `/metis-runtime <name>`
   reads it; a URL needs the token given with it.
-- The PLUGIN under `/ide` writes `<workspace>/.metis/ide/<pid>.json`: `{url, token, pid, workspace, protocol: 1,
+- The PLUGIN under `/metis-ui` writes `<workspace>/.metis/ui/<pid>.json`: `{url, token, pid, workspace, protocol: 1,
   started}` (removed at exit), like Claude Code's own ide lockfiles. A UI backend serving that workspace finds it
   there (the newest live one).
 - Re-discovery: a peer that loses its connection re-reads the discovery file (a restarted plugin has a new pid, port
@@ -76,7 +76,7 @@ Every message, both directions, both modes:
 | `run.started` / `run.ended` | `run, trace: "traces/<run>", spec, summary?, reason?: done\|stopped\|error, error?, surprises?` | a run's edges (spec: what the scenario runner ran, for reading only); the trace and its `config.yaml` are on disk when `run.ended` is sent |
 | `surprise.new` | `id, ref: ".metis/surprises/<id>.json", key, kind?, member?` | a surprise WRITTEN by the sender (SDK `drop_surprise`, its window kept); `key` the finding's identity (§5) |
 | `event.new` | `ref?, run, k0, k1, words?` | a marked or observed event, journaled |
-| `explain.request` | `id, mode: explain\|narrate, about: {surprise?: id, run?, k0?, k1?}, words?` | the person asks why (`explain`), or for the agent's own words over a window (`narrate`); the plugin answers. A backend with NO plugin attached answers its page at once with words ("no Claude Code is attached: /ide in it"), never silence |
+| `explain.request` | `id, mode: explain\|narrate, about: {surprise?: id, run?, k0?, k1?}, words?` | the person asks why (`explain`), or for the agent's own words over a window (`narrate`); the plugin answers. A backend with NO plugin attached answers its page at once with words ("no Claude Code is attached: /metis-ui in it"), never silence |
 | `payload` | `kind: surprise\|trace_window, body` | ONLY from a peer without workspace access: the receiver writes it, then signals `surprise.new` itself |
 
 ### plugin -> runtime / UI backend
@@ -89,7 +89,7 @@ Every message, both directions, both modes:
 | `world.changed` | `paths, commit?` | the world's host code changed: restart |
 | `explain.answer` | `id, text` | the answer to an `explain.request` |
 
-A peer that serves (the runtime under `/connect-runtime`, the plugin under `/ide`) exposes:
+A peer that serves (the runtime under `/metis-runtime`, the plugin under `/metis-ui`) exposes:
 `GET /feed?since=<seq>` (WebSocket: its signals as they come; plain GET: the backlog as JSON lines) and
 `POST /signal` (one envelope in; `200 {ok: true}` or `4xx {error: words}` — a refusal always carries words).
 
@@ -127,7 +127,7 @@ the text.
 
 ## 7. The plugin's tools and commands (its side)
 
-- `/connect-runtime <name|url#token>` -> `runtime_connect`: attaches by NAME to the newest live runtime of the name
+- `/metis-runtime <name|url#token>` -> `runtime_connect`: attaches by NAME to the newest live runtime of the name
   (`.metis/runtimes/<name>.json`), or waits for one; when it ends, re-attaches to the next runtime of the name by
   itself (`runtime.attached` / `runtime.detached` come into the inbox as the plugin's own local signals); a URL does not
   follow. Kept until `runtime_disconnect`. `runtime_list`, `runtime_status`.

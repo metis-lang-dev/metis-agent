@@ -1,18 +1,18 @@
-"""metis_agent.runtime.ide_client — a UI BACKEND's client of the Metis plugin's /ide endpoint (metis-plugin s-df4ff191;
+"""metis_agent.runtime.ui_client — a UI BACKEND's client of the Metis plugin's /metis-ui endpoint (metis-plugin s-df4ff191;
 plugin/docs/SURPRISE-INTERFACE.md v1.1, RUNTIME-INTERFACE.md v1.2 §1-§2). Domain-free: any UI backend (the road page's service is the
 first) uses it; the backend keeps only its page glue and its own transport to its pages.
 
-    ide = IdeClient(workspace, name="road-ui", domain="road").start()    one per backend process (a UI backend pairs with ONE plugin)
-    ide.status()                 {connected, url, since}
-    ide.surprise(run, k0, k1, words, key, member?, kind?, extra?)   a person's finding WRITTEN into the workspace (Workspace.drop_window:
+    ui = UiClient(workspace, name="road-ui", domain="road").start()    one per backend process (a UI backend pairs with ONE plugin)
+    ui.status()                 {connected, url, since}
+    ui.surprise(run, k0, k1, words, key, member?, kind?, extra?)   a person's finding WRITTEN into the workspace (Workspace.drop_window:
                                  the window kept under its key, one finding one surprise), then surprise.new when a plugin is attached
                                  -> {id, ref, key, member, trace, signalled}
-    ide.explain(about, words, mode)   explain.request (mode explain | narrate) -> {id}; ValueError in words with no plugin attached
-    ide.signal(body)             any other signal to the plugin
-    ide.take()                   the plugin's signals since the last take, for the backend's fan-out to its pages:
-                                 surprise.taken/ruled/applied, explain.answer, catalog.changed, world.changed, ide.connected/disconnected
+    ui.explain(about, words, mode)   explain.request (mode explain | narrate) -> {id}; ValueError in words with no plugin attached
+    ui.signal(body)             any other signal to the plugin
+    ui.take()                   the plugin's signals since the last take, for the backend's fan-out to its pages:
+                                 surprise.taken/ruled/applied, explain.answer, catalog.changed, world.changed, ui.connected/disconnected
 
-Discovery (§2): the newest live <workspace>/.metis/ide/<pid>.json of THIS workspace, looked for again whenever the connection is lost
+Discovery (§2): the newest live <workspace>/.metis/ui/<pid>.json of THIS workspace, looked for again whenever the connection is lost
 (a restarted plugin has a new pid, port and token). Transport: loopback HTTP + WebSocket, Bearer token. Payload first, then the signal
 (§0): the backend writes the record through the SDK itself; the plugin only hears of it."""
 import asyncio
@@ -38,8 +38,8 @@ def _alive(pid):
 
 
 def discover(root):
-    """The newest live plugin lockfile for ROOT (.metis/ide/<pid>.json), or None."""
-    d = Path(root) / ".metis" / "ide"
+    """The newest live plugin lockfile for ROOT (.metis/ui/<pid>.json), or None."""
+    d = Path(root) / ".metis" / "ui"
     best = None
     for f in d.glob("*.json") if d.is_dir() else []:
         try:
@@ -62,7 +62,7 @@ def safe(s):
     return re.sub(r"[^A-Za-z0-9._-]+", "-", str(s)).strip("-")
 
 
-class IdeClient:
+class UiClient:
     def __init__(self, root, name="ui", domain=None, member_of=None):
         """root: the workspace; name: the backend's (hello's ui:<name>); member_of(ws, run, k0, k1): a fallback for an SDK without
         Workspace.member_of (the SDK's is used when present)."""
@@ -77,7 +77,7 @@ class IdeClient:
         if self.thread:
             return self
         self.run_ = True
-        self.thread = threading.Thread(target=self._main, daemon=True, name="metis-ide-client")
+        self.thread = threading.Thread(target=self._main, daemon=True, name="metis-ui-client")
         self.thread.start()
         return self
 
@@ -114,7 +114,7 @@ class IdeClient:
                     ws_url = self.url.replace("http", "ws", 1) + "/feed?since=%d&token=%s" % (self.since, self.token)
                     async with s.ws_connect(ws_url, headers={"Authorization": "Bearer " + self.token}, heartbeat=20) as ws:
                         self.conn = ws
-                        self._put({"type": "ide.connected", "url": self.url})
+                        self._put({"type": "ui.connected", "url": self.url})
                         await self._post_async(s, {"type": "hello", "name": "ui:" + self.name, "domain": self.domain,
                                                    "workspace": self.root, "protocol": PROTOCOL, "capabilities": ["explain"]})
                         async for m in ws:
@@ -128,7 +128,7 @@ class IdeClient:
             except Exception:                              # noqa: BLE001 — the plugin gone or not answering: look again
                 pass
             if self.conn is not None:
-                self._put({"type": "ide.disconnected"})
+                self._put({"type": "ui.disconnected"})
             self.conn = None
             await asyncio.sleep(RETRY_S)
 
@@ -169,7 +169,7 @@ class IdeClient:
     def signal(self, body, timeout=10):
         """One signal to the plugin, from any thread: -> its answer; ValueError (in words) when refused or not attached."""
         if self.conn is None or self.loop is None:
-            raise ValueError("no Claude Code is attached to this workspace: run /ide in a Claude Code session started in %s" % self.root)
+            raise ValueError("no Claude Code is attached to this workspace: run /metis-ui in a Claude Code session started in %s" % self.root)
 
         async def one():
             import aiohttp
@@ -226,7 +226,7 @@ class IdeClient:
             self.signal({"type": "surprise.new", "id": sid, "ref": ref, "key": key, "kind": kind, "member": member})
             signalled = True
         except ValueError:
-            pass                                           # written: an /ide opened later sees it in the workspace
+            pass                                           # written: an /metis-ui opened later sees it in the workspace
         return {"id": sid, "ref": ref, "key": key, "member": member, "trace": trace, "signalled": signalled}
 
     def explain(self, about, words="", mode="explain"):

@@ -1,4 +1,4 @@
-"""RuntimeClient: a client of one runtime's feed (RUNTIME-INTERFACE.md §5), for the plugin's /connect-runtime and for any
+"""RuntimeClient: a client of one runtime's feed (RUNTIME-INTERFACE.md §5), for the plugin's /metis-runtime and for any
 UI backend that subscribes to a runtime. Domain-free.
 
     c = RuntimeClient(workspace, "plugin:123", on_signal=fn)     fn(sig) for every signal of the feed, in order

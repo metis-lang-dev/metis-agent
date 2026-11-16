@@ -1,5 +1,5 @@
-"""The /ide endpoint (plugin/docs/SURPRISE-INTERFACE.md v1.3 §1-§4): the plugin's side a UI BACKEND pairs with, on
-loopback with a token, published by a lockfile (.metis/ide/<pid>.json). With the session's hub: GET /feed (the plugin's
+"""The /metis-ui endpoint (plugin/docs/SURPRISE-INTERFACE.md v1.3 §1-§4): the plugin's side a UI BACKEND pairs with, on
+loopback with a token, published by a lockfile (.metis/ui/<pid>.json). With the session's hub: GET /feed (the plugin's
 signals: taken / ruled / applied / answers / catalog.changed, as a WebSocket or JSON lines) and POST /signal (the
 backend's hello, surprise.new, explain.request, payload); ONE backend paired at a time, a second refused naming the
 holder. Without a hub (the legacy page of step 4): POST /surprise /explain /event and GET /feed /feed/ws as before,
@@ -76,7 +76,7 @@ class Bridge:
         self.root = root if callable(root) else (lambda r=str(root): r)
         self.family = family if family is not None else os.environ.get("METIS_HOME")
         self.cors = cors
-        self.hub = hub                       # the surprise interface (iface.Hub): /feed + /signal + the lockfile = /ide
+        self.hub = hub                       # the surprise interface (iface.Hub): /feed + /signal + the lockfile = /metis-ui
         self.lockfile = None
         self.feeds = Counter()               # open spec feeds, per paired name
         self.thread = self.loop = self.runner = None
@@ -117,9 +117,9 @@ class Bridge:
             raise RuntimeError("the bridge did not start on %s:%s: %s" % (host, port, err[0]))
         self.since = time.time()
         if self.hub is not None:
-            self.hub.ide_on = True
+            self.hub.ui_on = True
             self.hub.ensure_pump()
-            d = Path(self.root()) / ".metis" / "ide"
+            d = Path(self.root()) / ".metis" / "ui"
             d.mkdir(parents=True, exist_ok=True)
             self.lockfile = d / ("%d.json" % os.getpid())
             self.lockfile.write_text(json.dumps({"url": "http://127.0.0.1:%d" % self.port, "token": self.token, "pid": os.getpid(),
@@ -142,7 +142,7 @@ class Bridge:
                 self.lockfile.unlink(missing_ok=True)
                 self.lockfile = None
             if self.hub is not None:
-                self.hub.ide_on = False
+                self.hub.ui_on = False
                 self.hub.unpair()
         return self.status()
 
@@ -282,7 +282,7 @@ class Bridge:
             else:
                 try:
                     resp = await handler(req)
-                except ValueError as e:                     # a refusal in words: counted, and the last one kept for ide_status
+                except ValueError as e:                     # a refusal in words: counted, and the last one kept for ui_status
                     self.counts["refused_" + req.path.strip("/")] += 1
                     self.last_error = {"path": req.path, "error": str(e), "at": time.strftime("%H:%M:%S")}
                     resp = web.json_response({"ok": False, "error": str(e)}, status=400)
@@ -390,13 +390,13 @@ class Bridge:
                 return web.json_response({"ok": True, "v": 1, "type": "hello", "name": self.hub.emitter.name,
                                           "workspace": str(Path(self.root()).resolve()), "protocol": 1, "paired": p})
             if self.hub.paired and frm and frm != self.hub.paired["name"]:
-                return web.json_response({"ok": False, "error": "the ide endpoint is paired with %s since %s; it disconnects first"
+                return web.json_response({"ok": False, "error": "the ui endpoint is paired with %s since %s; it disconnects first"
                                           % (self.hub.paired["name"], self.hub.paired["since"])}, status=409)
             if b.get("type") == "bye":
                 self.hub.unpair(frm)
                 return web.json_response({"ok": True})
             self.counts["signal"] += 1
-            via = "ide:%s@%s" % (frm or "?", (self.hub.paired or {}).get("since"))     # a re-paired backend counts from 1
+            via = "ui:%s@%s" % (frm or "?", (self.hub.paired or {}).get("since"))     # a re-paired backend counts from 1
             return web.json_response(await lp.run_in_executor(None, self.hub.signal_in, b, via))
 
         if self.hub is not None:

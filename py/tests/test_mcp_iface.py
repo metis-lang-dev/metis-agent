@@ -1,5 +1,5 @@
-"""The plugin's side of the surprise interface (SURPRISE-INTERFACE v1.3 §1, §7; RUNTIME-INTERFACE v1.5 §5): /ide (the
-endpoint + its lockfile, ONE UI backend paired: a second is refused naming the holder), /connect-runtime by NAME (one
+"""The plugin's side of the surprise interface (SURPRISE-INTERFACE v1.3 §1, §7; RUNTIME-INTERFACE v1.5 §5): /metis-ui (the
+endpoint + its lockfile, ONE UI backend paired: a second is refused naming the holder), /metis-runtime by NAME (one
 per session: a second refused naming the holder; it follows the name), wait_signals waking on a signal, the plugin's
 own signals (taken, an answer) out from its journal, and both modes at once: one surprise, one inbox row."""
 import json
@@ -58,9 +58,9 @@ def env(type, frm, seq, **f):
     return {"v": 1, "seq": seq, "ts": "now", "type": type, "from": frm, **f}
 
 
-def test_ide_pairs_one_backend_and_signals_both_ways(ses):
-    st = call(ses, "ide_open")
-    lock = ses.ws.root / ".metis" / "ide" / ("%d.json" % os.getpid())
+def test_ui_pairs_one_backend_and_signals_both_ways(ses):
+    st = call(ses, "ui_open")
+    lock = ses.ws.root / ".metis" / "ui" / ("%d.json" % os.getpid())
     rec = json.loads(lock.read_text())
     assert st["on"] and "token" not in st and rec["url"] == st["url"] and rec["workspace"] == str(ses.ws.root.resolve())
     url, tok = rec["url"], rec["token"]
@@ -95,7 +95,7 @@ def test_ide_pairs_one_backend_and_signals_both_ways(ses):
     assert ans[0]["id"] == "q1" and "light" in ans[0]["text"]
     assert call(ses, "explain_list")["requests"] == []
 
-    call(ses, "ide_close")
+    call(ses, "ui_close")
     assert not lock.exists()
 
 
@@ -130,8 +130,8 @@ def test_both_modes_at_once_one_surprise_one_row(ses):
     feed.start(port=0)
     try:
         call(ses, "runtime_connect", target="road-ui")
-        st = call(ses, "ide_open")
-        rec = json.loads((ses.ws.root / ".metis" / "ide" / ("%d.json" % os.getpid())).read_text())
+        st = call(ses, "ui_open")
+        rec = json.loads((ses.ws.root / ".metis" / "ui" / ("%d.json" % os.getpid())).read_text())
         feed.run_started("run1", "traces/run1", {})
         key = "run1:mark:1:30-55"
         sid = feed.finding({"kind": "mark", "k": 55, "k0": 30, "k1": 55, "words": "odd", "key": key}, now=True)
@@ -177,3 +177,24 @@ for n in range(int(sys.argv[2])):
     assert len(att) == 2
     wait_for(lambda: not call(ses, "runner_status")["stub"]["running"], timeout=15)
     assert call(ses, "runner_status")["stub"]["code"] == 0
+
+
+def test_a_blocking_wait_does_not_hold_the_other_calls(ses):
+    """The server runs each tools/call on its own thread: a status asked during a 5 s wait_signals answers at once."""
+    from tests.mcp_client import Client
+    c = Client(root=ses.ws.root)
+    try:
+        c.send({"jsonrpc": "2.0", "id": 900, "method": "tools/call",
+                "params": {"name": "wait_signals", "arguments": {"timeout_s": 5}}})
+        t0 = time.time()
+        c.send({"jsonrpc": "2.0", "id": 901, "method": "tools/call", "params": {"name": "ui_status", "arguments": {}}})
+        c.send({"jsonrpc": "2.0", "id": 902, "method": "tools/call", "params": {"name": "workspace_status", "arguments": {}}})
+        order = []
+        while len(order) < 3:
+            m = json.loads(c.p.stdout.readline())
+            if m.get("id") in (900, 901, 902):
+                order.append((m["id"], round(time.time() - t0, 1)))
+        assert [i for i, _ in order] == [901, 902, 900] or [i for i, _ in order] == [902, 901, 900], order
+        assert all(t < 3 for i, t in order if i != 900) and order[-1][1] >= 4.5, order
+    finally:
+        c.close()

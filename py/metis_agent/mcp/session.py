@@ -17,7 +17,7 @@ class Session:
         self.domain = None               # the open domain agent (tools/domain.py)
         self.on_switch = []              # callbacks after a switch (the server's list_changed)
         from .iface import Hub
-        self.hub = Hub(self)             # the surprise interface: inbox, outbox, the runtime connection, the /ide pairing
+        self.hub = Hub(self)             # the surprise interface: inbox, outbox, the runtime connection, the /metis-ui pairing
 
     def start(self, root=None):
         if root:
@@ -64,7 +64,7 @@ class Session:
             except Exception:  # noqa: BLE001
                 pass
         self.taken.clear()
-        try:                                     # the interface: the runtime connection and the /ide endpoint are the workspace's
+        try:                                     # the interface: the runtime connection and the /metis-ui endpoint are the workspace's
             self.hub.disconnect()
             from .tools.bridge import _B
             if "b" in _B:

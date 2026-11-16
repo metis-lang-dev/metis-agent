@@ -51,12 +51,12 @@ Keep the person's view current: a one-line `journal` note at each step (an attac
 
 ## Where surprises come from: the two modes (plugin/docs/SURPRISE-INTERFACE.md)
 
-- **Headless** (`/connect-runtime <name>`): the workspace's scenario runner (`runner_start` with its arguments, e.g. a
+- **Headless** (`/metis-runtime <name>`): the workspace's scenario runner (`runner_start` with its arguments, e.g. a
   card) serves each run as the runtime `<name>`; `runtime_connect <name>` follows it run after run. The loop is
   run -> WAIT -> work: `wait_signals` with types `surprise.new`, `run.ended`, `explain.request` (timeout up to 600 s;
   pass `since` = the last `next` so nothing between waits is missed), then work each new surprise with the cycle
   above, then wait again. Never poll in a loop of your own; `wait_signals` blocks until a signal is there.
-- **Interactive** (`/ide`): `ide_open`; a person's UI backend pairs and sends the person's marks as surprises and
+- **Interactive** (`/metis-ui`): `ui_open`; a person's UI backend pairs and sends the person's marks as surprises and
   their explain / narrate requests. Wait the same way; answer a request with `explain_answer` (explain: which rules
   decided on which facts; narrate: your own words over the window).
 - Both may be on at once; a surprise has one id, the inbox holds it once. Your takes, rulings, applies and answers

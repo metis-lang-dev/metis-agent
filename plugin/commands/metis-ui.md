@@ -5,10 +5,10 @@ argument-hint: "[close|status]"
 
 The interactive mode of the surprise interface (plugin/docs/SURPRISE-INTERFACE.md §1). With `$ARGUMENTS`:
 
-- empty: call `ide_open`. Say the URL and the lockfile (`.metis/ide/<pid>.json`) it published: a UI backend serving
+- empty: call `ui_open`. Say the URL and the lockfile (`.metis/ui/<pid>.json`) it published: a UI backend serving
   this workspace finds it there and pairs (one at a time). Do NOT print the token.
-- `status`: `ide_status` (on/off, the paired backend).
-- `close`: `ide_close`.
+- `status`: `ui_status` (on/off, the paired backend).
+- `close`: `ui_close`.
 
 Then wait for its signals with `wait_signals` (types `surprise.new`, `explain.request`). Work each surprise with the
 metis-loop skill (`/metis-surprise <id>`); answer each explain / narrate request with `explain_answer` (plain words:

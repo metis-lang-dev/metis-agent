@@ -1,5 +1,5 @@
-"""The surprise interface, the plugin's tools (plugin/docs/SURPRISE-INTERFACE.md): /ide (the endpoint a UI backend pairs
-with, its lockfile), /connect-runtime (the plugin's ONE runtime connection), the inbox both feed (signals, wait_signals),
+"""The surprise interface, the plugin's tools (plugin/docs/SURPRISE-INTERFACE.md): /metis-ui (the endpoint a UI backend pairs
+with, its lockfile), /metis-runtime (the plugin's ONE runtime connection), the inbox both feed (signals, wait_signals),
 and a UI's explain requests (explain_list, explain_answer). Domain-free: no tool names a domain, a member or a page."""
 from ..bridge import Bridge
 from ..registry import ToolError, arr, i, s, tool
@@ -19,17 +19,17 @@ def _st(st):
     return st
 
 
-@tool("ide_status", "The /ide endpoint: on or off, its URL, its lockfile, the UI backend paired with it (one at a time).")
-def ide_status(ses):
+@tool("ui_status", "The /metis-ui endpoint: on or off, its URL, its lockfile, the UI backend paired with it (one at a time).")
+def ui_status(ses):
     return _st(_ide(ses).status())
 
 
-@tool("ide_open", "/ide: open this session's endpoint on loopback with a fresh token and publish it for discovery "
-      "(.metis/ide/<pid>.json in the workspace: url, token, pid, workspace). A UI backend serving this workspace finds it "
+@tool("ui_open", "/metis-ui: open this session's endpoint on loopback with a fresh token and publish it for discovery "
+      "(.metis/ui/<pid>.json in the workspace: url, token, pid, workspace). A UI backend serving this workspace finds it "
       "there, pairs (one at a time) and sends its surprises and explain requests; it hears taken / ruled / applied / "
-      "answers / catalog changes back. On until ide_close or the end of this session.",
+      "answers / catalog changes back. On until ui_close or the end of this session.",
       {"port": i("the loopback port (default 0: any free one)"), "token": s("a token to use instead of a fresh one")})
-def ide_open(ses, port=0, token=None):
+def ui_open(ses, port=0, token=None):
     ses.need()
     try:
         return _st(_ide(ses).start(port=int(port), token=token))
@@ -37,8 +37,8 @@ def ide_open(ses, port=0, token=None):
         raise ToolError(str(e))
 
 
-@tool("ide_close", "Close the /ide endpoint (its lockfile removed, its token void, the pairing ended).")
-def ide_close(ses):
+@tool("ui_close", "Close the /metis-ui endpoint (its lockfile removed, its token void, the pairing ended).")
+def ui_close(ses):
     return _st(_ide(ses).stop())
 
 
@@ -92,7 +92,7 @@ def runtime_list(ses):
             "runner": (ws.root / "runner.yaml").is_file()}
 
 
-@tool("runtime_connect", "/connect-runtime: attach this session to ONE runtime of this workspace BY NAME (the newest live "
+@tool("runtime_connect", "/metis-runtime: attach this session to ONE runtime of this workspace BY NAME (the newest live "
       "runtime of that name; with none live yet it waits for one; when it ends it re-attaches to the next runtime of the "
       "name by itself, e.g. the next card of a scenario runner), or by '<url>#<token>' (not followed). With no target: "
       "the runner this session started, else the one live runtime. Its feed (surprise.new, run.started / run.ended, "
@@ -134,8 +134,8 @@ def runtime_disconnect(ses):
 
 
 @tool("runtime_status", "The attached runtime: its name, URL, what was read of its feed (since), its last error; and the "
-      "/ide pairing; and how many signals came in.")
+      "/metis-ui pairing; and how many signals came in.")
 def runtime_status(ses):
     h = ses.hub
-    return {"runtime": h.runtime.status() if h.runtime else None, "ide_paired": h.paired,
+    return {"runtime": h.runtime.status() if h.runtime else None, "ui_paired": h.paired,
             "signals": len(h.inbox.rows), "sent": len(h.out.rows)}

@@ -1,6 +1,6 @@
-# The Metis runtime interface (spec v1.5.1: the watch hook's handle Live.current; the user's ruling: scenario running SEPARATE from the runtime, runtimes NAMED with re-attach; signed off by bond004 and bond008 up to v1.4; metis-plugin s-df4ff191)
+# The Metis runtime interface (spec v1.6: the ui names (/metis-ui, .metis/ui/, ui_client.py); the watch hook's handle Live.current; the user's ruling: scenario running SEPARATE from the runtime, runtimes NAMED with re-attach; signed off by bond004 and bond008 up to v1.4; metis-plugin s-df4ff191)
 
-The RUNTIME side of [SURPRISE-INTERFACE.md](SURPRISE-INTERFACE.md): what serves the feed that `/connect-runtime`
+The RUNTIME side of [SURPRISE-INTERFACE.md](SURPRISE-INTERFACE.md): what serves the feed that `/metis-runtime`
 attaches to, implemented ONCE in metis-agent for every workspace's runtime. A domain brings only a small HOST (§3);
 no domain has server or client code of its own (the user's ruling, 2026-11-16).
 
@@ -21,7 +21,7 @@ What is new: one package `metis_agent/runtime/` (§2) and one host face (§3).
 
 ```
              plugin (Claude Code)          UI backend (e.g. the road page's service)
-                  │  /connect-runtime <name>     │  client (and, under /ide, the plugin's ide client)
+                  │  /metis-runtime <name>     │  client (and, under /metis-ui, the plugin's ui client)
                   ▼                              ▼
    ┌────────── RuntimeFeed (metis_agent/runtime/feed.py) ──────────┐
    │ named discovery file · token · client registry · fan-out      │
@@ -41,11 +41,11 @@ What is new: one package `metis_agent/runtime/` (§2) and one host face (§3).
   ID [--name road]`). The agent starts the headless runner itself (Bash, or `runner_start`: the workspace's
   `runner.yaml` command with its args, §6).
 - **Runtimes are NAMED.** A runner serves its runs under one name (road: `road`), one runtime per run (or one per
-  session: the runner's choice); the plugin's `/connect-runtime road` attaches to the newest live runtime of that
+  session: the runner's choice); the plugin's `/metis-runtime road` attaches to the newest live runtime of that
   name and RE-ATTACHES by itself when it ends and a new one of the name appears (§5): the agent's feed continues from
   run to run with no command.
-- **A service that is both a runtime and a UI backend** (the road page's) embeds the feed (`/connect-runtime` works
-  on it with no page open) AND, when a page is open and `/ide` is on, is an ide client (`ide_client.py`). A finding
+- **A service that is both a runtime and a UI backend** (the road page's) embeds the feed (`/metis-runtime` works
+  on it with no page open) AND, when a page is open and `/metis-ui` is on, is a ui client (`ui_client.py`). A finding
   reaching the plugin by both paths carries one key: one record (SDK §5).
 
 ## 2. The package `metis_agent/runtime/` (domain-free)
@@ -53,10 +53,10 @@ What is new: one package `metis_agent/runtime/` (§2) and one host face (§3).
 | module | what | owner |
 |---|---|---|
 | `feed.py` | `RuntimeFeed(workspace, name, host)`: the HTTP/WS server (`GET /feed`, `POST /signal`, `GET /status`), loopback + token, the named discovery file, the client registry and fan-out, write-then-signal of findings, `status` | bond |
-| `client.py` | `RuntimeClient`: attach by NAME (the newest live one; re-attach to the next of that name) or URL+token, resume by seq, send; used by the plugin (`/connect-runtime`) and any UI backend that subscribes to a runtime | bond |
+| `client.py` | `RuntimeClient`: attach by NAME (the newest live one; re-attach to the next of that name) or URL+token, resume by seq, send; used by the plugin (`/metis-runtime`) and any UI backend that subscribes to a runtime | bond |
 | `run.py` | `Run(workspace, host, feed).go(config, ticks, stem, env=None) -> {run, reason, summary}`: the in-process run loop: env applied, `host.prepare`, a fresh Live with the Tracer into `traces/<stem>-<UTC stamp>`, `host.start`, per tick `host.findings(live, k)` at the trace's k and `host.done`, `segment_closed` when the Tracer opens a segment, the kernel watch hook, the tracer closed, `host.summary` / `end_findings`, `feed.run_ended`. It calls only the producer API; any scenario runner (road's headless, ALFWorld's, the road UI backend) may use it | bond004 |
 | `host.py` | `RuntimeHost`: the base class of §3 (every method a no-op default) | bond004 |
-| `ide_client.py` | the UI backend's client of the plugin's `/ide` endpoint (discovery by lockfile, hello, write-then-signal via `drop_window`, explain, take) | bond008 |
+| `ui_client.py` | the UI backend's client of the plugin's `/metis-ui` endpoint (discovery by lockfile, hello, write-then-signal via `drop_window`, explain, take) | bond008 |
 
 The scenario runners live with their domains: road `metis-worlds road/runner/` (`python -m road.runner`, its
 `RoadRuntime` host: bond004), the road UI backend (bond008), ALFWorld's small runner (task, seed).
@@ -122,9 +122,9 @@ small scenario runner maps (task, seed) to its Live config and calls `Run.go`.
 - **A run per scenario start:** an embedding service (the page's one long Live) still calls `run_started` /
   `run_ended` per scenario start, each with its unique run name, not one run per service lifetime.
 - **The route of a page's request** (an embedded service): the page talks only to its backend; the backend sends an
-  explain / narrate request through its ide client when one is connected, else through `feed.request` to its runtime
-  clients (a plugin attached by `/connect-runtime`), else answers the page in words (`delivered: 0`).
-- **One key, two paths:** under `/ide` and `/connect-runtime` at once, an embedded service signals the same record's
+  explain / narrate request through its ui client when one is connected, else through `feed.request` to its runtime
+  clients (a plugin attached by `/metis-runtime`), else answers the page in words (`delivered: 0`).
+- **One key, two paths:** under `/metis-ui` and `/metis-runtime` at once, an embedded service signals the same record's
   `surprise.new` on both; the plugin de-dups by id. The key is the producer's: `<run>:mark:<n>:<k0>-<k1>` for a page
   mark, `<run>:<kind>[:<slug>]:<k>` for a host finding.
 - **Run names, every runner alike:** `<stem>-<UTC stamp>` (the embedded road service aligns to it).
@@ -144,7 +144,7 @@ small scenario runner maps (task, seed) to its Live config and calls `Run.go`.
 - `POST /signal`: one envelope in. `hello` registers the client (`from` is its name); `bye` or the last socket closing
   unregisters it.
 - **Multiplexing (the user's later amendment, which wins):** several clients at once, plugins and UIs alike; no
-  holder rule on a runtime (that 409 stays only for a UI backend pairing with a plugin under `/ide`, and for a plugin
+  holder rule on a runtime (that 409 stays only for a UI backend pairing with a plugin under `/metis-ui`, and for a plugin
   session's own one-runtime limit). The runtime's own signals go to all; a client's
   `surprise.taken/ruled/applied`, `catalog.changed`, `world.changed`, `explain.answer` are fanned out to the OTHER
   clients (and kept in the backlog with their `from`).
@@ -158,7 +158,7 @@ small scenario runner maps (task, seed) to its Live config and calls `Run.go`.
 
 `runner.yaml` at the workspace's root: `{name, command, args, env?, cwd?}`; `{workspace}` and `{python}` filled in, and
 the agent's own arguments (a card, a task) appended. The runner serves its runs as the runtime NAME; the plugin
-attaches with `/connect-runtime <name>` (before or after: it waits for the name).
+attaches with `/metis-runtime <name>` (before or after: it waits for the name).
 
 ```yaml
 # metis-worlds/road/runner.yaml (bond004)

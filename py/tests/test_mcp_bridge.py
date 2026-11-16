@@ -168,10 +168,10 @@ def test_feed_ws_pushes_frames(ws_root):
 ROAD = os.environ.get("METIS_TEST_ROAD") or str(__import__("pathlib").Path(__file__).resolve().parents[3] / "metis-worlds" / "road")
 
 
-def test_through_the_server_ide_open_explain_answer_close(tmp_path):
-    """The /ide tools in the MCP server on a copy of the road workspace: ide_open publishes the lockfile (no token in
+def test_through_the_server_ui_open_explain_answer_close(tmp_path):
+    """The /metis-ui tools in the MCP server on a copy of the road workspace: ui_open publishes the lockfile (no token in
     the answer), a UI backend pairs and signals a surprise and a question (SURPRISE-INTERFACE §4), explain_list lists
-    the question, explain_answer answers, the spec feed carries the answer, ide_close removes the lockfile."""
+    the question, explain_answer answers, the spec feed carries the answer, ui_close removes the lockfile."""
     from pathlib import Path
 
     from metis_agent.runtime.client import get, post
@@ -187,8 +187,8 @@ def test_through_the_server_ide_open_explain_answer_close(tmp_path):
             err, text = r
             assert not err, text
             return json.loads(text)
-        assert j(c.call("ide_status"))["on"] is False                     # dormant by default
-        st = j(c.call("ide_open"))
+        assert j(c.call("ui_status"))["on"] is False                     # dormant by default
+        st = j(c.call("ui_open"))
         assert st["on"] and "token" not in st and st["lockfile"]
         lk = json.loads(Path(st["lockfile"]).read_text())
         url, tok = lk["url"], lk["token"]
@@ -207,8 +207,8 @@ def test_through_the_server_ide_open_explain_answer_close(tmp_path):
                 break
             time.sleep(0.2)
         else:
-            raise AssertionError("no explain.answer on the ide feed")
-        assert j(c.call("ide_close"))["on"] is False and not Path(st["lockfile"]).exists()
+            raise AssertionError("no explain.answer on the ui feed")
+        assert j(c.call("ui_close"))["on"] is False and not Path(st["lockfile"]).exists()
     finally:
         c.close()
 
