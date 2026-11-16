@@ -1,4 +1,4 @@
-# The Metis runtime interface (spec v1 draft for sign-off: bond, bond004, bond008; metis-plugin s-df4ff191)
+# The Metis runtime interface (spec v1.1: bond004's amendments in; bond008's sign-off pending; metis-plugin s-df4ff191)
 
 The RUNTIME side of [SURPRISE-INTERFACE.md](SURPRISE-INTERFACE.md): what serves the feed that `/connect-runtime`
 attaches to, implemented ONCE in metis-agent for every workspace's runtime. A domain brings only a small HOST (§3);
@@ -69,7 +69,8 @@ class RuntimeHost:
     window = (40, 10)                   # ticks before / after a finding's k: its kept window [k-pre, k+post], clamped to the run
 
     def run_config(self, spec, workspace) -> dict:
-        """The run's Live config for SPEC: {config: {...the Live config...}, ticks: N, stem: "name-seed"}.
+        """The run's Live config for SPEC: {config: {...the Live config...}, ticks: N, stem: "name-seed", env?: {...}}.
+        ENV is applied in the child BEFORE the Live is made (road: METIS_ROAD_RUN, COMMONROAD_CACHE).
         A spec it cannot run: raise ValueError(words) (the runtime answers the request 400 with them)."""
 
     def start(self, live, cfg) -> None:   # after the Live is made (road: watch.blind on its members, the world shared)
@@ -96,6 +97,10 @@ A finding is `{kind, k, words, slug?, member?, k0?, k1?, ...}` (domain keys kept
 | `narration(n)` | the Live's `emit("narration", n)` (deterministic narration: the runtime's own) | `narration` (optional, for UIs) |
 | `run_ended(run, reason, summary?, error?)` | the tracer is CLOSED | first every queued finding WRITTEN, then `surprise.new` each, then `run.ended` |
 
+- **The trace** is the runtime's: it sets `config["trace"]["dir"] = <workspace>/.metis/traces/<run>` and keeps every
+  other key the host put in `config["trace"]` (road: `every: 200, ring: 0, commands: <its world commands>`).
+- **k is the trace's tick** (the Live's): `findings(live, k)` gets that k, and a finding's `k`, `k0`, `k1` are in it; a
+  host whose world counts its own ticks maps them (road: 1:1, checked in its host's test).
 - **Run names** are unique: `<stem>-<UTC stamp>` (`stem` from the host; never a reused trace dir: a restart's run
   rewriting old segments is the bug bond008 found).
 - **Findings are written only after the trace closes** (`keep_window` cannot copy a window the writer still holds):
@@ -115,7 +120,9 @@ A finding is `{kind, k, words, slug?, member?, k0?, k1?, ...}` (domain keys kept
   The backlog holds every signal but `status` (sockets only).
 - `POST /signal`: one envelope in. `hello` registers the client (`from` is its name); `bye` or the last socket closing
   unregisters it.
-- **Multiplexing (the user):** several clients at once. The runtime's own signals go to all; a client's
+- **Multiplexing (the user's later amendment, which wins):** several clients at once, plugins and UIs alike; no
+  holder rule on a runtime (that 409 stays only for a UI backend pairing with a plugin under `/ide`, and for a plugin
+  session's own one-runtime limit). The runtime's own signals go to all; a client's
   `surprise.taken/ruled/applied`, `catalog.changed`, `world.changed`, `explain.answer` are fanned out to the OTHER
   clients (and kept in the backlog with their `from`).
 - **Control:** `run.request {id, spec}` -> `200 {ok, run}` and `run.started {request: id}`; while a run is on:
