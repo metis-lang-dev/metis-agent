@@ -52,3 +52,15 @@ class Kitchen(RuntimeHost):
 class Broken(Kitchen):
     def start(self, live, cfg):
         raise RuntimeError("the world would not start")
+
+
+class Planted(Kitchen):
+    """The conformance adapter's host: findings planted from outside, handed out at the next tick."""
+
+    def __init__(self):
+        super().__init__()
+        self.queue = []
+
+    def findings(self, live, k):
+        out, self.queue = self.queue, []
+        return out

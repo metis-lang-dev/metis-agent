@@ -42,64 +42,101 @@ def config_yaml(cfg, d):
 
 
 class Run:
+    """One run, as a whole (go) or stepwise (begin / step / finish: a driver that interleaves its own work, the
+    conformance check's adapter)."""
+
     def __init__(self, workspace, host, feed):
         self.ws, self.host, self.feed = Path(workspace).resolve(), host, feed
         self._stop = threading.Event()
         self.live = None
+        self.on = False
 
     def stop(self):
         self._stop.set()
 
     def go(self, config, ticks, stem, spec=None, env=None):
+        """The run whole: begin, step until done / TICKS / stop, finish. -> {run, trace, reason, summary, error}"""
+        if not self.begin(config, stem, spec, env):
+            return self.finish()
+        reason = "done"
+        for _ in range(int(ticks)):
+            if self._stop.is_set():
+                reason = "stopped"
+                break
+            if not self.step():
+                if self.out["reason"] == "error":
+                    reason = "error"
+                break
+        return self.finish(reason)
+
+    def begin(self, config, stem, spec=None, env=None):
+        """The Live made, the host started, run_started. -> True, or False with out.reason 'error' (finish says it)."""
         cfg = json.loads(json.dumps(config, default=str))          # the run's own copy
         run = run_name(stem)
-        tdir = self.ws / ".metis" / "traces" / run
+        self.tdir = self.ws / ".metis" / "traces" / run
         trace = "traces/" + run
-        cfg["trace"] = dict(cfg.get("trace") or {}, dir=str(tdir))
-        tmp = Path(tempfile.mkdtemp(prefix="metis-run-"))
+        cfg["trace"] = dict(cfg.get("trace") or {}, dir=str(self.tdir))
+        self.tmp = Path(tempfile.mkdtemp(prefix="metis-run-"))
         if isinstance(cfg.get("v3"), dict):
-            cfg["v3"]["journal"] = str(tmp / "journal.jsonl")
-        saved = {k: os.environ.get(k) for k in (env or {})}
+            cfg["v3"]["journal"] = str(self.tmp / "journal.jsonl")
+        self.saved = {k: os.environ.get(k) for k in (env or {})}
         os.environ.update({k: str(v) for k, v in (env or {}).items()})
-        out = {"run": run, "trace": trace, "reason": "done", "summary": None, "error": None}
-        started, live, ends = False, None, []
+        self.out = {"run": run, "trace": trace, "reason": "done", "summary": None, "error": None}
+        self.started, self.watch, self.live = False, [], None
         try:
-            self.host.prepare(cfg, run, str(tdir))
-            config_yaml(cfg, tdir)
+            self.host.prepare(cfg, run, str(self.tdir))
+            config_yaml(cfg, self.tdir)
             from metis_agent import service as S
-            live = self.live = S.Live(cfg, self.host.model())
-            if getattr(live, "tracer", None) is None:
+            self.live = S.Live(cfg, self.host.model())
+            if getattr(self.live, "tracer", None) is None:
                 raise RuntimeError("the Live wrote no trace (its config's trace was ignored)")
-            watch = []
-            live.on_finding = watch.append                     # the kernel watch's surprises (service.Live's sink)
-            self.host.start(live, cfg)
+            self.live.on_finding = self.watch.append               # the kernel watch's surprises (service.Live's sink)
+            self.host.start(self.live, cfg)
             self.feed.run_started(run, trace, spec or {})
-            started = True
-            n_seg = len(live.tracer.seg.k0s)
-            for _ in range(int(ticks)):
-                if self._stop.is_set():
-                    out["reason"] = "stopped"
-                    break
-                live.tick()
-                k = live.tracer.k - 1
-                if len(live.tracer.seg.k0s) > n_seg:            # the Tracer opened a segment: the one before is closed
-                    if n_seg:
-                        self.feed.segment_closed(live.tracer.seg.k0s[-1] - 1)
-                    n_seg = len(live.tracer.seg.k0s)
-                for f in list(self.host.findings(live, k) or []) + watch:
-                    self.feed.finding(dict(f, k=int(f.get("k", k))))
-                watch.clear()
-                self.feed.tick(k)
-                if self.host.done(live, k):
-                    break
-            live.tracer.close()
-            out["summary"] = self.host.summary(live) or {}
-            last = max(0, live.tracer.k - 1)
-            ends = [dict(f, k=int(f.get("k", last))) for f in self.host.end_findings(live, out["summary"]) or []]
+            self.started = self.on = True
+            self.n_seg = len(self.live.tracer.seg.k0s)
+            return True
         except Exception as e:
-            import traceback
-            sys.stderr.write(traceback.format_exc())
-            out.update(reason="error", error="%s: %s" % (type(e).__name__, e))
+            self._failed(e)
+            return False
+
+    def step(self):
+        """One tick. -> False when the run ended by itself (host.done) or failed."""
+        live = self.live
+        try:
+            live.tick()
+            k = live.tracer.k - 1
+            if len(live.tracer.seg.k0s) > self.n_seg:              # the Tracer opened a segment: the one before is closed
+                if self.n_seg:
+                    self.feed.segment_closed(live.tracer.seg.k0s[-1] - 1)
+                self.n_seg = len(live.tracer.seg.k0s)
+            for f in list(self.host.findings(live, k) or []) + self.watch:
+                self.feed.finding(dict(f, k=int(f.get("k", k))))
+            self.watch.clear()
+            self.feed.tick(k)
+            return not self.host.done(live, k)
+        except Exception as e:
+            self._failed(e)
+            return False
+
+    def _failed(self, e):
+        import traceback
+        sys.stderr.write(traceback.format_exc())
+        self.out.update(reason="error", error="%s: %s" % (type(e).__name__, e))
+
+    def finish(self, reason=None):
+        """The tracer closed, the host's summary and end findings, the host closed, run_ended. -> out"""
+        out, live, ends = self.out, self.live, []
+        if reason and out["reason"] != "error":
+            out["reason"] = reason
+        try:
+            if live is not None and out["reason"] != "error":
+                live.tracer.close()
+                out["summary"] = self.host.summary(live) or {}
+                last = max(0, live.tracer.k - 1)
+                ends = [dict(f, k=int(f.get("k", last))) for f in self.host.end_findings(live, out["summary"]) or []]
+        except Exception as e:
+            self._failed(e)
         finally:
             if live is not None:
                 try:
@@ -110,12 +147,13 @@ class Run:
                     self.host.close(live)
                 except Exception as e:
                     sys.stderr.write("runtime: the host's close failed: %s\n" % e)
-            for k, v in saved.items():
+            for k, v in self.saved.items():
                 if v is None:
                     os.environ.pop(k, None)
                 else:
                     os.environ[k] = v
-            shutil.rmtree(tmp, ignore_errors=True)
-        if started or out["reason"] == "error":
-            self.feed.run_ended(run, out["reason"], summary=out["summary"], error=out["error"], end_findings=ends)
+            shutil.rmtree(self.tmp, ignore_errors=True)
+        if self.started or out["reason"] == "error":
+            self.feed.run_ended(out["run"], out["reason"], summary=out["summary"], error=out["error"], end_findings=ends)
+        self.on = False
         return out
