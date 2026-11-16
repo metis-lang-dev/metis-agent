@@ -85,48 +85,20 @@ def git_head(path):
 
 
 def member_of(ws, run, k0, k1):
-    """The member a window is about: the most worded firings in [k0, k1] (a rule with a %% line; the protocol's own
-    rules have none), never the director (its grants and bookkeeping are not what a tester marks), else the most firings of
-    any member but the director."""
-    from metis import trace as T
-    segs = T.read(ws.path("trace", run=run))
-    fired = Counter()
-    for s in segs:
-        for t in s.ticks:
-            if not (k0 <= t.get("k", -1) <= k1):
-                continue
-            for m, v in (t.get("members") or {}).items():
-                for q in v.get("seq") or []:
-                    for name in q.get("fired") or []:
-                        fired[(m, name.split("[")[0])] += 1
-    docs = {}
-    for m in {m for m, _ in fired}:
-        try:
-            from metis import catalog
-            from metis.domain.package import rule_docs
-            docs[m] = rule_docs(catalog.get(m, ws.root).program)
-        except Exception:                                   # a member the catalog cannot give: no words known for it
-            docs[m] = {}
-    worded = Counter()
-    for (m, r), c in fired.items():
-        if r in docs.get(m, {}) and "director" not in m:          # the director's grants have words too, but a tester's event is a member's
-            worded[m] += c
-    if worded:
-        return worded.most_common(1)[0][0]
-    rest = Counter()
-    for (m, _), c in fired.items():
-        if "director" not in m:
-            rest[m] += c
-    return rest.most_common(1)[0][0] if rest else None
+    """The member a window is about: metispy's Workspace.member_of (the surprise interface §6, never the director)."""
+    return ws.member_of(run, k0, k1)
 
 
 class Bridge:
-    def __init__(self, root, family=None, cors="*"):
+    def __init__(self, root, family=None, cors="*", hub=None):
         """root: a callable -> the workspace root (the server's, switchable), or a path; family: the dir the members'
         units are included from (default $METIS_HOME), watched with the workspace's domains."""
         self.root = root if callable(root) else (lambda r=str(root): r)
         self.family = family if family is not None else os.environ.get("METIS_HOME")
         self.cors = cors
+        self.hub = hub                       # the surprise interface (iface.Hub): /feed + /signal + the lockfile = /ide
+        self.lockfile = None
+        self.feeds = Counter()               # open spec feeds, per paired name
         self.thread = self.loop = self.runner = None
         self.port = self.token = None
         self.since = None
@@ -164,6 +136,15 @@ class Bridge:
             self.thread = None
             raise RuntimeError("the bridge did not start on %s:%s: %s" % (host, port, err[0]))
         self.since = time.time()
+        if self.hub is not None:
+            self.hub.ide_on = True
+            self.hub.ensure_pump()
+            d = Path(self.root()) / ".metis" / "ide"
+            d.mkdir(parents=True, exist_ok=True)
+            self.lockfile = d / ("%d.json" % os.getpid())
+            self.lockfile.write_text(json.dumps({"url": "http://127.0.0.1:%d" % self.port, "token": self.token, "pid": os.getpid(),
+                                                 "workspace": str(Path(self.root()).resolve()), "protocol": 1,
+                                                 "started": time.strftime("%Y-%m-%dT%H:%M:%S")}) + "\n")
         return self.status()
 
     def stop(self):
@@ -177,11 +158,19 @@ class Bridge:
             self.thread.join(10)
             self.thread = self.loop = self.runner = None
             self.port = self.token = None
+            if self.lockfile is not None:
+                self.lockfile.unlink(missing_ok=True)
+                self.lockfile = None
+            if self.hub is not None:
+                self.hub.ide_on = False
+                self.hub.unpair()
         return self.status()
 
     def status(self):
         on = bool(self.thread)
         return {"on": on, "root": str(self.root()), "port": self.port if on else None,
+                "lockfile": str(self.lockfile) if self.lockfile else None,
+                "paired": (self.hub.paired if self.hub is not None else None),
                 "url": ("http://127.0.0.1:%d" % self.port) if on else None, "token": self.token if on else None,
                 "since": self.since if on else None, "counts": dict(self.counts), "last_error": getattr(self, "last_error", None)}
 
@@ -199,21 +188,15 @@ class Bridge:
         if not ws.path("trace", run=run).is_dir():
             raise ValueError("no trace %s in the workspace %s" % (run, ws.root))
         n = b.get("n")
-        # the kept window is named by its event AND its ticks: a re-run on the same trace numbers its marks from 1 again, and an
-        # earlier "-mark-1" is another window (step 6: the re-run's #1 must not take the first run's ticks); the same window again
-        # (the same event sent twice) is the same copy
-        name = ("mark-%s-k%d-%d" % (n, win[0], win[1])) if n not in (None, "") else "w%d-%d" % tuple(win)
-        kept = ws.path("trace", run="%s-%s" % (run, name))
-        trace = "traces/" + kept.name if kept.is_dir() else ws.keep_window(run, win[0], win[1], name, who=WHO)
-        member = str(b.get("member") or "") or member_of(ws, trace[len("traces/"):], *win)
-        if not member:
-            raise ValueError("no member fired in %s %d..%d: name the member" % (run, *win))
-        rec = {"member": member, "trace": trace, "window": list(win), "k": win[1], "words": words, "reading": words,
-               "page": {k: b[k] for k in ("n", "kind", "scenario", "seed", "t0", "t1") if b.get(k) not in (None, "")},
-               "source": "road-ui"}
-        if (ws.state / trace / "config.yaml").is_file():
-            rec["config"] = str((ws.state / trace / "config.yaml").relative_to(ws.root))
-        sid = ws.drop_surprise(rec, who=WHO)
+        key = str(b.get("key") or "%s:mark:%s:%d-%d" % (run, n if n not in (None, "") else "-", win[0], win[1]))
+        page = {k: b[k] for k in ("n", "kind", "scenario", "seed", "t0", "t1") if b.get(k) not in (None, "")}
+        try:
+            sid = ws.drop_window(run, win[0], win[1], words, key, member=str(b.get("member") or "") or None, kind="mark",
+                                 source=str(b.get("source") or "ui"), who=WHO, page=page)
+        except ValueError as e:
+            raise ValueError(str(e))
+        rec = ws.surprise(sid)
+        trace, member = rec.get("trace"), rec.get("member")
         self.counts["surprise"] += 1
         return {"id": sid, "trace": trace, "member": member}
 
@@ -222,7 +205,7 @@ class Bridge:
         win = b.get("window")
         ref = "x%s-%s" % (time.strftime("%Y%m%dT%H%M%S"), secrets.token_hex(2))
         row = ws.journal(WHO, "explain", ref=ref, run=str(b.get("run") or ""), window=win, member=b.get("member"),
-                         words=" ".join(str(b.get("words") or "").split()), n=b.get("n"), source="road-ui")
+                         words=" ".join(str(b.get("words") or "").split()), n=b.get("n"), source=str(b.get("source") or "ui"))
         self.counts["explain"] += 1
         return {"ref": ref, "ts": row["ts"]}
 
@@ -231,7 +214,7 @@ class Bridge:
         keep = {k: b[k] for k in ("n", "edge", "k0", "k1", "run", "words", "kind", "t0", "t1") if b.get(k) not in (None, "")}
         if "n" not in keep or "edge" not in keep:
             raise ValueError("an event has its number n and its edge")
-        ws.journal(WHO, "event", source="road-ui", **keep)
+        ws.journal(WHO, "event", source=str(b.get("source") or "ui"), **keep)
         self.counts["event"] += 1
         return {"ok": True}
 
@@ -379,7 +362,69 @@ class Bridge:
         app.router.add_post("/surprise", poster(self.surprise))
         app.router.add_post("/explain", poster(self.explain))
         app.router.add_post("/event", poster(self.event))
-        app.router.add_get("/feed", feed)
+        async def sig_feed(req):
+            """The spec's feed (§4): the plugin's signals after ?since=; a WebSocket when asked for one, else JSON lines."""
+            since = int(req.query.get("since", 0) or 0)
+            if req.headers.get("Upgrade", "").lower() != "websocket":
+                rows = self.hub.out.after(since)
+                return web.Response(text="".join(json.dumps(r) + "\n" for r in rows), content_type="application/x-ndjson")
+            ws = web.WebSocketResponse(heartbeat=20)
+            await ws.prepare(req)
+            who = None
+            try:
+                while not ws.closed:
+                    if who is None and self.hub.paired:
+                        who = self.hub.paired["name"]
+                        self.feeds[who] += 1
+                    for r in await lp.run_in_executor(None, self.hub.out.after, since, POLL_S):
+                        await ws.send_str(json.dumps(r))
+                        since = max(since, r["seq"])
+                    try:
+                        m = await ws.receive(timeout=0.05)
+                        if m.type in (WSMsgType.CLOSE, WSMsgType.CLOSED, WSMsgType.ERROR):
+                            break
+                    except asyncio.TimeoutError:
+                        pass
+            finally:
+                await ws.close()
+                if who is not None:
+                    self.feeds[who] -= 1
+                    if self.feeds[who] <= 0:                 # the paired backend's last feed closed: the pairing ends
+                        self.hub.unpair(who)
+            return ws
+
+        async def signal(req):
+            try:
+                b = await req.json()
+            except ValueError:
+                raise ValueError("a JSON body: one signal envelope")
+            if not isinstance(b, dict):
+                raise ValueError("a JSON object: one signal envelope")
+            frm = str(b.get("from") or "")
+            if b.get("type") == "hello":
+                try:
+                    p = self.hub.pair(frm or str(b.get("name") or "ui:?"))
+                except PermissionError as e:
+                    self.counts["refused_pair"] += 1
+                    return web.json_response({"ok": False, "error": str(e)}, status=409)
+                return web.json_response({"ok": True, "v": 1, "type": "hello", "name": self.hub.emitter.name,
+                                          "workspace": str(Path(self.root()).resolve()), "protocol": 1, "paired": p})
+            if self.hub.paired and frm and frm != self.hub.paired["name"]:
+                return web.json_response({"ok": False, "error": "the ide endpoint is paired with %s since %s; it disconnects first"
+                                          % (self.hub.paired["name"], self.hub.paired["since"])}, status=409)
+            if b.get("type") == "bye":
+                self.hub.unpair(frm)
+                return web.json_response({"ok": True})
+            self.counts["signal"] += 1
+            via = "ide:%s@%s" % (frm or "?", (self.hub.paired or {}).get("since"))     # a re-paired backend counts from 1
+            return web.json_response(await lp.run_in_executor(None, self.hub.signal_in, b, via))
+
+        if self.hub is not None:
+            app.router.add_get("/feed", sig_feed)
+            app.router.add_post("/signal", signal)
+            app.router.add_route("OPTIONS", "/signal", preflight)
+        else:
+            app.router.add_get("/feed", feed)
         app.router.add_get("/feed/ws", feed_ws)
         app.router.add_get("/status", status)
         for p in ("/surprise", "/explain", "/event"):

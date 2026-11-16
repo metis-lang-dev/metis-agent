@@ -16,6 +16,8 @@ class Session:
         self.repl = None                 # the open REPL (tools/repl.py)
         self.domain = None               # the open domain agent (tools/domain.py)
         self.on_switch = []              # callbacks after a switch (the server's list_changed)
+        from .iface import Hub
+        self.hub = Hub(self)             # the surprise interface: inbox, outbox, the runtime connection, the /ide pairing
 
     def start(self, root=None):
         if root:
@@ -62,6 +64,13 @@ class Session:
             except Exception:  # noqa: BLE001
                 pass
         self.taken.clear()
+        try:                                     # the interface: the runtime connection and the /ide endpoint are the workspace's
+            self.hub.disconnect()
+            from .tools.bridge import _B
+            if "b" in _B:
+                _B["b"].stop()
+        except Exception:  # noqa: BLE001
+            pass
         for attr in ("repl", "domain"):
             child = getattr(self, attr, None)
             if child is not None:

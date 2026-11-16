@@ -89,4 +89,5 @@ def main(argv=None):
                 _send({"jsonrpc": "2.0", "id": msg.get("id"), "error": {"code": -32603, "message": str(e)}})
     finally:
         SESSION.release()
+        SESSION.hub.runner_stop()            # no orphan scenario runner after the session
     return 0
