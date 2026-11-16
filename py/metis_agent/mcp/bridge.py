@@ -183,7 +183,7 @@ class Bridge:
         on = bool(self.thread)
         return {"on": on, "root": str(self.root()), "port": self.port if on else None,
                 "url": ("http://127.0.0.1:%d" % self.port) if on else None, "token": self.token if on else None,
-                "since": self.since if on else None, "counts": dict(self.counts)}
+                "since": self.since if on else None, "counts": dict(self.counts), "last_error": getattr(self, "last_error", None)}
 
     # ── IN ──
     def surprise(self, b):
@@ -199,7 +199,10 @@ class Bridge:
         if not ws.path("trace", run=run).is_dir():
             raise ValueError("no trace %s in the workspace %s" % (run, ws.root))
         n = b.get("n")
-        name = ("mark-%s" % n) if n not in (None, "") else "w%d-%d" % tuple(win)
+        # the kept window is named by its event AND its ticks: a re-run on the same trace numbers its marks from 1 again, and an
+        # earlier "-mark-1" is another window (step 6: the re-run's #1 must not take the first run's ticks); the same window again
+        # (the same event sent twice) is the same copy
+        name = ("mark-%s-k%d-%d" % (n, win[0], win[1])) if n not in (None, "") else "w%d-%d" % tuple(win)
         kept = ws.path("trace", run="%s-%s" % (run, name))
         trace = "traces/" + kept.name if kept.is_dir() else ws.keep_window(run, win[0], win[1], name, who=WHO)
         member = str(b.get("member") or "") or member_of(ws, trace[len("traces/"):], *win)
@@ -316,7 +319,9 @@ class Bridge:
             else:
                 try:
                     resp = await handler(req)
-                except ValueError as e:
+                except ValueError as e:                     # a refusal in words: counted, and the last one kept for bridge_status
+                    self.counts["refused_" + req.path.strip("/")] += 1
+                    self.last_error = {"path": req.path, "error": str(e), "at": time.strftime("%H:%M:%S")}
                     resp = web.json_response({"ok": False, "error": str(e)}, status=400)
             if self.cors:
                 resp.headers["Access-Control-Allow-Origin"] = self.cors
