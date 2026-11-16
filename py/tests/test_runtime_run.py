@@ -111,3 +111,15 @@ def test_two_starts_in_one_second_get_two_names(tmp_path):
         assert r.out["run"] != taken and r.out["run"].startswith(stem + "-")       # never the existing trace dir
     finally:
         r.finish("done")
+
+
+def test_a_kernel_watch_surprise_is_a_finding_live(tmp_path):
+    """The watch hook end to end in a live run: a member that ticks again after its command reads what its program
+    cannot make -> Watch's surprise (unmodeled) -> the member's surprise reply -> Live.on_finding -> the run's finding."""
+    from metis_agent.runtime.run import Run
+    feed, host = StubFeed(), RH.PlantedReading()
+    out = Run(tmp_path / "ws", host, feed).go(RH.kitchen_config(1), 60, "kitchen-watch")
+    assert out["reason"] == "done" and host.planted is not None
+    watch = [c[1] for c in feed.calls if c[0] == "finding" and c[1]["kind"] == "watch"]
+    assert watch and watch[0]["member"] == "cook_a" and watch[0]["k"] >= host.planted, feed.calls
+    assert watch[0]["record"] is not None and watch[0]["words"]

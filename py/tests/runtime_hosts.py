@@ -64,3 +64,25 @@ class Planted(Kitchen):
     def findings(self, live, k):
         out, self.queue = self.queue, []
         return out
+
+
+class PlantedReading(Kitchen):
+    """A live kernel-watch surprise: once MEMBER's reading has SEEN, the face the watch reads (the outer host's
+    observe) also says GONE, an atom the member's own event consumed: a reading its program cannot make."""
+
+    def __init__(self, member="cook_a", seen="held_onion", gone="hand_free"):
+        super().__init__()
+        self.member, self.seen, self.gone, self.planted = member, seen, gone, None
+
+    def start(self, live, cfg):
+        outer = live.agents.agents[self.member].repl.plugin
+        real = outer.observe
+
+        def observe(counts):
+            r = dict(real(counts))
+            if self.planted is None and r.get(self.seen):
+                self.planted = live.tracer.k
+            if self.planted is not None:
+                r[self.gone] = 1
+            return r
+        outer.observe = observe
