@@ -204,3 +204,19 @@ def test_through_the_server_enable_inbox_answer_disable(tmp_path):
         assert j(c.call("bridge_disable"))["on"] is False
     finally:
         c.close()
+
+
+def test_the_inferred_member_is_never_the_director(ws_root, monkeypatch):
+    """Live on SUMO (step 4's check): a mark over a cut-in inferred road_director, whose grants have %% words too."""
+    import metis_agent.mcp.bridge as B
+    from metis.catalog import workspace as W
+
+    def docs_all(name, root):                                       # every member's rules worded, the director's included
+        class D:
+            program = "x"
+        return D()
+    monkeypatch.setattr("metis.catalog.get", docs_all, raising=False)
+    monkeypatch.setattr("metis.domain.package.rule_docs", lambda p: {r: "w" for r in ("age_grant_top", "status_reset", "status_age",
+                        "yield_red", "guard_red", "drive", "accel", "keep_limit")}, raising=False)
+    m = B.member_of(W.workspace(str(ws_root)), "run1", 0, 199)
+    assert m and "director" not in m

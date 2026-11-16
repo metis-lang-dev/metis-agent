@@ -86,7 +86,8 @@ def git_head(path):
 
 def member_of(ws, run, k0, k1):
     """The member a window is about: the most worded firings in [k0, k1] (a rule with a %% line; the protocol's own
-    rules and the director's bookkeeping have none), else the most firings of any member but the director."""
+    rules have none), never the director (its grants and bookkeeping are not what a tester marks), else the most firings of
+    any member but the director."""
     from metis import trace as T
     segs = T.read(ws.path("trace", run=run))
     fired = Counter()
@@ -108,7 +109,7 @@ def member_of(ws, run, k0, k1):
             docs[m] = {}
     worded = Counter()
     for (m, r), c in fired.items():
-        if r in docs.get(m, {}):
+        if r in docs.get(m, {}) and "director" not in m:          # the director's grants have words too, but a tester's event is a member's
             worded[m] += c
     if worded:
         return worded.most_common(1)[0][0]
