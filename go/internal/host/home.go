@@ -99,7 +99,7 @@ type homeAct struct {
 var homeActs = map[string]homeAct{
 	"light_on": {"light", "on", nil}, "light_off": {"light", "off", nil}, "sweep_off": {"light", "off", nil},
 	"vacant_off": {"light", "off", nil},
-	"air_on": {"unit", "on", nil}, "air_off": {"unit", "off", nil}, "air_off_cold": {"unit", "off", nil},
+	"air_on":     {"unit", "on", nil}, "air_off": {"unit", "off", nil}, "air_off_cold": {"unit", "off", nil},
 	"sweep_air_off": {"unit", "off", nil}, "sweep_air_off_heat": {"unit", "off", nil},
 	"air_night": {"unit", "preset", "night"}, "air_night_from_boost": {"unit", "preset", "night"},
 	"sweep_night": {"unit", "preset", "night"}, "sweep_night_boost": {"unit", "preset", "night"},
@@ -346,8 +346,8 @@ type HomeSim struct{ S *HomeState }
 
 func NewHomeSim(m *HomeMap) *HomeSim { return &HomeSim{S: newHomeState(m)} }
 
-func (s *HomeSim) Name() string       { return "sim" }
-func (s *HomeSim) Read() *HomeState   { return s.S }
+func (s *HomeSim) Name() string        { return "sim" }
+func (s *HomeSim) Read() *HomeState    { return s.S }
 func (s *HomeSim) IR(_, _ string) bool { return s.S.IRReady }
 
 func (s *HomeSim) Do(kind, role, op string, value any) bool { return simDo(s.S, kind, role, op, value) }
@@ -781,7 +781,7 @@ func (w *HomeWorld) Readings(beat int) map[string]bool {
 			r[c+"("+room+")"] = c == tcls
 		}
 		for _, x := range []struct {
-			c        tri
+			c         tri
 			name, key string
 		}{{cc, "got_cold", "cold_" + room}, {wc, "got_warm", "warm_" + room}} {
 			if x.c == triTrue && w.prevTri[x.key] == triFalse {
