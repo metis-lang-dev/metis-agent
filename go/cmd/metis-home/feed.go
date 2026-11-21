@@ -140,7 +140,7 @@ func (f *Feed) Surprise(domain string, reply map[string]any) {
 		ID string `json:"id"`
 	}
 	if err == nil {
-		err = json.Unmarshal(lastLine(out), &got)
+		err = json.Unmarshal(jsonPart(out), &got)
 	}
 	if err != nil || got.ID == "" {
 		msg := fmt.Sprint(err)
@@ -155,9 +155,13 @@ func (f *Feed) Surprise(domain string, reply map[string]any) {
 		"key": "home:" + domain + ":" + got.ID, "member": domain})
 }
 
-func lastLine(b []byte) []byte {
-	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
-	return []byte(lines[len(lines)-1])
+// jsonPart is the SDK's answer: its output from the first '{' (it may print it indented).
+func jsonPart(b []byte) []byte {
+	s := string(b)
+	if i := strings.Index(s, "{"); i >= 0 {
+		return []byte(s[i:])
+	}
+	return b
 }
 
 func (f *Feed) signalIn(sig map[string]any) (int, map[string]any) {
