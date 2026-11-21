@@ -292,7 +292,48 @@ func NewAgent(d Domain, seed uint64, caseName string) (*Agent, error) {
 	}
 	a.Consult = &TemplateConsult{Sh: a.Sh, W: a.W, R: a.R, Tables: d.Tables, HandleNames: a.handles}
 	a.Sink = &Sink{Domain: d.Name, Key: p.Key}
+	if err := a.syncWorld(); err != nil {
+		p.Close()
+		return nil, fmt.Errorf("domain %s: the host's sync: %w", d.Name, err)
+	}
 	return a, nil
+}
+
+// syncPlugin is the host with its TIME face replaced by its sync (py sync_world: plugin.tick = inner.sync).
+type syncPlugin struct {
+	rt.Host
+	s Syncer
+}
+
+func (p syncPlugin) Tick(counts map[string]int) ([]string, bool) { return p.s.Sync(counts), false }
+
+// syncWorld is py's sync_world: a host whose world has its own state (Syncer)
+// brings the program to it now, as one exo row with no world step; the watch
+// checkpointed there and revived. Nothing for any other host.
+func (a *Agent) syncWorld() error {
+	if a.Sh == nil || a.Sh.Plugin == nil {
+		return nil
+	}
+	var inner any = a.Sh.Plugin
+	if a.Host != nil {
+		inner = a.Host.Inner
+	}
+	s, ok := inner.(Syncer)
+	if !ok {
+		return nil
+	}
+	orig := a.Sh.Plugin
+	a.Sh.Plugin = syncPlugin{orig, s}
+	_, _, err := a.Sh.Tick(false)
+	a.Sh.Plugin = orig
+	if err != nil {
+		return err
+	}
+	if err := a.W.checkpoint(); err != nil {
+		return err
+	}
+	a.W.Quiet = false
+	return nil
 }
 
 // reportsOf is py's intent_domain.reports: the world's reports the person
@@ -1012,6 +1053,9 @@ func (a *Agent) world(msg map[string]any) []Reply {
 		return []Reply{a.errorReply(msg["id"], err.Error())}
 	}
 	a.worlds = append(a.worlds, lines)
+	if err := a.syncWorld(); err != nil {
+		return []Reply{a.errorReply(msg["id"], err.Error())}
+	}
 	return nil
 }
 
@@ -1058,8 +1102,13 @@ func (a *Agent) ports() []Reply {
 	if reps == nil {
 		reps = map[string]any{}
 	}
-	return []Reply{a.reply("ports", F{"world": a.Host != nil, "pairs": pairs, "reports": reps, "handles": handles,
-		"held": held, "ref": a.ref(true, "")})}
+	f := F{"world": a.Host != nil, "pairs": pairs, "reports": reps, "handles": handles, "held": held, "ref": a.ref(true, "")}
+	if a.Host != nil {
+		if pp, ok := a.Host.Inner.(Porter); ok { // py: the host's own ports(), when it has one
+			f["host"] = pp.Ports()
+		}
+	}
+	return []Reply{a.reply("ports", f)}
 }
 
 // Handle is one line -> the agent's replies (py handle()).

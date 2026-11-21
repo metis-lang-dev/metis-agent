@@ -100,6 +100,32 @@ type SharedEnv interface {
 type MemEnv struct {
 	mu  sync.Mutex
 	env *PairEnv
+	// Shared is what a process's hosts share beyond the kitchen pair (the
+	// home's one world for its five views), kept across a reload: the
+	// Process carries it from build to build.
+	Shared *Shared
+}
+
+// Shared is a process's state its hosts share: the catalog root, and the
+// home world once a home view asks for it.
+type Shared struct {
+	Root string
+	mu   sync.Mutex
+	home *HomeWorld
+}
+
+// Home is the process's home world, made on first use from the map under Root.
+func (s *Shared) Home() (*HomeWorld, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.home == nil {
+		m, err := LoadHomeMap(HomeMapPath(s.Root))
+		if err != nil {
+			return nil, err
+		}
+		s.home = NewHomeWorld(m, nil)
+	}
+	return s.home, nil
 }
 
 // NewMemEnv shares one fresh kitchen.

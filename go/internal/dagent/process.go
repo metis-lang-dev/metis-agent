@@ -54,6 +54,31 @@ var Hosts = map[string]HostEntry{
 		Pair: []string{"kitchen", "kitchen_shared"}, PricedBy: "kitchen_shared"},
 }
 
+// homeHost is a home package's host (metis-worlds `home`): a view of the
+// process's one home world, the map read from the catalog root.
+func homeHost(pkg string) HostEntry {
+	return HostEntry{
+		New: func(env *host.MemEnv) rt.Host {
+			sh := env.Shared
+			if sh == nil {
+				sh = &host.Shared{}
+			}
+			w, err := sh.Home()
+			if err != nil {
+				panic(fmt.Sprintf("home host %s: %v", pkg, err))
+			}
+			return host.NewHomeView(pkg, w)
+		},
+		Tables: host.HomeTables(pkg), PluginSpec: "../../world/home_host.py:" + pkg, OwnDay: true,
+	}
+}
+
+func init() {
+	for _, p := range host.HomePackages {
+		Hosts[p] = homeHost(p)
+	}
+}
+
 // Process builds and rebuilds the agents of one process.
 type Process struct {
 	Root     string // the metis-catalog checkout
@@ -71,6 +96,16 @@ type Process struct {
 	// --narrate), on Speaker (the model's speaking turn; nil = none)
 	Narrate []string
 	Speaker Speaker
+	// shared: what the hosts of this process share across builds and reloads (the home's one world)
+	shared *host.Shared
+}
+
+// Shared is the process's shared host state (made on first use).
+func (p *Process) Shared() *host.Shared {
+	if p.shared == nil {
+		p.shared = &host.Shared{Root: p.Root}
+	}
+	return p.shared
 }
 
 // home is METIS_HOME as metis.catalog.home() resolves it: the variable, else metispy's own metis/catalog.
@@ -187,6 +222,7 @@ func (p *Process) Domains(names []string) ([]Domain, error) {
 		return nil, err
 	}
 	env := host.NewMemEnv(host.DefaultPairScript())
+	env.Shared = p.Shared()
 	var out []Domain
 	for _, n := range names {
 		m, ok := ms[n]

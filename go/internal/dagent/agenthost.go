@@ -16,6 +16,25 @@ import (
 	"github.com/metis-lang-dev/metis-agent/go/internal/rt"
 )
 
+// Worlder is a host with its own world face (py: the inner host's world(lines)):
+// it takes the driver's world lines itself (the home's simulated world).
+type Worlder interface {
+	World(lines []string) error
+}
+
+// Syncer is a host whose world has its own state (py: the inner host's
+// sync(counts)): the program is brought to it as one exo row at load and
+// after world lines (py domain_agent sync_world).
+type Syncer interface {
+	Sync(counts map[string]int) []string
+}
+
+// Porter is a host with a ports face (py: the inner host's ports()): what it
+// reads and drives, in the domain's ports reply as "host".
+type Porter interface {
+	Ports() map[string]any
+}
+
 // Inner is a catalog host with a hosted day (host.Plant, host.Dog).
 type Inner interface {
 	rt.Host
@@ -116,6 +135,9 @@ func (a *AgentHost) Live() {
 // World queues the driver's world changes ("-closed(kitchen)",
 // "+open(kitchen)"): do-lines on the next tick.
 func (a *AgentHost) World(lines []string) error {
+	if w, ok := a.Inner.(Worlder); ok { // a host with its own world face takes them itself (py: inner.world)
+		return w.World(lines)
+	}
 	var bad []string
 	for _, l := range lines {
 		if len(l) < 2 || (l[0] != '+' && l[0] != '-') {

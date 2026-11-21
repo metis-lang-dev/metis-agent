@@ -26,12 +26,20 @@ import (
 // goldenPackages: the packages with goldens the Go agent serves.
 var goldenPackages = []string{"dog", "plant"}
 
+// homeGoldenPackages: the home world's packages (metis-worlds `home`; $METIS_HOME_WORLD, else the
+// sibling metis-worlds checkout's home/), held to their goldens the same way.
+var homeGoldenPackages = []string{"lights", "air", "media", "scenes", "comfort"}
+
 // goldenHost is the golden's word for a runtime's plugin spec (metis.domain.day HOST).
 const goldenHost = "<host>"
 
 func goldenRows(t *testing.T, d, file string) []json.RawMessage {
+	return goldenRowsAt(t, catalogDir(t), d, file)
+}
+
+func goldenRowsAt(t *testing.T, root, d, file string) []json.RawMessage {
 	t.Helper()
-	p := filepath.Join(catalogDir(t), "domains", d, "goldens", file)
+	p := filepath.Join(root, "domains", d, "goldens", file)
 	f, err := os.Open(p)
 	if err != nil {
 		t.Skipf("no %s (a catalog before the goldens)", p)
@@ -87,10 +95,42 @@ func scrubbedReads(t *testing.T, raw json.RawMessage) json.RawMessage {
 }
 
 func TestTheGoAgentServesThePackagesGoldens(t *testing.T) {
-	python := venvPython(t)
 	for _, d := range goldenPackages {
-		rows := goldenRows(t, d, "day.out.jsonl")
-		proc := &Process{Root: catalogDir(t), Metispy: metispyDir(t), Python: python, BuildDir: t.TempDir(),
+		servesGolden(t, catalogDir(t), d)
+	}
+}
+
+// homeWorldDir is the home world (metis-worlds `home`): $METIS_HOME_WORLD, else the sibling checkouts'.
+func homeWorldDir(t *testing.T) string {
+	for _, d := range []string{os.Getenv("METIS_HOME_WORLD"), "../../../../metis-worlds-home/home", "../../../../metis-worlds/home"} {
+		if d == "" {
+			continue
+		}
+		if abs, err := filepath.Abs(d); err == nil {
+			if _, err := os.Stat(filepath.Join(abs, "world", "home.map.json")); err == nil {
+				return abs
+			}
+		}
+	}
+	t.Skip("no metis-worlds home world (METIS_HOME_WORLD)")
+	return ""
+}
+
+// TestTheGoAgentServesTheHomeGoldens: the home world's packages, each on its own process (a fresh
+// world, as metis.catalog golden runs each), on the simulated home.
+func TestTheGoAgentServesTheHomeGoldens(t *testing.T) {
+	t.Setenv("METIS_HOME_HA", "")
+	root := homeWorldDir(t)
+	for _, d := range homeGoldenPackages {
+		t.Run(d, func(t *testing.T) { servesGolden(t, root, d) })
+	}
+}
+
+func servesGolden(t *testing.T, root, d string) {
+	python := venvPython(t)
+	{
+		rows := goldenRowsAt(t, root, d, "day.out.jsonl")
+		proc := &Process{Root: root, Metispy: metispyDir(t), Python: python, BuildDir: t.TempDir(),
 			Names: []string{d}}
 		srv, err := proc.Build(1, "replay")
 		if err != nil {
@@ -148,14 +188,26 @@ func TestTheGoAgentServesThePackagesGoldens(t *testing.T) {
 }
 
 func TestTheMapperIsThePackages(t *testing.T) {
-	cat := catalogDir(t)
 	for _, d := range goldenPackages {
+		mapperGolden(t, catalogDir(t), d)
+	}
+}
+
+func TestTheMapperIsTheHomePackages(t *testing.T) {
+	root := homeWorldDir(t)
+	for _, d := range homeGoldenPackages {
+		mapperGolden(t, root, d)
+	}
+}
+
+func mapperGolden(t *testing.T, cat, d string) {
+	{
 		spec, err := LoadSpec(filepath.Join(cat, "domains", d, "intent.yaml"))
 		if err != nil {
 			t.Fatal(err)
 		}
 		mp := NewMapper(spec.Card)
-		rows := goldenRows(t, d, "intents.out.jsonl")
+		rows := goldenRowsAt(t, cat, d, "intents.out.jsonl")
 		for _, raw := range rows {
 			var c struct {
 				In struct {
