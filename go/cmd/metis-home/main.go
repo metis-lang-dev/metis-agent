@@ -20,7 +20,13 @@
 //
 // Home Assistant: METIS_HOME_HA=http://127.0.0.1:8123 and the token file
 // (METIS_HOME_TOKEN, else ~/.config/fsttm/hass.token); without them the home
-// is simulated.
+// is simulated. With them the home is read through the SEMANTIC WORLD
+// (metis-worlds libs/semantic-world/go; world.go): Home Assistant's websocket
+// folded into one world of beliefs, the host's families read from it, a
+// command's prediction held until read back, the packages' beliefs:/levels:
+// served as quantised ports and weight ports, their advice concluded into it,
+// and its lines (confidence, source, age) sent to ENVIRONMENT (-env; FSTTM's
+// fsttm-hass then has hass.dump false). -semworld=false: the REST polling.
 package main
 
 import (
@@ -41,12 +47,14 @@ import (
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/dagent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/host"
+	semhome "github.com/metis-lang-dev/metis-worlds/libs/semantic-world/go/home"
 )
 
 type config struct {
 	world, domains, door, tools, feed, name, python, metisc, records string
 	beat, callTimeout, watch                                         time.Duration
 	seed                                                             uint64
+	semworld, env                                                    bool
 }
 
 var final = map[string]bool{"done": true, "refused": true, "expired": true, "cancelled": true}
@@ -103,6 +111,7 @@ type service struct {
 	nid     int
 	tools   []Tool
 	hashes  map[string]string
+	proj    *Projector // the semantic world's lines into ENVIRONMENT / REASONING (nil: off)
 }
 
 func (s *service) loadTools() {
@@ -280,6 +289,9 @@ func (s *service) run() {
 		select {
 		case <-beat.C:
 			s.serve(map[string]any{"clock": "beat"})
+			if s.proj != nil {
+				go s.proj.Step()
+			}
 		case c := <-s.calls:
 			s.submit(c)
 		case sig := <-s.signals:
@@ -354,6 +366,8 @@ func main() {
 	flag.DurationVar(&c.callTimeout, "call-timeout", 6*time.Second, "how long a tool call waits for the rules' outcome")
 	flag.DurationVar(&c.watch, "watch", 5*time.Second, "how often the packages' files are checked for a change")
 	flag.Uint64Var(&c.seed, "seed", 1, "the agents' seed")
+	flag.BoolVar(&c.semworld, "semworld", true, "read Home Assistant through the semantic world (its websocket; METIS_HOME_HA set)")
+	flag.BoolVar(&c.env, "env", true, "with -semworld: the world's lines into the ENVIRONMENT stream (fsttm-hass's dump then off: hass.dump false)")
 	flag.Parse()
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 	c.world, _ = filepath.Abs(expand(c.world))
@@ -368,6 +382,14 @@ func main() {
 	s.proc = &dagent.Process{Root: c.world, Metisc: expand(c.metisc), Names: s.names, Records: c.records,
 		Session: time.Now().Format("20060102-150405")}
 	var err error
+	var world *semhome.Home
+	if url, token, ok := haConn(); ok && c.semworld {
+		if world, err = newWorld(c.world); err != nil {
+			log.Fatalf("the semantic world: %v", err)
+		}
+		s.proc.Shared().Sem = world
+		go runHA(world, url, token)
+	}
 	if s.srv, err = s.proc.Build(c.seed, "live"); err != nil {
 		log.Fatalf("the home's packages: %v", err)
 	}
@@ -376,6 +398,16 @@ func main() {
 	w, _ := s.proc.Shared().Home()
 	log.Printf("%d packages served on the C++ runtime in %.2fs (home: %s backend)", len(s.names),
 		time.Since(t0).Seconds(), w.Back.Name())
+	if sem, ok := w.Back.(*host.HomeSem); ok {
+		if err := joinPackages(sem, c.world, s.names); err != nil {
+			log.Fatalf("the packages' beliefs: %v", err)
+		}
+		if c.env {
+			s.proj = &Projector{W: world, Door: s.door}
+			s.door.OnConnect = s.proj.Known
+			log.Printf("the semantic world's lines go to ENVIRONMENT on %s", c.door)
+		}
+	}
 	s.feed = &Feed{Name: c.name, Domain: "home", Workspace: c.world,
 		OnSignal: func(sig map[string]any) { s.signals <- sig }}
 	if err := s.feed.Start(c.feed); err != nil {

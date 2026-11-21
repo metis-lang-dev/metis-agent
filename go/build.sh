@@ -8,6 +8,15 @@
 #   ./build.sh [cmd...]      → bin/   |   ./build.sh test [pkgs...]   |   ./build.sh vet [pkgs...]
 set -euo pipefail
 cd "$(dirname "$0")"
+# the semantic world (metis-worlds libs/semantic-world/go): go.mod's replace names the sibling checkout
+# ../../metis-worlds (the NUC's ~/metis/metis-worlds, branch home or main); SEMWORLD_DIR names another
+# (a worktree), through a go.work made here
+if [ -n "${SEMWORLD_DIR:-}" ]; then
+  GOWORK="$(mktemp -d)/go.work"
+  printf 'go 1.24.0\n\nuse %s\n\nreplace github.com/metis-lang-dev/metis-worlds/libs/semantic-world/go => %s\n' \
+    "$PWD" "$(cd "$SEMWORLD_DIR" && pwd)" > "$GOWORK"
+  export GOWORK
+fi
 # llama.cpp: the submodule third_party/llama.cpp (the pin: the commit py's
 # llama_cpp_python vendors), built there by third_party/build-llama.sh when
 # its libraries are missing (CUDA when nvcc is found); LLAMA_DIR overrides

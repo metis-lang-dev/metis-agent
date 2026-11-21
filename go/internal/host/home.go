@@ -37,6 +37,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/metis-lang-dev/metis-agent/go/internal/rt"
 )
 
 // HomeGrace is the beats a switched device is given before it is read back;
@@ -917,6 +919,14 @@ type HomeView struct {
 	hold  map[string]int // role -> the beat its grace ends
 	acted []act
 	due   []Due
+	// the semantic world's face: the rules fired this beat, the advice in the world and since when
+	fired   []firedRule
+	advised map[string]float64
+}
+
+type firedRule struct {
+	name string
+	args []string
 }
 
 // NewHomeView is pkg's view of w.
@@ -976,7 +986,49 @@ func (v *HomeView) Tick(counts map[string]int) ([]string, bool) {
 	dos = append(dos, v.corrections(counts)...)
 	dos = append(dos, v.W.Queues[v.Pkg]...)
 	v.W.Queues[v.Pkg] = []string{}
+	if sem, ok := v.W.Back.(*HomeSem); ok {
+		v.conclude(sem, atoms, counts)
+		dos = append(dos, sem.LevelLines(v.Pkg)...)
+	}
+	v.fired = nil
 	return dos, false
+}
+
+// ConclusionTTL: how long an advice stays in the world after the rule gave it (s).
+const ConclusionTTL = 600
+
+// conclude writes the advice the last beat gave into the semantic world (its fired rule named when one
+// rule of that beat bound the atom's argument), and withdraws an advice after ConclusionTTL.
+func (v *HomeView) conclude(sem *HomeSem, atoms []string, counts map[string]int) {
+	now := sem.Now()
+	if v.advised == nil {
+		v.advised = map[string]float64{}
+	}
+	for _, a := range atoms {
+		if counts[a] == 0 || !concluded(predOf(a)) {
+			continue
+		}
+		_, args, _ := strings.Cut(a, "(")
+		arg := strings.Split(handleOf(args), ",")[0]
+		rule := ""
+		for _, f := range v.fired {
+			if contains(f.args, arg) {
+				if rule != "" && rule != f.name {
+					rule = ""
+					break
+				}
+				rule = f.name
+			}
+		}
+		sem.Conclude(v.Pkg, a, true, rule)
+		v.advised[a] = now
+	}
+	for a, t := range v.advised {
+		if now-t > ConclusionTTL {
+			sem.Conclude(v.Pkg, a, false, "")
+			delete(v.advised, a)
+		}
+	}
 }
 
 // Sync is the do-lines that bring the program to the world now, no step
@@ -994,6 +1046,7 @@ func (v *HomeView) OnEvent(name string, args []string) {
 	base, _, _ := strings.Cut(name, "[")
 	base, _, _ = strings.Cut(base, "-")
 	v.acted = append(v.acted, act{v.beat, base, append([]string{}, args...)})
+	v.fired = append(v.fired, firedRule{base, append([]string{}, args...)})
 	switch base {
 	case "scene_set", "arrive":
 		scene := "home"
@@ -1205,6 +1258,23 @@ func (v *HomeView) Restore(b json.RawMessage) error {
 	}
 	return json.Unmarshal(x[2], &v.acted)
 }
+
+// Weights are the semantic world's ports, priced for the wire's weight ports (none without the world:
+// a package that declares beliefs needs it).
+func (v *HomeView) Weights() map[string]rt.WeightFunc {
+	if sem, ok := v.W.Back.(*HomeSem); ok {
+		return sem.Weights()
+	}
+	flat := map[string]rt.WeightFunc{} // the simulation (the goldens): every belief port the flat reading
+	for _, p := range homeBeliefPorts {
+		flat[p] = func([]string, rt.Counts) float64 { return 1 }
+	}
+	return flat
+}
+
+// homeBeliefPorts are the ports the semantic world's home adapter offers (DESIGN.md §2).
+var homeBeliefPorts = []string{"present", "someone_home", "on", "reachable", "preset", "cold", "warm", "humid",
+	"out_cold", "day"}
 
 // Ports is what the view reads and drives (a console's ports line).
 func (v *HomeView) Ports() map[string]any {

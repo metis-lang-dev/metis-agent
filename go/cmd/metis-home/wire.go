@@ -24,8 +24,11 @@ import (
 // Door is a client of the stream door, reopened when the voice process restarts.
 type Door struct {
 	Addr string
-	mu   sync.Mutex
-	conn net.Conn
+	// OnConnect, when set, gives the events a new connection starts with (the world's whole projection,
+	// so a voice engine that restarted is current at once)
+	OnConnect func() []map[string]any
+	mu        sync.Mutex
+	conn      net.Conn
 }
 
 // Reason writes one REASONING entry; false when the door is closed (the voice is not up).
@@ -33,9 +36,15 @@ func (d *Door) Reason(text string) bool {
 	return d.send(map[string]any{"stream": "reasoning", "text": text})
 }
 
-func (d *Door) send(ev map[string]any) bool {
-	b, _ := json.Marshal(ev)
-	b = append(b, '\n')
+func (d *Door) send(ev map[string]any) bool { return d.SendAll([]map[string]any{ev}) }
+
+// SendAll writes events as JSON lines; false when the door is closed.
+func (d *Door) SendAll(evs []map[string]any) bool {
+	var b []byte
+	for _, ev := range evs {
+		x, _ := json.Marshal(ev)
+		b = append(append(b, x...), '\n')
+	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	for try := 0; try < 2; try++ {
@@ -45,6 +54,19 @@ func (d *Door) send(ev map[string]any) bool {
 				return false
 			}
 			d.conn = c
+			if d.OnConnect != nil {
+				var first []byte
+				for _, ev := range d.OnConnect() {
+					x, _ := json.Marshal(ev)
+					first = append(append(first, x...), '\n')
+				}
+				c.SetWriteDeadline(time.Now().Add(2 * time.Second))
+				if _, err := c.Write(first); err != nil {
+					c.Close()
+					d.conn = nil
+					continue
+				}
+			}
 		}
 		d.conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 		if _, err := d.conn.Write(b); err == nil {

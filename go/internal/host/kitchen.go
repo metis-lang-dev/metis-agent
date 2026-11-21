@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/rt"
+	semhome "github.com/metis-lang-dev/metis-worlds/libs/semantic-world/go/home"
 )
 
 // The kitchen pair (metispy metis/domains/kitchen/pair.py): one physical
@@ -110,6 +111,9 @@ type MemEnv struct {
 // home world once a home view asks for it.
 type Shared struct {
 	Root string
+	// Sem: the semantic world the home is read through (metis-home sets it before the build; nil: the
+	// backend from the environment, Home Assistant's REST polling or the simulation)
+	Sem  *semhome.Home
 	mu   sync.Mutex
 	home *HomeWorld
 }
@@ -123,7 +127,13 @@ func (s *Shared) Home() (*HomeWorld, error) {
 		if err != nil {
 			return nil, err
 		}
-		s.home = NewHomeWorld(m, nil)
+		var back HomeBackend
+		if s.Sem != nil {
+			if ha, ok := HomeBackendFromEnv(m).(*HomeHA); ok {
+				back = NewHomeSem(m, s.Sem, ha)
+			}
+		}
+		s.home = NewHomeWorld(m, back)
 	}
 	return s.home, nil
 }

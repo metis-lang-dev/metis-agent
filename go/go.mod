@@ -9,4 +9,9 @@ require (
 
 require gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 
-require github.com/kr/pretty v0.3.1 // indirect
+require (
+	github.com/kr/pretty v0.3.1 // indirect
+	github.com/metis-lang-dev/metis-worlds/libs/semantic-world/go v0.0.0-00010101000000-000000000000
+)
+
+replace github.com/metis-lang-dev/metis-worlds/libs/semantic-world/go => ../../metis-worlds/libs/semantic-world/go
