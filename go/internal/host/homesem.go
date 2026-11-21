@@ -69,17 +69,17 @@ func (h *HomeSem) Read() *HomeState {
 	return s
 }
 
-// Do is the REST call, then the world's prediction of what it changed.
+// Do is the world's prediction of what the command changes, then the REST call. The prediction comes
+// first: Home Assistant's state_changed can arrive on the websocket before the REST call returns, and a
+// prediction written after it would wait for a read-back that already came. A device not in Home
+// Assistant gets no prediction (the REST call refuses it).
 func (h *HomeSem) Do(kind, role, op string, value any) bool {
-	if !h.HA.Do(kind, role, op, value) {
-		return false
-	}
 	name, val := "", ""
 	switch {
 	case op == "on" || op == "off":
 		name, val = "power", op
 	case kind == "unit" && op == "preset":
-		name, _ = "preset", ""
+		name = "preset"
 		val, _ = value.(string)
 	case kind == "unit" && (op == "heater" || op == "winter"):
 		name, val = op, "off"
@@ -87,10 +87,14 @@ func (h *HomeSem) Do(kind, role, op string, value any) bool {
 			val = "on"
 		}
 	}
-	if name != "" && val != "" {
+	h.W.W.Lock()
+	e := h.W.W.Entries[role]
+	absent := e == nil || e.Attrs["absent"] != ""
+	h.W.W.Unlock()
+	if name != "" && val != "" && !absent {
 		_ = h.W.Command(role, name, val, h.Now())
 	}
-	return true
+	return h.HA.Do(kind, role, op, value)
 }
 
 func (h *HomeSem) IR(_, _ string) bool { return false } // not yet wired

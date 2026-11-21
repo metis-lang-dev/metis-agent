@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"encoding/json"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -130,5 +132,42 @@ func TestProjectorDoor(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	if len(got) != n {
 		t.Fatalf("an unchanged world was sent again: %v", <-got)
+	}
+}
+
+// A command whose state_changed comes back before the REST call returns is confirmed, not left
+// "commanded, no reading" (the prediction is written before the call).
+func TestCommandReadBackDuringTheCall(t *testing.T) {
+	w, root := testWorld(t)
+	m, err := host.LoadHomeMap(host.HomeMapPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := host.Now()
+	ha := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if strings.HasSuffix(r.URL.Path, "/fan/turn_on") {
+			w.Ingest(st("fan.lab_supply_fan", "on", nil), now+0.2)
+		}
+		rw.Write([]byte("[]"))
+	}))
+	defer ha.Close()
+	sem := host.NewHomeSem(m, w, host.NewHomeHA(m, ha.URL, "x"))
+	sem.Now = func() float64 { return now }
+	w.Ingest(st("fan.lab_supply_fan", "off", nil), now)
+	w.Ingest(st("fan.lab_extract_fan", "off", nil), now)
+	sem.Read()
+	if !sem.Do("unit", "u2", "on", nil) {
+		t.Fatal("the call failed")
+	}
+	now += 30 // past the grace
+	if !sem.Read().Units["u2"].Running() {
+		t.Fatal("not running")
+	}
+	v := w.W.Var("u2", "power")
+	if v.Src.Kind != "sensor" || v.Unsure {
+		t.Fatalf("u2.power after the read-back: src %+v unsure %v", v.Src, v.Unsure)
+	}
+	for _, s := range w.W.Surprises {
+		t.Fatalf("a confirmed command was surprised: %+v", s)
 	}
 }
