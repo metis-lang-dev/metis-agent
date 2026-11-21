@@ -20,7 +20,7 @@ func TestASurpriseIsWrittenThenSignalled(t *testing.T) {
 	}
 	defer f.Stop()
 	f.Surprise("air", map[string]any{"kind": "surprise", "domain": "air",
-		"record": map[string]any{"reading": map[string]any{"running(u2)": 1}, "atoms": []any{"running(u2)"}},
+		"record":     map[string]any{"reading": map[string]any{"running(u2)": 1}, "atoms": []any{"running(u2)"}},
 		"difference": map[string]any{"running(u2)": 1}})
 	var sid string
 	for _, s := range f.after(0, "") {
