@@ -12,7 +12,7 @@
 //
 // and a NAMED RUNTIME of the Metis surprise interface for Claude Code: its
 // discovery file in the workspace's .metis/runtimes/, surprises written to
-// the workspace by the SDK then signalled, catalog.changed from the plugin
+// the workspace (internal/workspace, the SDK's format) then signalled, catalog.changed from the plugin
 // (after the user merges the rules) reloading the packages, which are also
 // watched by content.
 //
@@ -347,7 +347,7 @@ func main() {
 	flag.StringVar(&c.tools, "tools", "127.0.0.1:8768", "the tool port the conversation's LLM calls")
 	flag.StringVar(&c.feed, "feed", "127.0.0.1:0", "the runtime feed (the surprise interface; port 0 = any)")
 	flag.StringVar(&c.name, "name", "home", "the runtime's name (/metis-runtime <name>)")
-	flag.StringVar(&c.python, "python", "~/metis/metis-agent/py/.venv/bin/python", "a python with metispy (the workspace SDK's surprise writer); \"\" = none")
+	flag.StringVar(&c.python, "python", "", "ignored (surprises are written in Go now); kept so older units still start")
 	flag.StringVar(&c.metisc, "metisc", "", "metis-lang's metisc, the linker (default $METISC, else the sibling checkout)")
 	flag.StringVar(&c.records, "records", "catalog", "the agents' surprise records (catalog = each package's records/)")
 	flag.DurationVar(&c.beat, "beat", time.Second, "the wall-clock beat")
@@ -357,13 +357,6 @@ func main() {
 	flag.Parse()
 	log.SetFlags(log.Ltime | log.Lmicroseconds)
 	c.world, _ = filepath.Abs(expand(c.world))
-	c.python = expand(c.python)
-	if c.python != "" {
-		if _, err := os.Stat(c.python); err != nil {
-			log.Printf("no python at %s: surprises are signalled but not written to the workspace", c.python)
-			c.python = ""
-		}
-	}
 	t0 := time.Now()
 	s := &service{cfg: c, door: &Door{Addr: c.door}, calls: make(chan call), signals: make(chan map[string]any, 16),
 		pending: map[string]chan Outcome{}}
@@ -383,7 +376,7 @@ func main() {
 	w, _ := s.proc.Shared().Home()
 	log.Printf("%d packages served on the C++ runtime in %.2fs (home: %s backend)", len(s.names),
 		time.Since(t0).Seconds(), w.Back.Name())
-	s.feed = &Feed{Name: c.name, Domain: "home", Workspace: c.world, Python: c.python,
+	s.feed = &Feed{Name: c.name, Domain: "home", Workspace: c.world,
 		OnSignal: func(sig map[string]any) { s.signals <- sig }}
 	if err := s.feed.Start(c.feed); err != nil {
 		log.Fatalf("the runtime feed: %v", err)

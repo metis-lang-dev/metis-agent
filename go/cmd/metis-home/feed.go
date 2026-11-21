@@ -11,8 +11,8 @@ package main
 //	GET  /status                the state and the hello
 //
 // Payload first, then the signal: a kernel surprise is written to the
-// workspace by metispy's Workspace SDK (`python -m metis.catalog.workspace
-// drop`, the one producer path), then signalled as surprise.new. No run
+// workspace by internal/workspace (byte for byte what metispy's Workspace SDK's
+// drop writes; no Python), then signalled as surprise.new. No run
 // control: the home runs as long as it lives.
 
 import (
@@ -21,6 +21,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/metis-lang-dev/metis-agent/go/internal/workspace"
 	"io"
 	"log"
 	"net"
@@ -45,7 +46,6 @@ var feedback = map[string]bool{"surprise.taken": true, "surprise.tried": true, "
 // Feed is the runtime's side of the interface.
 type Feed struct {
 	Name, Domain, Workspace string
-	Python                  string // the interpreter with metispy (the SDK's drop); "" = surprises signalled, not written
 	OnSignal                func(sig map[string]any)
 
 	mu            sync.Mutex
@@ -105,7 +105,7 @@ func (f *Feed) state() map[string]any {
 		"restart_needed": f.restartNeeded}
 }
 
-// Surprise writes a kernel surprise into the workspace (the SDK's drop), then signals surprise.new.
+// Surprise writes a kernel surprise into the workspace (internal/workspace: the SDK's drop, in Go), then signals surprise.new.
 func (f *Feed) Surprise(domain string, reply map[string]any) {
 	f.mu.Lock()
 	f.counts["surprise"]++
@@ -126,42 +126,15 @@ func (f *Feed) Surprise(domain string, reply map[string]any) {
 		}
 	}
 	rec["member"] = domain
-	if f.Python == "" {
-		f.Emit("surprise.new", map[string]any{"id": nil, "key": nil, "member": domain, "note": "not written: no SDK python"})
-		return
-	}
 	b, _ := json.Marshal(rec)
-	cmd := exec.Command(f.Python, "-m", "metis.catalog.workspace", "drop", "-", "--who", "world")
-	cmd.Dir = f.Workspace
-	cmd.Env = append(os.Environ(), "METIS_CATALOG="+f.Workspace)
-	cmd.Stdin = strings.NewReader(string(b))
-	out, err := cmd.Output()
-	var got struct {
-		ID string `json:"id"`
-	}
-	if err == nil {
-		err = json.Unmarshal(jsonPart(out), &got)
-	}
-	if err != nil || got.ID == "" {
-		msg := fmt.Sprint(err)
-		if ee, ok := err.(*exec.ExitError); ok {
-			msg += ": " + strings.TrimSpace(string(ee.Stderr))
-		}
-		log.Printf("[runtime] surprise of %s not written: %s", domain, msg)
-		f.Emit("finding.refused", map[string]any{"member": domain, "error": msg})
+	id, err := workspace.DropSurprise(f.Workspace, b, "world")
+	if err != nil {
+		log.Printf("[runtime] surprise of %s not written: %v", domain, err)
+		f.Emit("finding.refused", map[string]any{"member": domain, "error": err.Error()})
 		return
 	}
-	f.Emit("surprise.new", map[string]any{"id": got.ID, "ref": ".metis/surprises/" + got.ID + ".json",
-		"key": "home:" + domain + ":" + got.ID, "member": domain})
-}
-
-// jsonPart is the SDK's answer: its output from the first '{' (it may print it indented).
-func jsonPart(b []byte) []byte {
-	s := string(b)
-	if i := strings.Index(s, "{"); i >= 0 {
-		return []byte(s[i:])
-	}
-	return b
+	f.Emit("surprise.new", map[string]any{"id": id, "ref": ".metis/surprises/" + id + ".json",
+		"key": "home:" + domain + ":" + id, "member": domain})
 }
 
 func (f *Feed) signalIn(sig map[string]any) (int, map[string]any) {

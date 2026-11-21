@@ -7,14 +7,11 @@ import (
 	"testing"
 )
 
-// A kernel surprise reaches the workspace through the SDK (payload first), then surprise.new.
+// A kernel surprise reaches the workspace (internal/workspace, the SDK's format; payload
+// first), then surprise.new.
 func TestASurpriseIsWrittenThenSignalled(t *testing.T) {
-	py, _ := filepath.Abs("../../../py/.venv/bin/python")
-	if _, err := os.Stat(py); err != nil {
-		t.Skip("no py venv (the SDK runs there)")
-	}
 	ws := t.TempDir()
-	f := &Feed{Name: "home", Domain: "home", Workspace: ws, Python: py}
+	f := &Feed{Name: "home", Domain: "home", Workspace: ws}
 	if err := f.Start("127.0.0.1:0"); err != nil {
 		t.Fatal(err)
 	}
