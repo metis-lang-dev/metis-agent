@@ -171,3 +171,65 @@ func TestCommandReadBackDuringTheCall(t *testing.T) {
 		t.Fatalf("a confirmed command was surprised: %+v", s)
 	}
 }
+
+// The air package's power level from the world, corrected against the program's counts: the #init's
+// power(off,u2) is kept, not asserted again; a command makes it unconfirmed; the read-back makes it on.
+// (Before, the board's own diff added +power(off, u2) beside the #init, and a later -1 left power(off) and
+// power(on) both held.)
+func TestLevelsCorrectedAgainstCounts(t *testing.T) {
+	w, root := testWorld(t)
+	m, err := host.LoadHomeMap(host.HomeMapPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ha := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) { rw.Write([]byte("[]")) }))
+	defer ha.Close()
+	sem := host.NewHomeSem(m, w, host.NewHomeHA(m, ha.URL, "x"))
+	now := host.Now()
+	sem.Now = func() float64 { return now }
+	man := filepath.Join(root, "domain.yaml")
+	if err := os.WriteFile(man, []byte(`levels: {power: {from: {belief: unit_on}, at: [0.05, 0.95], names: ["off", unconfirmed, "on"]}}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := sem.Join("air", man); err != nil {
+		t.Fatal(err)
+	}
+	w.Ingest(st("fan.lab_supply_fan", "off", nil), now)
+	w.Ingest(st("fan.lab_extract_fan", "off", nil), now)
+	hw := host.NewHomeWorld(m, sem)
+	v := host.NewHomeView("air", hw)
+	levels := func(dos []string) []string {
+		var out []string
+		for _, d := range dos {
+			if strings.Contains(d, "power(") {
+				out = append(out, d)
+			}
+		}
+		return out
+	}
+	counts := map[string]int{"power(off,u2)": 1}
+	if dos, _ := v.Tick(counts); len(levels(dos)) != 0 {
+		t.Fatalf("the #init's level stands: %v", levels(dos))
+	}
+	sem.Do("unit", "u2", "on", nil)
+	dos, _ := v.Tick(counts)
+	if got := levels(dos); len(got) != 2 || !contains(got, "-power(off,u2) 1") || !contains(got, "+power(unconfirmed,u2)") {
+		t.Fatalf("commanded: %v", got)
+	}
+	counts = map[string]int{"power(unconfirmed,u2)": 1}
+	now++
+	w.Ingest(st("fan.lab_supply_fan", "on", nil), now)
+	dos, _ = v.Tick(counts)
+	if got := levels(dos); len(got) != 2 || !contains(got, "-power(unconfirmed,u2) 1") || !contains(got, "+power(on,u2)") {
+		t.Fatalf("read back: %v", got)
+	}
+}
+
+func contains(xs []string, x string) bool {
+	for _, y := range xs {
+		if y == x {
+			return true
+		}
+	}
+	return false
+}

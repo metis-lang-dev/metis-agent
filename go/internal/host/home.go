@@ -29,6 +29,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -77,20 +78,20 @@ var homeSweeps = map[string][]struct {
 
 var homeReads = map[string][]string{
 	"lights": {"light_lit", "light_dark", "light_ok", "light_missing", "room_lit", "room_unlit",
-		"occupied", "empty", "vacant", "unsensed", "day", "night"},
+		"occupied", "empty", "vacant", "unsensed", "day", "night", "presence"},
 	"air": {"running", "stopped", "normal_mode", "night_mode", "boost_mode", "heater_on", "heater_off",
-		"winter_on", "winter_off", "unit_ok", "unit_missing", "cold_out", "mild_out", "out_unknown"},
+		"winter_on", "winter_off", "unit_ok", "unit_missing", "cold_out", "mild_out", "out_unknown",
+		"power", "outside"},
 	"media":  {"tv_on", "tv_off", "tv_ok", "tv_missing", "ir_ready", "ir_absent"},
 	"scenes": {"someone_home", "nobody_home", "home_unsensed", "day", "night"},
 	"comfort": {"running", "stopped", "heater_on", "heater_off", "cold_room", "comfy_room", "warm_room",
-		"untracked", "humid_room", "fresh_room", "humidity_unknown"},
+		"untracked", "humid_room", "fresh_room", "humidity_unknown", "chill", "heat", "damp", "power"},
 }
 
-var homeOwned = map[string][]string{
+var homeOwned = map[string][]string{ // a unit's power is the world's: its level (power), not owned
 	"lights": {"light_lit", "light_dark", "room_lit", "room_unlit"},
-	"air": {"running", "stopped", "normal_mode", "night_mode", "boost_mode", "heater_on", "heater_off",
-		"winter_on", "winter_off"},
-	"media": {"tv_on", "tv_off"},
+	"air":    {"normal_mode", "night_mode", "boost_mode", "heater_on", "heater_off", "winter_on", "winter_off"},
+	"media":  {"tv_on", "tv_off"},
 }
 
 type homeAct struct {
@@ -129,7 +130,8 @@ func HomeTables(pkg string) *Tables {
 		},
 		Keys: map[string]string{"light_missing": "{P}", "unit_missing": "{P}", "tv_missing": "{P}",
 			"stopped": "{P}", "ir_absent": "remote"},
-		Standing: []string{"lx", "ux", "tx", "irx", "rx"},
+		// + the unnamed handles (the map's "unnamed": la, ua): a device named without its room
+		Standing: []string{"lx", "ux", "tx", "irx", "rx", "la", "ua"},
 	}
 }
 
@@ -300,8 +302,9 @@ type homeUnit struct {
 }
 type homeTV struct{ on, ok bool }
 type homeClimate struct {
-	c  float64
-	rh *float64
+	c   float64
+	rh  *float64
+	age float64 // s since its last reading (the simulation's): the spread grows
 }
 
 // HomeState is what the world is: the reference's Sim fields.
@@ -691,6 +694,16 @@ type HomeWorld struct {
 	lastBeat   int
 	hasBeat    bool
 	lastR      map[string]bool
+	// the simulated world's levels (homeLevels): a unit's commanded power until its grace ends, the power
+	// last believed, the beats it has run (the outside sensor's warm-up)
+	commanded map[string]homeCmd
+	pOn       map[string]float64
+	runBeats  map[string]int
+}
+
+type homeCmd struct {
+	on    bool
+	until int
 }
 
 // NewHomeWorld is a world on m (nil: world/home.map.json under root) and back (nil: from the env).
@@ -699,7 +712,8 @@ func NewHomeWorld(m *HomeMap, back HomeBackend) *HomeWorld {
 		back = HomeBackendFromEnv(m)
 	}
 	w := &HomeWorld{M: m, Back: back, Queues: map[string][]string{}, sinceEmpty: map[string]int{},
-		cls: map[string]string{}, prevTri: map[string]tri{}}
+		cls: map[string]string{}, prevTri: map[string]tri{}, commanded: map[string]homeCmd{},
+		pOn: map[string]float64{}, runBeats: map[string]int{}}
 	for _, p := range HomePackages {
 		w.Queues[p] = []string{}
 	}
@@ -721,6 +735,8 @@ func (w *HomeWorld) Readings(beat int) map[string]bool {
 	}
 	s := w.Back.Read()
 	r := map[string]bool{}
+	_, sem := w.Back.(*HomeSem)
+	lv := !sem // the semantic world serves the levels itself (HomeSem.LevelAtoms); else the simulated ones
 	var ev []string
 	for _, l := range w.M.Lights {
 		d := s.Lights[l]
@@ -763,10 +779,45 @@ func (w *HomeWorld) Readings(beat int) map[string]bool {
 		}
 		w.cls[room] = cls
 		clim := s.Climate[room]
-		var t *float64
+		if lv {
+			var odds *float64
+			switch pres {
+			case "occupied":
+				o := levLMax
+				odds = &o
+			case "empty":
+				o := math.Max(-levLMax, levLMax-(levLMax-math.Log(0.3/0.7))/vac[0]*float64(w.sinceEmpty[room])*HomeBeatS)
+				odds = &o
+			}
+			var p *float64
+			if odds != nil {
+				x := 1 / (1 + math.Exp(-*odds))
+				p = &x
+			}
+			homeLevel(r, "presence", room, p)
+		}
+		var t, sd *float64
 		if clim != nil {
 			c := clim.c
 			t = &c
+			if lv {
+				clim.age += HomeBeatS
+				d := math.Sqrt(levTempR + levTempQ*clim.age)
+				sd = &d
+				if d > levUntrack { // too old to know: untracked, no level
+					t = nil
+				}
+			}
+		}
+		if lv {
+			var pc, pw *float64
+			if t != nil {
+				a := phi((cold[0] - *t) / *sd)
+				b := 1 - phi((warm[0]-*t) / *sd)
+				pc, pw = &a, &b
+			}
+			homeLevel(r, "chill", room, pc)
+			homeLevel(r, "heat", room, pw)
 		}
 		cc := hysteresis(w.prevTri["cold_"+room], t, cold[0], cold[1], false)
 		wc := hysteresis(w.prevTri["warm_"+room], t, warm[0], warm[1], true)
@@ -794,6 +845,19 @@ func (w *HomeWorld) Readings(beat int) map[string]bool {
 		var rh *float64
 		if clim != nil {
 			rh = clim.rh
+		}
+		if lv {
+			var pd *float64
+			if rh != nil {
+				sdRH := math.Sqrt(levRHR + levRHQ*clim.age)
+				if sdRH > levRHUnknown {
+					rh = nil
+				} else {
+					x := 1 - phi((humidT[0]-*rh)/sdRH)
+					pd = &x
+				}
+			}
+			homeLevel(r, "damp", room, pd)
 		}
 		hc := hysteresis(w.prevTri["humid_"+room], rh, humidT[0], humidT[1], true)
 		hcls := "fresh_room"
@@ -848,10 +912,45 @@ func (w *HomeWorld) Readings(beat int) map[string]bool {
 		for _, p := range []string{"normal", "night", "boost"} {
 			r[p+"_mode("+u+")"] = d.preset == p
 		}
-		// the outside sensor sits in the unit: with the fans stopped it reads the unit, not the weather
+		// the outside sensor sits in the unit: with the fans stopped it reads the unit, not the weather (and,
+		// simulated, before the fans have run levWarmup beats: the world drops those readings)
 		var out *float64
 		if d.running {
 			out = d.outside
+		}
+		if lv {
+			// the world's power: a reading believed (R), a command predicted until its grace ends, a unit
+			// that does not answer kept at what was last believed
+			p := 0.5
+			if c, ok := w.commanded[u]; ok && beat <= c.until {
+				p = 1 - levPCmd
+				if c.on {
+					p = levPCmd
+				}
+			} else if d.ok {
+				p = 1 - levPRead
+				if d.running {
+					p = levPRead
+				}
+			} else if q, ok := w.pOn[u]; ok {
+				p = q
+			}
+			w.pOn[u] = p
+			homeLevel(r, "power", u, &p)
+			if d.running {
+				w.runBeats[u]++
+			} else {
+				w.runBeats[u] = 0
+			}
+			if w.runBeats[u] <= levWarmup {
+				out = nil
+			}
+			var po *float64
+			if out != nil {
+				x := phi((outT[0] - *out) / levOutSD)
+				po = &x
+			}
+			homeLevel(r, "outside", u, po)
 		}
 		oc := hysteresis(w.prevTri["out_"+u], out, outT[0], outT[1], false)
 		ocls := "mild_out"
@@ -936,6 +1035,19 @@ func NewHomeView(pkg string, w *HomeWorld) *HomeView {
 
 func (v *HomeView) corrections(counts map[string]int) []string {
 	r := v.W.Readings(v.beat)
+	if sem, ok := v.W.Back.(*HomeSem); ok { // the package's levels, from the semantic world
+		lv := sem.LevelAtoms(v.Pkg)
+		if len(lv) > 0 {
+			rr := make(map[string]bool, len(r)+len(lv))
+			for k, x := range r {
+				rr[k] = x
+			}
+			for k, x := range lv {
+				rr[k] = x
+			}
+			r = rr
+		}
+	}
 	atoms := make([]string, 0, len(r))
 	for a := range r {
 		atoms = append(atoms, a)
@@ -988,7 +1100,6 @@ func (v *HomeView) Tick(counts map[string]int) ([]string, bool) {
 	v.W.Queues[v.Pkg] = []string{}
 	if sem, ok := v.W.Back.(*HomeSem); ok {
 		v.conclude(sem, atoms, counts)
-		dos = append(dos, sem.LevelLines(v.Pkg)...)
 	}
 	v.fired = nil
 	return dos, false
@@ -1071,6 +1182,9 @@ func (v *HomeView) OnEvent(name string, args []string) {
 		if contains(roles, x) {
 			v.W.Back.Do(a.kind, x, a.op, a.value)
 			v.hold[x] = v.beat + HomeGrace
+			if a.kind == "unit" && (a.op == "on" || a.op == "off") { // the world's prediction, unconfirmed for the grace
+				v.W.commanded[x] = homeCmd{a.op == "on", v.beat + HomeGrace}
+			}
 			return
 		}
 	}
@@ -1180,10 +1294,17 @@ func simWorldLine(w *HomeWorld, s *HomeState, sign byte, atom string) error {
 		} else {
 			d.ok = (pred == "tv_ok") == on
 		}
-	case "occupied", "empty":
+	case "occupied", "empty": // +empty(r1, 400): empty for 400 s (the world's presence decaying)
 		s.Presence[arg(0)] = ""
 		if on {
 			s.Presence[arg(0)] = pred
+			if pred == "empty" && len(a) > 1 {
+				f, err := num(1)
+				if err != nil {
+					return err
+				}
+				w.sinceEmpty[arg(0)] = int(*f/HomeBeatS) - 1
+			}
 		}
 	case "vacant": // +vacant(r1): empty for longer than the timer (the tests' shortcut)
 		s.Presence[arg(0)] = ""
@@ -1205,6 +1326,13 @@ func simWorldLine(w *HomeWorld, s *HomeState, sign byte, atom string) error {
 			}
 			s.Climate[arg(0)] = &homeClimate{c: *c, rh: rh}
 		}
+	case "stale": // +stale(r1, 3000): the thermometer unheard for 3000 s
+		c := s.Climate[arg(0)]
+		f, err := num(1)
+		if c == nil || err != nil || f == nil {
+			return bad
+		}
+		c.age = *f
 	case "day", "night":
 		s.SunUp = (pred == "day") == on
 	case "ir_ready", "ir_absent":
@@ -1273,8 +1401,57 @@ func (v *HomeView) Weights() map[string]rt.WeightFunc {
 }
 
 // homeBeliefPorts are the ports the semantic world's home adapter offers (DESIGN.md §2).
-var homeBeliefPorts = []string{"present", "someone_home", "on", "reachable", "preset", "cold", "warm", "humid",
-	"out_cold", "day"}
+var homeBeliefPorts = []string{"present", "someone_home", "on", "unit_on", "light_on", "tv_on", "reachable", "preset",
+	"cold", "warm", "humid", "out_cold", "day"}
+
+// ── the simulated world's levels (metis-worlds home/world/home_host.py LEVELS, the world's numbers in
+// small): the same atoms the semantic world serves, so the goldens exercise the rules that read them ──
+
+const (
+	levLMax           = 4.0       // presence log-odds: sure (the radar's "someone"), and its floor
+	levPRead, levPCmd = 0.98, 0.9 // a device's power read back / predicted by a command
+	levTempR          = 0.09      // a thermometer reading's variance (°C²)
+	levTempQ          = 0.0005    // its growth while unheard (°C²/s)
+	levRHR, levRHQ    = 4.0, 0.01 // the same for humidity (%²)
+	levUntrack        = 1.5       // sd beyond which a temperature is not known
+	levRHUnknown      = 5.0       // sd beyond which a humidity is not known
+	levOutSD          = 0.5       // an outside reading's sd (°C)
+	levWarmup         = 3         // beats a unit runs before its outside sensor reads the weather
+)
+
+// homeLevelSpecs: level pred -> thresholds and names (every package's domain.yaml levels:, held equal
+// by the home world's tests).
+var homeLevelSpecs = map[string]struct {
+	at    []float64
+	names []string
+}{
+	"presence": {[]float64{0.3, 0.7}, []string{"nobody", "maybe_someone", "someone"}},
+	"power":    {[]float64{0.05, 0.95}, []string{"off", "unconfirmed", "on"}},
+	"chill":    {[]float64{0.5, 0.9}, []string{"not_cold", "maybe_cold", "cold"}},
+	"heat":     {[]float64{0.5, 0.9}, []string{"not_warm", "maybe_warm", "warm"}},
+	"damp":     {[]float64{0.5, 0.9}, []string{"dry", "maybe_humid", "humid"}},
+	"outside":  {[]float64{0.5}, []string{"mild_out", "cold_out"}},
+}
+
+// homeLevel sets PRED's level atoms at KEY: exactly one true when the belief p is known, none when nil.
+func homeLevel(r map[string]bool, pred, key string, p *float64) {
+	spec := homeLevelSpecs[pred]
+	lv := ""
+	if p != nil {
+		i := 0
+		for _, t := range spec.at {
+			if t <= *p {
+				i++
+			}
+		}
+		lv = spec.names[i]
+	}
+	for _, n := range spec.names {
+		r[pred+"("+n+","+key+")"] = n == lv
+	}
+}
+
+func phi(x float64) float64 { return 0.5 * (1 + math.Erf(x/math.Sqrt2)) }
 
 // Ports is what the view reads and drives (a console's ports line).
 func (v *HomeView) Ports() map[string]any {

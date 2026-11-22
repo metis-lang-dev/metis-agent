@@ -134,6 +134,20 @@ func (h *HomeSem) LevelLines(pkg string) []string {
 	return h.W.B.Lines(pkg)
 }
 
+// LevelAtoms are pkg's level atoms now (semworld Board.LevelAtoms): the host corrects them against the
+// program's counts with its other readings (none for a package that declares no levels).
+func (h *HomeSem) LevelAtoms(pkg string) map[string]bool {
+	h.mu.Lock()
+	j := h.joined[pkg]
+	h.mu.Unlock()
+	if !j {
+		return nil
+	}
+	h.W.W.Lock()
+	defer h.W.W.Unlock()
+	return h.W.B.LevelAtoms(pkg)
+}
+
 // Weights are the world's ports as the runtime's weight functions (bound to the wire's weight ports).
 func (h *HomeSem) Weights() map[string]rt.WeightFunc {
 	out := map[string]rt.WeightFunc{}

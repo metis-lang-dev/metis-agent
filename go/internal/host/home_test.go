@@ -115,7 +115,13 @@ func TestHomeOutsideColdHysteresisAndNothingWhenStopped(t *testing.T) {
 		t.Fatal("stopped: the sensor reads the unit")
 	}
 	u.running, u.outside = true, f64(12)
-	if !w.Readings(2)["mild_out(u2)"] {
+	for b := 2; b < 2+levWarmup; b++ { // the warm-up: the sensor reads the unit, not the weather yet
+		if !w.Readings(b)["out_unknown(u2)"] {
+			t.Fatalf("beat %d of the warm-up: not the weather yet", b)
+		}
+	}
+	b0 := 2 + levWarmup
+	if r := w.Readings(b0); !r["mild_out(u2)"] || !r["outside(mild_out,u2)"] {
 		t.Fatal("12: mild")
 	}
 	for i, c := range []struct {
@@ -123,7 +129,7 @@ func TestHomeOutsideColdHysteresisAndNothingWhenStopped(t *testing.T) {
 		want string
 	}{{9, "mild_out"}, {7.5, "cold_out"}, {9.5, "cold_out"}, {10.5, "mild_out"}} {
 		u.outside = f64(c.v)
-		if !w.Readings(3 + i)[c.want+"(u2)"] {
+		if !w.Readings(b0 + 1 + i)[c.want+"(u2)"] {
 			t.Fatalf("%v: want %s", c.v, c.want)
 		}
 	}
@@ -215,7 +221,13 @@ func TestHomeAssistantMapping(t *testing.T) {
 	m := testMap(t)
 	w := NewHomeWorld(m, NewHomeHA(m, srv.URL, "t0k"))
 	r := w.Readings(1)
-	for _, a := range []string{"running(u2)", "night_mode(u2)", "heater_on(u2)", "winter_off(u2)", "cold_out(u2)",
+	if !r["out_unknown(u2)"] || !r["power(on,u2)"] || !r["power(off,u1)"] {
+		t.Fatal("a unit just seen running: its power read, its outside sensor not the weather before the warm-up")
+	}
+	for b := 2; b <= levWarmup+1; b++ {
+		r = w.Readings(b)
+	}
+	for _, a := range []string{"running(u2)", "night_mode(u2)", "heater_on(u2)", "winter_off(u2)", "cold_out(u2)", "outside(cold_out,u2)",
 		"stopped(u1)", "out_unknown(u1)", "night", "light_missing(l1)", "tv_missing(t1)", "unsensed(r1)", "ir_absent"} {
 		if !r[a] {
 			t.Errorf("want %s", a)
@@ -232,4 +244,40 @@ func TestHomeAssistantMapping(t *testing.T) {
 	if !reflect.DeepEqual(calls, want) {
 		t.Fatalf("calls %v", calls)
 	}
+}
+
+// TestHomeSimPowerLevelIsUnconfirmedForTheGrace: a commanded unit's power level (metis-worlds home_host.py's
+// levels, the world's numbers in small) is unconfirmed until its grace ends, then the reading's; the
+// view corrects the level against the program's counts like any reading (its #init included).
+func TestHomeSimPowerLevelIsUnconfirmedForTheGrace(t *testing.T) {
+	w, _ := simWorld(t)
+	v := NewHomeView("air", w)
+	counts := map[string]int{"power(off,u2)": 1, "power(off,u1)": 1}
+	if dos, _ := v.Tick(counts); contains(dos, "+power(off,u2)") {
+		t.Fatalf("the #init's level is not asserted twice: %v", dos)
+	}
+	v.OnEvent("air_on", []string{"u2"})
+	dos, _ := v.Tick(counts)
+	if !contains(dos, "-power(off,u2) 1") || !contains(dos, "+power(unconfirmed,u2)") {
+		t.Fatalf("commanded: unconfirmed, got %v", dos)
+	}
+	counts = map[string]int{"power(unconfirmed,u2)": 1, "power(off,u1)": 1}
+	for i := 0; i < HomeGrace-1; i++ {
+		if dos, _ := v.Tick(counts); len(filterPrefix(dos, "power")) != 0 {
+			t.Fatalf("within the grace: %v", dos)
+		}
+	}
+	if dos, _ := v.Tick(counts); !contains(dos, "+power(on,u2)") || !contains(dos, "-power(unconfirmed,u2) 1") {
+		t.Fatalf("after the grace: the reading's level, got %v", dos)
+	}
+}
+
+func filterPrefix(dos []string, pred string) []string {
+	var out []string
+	for _, d := range dos {
+		if strings.HasPrefix(strings.TrimLeft(d, "+-"), pred+"(") {
+			out = append(out, d)
+		}
+	}
+	return out
 }
