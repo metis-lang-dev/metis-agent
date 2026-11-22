@@ -9,7 +9,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 # the semantic world (metis-worlds libs/semantic-world/go): go.mod's replace names the sibling checkout
-# ../../metis-worlds (the NUC's ~/metis/metis-worlds, branch home or main); SEMWORLD_DIR names another
+# ../../metis-worlds (the NUC's ~/metis/metis-worlds, on main); SEMWORLD_DIR names another
 # (a worktree), through a go.work made here
 if [ -n "${SEMWORLD_DIR:-}" ]; then
   GOWORK="$(mktemp -d)/go.work"
