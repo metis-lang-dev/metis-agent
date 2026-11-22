@@ -407,11 +407,65 @@ type HomeHA struct {
 	Client  *http.Client
 	at      time.Time
 	readErr string
+
+	BoostMax time.Duration // a boost goes back to normal after this (0: never)
+	mu       sync.Mutex
+	boost    map[string]*time.Timer
 }
 
 func NewHomeHA(m *HomeMap, url, token string) *HomeHA {
 	return &HomeHA{M: m, S: newHomeState(m), URL: strings.TrimRight(url, "/"), Token: token,
-		Client: &http.Client{Timeout: 2 * time.Second}}
+		Client: &http.Client{Timeout: 6 * time.Second}, BoostMax: boostMaxFromEnv()}
+}
+
+// callRetry: a call once more after a second when it fails (the Prana's server drops requests
+// on a weak link; Home Assistant then answers 500).
+func (h *HomeHA) callRetry(method, path string, body any) (json.RawMessage, error) {
+	b, err := h.call(method, path, body)
+	if err != nil {
+		log.Printf("[home host] %s: %v; once more", path, err)
+		time.Sleep(time.Second)
+		b, err = h.call(method, path, body)
+	}
+	return b, err
+}
+
+// boostFor: a boost ends by itself after BoostMax (the unit's own boost runs on and on, and
+// boost air is cold air): back to normal.
+func (h *HomeHA) boostFor(role string) {
+	if h.BoostMax <= 0 {
+		return
+	}
+	h.boostEnd(role)
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.boost == nil {
+		h.boost = map[string]*time.Timer{}
+	}
+	h.boost[role] = time.AfterFunc(h.BoostMax, func() {
+		log.Printf("[home host] %s: boost for %s: back to normal", role, h.BoostMax)
+		h.Do("unit", role, "preset", "normal")
+	})
+}
+
+func (h *HomeHA) boostEnd(role string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if t := h.boost[role]; t != nil {
+		t.Stop()
+		delete(h.boost, role)
+	}
+}
+
+// boostMaxFromEnv: METIS_HOME_BOOST_MAX (a Go duration; 0: no limit), default 10 minutes.
+func boostMaxFromEnv() time.Duration {
+	if v := os.Getenv("METIS_HOME_BOOST_MAX"); v != "" {
+		if d, err := time.ParseDuration(v); err == nil {
+			return d
+		}
+		log.Printf("[home host] METIS_HOME_BOOST_MAX=%q: not a duration; 10m", v)
+	}
+	return 10 * time.Minute
 }
 
 func (h *HomeHA) Name() string { return "ha" }
@@ -590,19 +644,49 @@ func (h *HomeHA) Do(kind, role, op string, value any) bool {
 			if !ok {
 				return errNoEntity
 			}
-			fans := []string{"fan." + p + "_supply_fan", "fan." + p + "_extract_fan"}
-			switch op {
-			case "on", "off":
-				_, err := h.call("POST", "/api/services/fan/turn_"+op, map[string]any{"entity_id": fans})
+			// One fan at a time, never both in one call: Home Assistant runs a call's entities at
+			// once, the unit's small HTTP server drops the second request, and a bound unit (boost
+			// binds its fans) gets the command twice: on 2026-11-22 no stop reached the lab unit
+			// after a boost, one request alone stopped it at once.
+			sup, ext := "fan."+p+"_supply_fan", "fan."+p+"_extract_fan"
+			fan := func(svc, e string, extra map[string]any) error {
+				body := map[string]any{"entity_id": e}
+				for k, v := range extra {
+					body[k] = v
+				}
+				_, err := h.callRetry("POST", "/api/services/fan/"+svc, body)
 				return err
-			case "preset":
-				if v, _ := value.(string); v == "night" || v == "boost" {
-					_, err := h.call("POST", "/api/services/fan/set_preset_mode", map[string]any{"entity_id": fans, "preset_mode": v})
+			}
+			both := func(svc string) error {
+				if err := fan(svc, sup, nil); err != nil {
 					return err
 				}
-				// normal: no preset (to verify on the unit: turn_on without a preset)
-				_, err := h.call("POST", "/api/services/fan/turn_on", map[string]any{"entity_id": fans})
-				return err
+				return fan(svc, ext, nil)
+			}
+			switch op {
+			case "on", "off":
+				h.boostEnd(role)
+				return both("turn_" + op)
+			case "preset":
+				if v, _ := value.(string); v == "night" || v == "boost" {
+					// the preset is the unit's switch: set once, through one fan
+					if err := fan("set_preset_mode", sup, map[string]any{"preset_mode": v}); err != nil {
+						return err
+					}
+					if v == "boost" {
+						h.boostFor(role)
+					} else {
+						h.boostEnd(role)
+					}
+					return nil
+				}
+				// normal: Home Assistant can set a preset but not clear one; a stop clears it on
+				// the unit (seen on the lab unit's boost), so: off, then on again
+				h.boostEnd(role)
+				if err := both("turn_off"); err != nil {
+					return err
+				}
+				return both("turn_on")
 			case "heater", "winter":
 				on, _ := value.(bool)
 				svc := "turn_off"

@@ -7,6 +7,7 @@ package host
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -16,6 +17,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 var homeFamilies = [][]string{{"light_lit", "light_dark"}, {"light_ok", "light_missing"}, {"room_lit", "room_unlit"},
@@ -239,10 +241,63 @@ func TestHomeAssistantMapping(t *testing.T) {
 	NewHomeView("air", w).OnEvent("air_boost_from_night", []string{"u2"})
 	NewHomeView("air", w).OnEvent("heater_down", []string{"u2"})
 	want := [][2]any{
-		{"/api/services/fan/set_preset_mode", map[string]any{"entity_id": []any{"fan.lab_supply_fan", "fan.lab_extract_fan"}, "preset_mode": "boost"}},
+		{"/api/services/fan/set_preset_mode", map[string]any{"entity_id": "fan.lab_supply_fan", "preset_mode": "boost"}},
 		{"/api/services/switch/turn_off", map[string]any{"entity_id": "switch.lab_heater"}}}
 	if !reflect.DeepEqual(calls, want) {
 		t.Fatalf("calls %v", calls)
+	}
+}
+
+// TestHomeAssistantPranaOneFanAtATime: a unit's fans are commanded one call each (the Prana's
+// server drops a second request at once; a bound unit would get it twice), normal is off then
+// on (Home Assistant cannot clear a preset), and a boost goes back to normal after BoostMax.
+func TestHomeAssistantPranaOneFanAtATime(t *testing.T) {
+	var mu sync.Mutex
+	var calls []string
+	fail := 1 // the first call fails: retried
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			w.Write([]byte("[]"))
+			return
+		}
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+		mu.Lock()
+		defer mu.Unlock()
+		if fail > 0 {
+			fail--
+			http.Error(w, "Server disconnected", 500)
+			return
+		}
+		e, _ := body["entity_id"].(string)
+		calls = append(calls, strings.TrimPrefix(r.URL.Path, "/api/services/fan/")+" "+e+fmt.Sprint(body["preset_mode"] != nil))
+	}))
+	defer srv.Close()
+	m := testMap(t)
+	h := NewHomeHA(m, srv.URL, "t0k")
+	h.BoostMax = 300 * time.Millisecond
+	got := func() []string { mu.Lock(); defer mu.Unlock(); c := calls; calls = nil; return c }
+	if !h.Do("unit", "u2", "off", nil) {
+		t.Fatal("off refused")
+	}
+	if c := got(); !reflect.DeepEqual(c, []string{"turn_off fan.lab_supply_fanfalse", "turn_off fan.lab_extract_fanfalse"}) {
+		t.Fatalf("off: %v", c)
+	}
+	h.Do("unit", "u2", "preset", "boost")
+	if c := got(); !reflect.DeepEqual(c, []string{"set_preset_mode fan.lab_supply_fantrue"}) {
+		t.Fatalf("boost: %v", c)
+	}
+	time.Sleep(500 * time.Millisecond)
+	if c := got(); !reflect.DeepEqual(c, []string{"turn_off fan.lab_supply_fanfalse", "turn_off fan.lab_extract_fanfalse",
+		"turn_on fan.lab_supply_fanfalse", "turn_on fan.lab_extract_fanfalse"}) {
+		t.Fatalf("boost's end (normal: off, on): %v", c)
+	}
+	h.Do("unit", "u2", "preset", "boost")
+	h.Do("unit", "u2", "off", nil) // stopped: the boost's end is cancelled
+	got()
+	time.Sleep(500 * time.Millisecond)
+	if c := got(); len(c) != 0 {
+		t.Fatalf("a stopped unit's boost ended anyway: %v", c)
 	}
 }
 
