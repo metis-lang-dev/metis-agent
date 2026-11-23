@@ -37,10 +37,13 @@ def alive(pid):
 
 
 def runtimes(root):
-    """The runtimes' discovery files of the workspace ROOT (.metis/runtimes/<name>.json), each with alive."""
+    """The runtimes' discovery files of the workspace ROOT (.metis/runtimes/<name>.json), each with alive. A headless
+    runtime's summary beside them (<name>.summary.json, runtime/serve.py) is not a runtime."""
     d = Path(root) / ".metis" / "runtimes"
     out = []
     for f in sorted(d.glob("*.json")) if d.is_dir() else []:
+        if f.name.endswith(".summary.json"):
+            continue
         try:
             rec = json.loads(f.read_text())
         except (OSError, ValueError):

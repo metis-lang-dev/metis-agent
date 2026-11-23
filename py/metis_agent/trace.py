@@ -403,12 +403,21 @@ class TraceHost:
     def __init__(self, member, feed):
         self.member, self.feed = member, feed
         self.touched, self.world_preds = set(), set()
+        self.presence, self.seen = False, set()     # observe(): presence, in a watched replay
 
     def reading(self):
         return dict(self.feed.copies.get(self.member, {}))
 
     def observe(self, counts):
-        return self.reading()
+        if not self.presence:
+            return self.reading()
+        # a watched replay (replay_composition's WATCH): the record's copy is a SET (+/- per tick), so the reading is
+        # presence: an atom in the copy at the session's own count (1 when it has none), an atom the copy held and
+        # dropped at 0. A count the trace does not carry is never a surprise; an atom there or gone against the
+        # member's model is
+        now = self.feed.copies.get(self.member, {})
+        self.seen |= set(now)
+        return {a: (max(1, int(counts.get(a, 0))) if a in now else 0) for a in self.seen}
 
     def next_lines(self):
         q = self.feed.beats.get(self.member) or []
@@ -538,6 +547,13 @@ class CompositionReplay:
         self.ticks, self.divergence, self.checkpoints = 0, None, 0
         self.rows, self.first_enabled, self.live_changed, self.at = [], None, False, {}
         self.unjudged = []                         # members whose weight ports the trace does not carry: their choices the record's
+        self.divergences, self.resyncs = [], 0     # a watched replay's (replay_composition's WATCH): it goes on past them
+
+    def diverged(self, bad, most=100):
+        if self.divergence is None:
+            self.divergence = bad
+        if len(self.divergences) < most:
+            self.divergences.append(bad)
 
     @property
     def ok(self):
@@ -558,13 +574,20 @@ def _compare(rec, got):
     return None
 
 
-def replay_composition(path, cfg, candidate=None):
+def replay_composition(path, cfg, candidate=None, segments=None, watch=None):
     """Every member and the director over the trace at PATH, on the real Live built from CFG (the run's config, its catalog in the
     environment): the hosts feed what was applied, the relays are the agent's own. No candidate: it must give the record, every tick,
     fired rows and commands alike. → CompositionReplay; .divergence the first. CANDIDATE ({"member", "rules"}: CFG's catalog has them): every tick is
-    run and compared (fired_diff)."""
+    run and compared (fired_diff).
+
+    WATCH (a callable; the headless runtime's --follow-trace, runtime/serve.py): every member's watch NOT blind, whatever the
+    trace's header says (a stack writes blind: true), and each surprise it raises handed to WATCH as the Live's on_finding gives
+    it ({kind: watch, k, member, words, ...}); a divergence from the record does not end the replay (a surprised member observes
+    only: its rows differ from then on): the first is .divergence, all are .divergences, and at a segment's checkpoint the
+    sessions that differ are set to it (resynced: .resyncs). SEGMENTS: the segments to replay in place of read(PATH), a sequence
+    whose [0] is there at once and whose iteration may wait for more (a followed trace's, each segment's ticks likewise)."""
     from . import service as S
-    segs = T.read(path)
+    segs = T.read(path) if segments is None else segments
     head = segs[0].header
     unjudged = sorted(m for m, h in head["members"].items() if h.get("weights"))
     for m, h in head["members"].items():
@@ -592,11 +615,20 @@ def replay_composition(path, cfg, candidate=None):
             if not candidate and head.get("image") and lv.image is not None and lv.image.hash != head["image"]:
                 raise T.TraceError("this trace is of image %s, this config's is %s: it does not replay across a relink" % (head["image"], lv.image.hash))
             out.live_changed = bool(head.get("live")) and head["live"] != _live_key()
+            if watch is not None:
+                # the kernel watch's surprises as the Live's own sink gives them (service.Live.watch_finding, at the trace's
+                # k); the rest of a tick's replies are nobody's here, as unwatched
+                lv.on_finding = watch
+                lv.handle_due = lambda beat, due: [lv.watch_finding(dict(r, text=r.get("text"))) for r in due
+                                                   if r.get("kind") == "surprise"]
+
             def prepare(m, a):
-                a.watch.blind = True               # a surprise is a reading against a world: none here (a run's stall shows as a divergence)
+                a.watch.blind = watch is None      # a surprise is a reading against a world: none here (a run's stall shows as a divergence),
+                                                   # unless watched: then never blind, whatever the header says
                 outer = getattr(a, "host", None)
                 inner = getattr(outer, "inner", outer)
                 if isinstance(inner, TraceHost):
+                    inner.presence = watch is not None
                     inner.outer, outer.commands = outer, ()
                     if candidate and m == candidate["member"]:
                         inner.repl, inner.watched = a.repl, set(candidate["rules"])
@@ -630,9 +662,13 @@ def replay_composition(path, cfg, candidate=None):
             for i, seg in enumerate(segs):
                 if i and "cut" not in seg.header and not candidate:
                     bad = _sessions_differ(ags, seg)
-                    if bad:
+                    if bad and watch is None:
                         out.divergence = bad
                         return out
+                    if bad:                        # watched: the record's checkpoint is the truth, the sessions set to it
+                        out.diverged(bad)
+                        _restart(lv, ags, feed, tracer, seg)
+                        out.resyncs += 1
                     out.checkpoints += 1
                 if i and "cut" in seg.header:      # a new game, a room entered (alf-bundle step 3): the world changed under the run,
                     _restart(lv, ags, feed, tracer, seg)   # the replay carries on from the record's checkpoint after it
@@ -657,6 +693,8 @@ def replay_composition(path, cfg, candidate=None):
                         for m in want_at.get(rec["k"], ()) if not rec.get("between") else ():
                             e = (got or {"members": {}})["members"].get(m, {})
                             out.at[(rec["k"], m)] = {"counts": dict(ags[m].repl.counts), "fired": _fired(e), "out": [x for x in e.get("out", ()) if isinstance(x, str)]}
+                    elif bad and watch is not None:
+                        out.diverged(bad)
                     elif bad:
                         out.divergence = bad
                         return out
