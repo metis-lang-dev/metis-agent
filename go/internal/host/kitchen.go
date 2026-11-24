@@ -113,9 +113,14 @@ type Shared struct {
 	Root string
 	// Sem: the semantic world the home is read through (metis-home sets it before the build; nil: the
 	// backend from the environment, Home Assistant's REST polling or the simulation)
-	Sem  *semhome.Home
-	mu   sync.Mutex
-	home *HomeWorld
+	Sem *semhome.Home
+	// Apply and Device, with Sem: an embedding's event log (every change to the world an event it
+	// logs and applies) and its own way to the devices (nil: Home Assistant's REST calls from the
+	// environment)
+	Apply  func(semhome.Event) (semhome.Out, error)
+	Device Device
+	mu     sync.Mutex
+	home   *HomeWorld
 }
 
 // Home is the process's home world, made on first use from the map under Root.
@@ -129,8 +134,16 @@ func (s *Shared) Home() (*HomeWorld, error) {
 		}
 		var back HomeBackend
 		if s.Sem != nil {
-			if ha, ok := HomeBackendFromEnv(m).(*HomeHA); ok {
-				back = NewHomeSem(m, s.Sem, ha)
+			dev := s.Device
+			if dev == nil {
+				if ha, ok := HomeBackendFromEnv(m).(*HomeHA); ok {
+					dev = ha
+				}
+			}
+			if dev != nil {
+				sem := NewHomeSem(m, s.Sem, dev)
+				sem.Apply = s.Apply
+				back = sem
 			}
 		}
 		s.home = NewHomeWorld(m, back)

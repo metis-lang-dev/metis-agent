@@ -7,6 +7,7 @@ package host
 // beliefs:/levels: read the world's quantised ports.
 
 import (
+	"log"
 	"strings"
 	"sync"
 	"time"
@@ -19,28 +20,56 @@ import (
 // Now is the world's clock: Unix seconds.
 func Now() float64 { return float64(time.Now().UnixNano()) / 1e9 }
 
-// HomeSem is the backend over the semantic world W; commands reach Home Assistant through HA.
+// Device is what carries a command to the devices (Home Assistant's REST calls: HomeHA, or an
+// embedding's own, as Nina's acasa).
+type Device interface {
+	Do(kind, role, op string, value any) bool
+}
+
+// HomeSem is the backend over the semantic world W; commands reach the devices through HA.
+//
+// Every change it makes to the world is an event (semantic-world home.Event) given to Apply: the
+// beat's settle, a command's prediction, a package's conclusion. An embedding that keeps an event
+// log (Nina) sets Apply to log the event and then apply it, so the log is the world's one writer
+// and a replay rebuilds it; unset, the events are applied to W directly.
 type HomeSem struct {
-	M   *HomeMap
-	W   *semhome.Home
-	HA  *HomeHA
-	S   *HomeState
-	Now func() float64
+	M     *HomeMap
+	W     *semhome.Home
+	HA    Device
+	S     *HomeState
+	Now   func() float64
+	Apply func(semhome.Event) (semhome.Out, error)
 
 	mu     sync.Mutex
 	joined map[string]bool
+	beat   semhome.Out // the last settle's outputs (its members' lines)
 }
 
 // NewHomeSem is the backend on world w, commanding through ha.
-func NewHomeSem(m *HomeMap, w *semhome.Home, ha *HomeHA) *HomeSem {
+func NewHomeSem(m *HomeMap, w *semhome.Home, ha Device) *HomeSem {
 	return &HomeSem{M: m, W: w, HA: ha, S: newHomeState(m), Now: Now, joined: map[string]bool{}}
+}
+
+func (h *HomeSem) apply(ev semhome.Event) semhome.Out {
+	f := h.Apply
+	if f == nil {
+		f = h.W.Apply
+	}
+	out, err := f(ev)
+	if err != nil {
+		log.Printf("[home host] the world refused %s: %v", ev.Kind, err)
+	}
+	return out
 }
 
 func (h *HomeSem) Name() string { return "semworld" }
 
 // Read settles the world (the beat's boundary step) and reads the families' state from it.
 func (h *HomeSem) Read() *HomeState {
-	h.W.Settle(h.Now())
+	out := h.apply(semhome.Event{At: h.Now(), Kind: "settle"})
+	h.mu.Lock()
+	h.beat = out
+	h.mu.Unlock()
 	st := h.W.State()
 	s := h.S
 	for k, l := range st.Lights {
@@ -92,7 +121,7 @@ func (h *HomeSem) Do(kind, role, op string, value any) bool {
 	absent := e == nil || e.Attrs["absent"] != ""
 	h.W.W.Unlock()
 	if name != "" && val != "" && !absent {
-		_ = h.W.Command(role, name, val, h.Now())
+		h.apply(semhome.Event{At: h.Now(), Kind: "command", ID: role, Var: name, Value: val})
 	}
 	return h.HA.Do(kind, role, op, value)
 }
@@ -120,18 +149,16 @@ func (h *HomeSem) Join(pkg, manifest string) error {
 	return nil
 }
 
-// LevelLines are the do-lines bringing pkg's level atoms to the world now (none for a package that
-// declares no levels).
+// LevelLines are the do-lines the last beat's settle brought for pkg's level atoms (none for a
+// package that declares no levels). Reading the board changes it, so the lines come from the
+// settle's outputs, never from Board.Lines here.
 func (h *HomeSem) LevelLines(pkg string) []string {
 	h.mu.Lock()
-	j := h.joined[pkg]
-	h.mu.Unlock()
-	if !j {
+	defer h.mu.Unlock()
+	if !h.joined[pkg] {
 		return nil
 	}
-	h.W.W.Lock()
-	defer h.W.W.Unlock()
-	return h.W.B.Lines(pkg)
+	return h.beat.Lines[pkg]
 }
 
 // LevelAtoms are pkg's level atoms now (semworld Board.LevelAtoms): the host corrects them against the
@@ -161,9 +188,7 @@ func (h *HomeSem) Weights() map[string]rt.WeightFunc {
 // Conclude writes a package's conclusion (an advise_* outcome) into the world: the member's own entry,
 // never fused into a sensed belief.
 func (h *HomeSem) Conclude(pkg, atom string, on bool, rule string) {
-	h.W.W.Lock()
-	defer h.W.W.Unlock()
-	h.W.W.Conclude(pkg, atom, on, rule, h.Now())
+	h.apply(semhome.Event{At: h.Now(), Kind: "conclude", Member: pkg, Fact: atom, On: on, Rule: rule})
 }
 
 // concluded are the conclusion preds: advice the rules give unasked.

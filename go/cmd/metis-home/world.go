@@ -117,13 +117,13 @@ func followHA(w *semhome.Home, url, token string) error {
 			var states []semhome.HAState
 			_ = json.Unmarshal(m.Result, &states)
 			now := host.Now()
-			for _, st := range states {
-				w.Ingest(st, now)
+			for i := range states {
+				w.Apply(semhome.Event{At: now, Kind: "ha_state", HA: &states[i]})
 			}
 			log.Printf("[world] %d states folded in", len(states))
 		case m.Type == "event":
 			if st := m.Event.Data.NewState; st != nil {
-				w.Ingest(*st, host.Now())
+				w.Apply(semhome.Event{At: host.Now(), Kind: "ha_state", HA: st})
 			}
 		}
 	}
@@ -135,7 +135,7 @@ func runHA(w *semhome.Home, url, token string) {
 	for {
 		t0 := time.Now()
 		err := followHA(w, url, token)
-		w.FeedDown(host.Now())
+		w.Apply(semhome.Event{At: host.Now(), Kind: "feed_down"})
 		if errors.Is(err, errAuth) {
 			log.Printf("[world] %v: the world gets no readings", err)
 			return

@@ -84,11 +84,6 @@ type ToolCall struct {
 	Args   map[string]any `json:"args"`
 }
 
-// Outcome is a call's answer: done | refused | error | pending, with the rule's words.
-type Outcome struct {
-	Status string `json:"status"`
-	Text   string `json:"text"`
-}
 
 // ServeTools answers the tool port: tools() lists, call() runs one call (blocking until its outcome).
 func ServeTools(addr string, tools func() []Tool, call func(ToolCall) Outcome) (net.Listener, error) {
@@ -113,7 +108,7 @@ func ServeTools(addr string, tools func() []Tool, call func(ToolCall) Outcome) (
 					}
 					var out any
 					if err := json.Unmarshal(sc.Bytes(), &req); err != nil {
-						out = Outcome{"error", "a request is a JSON object: " + err.Error()}
+						out = Outcome{Status: "error", Text: "a request is a JSON object: " + err.Error()}
 					} else {
 						switch req.Op {
 						case "tools":
@@ -121,7 +116,7 @@ func ServeTools(addr string, tools func() []Tool, call func(ToolCall) Outcome) (
 						case "call":
 							out = call(req.ToolCall)
 						default:
-							out = Outcome{"error", "op is tools or call"}
+							out = Outcome{Status: "error", Text: "op is tools or call"}
 						}
 					}
 					b, _ := json.Marshal(out)

@@ -1,4 +1,4 @@
-package main
+package metishome
 
 // The home's tools as the conversation's LLM sees them: one per package, its
 // intent schema (metispy metis.intents schema, ported) with the package's
@@ -100,7 +100,8 @@ func verbNames(v any) []string {
 }
 
 // toolFor is the package's tool: its manifest line and its schema, described.
-func toolFor(root, pkg string) (Tool, error) {
+// ToolFor is package pkg's tool under the catalog root: home_<pkg>, its intents and slots.
+func ToolFor(root, pkg string) (Tool, error) {
 	dir := filepath.Join(root, "domains", pkg)
 	b, err := os.ReadFile(filepath.Join(dir, "intent.yaml"))
 	if err != nil {
