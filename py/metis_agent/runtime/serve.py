@@ -3,7 +3,8 @@ nobody attached, recording every finding as a loop-readable surprise. A nightly 
 stops it after; the driver reads the summary file.
 
     python -m metis_agent.runtime.serve --name N --workspace W [--follow-trace DIR [--config CFG] [--composition D]
-                                        [--run RUN]] [--until-file F | --linger S] [--port P] [--window PRE,POST]
+                                        [--run RUN] [--exclude [MEMBER:]PRED ...]] [--until-file F | --linger S]
+                                        [--port P] [--window PRE,POST]
 
 - the workspace W (made, with W/.metis/, when missing); the feed serves on 127.0.0.1 with a fresh token and writes its
   discovery file W/.metis/runtimes/<N>.json (a client MAY attach: /metis-runtime N; none needs to); the journal
@@ -13,9 +14,19 @@ stops it after; the driver reads the summary file.
   whole lines), mirrored into W/.metis/traces/<RUN>/ (RUN: --run, default DIR's name, or its parent's when DIR is
   road_trace), and replayed on the composition's Live with every member's watch NOT blind, whatever the header says (a
   stack writes blind: true): metis_agent.trace.replay_composition(watch=...), the agent's own watch and relay code, no
-  law evaluated here. Each surprise of a watch is a finding {kind: watch, k, member} written through the feed's one
-  producer path (workspace.drop_window: the window [k-PRE, k+POST] kept as traces/<RUN>-<key>/, then
-  surprises/<id>.json), once its segment is closed. Each record also carries fingerprint, layer and severity (the
+  law evaluated here. NOT BLIND, EXCEPT TO THE WORLD'S CLOCK: a member's WORLD-DRIVEN predicates are left out of its
+  watch's reading (the watch never compares them with the model), as the road's runner makes its watches blind for "a
+  world that moves by itself" (metis-worlds road/runner/host.py), but only for those atoms: the law says which
+  (metis_agent.trace.world_driven): a predicate the member's manifest declares world-private, that its program consumes
+  (a linear premise, not a $-read) and that none of its rules produces: a token the world gives and the member spends,
+  put back by the world on its own clock whatever the member did (the road's `now`, the host's beat: one command a
+  period). Every other reading stays watched: a world-private atom the member only reads, or one its rules move, against
+  the model is a surprise. --exclude PRED (repeatable; MEMBER:PRED for one member) adds a predicate to every member's
+  set (one member's), whatever the law says; the summary's `excluded` is what each member's watch did not see. A member
+  is never re-armed after a surprise: it observes only for the rest of the run. Each surprise of a watch is a finding
+  {kind: watch, k, member} written through the feed's one producer path (workspace.drop_window: the window
+  [k-PRE, k+POST] kept as traces/<RUN>-<key>/, then surprises/<id>.json), once its segment is closed; its words say
+  what the watch read, never the agent's process-local line or record number. Each record also carries fingerprint, layer and severity (the
   nightly's merged index: runtime/fingerprint.py; the scene class from --scene, else the config's scene or card tags).
   The Live's config: --config (a service config), else DIR/config.yaml
   (the run's own, as runtime.run writes it); a stack's header names only its image hash and no composition, so a stack's
@@ -26,7 +37,7 @@ stops it after; the driver reads the summary file.
   discovery file removed)
 - the summary, on stdout (one JSON line) and in W/.metis/runtimes/<N>.summary.json:
       {name, recording, surprises: [ids], findings: n, segments: n, ticks, errors: [...], run, trace, followed,
-       divergences, resyncs, reason, started, stopped}
+       divergences, resyncs, excluded: {member: [predicate]}, reason, started, stopped}
   recording: true when the runtime served for its whole life and, following, the watch ran over the trace (a trace it
   cannot replay — another image, another protocol, no config — is recording: false with the reason in errors). A
   divergence from the record is not an error: a surprised member observes only, so its rows differ from then on; each
@@ -228,9 +239,20 @@ def trace_config(src, head, config=None, composition=None):
     return cfg, str(path)
 
 
-def follow_trace(feed, ws, src, stop, run=None, config=None, composition=None, idle=None, poll=POLL_S, scene=None):
-    """DIR followed into the feed (the module doc). → the summary's part: {run, trace, followed, recording, findings,
-    segments, ticks, divergences, resyncs, reason, errors}"""
+def excludes(given):
+    """--exclude's values ([MEMBER:]PRED) → {member: [pred]} with "*" for every member."""
+    out = {}
+    for x in given or ():
+        m, _, p = str(x).rpartition(":")
+        if p.strip():
+            out.setdefault(m.strip() or "*", []).append(p.strip())
+    return out
+
+
+def follow_trace(feed, ws, src, stop, run=None, config=None, composition=None, idle=None, poll=POLL_S, scene=None,
+                 exclude=None):
+    """DIR followed into the feed (the module doc). EXCLUDE: --exclude's values. → the summary's part: {run, trace,
+    followed, recording, findings, segments, ticks, divergences, resyncs, excluded, reason, errors}"""
     from metis import trace as T
     from metis_agent.trace import replay_composition
     from .run import config_yaml
@@ -242,7 +264,7 @@ def follow_trace(feed, ws, src, stop, run=None, config=None, composition=None, i
         run = "%s-%d" % (base, n)
     mirror = ws.path("trace", run=run)
     out = {"run": run, "trace": "traces/" + run, "followed": str(src), "recording": False, "findings": 0, "segments": 0,
-           "ticks": 0, "divergences": 0, "resyncs": 0, "reason": None, "errors": []}
+           "ticks": 0, "divergences": 0, "resyncs": 0, "excluded": {}, "reason": None, "errors": []}
     fl = None
     try:
         mirror.mkdir(parents=True)
@@ -264,15 +286,25 @@ def follow_trace(feed, ws, src, stop, run=None, config=None, composition=None, i
             out["findings"] += 1
             d = f.get("difference") or {}
             said = ", ".join("%s %+d" % (a, n) for a, n in sorted(d.items()))
-            words = "%s's watch (not blind) at k %s: the reading is not the model%s. %s" % (
-                f.get("member"), f.get("k"), (": " + said) if said else "", f.get("words") or "")
+            # the record's words are what the watch read; the agent's own line (its process-local "surprise N, paused:
+            # ...") and its record number are this process's, never the loop's: neither is kept
+            words = "%s's watch (not blind) at k %s: the reading is not the model%s." % (
+                f.get("member"), f.get("k"), (": " + said) if said else "")
             program = ((head.get("members") or {}).get(f.get("member")) or {}).get("key")
+            f = {x: v for x, v in f.items() if x != "record"}
             f = dict(f, words=words, slug=f.get("slug") or f.get("member"))       # one key per member and k
             f.update(FP.fields(f, family=family, program=program, scene=scene_of))   # the merged index's (fingerprint.py)
             feed.finding(f)
         out["recording"] = True
-        r = replay_composition(mirror, cfg, segments=fl, watch=sink)
-        out.update(divergences=len(r.divergences), resyncs=r.resyncs, reason=fl.ended or "end")
+        given = excludes(exclude)
+        every = given.pop("*", [])
+        members = list(head.get("members") or {})
+        unknown = sorted(set(given) - set(members))
+        if unknown:
+            out["errors"].append("--exclude names %s, not a member of this trace (%s)" % (", ".join(unknown), ", ".join(members)))
+        r = replay_composition(mirror, cfg, segments=fl, watch=sink,
+                               exclude={m: every + given.get(m, []) for m in members})
+        out.update(divergences=len(r.divergences), resyncs=r.resyncs, excluded=r.excluded, reason=fl.ended or "end")
         if r.divergence:
             out["first_divergence"] = r.divergence
     except (T.TraceError, ValueError, OSError) as e:
@@ -294,7 +326,7 @@ def follow_trace(feed, ws, src, stop, run=None, config=None, composition=None, i
 
 
 def serve(name, workspace, follow=None, until_file=None, linger=None, port=0, config=None, composition=None, run=None,
-          window=(40, 10), domain=None, stop=None, poll=POLL_S, scene=None):
+          window=(40, 10), domain=None, stop=None, poll=POLL_S, scene=None, exclude=None):
     """The runtime, start to stop (the module doc). STOP: a threading.Event (the signals set it). → the summary."""
     from metis.catalog import workspace as W
     root = Path(workspace).resolve()
@@ -326,7 +358,7 @@ def serve(name, workspace, follow=None, until_file=None, linger=None, port=0, co
     try:
         if follow:
             summary.update(follow_trace(feed, ws, follow, stop, run=run, config=config, composition=composition,
-                                        idle=linger, poll=poll, scene=scene))
+                                        idle=linger, poll=poll, scene=scene, exclude=exclude))
         else:
             stop.wait()
             summary["reason"] = "stop"
@@ -360,6 +392,8 @@ def main(argv=None):
     end.add_argument("--until-file", metavar="F", help="stop once F exists")
     end.add_argument("--linger", type=float, metavar="S",
                      help="stop after S seconds (following: S seconds with nothing new in DIR; 0: what DIR holds now)")
+    ap.add_argument("--exclude", action="append", metavar="[MEMBER:]PRED",
+                    help="a predicate the watch does not see, beside the law's world-driven ones (repeat; MEMBER:PRED for one member)")
     ap.add_argument("--port", type=int, default=0)
     ap.add_argument("--window", default="40,10", help="ticks kept before,after a finding's k (default 40,10)")
     ap.add_argument("--domain", help="the domain the hello names (default none)")
@@ -379,7 +413,7 @@ def main(argv=None):
         a.config = str(Path(a.config).resolve())
     s = serve(a.name, a.workspace, follow=a.follow_trace, until_file=a.until_file, linger=a.linger, port=a.port,
               config=a.config, composition=a.composition, run=a.run, window=(pre, post), domain=a.domain, stop=stop,
-              scene=a.scene)
+              scene=a.scene, exclude=a.exclude)
     print(json.dumps(s, default=str), file=out_fh, flush=True)
     return 0 if s.get("recording") else 1
 

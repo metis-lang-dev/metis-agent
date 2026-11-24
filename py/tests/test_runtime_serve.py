@@ -211,6 +211,8 @@ def test_follow_trace_written_incrementally_records_the_surprise(tmp_path):
     assert r["member"] == "cook_b" and r["finding"] == "watch" and r["run"] == "stack" and r["k"] >= 5
     assert r["key"] == "stack:watch:cook_b:%d" % r["k"] and r["difference"] == {"held_dish": 1}
     assert "held_dish +1" in r["words"] and "cook_b's watch (not blind)" in r["words"]
+    assert "paused" not in r["words"] and "surprise 0" not in r["words"] and "record" not in r   # nothing process-local
+    assert s["excluded"] == {"cook_a": ["order"], "cook_b": ["order"], "pot_director": []}
     assert r["layer"] == "law" and r["severity"] == "other" and re.match(r"^[0-9a-f]{16}$", r["fingerprint"])
     head = json.loads(lines(rec / "seg-0.jsonl")[0])                      # the family and the member's program key: the header's
     assert r["fingerprint"] == FP.fingerprint({"kind": "watch", "member": "cook_b", "difference": {"held_dish": 1}},
@@ -243,3 +245,65 @@ def test_the_watch_is_not_blind_whatever_the_header_says_and_a_true_run_is_quiet
     quiet = []
     r = replay_composition(tmp_path / "clean", c, watch=quiet.append)
     assert quiet == [] and r.ok, r.divergence
+
+
+def test_world_driven_is_the_law_s_world_token():
+    """world_driven: a world-private predicate the program consumes and no rule produces (the road's `now`, the
+    kitchen's `order`); a world-private one only read ($), one the rules move, or one not world-private is not."""
+    from types import SimpleNamespace as E
+    from metis_agent.trace import world_driven
+    shared = {"now": "world-private", "signal": "world-private", "lane": "world-private", "go": "out", "tick__gen": "in"}
+    events = [("clause", "act", E(consume={"now": 1, "go": 1}, produce={}, persist={"signal(nextzone,red)": 1})),
+              ("clause", "act", E(consume={"lane(left)": 1}, produce={"lane(right)": 1}, persist={})),
+              ("clause", "act", E(consume={"tick__gen(p,c,g0)": 1}, produce={"tick__gen(p,c,g1)": 1}, persist={"now": 1})),
+              ("exo", "act", E(consume={"signal(nextzone,red)": 1}, produce={"now": 1}, persist={}))]   # a world line's row: not the law
+    assert world_driven({"shared": shared}, events) == ["now"]
+    assert world_driven({"shared": dict(shared, now="out")}, events) == []
+    assert world_driven({}, events) == [] and world_driven({"shared": shared}, ()) == []
+
+
+def planted(rec, k, plus=(), minus=()):
+    """cook_b's copy at tick K of the recorded trace REC set to +PLUS -MINUS (the world's doing)."""
+    for f in rec.glob("seg-*.jsonl"):
+        rows = [json.loads(x) for x in f.read_text().splitlines()]
+        for r in rows[1:]:
+            if r["k"] == k:
+                r["members"].setdefault("cook_b", {})["copy"] = {"+": list(plus), "-": list(minus)}
+        f.write_text("".join(json.dumps(r) + "\n" for r in rows))
+
+
+@kitchen
+def test_the_world_s_own_token_is_no_surprise_and_a_reading_still_is(tmp_path, monkeypatch):
+    """The ruling (the road runner's "a world that moves by itself", narrowed to the law's world-driven atoms): the
+    kitchen's `order` is the world's token (the cooks' serve consumes it, no rule makes one). The world taking cook_b's
+    order away at k 5, against its model, is no surprise; cook_b's reading of a dish it never fetched, at the same
+    tick, still is, alone. With the derivation off, the order would have been one. --exclude adds a predicate."""
+    import metis_agent.trace as MT
+    rec, cfg = recorded(tmp_path)
+    c = json.loads(cfg.read_text())
+    planted(rec, 5, plus=["held_dish"], minus=["order"])
+    seen = []
+    r = MT.replay_composition(rec, c, watch=seen.append)
+    assert r.excluded == {"cook_a": ["order"], "cook_b": ["order"], "pot_director": []}
+    assert [(f["member"], f["difference"]) for f in seen] == [("cook_b", {"held_dish": 1})]
+    with monkeypatch.context() as mp:                                       # the law's set off: the token is read
+        mp.setattr(MT, "world_driven", lambda manifest, events: [])
+        blind_to_nothing = []
+        MT.replay_composition(rec, c, watch=blind_to_nothing.append)
+        assert [(f["member"], f["difference"]) for f in blind_to_nothing] == [("cook_b", {"held_dish": 1, "order": -1})]
+    planted(rec, 5, minus=["order"])                                        # the token alone: quiet, and the record replays
+    quiet = []
+    r = MT.replay_composition(rec, c, watch=quiet.append)
+    assert quiet == [] and r.ok, r.divergence
+    with monkeypatch.context() as mp:
+        mp.setattr(MT, "world_driven", lambda manifest, events: [])
+        loud = []
+        MT.replay_composition(rec, c, watch=loud.append)
+        assert [(f["member"], f["difference"]) for f in loud] == [("cook_b", {"order": -1})]
+    # the runtime: --exclude adds to the law's set (one member's, MEMBER:PRED), and the summary says what was not seen
+    planted(rec, 5, plus=["held_dish"], minus=["order"])
+    s = SV.serve("bench", tmp_path / "ws", follow=rec, config=cfg, linger=0, poll=0.02, exclude=["cook_b:held_dish"])
+    assert s["recording"] and s["errors"] == [] and s["surprises"] == [] and s["findings"] == 0
+    assert s["excluded"] == {"cook_a": ["order"], "cook_b": ["held_dish", "order"], "pot_director": []}
+    s = SV.serve("bench2", tmp_path / "ws2", follow=rec, config=cfg, linger=0, poll=0.02, exclude=["nobody:order"])
+    assert len(s["surprises"]) == 1 and any("--exclude names nobody" in e for e in s["errors"])

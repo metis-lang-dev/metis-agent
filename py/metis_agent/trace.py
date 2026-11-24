@@ -388,6 +388,29 @@ class Feed:
             self.beats[m] = [i["beat"] for i in e.get("seq", ()) if "beat" in i]
 
 
+def _pred(atom):
+    return str(atom).split("(", 1)[0]
+
+
+def world_driven(manifest, events):
+    """The member's WORLD-DRIVEN predicates, from its law: those its manifest declares world-private (shared: P:
+    world-private) that its program CONSUMES (a rule's linear premise, not a $-read) and that no rule of it PRODUCES.
+    Such an atom is a token the world gives and the member spends (the road's `now`, the host's beat: one command a
+    period); only the world puts it back, on its own clock, whatever the member did, so its presence in a reading is the
+    world's motion, never the member's effect: a watch compared on it is surprised by the world's clock (the road
+    runner's watch is blind for that reason). A world-private atom the member only reads ($), or one its rules move
+    (consumed and produced, a P(a) -o P(b)), is not: a reading against the model there is a surprise. EVENTS: the
+    program's (repl.events_tbl rows (kind, stage, event)). → the sorted predicate names."""
+    world = {p for p, v in ((manifest or {}).get("shared") or {}).items() if v == "world-private"}
+    spent, made = set(), set()
+    for kind, _, ev in events or ():
+        if kind == "exo":                          # a world line's row, not the program's
+            continue
+        spent |= {_pred(a) for a, n in ev.consume.items() if n}
+        made |= {_pred(a) for a, n in ev.produce.items() if n}
+    return sorted((world & spent) - made)
+
+
 class TraceHost:
     """A member's world, from the trace: its reading the recorded copy, its tick the lines it applied. A rule fired is no command to anything.
     A world line (a page's: the road page's run:, mark:, watching) is taken as the live host took it: the agent's sync after it answers
@@ -404,6 +427,7 @@ class TraceHost:
         self.member, self.feed = member, feed
         self.touched, self.world_preds = set(), set()
         self.presence, self.seen = False, set()     # observe(): presence, in a watched replay
+        self.excluded = set()                       # observe(): predicates the watch does not see (world_driven)
 
     def reading(self):
         return dict(self.feed.copies.get(self.member, {}))
@@ -414,8 +438,9 @@ class TraceHost:
         # a watched replay (replay_composition's WATCH): the record's copy is a SET (+/- per tick), so the reading is
         # presence: an atom in the copy at the session's own count (1 when it has none), an atom the copy held and
         # dropped at 0. A count the trace does not carry is never a surprise; an atom there or gone against the
-        # member's model is
-        now = self.feed.copies.get(self.member, {})
+        # member's model is. An EXCLUDED predicate's atoms (world_driven: the world's clock) are not in the reading
+        # at all, so the watch never compares them with the model
+        now = {a: n for a, n in self.feed.copies.get(self.member, {}).items() if _pred(a) not in self.excluded}
         self.seen |= set(now)
         return {a: (max(1, int(counts.get(a, 0))) if a in now else 0) for a in self.seen}
 
@@ -548,6 +573,7 @@ class CompositionReplay:
         self.rows, self.first_enabled, self.live_changed, self.at = [], None, False, {}
         self.unjudged = []                         # members whose weight ports the trace does not carry: their choices the record's
         self.divergences, self.resyncs = [], 0     # a watched replay's (replay_composition's WATCH): it goes on past them
+        self.excluded = {}                         # a watched replay's: {member: [predicate]} its watch does not see
 
     def diverged(self, bad, most=100):
         if self.divergence is None:
@@ -574,7 +600,7 @@ def _compare(rec, got):
     return None
 
 
-def replay_composition(path, cfg, candidate=None, segments=None, watch=None):
+def replay_composition(path, cfg, candidate=None, segments=None, watch=None, exclude=None):
     """Every member and the director over the trace at PATH, on the real Live built from CFG (the run's config, its catalog in the
     environment): the hosts feed what was applied, the relays are the agent's own. No candidate: it must give the record, every tick,
     fired rows and commands alike. → CompositionReplay; .divergence the first. CANDIDATE ({"member", "rules"}: CFG's catalog has them): every tick is
@@ -584,8 +610,10 @@ def replay_composition(path, cfg, candidate=None, segments=None, watch=None):
     trace's header says (a stack writes blind: true), and each surprise it raises handed to WATCH as the Live's on_finding gives
     it ({kind: watch, k, member, words, ...}); a divergence from the record does not end the replay (a surprised member observes
     only: its rows differ from then on): the first is .divergence, all are .divergences, and at a segment's checkpoint the
-    sessions that differ are set to it (resynced: .resyncs). SEGMENTS: the segments to replay in place of read(PATH), a sequence
-    whose [0] is there at once and whose iteration may wait for more (a followed trace's, each segment's ticks likewise)."""
+    sessions that differ are set to it (resynced: .resyncs). A watched member's WORLD-DRIVEN predicates (world_driven: from
+    its manifest and its program) are left out of its reading, so the world's clock is no surprise; EXCLUDE adds to them,
+    {member: [predicate]} or [predicate] for every member; .excluded is what each member's watch did not see. SEGMENTS:
+    the segments to replay in place of read(PATH), a sequence whose [0] is there at once and whose iteration may wait for more (a followed trace's, each segment's ticks likewise)."""
     from . import service as S
     segs = T.read(path) if segments is None else segments
     head = segs[0].header
@@ -629,6 +657,10 @@ def replay_composition(path, cfg, candidate=None, segments=None, watch=None):
                 inner = getattr(outer, "inner", outer)
                 if isinstance(inner, TraceHost):
                     inner.presence = watch is not None
+                    if watch is not None:          # what the watch does not see: the law's world-driven atoms, and EXCLUDE
+                        inner.excluded = set(world_driven(lv.manifest(m), a.repl.events_tbl)) | set(
+                            (exclude.get(m) or ()) if isinstance(exclude, dict) else (exclude or ()))
+                        out.excluded[m] = sorted(inner.excluded)
                     inner.outer, outer.commands = outer, ()
                     if candidate and m == candidate["member"]:
                         inner.repl, inner.watched = a.repl, set(candidate["rules"])
