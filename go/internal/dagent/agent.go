@@ -278,6 +278,13 @@ func NewAgent(d Domain, seed uint64, caseName string) (*Agent, error) {
 	names := a.handles
 	a.Replier = NewReplier(d.Name, docs, d.Spec.Outcomes, cmds, d.Spec.AlternativesFunc(), p.Queries, blocking,
 		func(v string) string {
+			if a.Host != nil {
+				if nm, ok := a.Host.Inner.(Namer); ok {
+					if n, ok := nm.Name(v); ok {
+						return n
+					}
+				}
+			}
 			if n, ok := names[v]; ok {
 				return n
 			}

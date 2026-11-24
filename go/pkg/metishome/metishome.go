@@ -77,6 +77,9 @@ type Options struct {
 	Composed   bool
 	OnTick     func(kind string, f map[string]any)
 	OnSurprise func(domain string, reply map[string]any) // a surprise, for the records (nil: dropped)
+	// Hosts: the Go hosts of the agent's own packages (by name; each also in Packages), beside the
+	// home's
+	Hosts map[string]HostSpec
 }
 
 type Service struct {
@@ -107,6 +110,7 @@ func Open(o Options) (*Service, error) {
 	if o.Session == "" {
 		o.Session = time.Now().Format("20060102-150405")
 	}
+	register(o.Hosts)
 	s := &Service{o: o, pending: map[string]chan Outcome{}}
 	s.proc = &dagent.Process{Root: o.Root, Metisc: o.Metisc, Names: o.Packages, Records: o.Records, Session: o.Session}
 	if o.Sem != nil {

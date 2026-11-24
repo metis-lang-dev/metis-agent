@@ -35,6 +35,19 @@ type Porter interface {
 	Ports() map[string]any
 }
 
+// Payloaded is a host that takes a command's payload with the event that consumed it (the
+// call's arguments the atom does not carry: a timer's minutes, a reminder's subject): it gets
+// OnPayload instead of OnEvent; payload is nil for an event that consumed no command.
+type Payloaded interface {
+	OnPayload(name string, args []string, payload map[string]any)
+}
+
+// Namer is a host whose handles' names change as it runs (a timer slot is named by what it is
+// for): a line's {T} is its name; false, the card's.
+type Namer interface {
+	Name(handle string) (string, bool)
+}
+
 // Inner is a catalog host with a hosted day (host.Plant, host.Dog).
 type Inner interface {
 	rt.Host
@@ -267,6 +280,7 @@ func (a *AgentHost) OnEvent(name string, args []string) {
 	if a.Gate != nil && !a.Gate(name) {
 		return
 	}
+	var payload map[string]any
 	if a.LastConsume != nil {
 		for _, atom := range a.LastConsume() {
 			if len(a.Inflight[atom]) == 0 {
@@ -278,6 +292,7 @@ func (a *AgentHost) OnEvent(name string, args []string) {
 				delete(a.Inflight, atom)
 			}
 			a.ActedLog = append(a.ActedLog, Acted{a.Beat(), name, q.ID, q.Payload})
+			payload = q.Payload
 			break
 		}
 	}
@@ -285,7 +300,11 @@ func (a *AgentHost) OnEvent(name string, args []string) {
 	for _, x := range a.Inner.Due() {
 		before[x] = true
 	}
-	a.Inner.OnEvent(name, args)
+	if p, ok := a.Inner.(Payloaded); ok {
+		p.OnPayload(name, args, payload)
+	} else {
+		a.Inner.OnEvent(name, args)
+	}
 	if a.LiveCase {
 		due := a.Inner.Due()
 		for i, x := range due {
