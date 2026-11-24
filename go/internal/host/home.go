@@ -56,7 +56,7 @@ var homeOutcomes = map[string][]string{
 	"lights":  {"done", "refused", "switched", "kept", "missed", "auto_off", "suggest_light"},
 	"air":     {"done", "refused", "switched", "kept", "missed", "advise_winter", "noted"},
 	"media":   {"done", "refused", "switched", "kept", "missed", "sent"},
-	"scenes":  {"done", "refused", "began", "suggest", "welcomed"},
+	"scenes":  {"done", "refused", "scene_lights", "scene_air", "scene_media", "suggest", "welcomed"},
 	"comfort": {"advise_air", "advise_heater", "advise_open", "noted", "said", "refused"},
 }
 
@@ -768,6 +768,9 @@ func hysteresis(prev tri, value *float64, enter, leave float64, above bool) tri 
 
 // HomeWorld is the one world of a process, shared by its five views.
 type HomeWorld struct {
+	// Composed: the packages run as one composition under the director, which routes a scene's
+	// wishes (the home's interface): the host fans nothing out
+	Composed   bool
 	mu         sync.Mutex
 	M          *HomeMap
 	Back       HomeBackend
@@ -1244,6 +1247,9 @@ func (v *HomeView) OnEvent(name string, args []string) {
 	v.fired = append(v.fired, firedRule{base, append([]string{}, args...)})
 	switch base {
 	case "scene_set", "arrive":
+		if v.W.Composed {
+			return
+		}
 		scene := "home"
 		if base == "scene_set" && len(args) > 0 {
 			scene = args[0]

@@ -71,12 +71,17 @@ type Options struct {
 	Apply  func(semhome.Event) (semhome.Out, error)
 	Device Device
 
-	OnReasoning func(Reasoning)                           // every reply worth telling (nil: dropped)
-	OnSurprise  func(domain string, reply map[string]any) // a surprise, for the records (nil: dropped)
+	OnReasoning func(Reasoning) // every reply worth telling (nil: dropped)
+	// Composed: the packages run as the home's composition (Root/domains/composition.yaml, its image built
+	// under Root/domains/build/) under its director, on the tick; OnTick sees the tick's journal rows
+	Composed   bool
+	OnTick     func(kind string, f map[string]any)
+	OnSurprise func(domain string, reply map[string]any) // a surprise, for the records (nil: dropped)
 }
 
 type Service struct {
 	o       Options
+	tick    *dagent.Tick
 	mu      sync.Mutex
 	proc    *dagent.Process
 	srv     dagent.Server
@@ -124,12 +129,55 @@ func Open(o Options) (*Service, error) {
 		}
 	}
 	var err error
-	if s.srv, err = s.proc.Build(o.Seed, "live"); err != nil {
+	if o.Composed {
+		if err := s.openComposition(); err != nil {
+			return nil, err
+		}
+	} else if s.srv, err = s.proc.Build(o.Seed, "live"); err != nil {
 		return nil, fmt.Errorf("the home's packages: %w", err)
 	}
 	s.hashes = s.watched()
 	s.loadTools()
 	return s, nil
+}
+
+// openComposition builds the home's composition and its tick.
+func (s *Service) openComposition() error {
+	c, err := dagent.ReadComposition(filepath.Join(s.o.Root, "domains"))
+	if err != nil {
+		return fmt.Errorf("the home's composition: %w (build it: metisc build . in %s/domains)", err, s.o.Root)
+	}
+	if w, err := s.proc.Shared().Home(); err == nil {
+		w.Composed = true // the director routes a scene's wishes: the host fans nothing out
+	}
+	ds, err := s.proc.BuildComposition(c, s.o.Seed, "live")
+	if err != nil {
+		return fmt.Errorf("the home's composition: %w", err)
+	}
+	s.srv = ds
+	s.tick = dagent.NewTick(c, ds, dagent.TickHooks{
+		Journal: func(kind string, f dagent.F) {
+			if s.o.OnTick != nil {
+				s.o.OnTick(kind, map[string]any(f))
+			}
+		},
+		Reply: func(r map[string]any) {
+			if d, _ := r["domain"].(string); d == c.Direct() {
+				// the director's own lines (who is woken for what) are its bookkeeping: the tick's journal, not
+				// the voice; what it says for the person comes as Say
+				if s.o.OnTick != nil {
+					s.o.OnTick("tick-said", map[string]any{"domain": d, "text": r["text"], "kind": r["kind"]})
+				}
+				return
+			}
+			s.reply(r)
+		},
+		Say: func(text, kind string) {
+			s.tell(Reasoning{Domain: c.Direct(), Kind: "event", Text: text, Line: c.Direct() + " noticed: " + text})
+		},
+	})
+	s.tick.AllCards = true // Nina serves every package's card: the director's wake/sleep is its bookkeeping
+	return nil
 }
 
 // Backend is how the home is read: semworld, ha (REST polling) or sim.
@@ -182,7 +230,13 @@ func (s *Service) Call(ctx context.Context, tool string, args map[string]any) Ou
 	s.nid++
 	id := fmt.Sprintf("t%d", s.nid)
 	s.pending[id] = out
-	s.serve(map[string]any{"id": id, "domain": d, "verb": verb, "args": a})
+	if s.tick != nil {
+		for _, r := range s.tick.Intent(d, id, verb, a) {
+			s.reply(r)
+		}
+	} else {
+		s.serve(map[string]any{"id": id, "domain": d, "verb": verb, "args": a})
+	}
 	s.mu.Unlock()
 	select {
 	case o := <-out:
@@ -196,6 +250,10 @@ func (s *Service) Call(ctx context.Context, tool string, args map[string]any) Ou
 func (s *Service) Beat() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.tick != nil {
+		s.tick.Step()
+		return
+	}
 	s.serve(map[string]any{"clock": "beat"})
 }
 
@@ -304,6 +362,14 @@ func (s *Service) serve(msg map[string]any) {
 		if json.Unmarshal(b, &r) != nil {
 			continue
 		}
+		s.reply(r)
+	}
+}
+
+// reply handles one reply of the rules (s.mu held): reasoning out, an outcome to its caller, a
+// surprise to the records.
+func (s *Service) reply(r map[string]any) {
+	{
 		d, _ := r["domain"].(string)
 		kind, _ := r["kind"].(string)
 		status, _ := r["status"].(string)
@@ -317,7 +383,7 @@ func (s *Service) serve(msg map[string]any) {
 		id, _ := r["id"].(string)
 		ch, ok := s.pending[id]
 		if !ok {
-			continue
+			return
 		}
 		switch {
 		case kind == "error":

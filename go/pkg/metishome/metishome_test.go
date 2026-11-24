@@ -185,3 +185,55 @@ func joinOn(w *semhome.Home, root, pkg string) error {
 	}
 	return w.B.Join(man)
 }
+
+// TestTheComposedHomeRoutesAScene: the home's composition (nina-live/catalog/domains, its image built)
+// under its director, on the tick: the night scene's three wishes are routed by the director's rules to the
+// lights, the air and the media (no host fan-out), and each package settles its devices by its sweep rules.
+func TestTheComposedHomeRoutesAScene(t *testing.T) {
+	t.Setenv("METIS_HOME_HA", "")
+	root := homeWorld(t)
+	var mu sync.Mutex
+	var said []string
+	var goals [][2]string
+	s, err := Open(Options{Root: root, Records: "off", Composed: true,
+		OnReasoning: func(r Reasoning) { mu.Lock(); said = append(said, r.Line); mu.Unlock() },
+		OnTick: func(kind string, f map[string]any) {
+			if kind == "tick-relay" && f["what"] == "goal" {
+				mu.Lock()
+				goals = append(goals, [2]string{f["domain"].(string), f["goal"].(string)})
+				mu.Unlock()
+			}
+		}})
+	if err != nil {
+		t.Skip(err) // no built image: metisc build . in nina-live/catalog/domains
+	}
+	if len(s.Tools()) != 5 {
+		t.Fatalf("%d tools", len(s.Tools()))
+	}
+	stop := beating(s)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	o := s.Call(ctx, "home_scenes", map[string]any{"intent": "NIGHT"})
+	if o.Status != "done" {
+		stop()
+		t.Fatalf("the night scene: %+v", o)
+	}
+	time.Sleep(600 * time.Millisecond)
+	stop()
+	mu.Lock()
+	defer mu.Unlock()
+	want := map[[2]string]bool{{"lights", "scene_lights(night)"}: true, {"air", "scene_air(night)"}: true, {"media", "scene_media(night)"}: true}
+	for _, g := range goals {
+		delete(want, g)
+	}
+	if len(want) != 0 {
+		t.Fatalf("not routed: %v (goals %v)", want, goals)
+	}
+	joined := strings.Join(said, "\n")
+	for _, p := range []string{"lights ", "air ", "media "} {
+		if !strings.Contains(joined, p) {
+			t.Fatalf("no line from %s after the scene:\n%s", p, joined)
+		}
+	}
+	t.Logf("goals %v\n%s", goals, joined)
+}

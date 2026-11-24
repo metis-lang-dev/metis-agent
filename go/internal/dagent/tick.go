@@ -133,6 +133,9 @@ type Tick struct {
 	Hooks TickHooks
 	Beat  int
 	Off   map[string]bool // specialists whose card the director put to sleep
+	// AllCards: every card stays served (Nina's five): the director's wake/sleep is journaled, its
+	// sleep filters nothing
+	AllCards bool
 
 	lastBeat   map[string]int
 	seen       map[string]seenRows
@@ -142,7 +145,8 @@ type Tick struct {
 	cancelQ    []string
 	cancelLate []string
 	goalTake   map[string]int
-	stop       string // "" | asserted | beaten
+	awaiting   map[string]bool // members given a goal that have not answered: idle(D) once they are quiet
+	stop       string          // "" | asserted | beaten
 	lastStatus map[string]string
 	holders    map[string]string // resource → its holder
 	rows       map[string][]TraceRow
@@ -164,7 +168,7 @@ type grantOut struct {
 // NewTick is the tick over the composition's agents; the director's loop from its facts and kinds.
 func NewTick(c *Composition, d *Domains, h TickHooks) *Tick {
 	t := &Tick{C: c, D: d, Hooks: h, Off: map[string]bool{}, lastBeat: map[string]int{}, seen: map[string]seenRows{},
-		granted: map[string]bool{}, goalTake: map[string]int{}, holders: map[string]string{}, rows: map[string][]TraceRow{},
+		granted: map[string]bool{}, goalTake: map[string]int{}, awaiting: map[string]bool{}, holders: map[string]string{}, rows: map[string][]TraceRow{},
 		Why: map[string]string{}}
 	if dn := c.Direct(); dn != "" && d.Agents[dn] != nil {
 		t.Dir = NewDirectorLoop(dn, NewDirectorFacts(c.Director.Facts), c.Director.Kinds, tickOps{t})
@@ -248,7 +252,9 @@ func (t *Tick) sift(d string, r map[string]any) {
 		if r["kind"] == "taken" || r["clock"] != nil || r["ack"] != nil {
 			return
 		}
-		if t.Dir != nil && r["kind"] == "result" && t.Dir.Domains[d] {
+		// a result nobody asked for is held: the director speaks for its domains' (its lines, its ask); a
+		// call's result (its id) always reaches its caller
+		if id, _ := r["id"].(string); t.Dir != nil && r["kind"] == "result" && t.Dir.Domains[d] && id == "" {
 			t.held = append(t.held, r)
 			return
 		}
@@ -334,7 +340,25 @@ func (t *Tick) Step() {
 	}
 	t.releaseHeld(k)
 	if t.Dir != nil {
+		t.crossed(k)
 		t.statuses()
+	}
+}
+
+// crossed: a signal that arrived from a member and was forwarded has crossed (it is its handler's
+// now): retracted from the member that put it out, which may not consume its own out (spec/15 I4).
+func (t *Tick) crossed(k int) {
+	for _, b := range t.Dir.Log[k:] {
+		if b.From == "" || len(b.Goals) == 0 {
+			continue
+		}
+		ag, m := t.D.Agents[b.From], t.C.Member(b.From)
+		p := kindOfAtom(b.Arrival)
+		if ag == nil || m == nil || m.Shared[p] != "out" || ag.Sh.Counts.N[b.Arrival] <= 0 {
+			continue
+		}
+		t.take(b.From, []string{"-" + b.Arrival + " 1"}, false)
+		t.journal("tick-relay", F{"what": "crossed", "from": b.From, "atom": b.Arrival, "stamp": t.Beat})
 	}
 }
 
@@ -538,6 +562,9 @@ func (o tickOps) Instance(d, goal string) {
 	}
 	if t.take(d, lines, true) {
 		t.goalTake[d] = t.Beat
+		if t.Dir.Facts.Specialist[d] {
+			t.awaiting[d] = true
+		}
 	}
 	t.journal("tick-relay", F{"what": "goal", "domain": d, "goal": goal, "stamp": t.Beat})
 }
@@ -560,6 +587,10 @@ func (o tickOps) Generation(args ...string) {
 func (o tickOps) Cancel(d string) { o.t.cancel(d) }
 
 func (t *Tick) card(d string, on bool) {
+	if t.AllCards {
+		t.journal("tick-card", F{"domain": d, "active": on, "stamp": t.Beat})
+		return
+	}
 	if on {
 		delete(t.Off, d)
 	} else {
@@ -663,6 +694,17 @@ func (t *Tick) statuses() {
 		t.journal("tick-relay", F{"what": "status", "domain": t.Dir.Name, "lines": lines, "stamp": t.Beat})
 	}
 	t.lastStatus = out
+	// a specialist given a goal that has beaten since and is quiet (idle or done) answered: idle(D)
+	// arrives, the director's bookkeeping frees it (the base: "idle arrives after linger beats"; a
+	// specialist that answers with a result kind is idled by the loop itself)
+	for _, d := range doms {
+		if t.awaiting[d] && t.lastBeat[d] > t.goalTake[d] && out[d] != "running" {
+			delete(t.awaiting, d)
+			if !contains(t.Dir.Queue, "idle("+d+")") {
+				t.Dir.Arrive("idle(" + d + ")")
+			}
+		}
+	}
 	// the reports any specialist's rules produced this tick, woken or not: into the director, latched
 	reports := t.C.Reports()
 	for _, d := range doms {
