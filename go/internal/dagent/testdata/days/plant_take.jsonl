@@ -1,0 +1,9 @@
+{"ports": {}, "id": "p0"}
+{"clock": "beat"}
+{"take": ["+moist 1"], "id": "t1"}
+{"clock": "beat"}
+{"take": ["-moist 1", "+dry 1"], "refresh": false, "id": "t2"}
+{"clock": "beat"}
+{"take": [], "id": "t3"}
+{"take": "+moist 1"}
+{"clock": "beat"}

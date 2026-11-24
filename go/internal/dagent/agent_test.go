@@ -14,6 +14,7 @@ package dagent
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,9 +53,14 @@ func testDomain(t *testing.T, d string) Domain {
 
 // liveDay is py's serve() on the day now: dagent_fixtures.py --live, its stream's lines.
 func liveDay(t *testing.T, d string, trace, narrate bool) [][]byte {
+	return liveDayFile(t, d, d, trace, narrate)
+}
+
+// liveDayFile: py's domain agent for domain d on the day testdata/days/<day>.jsonl
+func liveDayFile(t *testing.T, d, dayName string, trace, narrate bool) [][]byte {
 	python := venvPython(t)
 	tool, _ := filepath.Abs("../../../py/tools/dagent_fixtures.py")
-	day, _ := filepath.Abs("testdata/days/" + d + ".jsonl")
+	day, _ := filepath.Abs("testdata/days/" + dayName + ".jsonl")
 	args := []string{tool, "--live", d, day}
 	if trace {
 		args = append(args, "--trace")
@@ -237,4 +243,43 @@ func (n stubNarrator) Narrate(f Fragment) Narrated {
 		return Narrated{Text: head + "."}
 	}
 	return Narrated{Text: "narrated " + f.Kind + ": " + f.Body()}
+}
+
+// TestATakeIsPys: a take (the tick's relays, grants and deliveries) is one exo row through the
+// host's tick, as py's: the same replies, the same traces after it, refresh or not, an empty take
+// and a single line.
+func TestATakeIsPys(t *testing.T) {
+	stream := liveDayFile(t, "plant", "plant_take", true, false)
+	a, err := NewAgent(testDomain(t, "plant"), 1, "replay")
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.Tracing = true
+	for n, raw := range stream {
+		var row struct {
+			In  json.RawMessage   `json:"in"`
+			Out []json.RawMessage `json:"out"`
+		}
+		if err := json.Unmarshal(raw, &row); err != nil {
+			t.Fatal(err)
+		}
+		if row.In == nil {
+			sameJSON(t, "plant ready", raw, a.Ready())
+			continue
+		}
+		var msg map[string]any
+		if err := json.Unmarshal(row.In, &msg); err != nil {
+			t.Fatal(err)
+		}
+		var srv Server = a
+		var got []any
+		srv, got = Serve(srv, msg, nil)
+		a = srv.(*Agent)
+		if len(got) != len(row.Out) {
+			t.Fatalf("line %d %s: %d outputs, py %d:\n got %s\n want %s", n, row.In, len(got), len(row.Out), js(got), js(row.Out))
+		}
+		for i := range got {
+			sameJSON(t, fmt.Sprintf("line %d %s out %d", n, row.In, i), row.Out[i], got[i])
+		}
+	}
 }

@@ -25,6 +25,7 @@ var replyKinds = map[string][]string{
 	"ports":      {"world", "pairs", "reports", "handles", "held", "host"},
 	"trace":      {"beat", "fired", "more", "narrated", "consults", "reads", "world", "records"},
 	"reloaded":   {"key"},
+	"taken":      {"id", "n"}, // a live session took do-lines as one row (take)
 	"added":      {"key"},
 }
 

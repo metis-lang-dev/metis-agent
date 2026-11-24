@@ -336,6 +336,68 @@ func (a *Agent) syncWorld() error {
 	return nil
 }
 
+// Refresher is a host that reads the world again on demand (py's inner.refresh(): another host
+// stepped it).
+type Refresher interface {
+	Refresh()
+}
+
+type linesPlugin struct {
+	rt.Host
+	lines []string
+}
+
+func (p linesPlugin) Tick(map[string]int) ([]string, bool) { return p.lines, false }
+
+// take is py's take: {"take": [do-lines], "refresh"?, "id"?}, the session's next activation
+// without a reload (a director host's deliver, a grant, a relayed report or status): the lines
+// applied as ONE exo row, as syncWorld applies a host's sync; the host refreshed first unless
+// "refresh" is false (a token the agent syncs: the world is not re-read); the watch checkpointed.
+func (a *Agent) take(msg map[string]any) ([]Reply, error) {
+	var lines []string
+	switch v := msg["take"].(type) {
+	case []any:
+		for _, x := range v {
+			if s := strings.TrimSpace(fmt.Sprint(x)); s != "" {
+				lines = append(lines, fmt.Sprint(x))
+			}
+		}
+	case []string:
+		for _, x := range v {
+			if strings.TrimSpace(x) != "" {
+				lines = append(lines, x)
+			}
+		}
+	case string:
+		if strings.TrimSpace(v) != "" {
+			lines = []string{v}
+		}
+	}
+	if a.Sh == nil || a.Sh.Plugin == nil {
+		return []Reply{a.reply("error", F{"id": msg["id"], "error": "take: this session has no env to take lines through"})}, nil
+	}
+	var inner any = a.Sh.Plugin
+	if a.Host != nil {
+		inner = a.Host.Inner
+	}
+	if r, ok := inner.(Refresher); ok {
+		if refresh, set := msg["refresh"].(bool); !set || refresh {
+			r.Refresh()
+		}
+	}
+	orig := a.Sh.Plugin
+	a.Sh.Plugin = linesPlugin{orig, lines}
+	_, _, err := a.Sh.Tick(false)
+	a.Sh.Plugin = orig
+	if err != nil {
+		return nil, err
+	}
+	if err := a.W.checkpoint(); err != nil {
+		return nil, err
+	}
+	return []Reply{a.reply("taken", F{"id": msg["id"], "n": len(lines)})}, nil
+}
+
 // reportsOf is py's intent_domain.reports: the world's reports the person
 // can send (the host's answers to a long command) -> the handle kind each
 // takes; the waits take none.
@@ -1134,6 +1196,8 @@ func (a *Agent) Handle(msg map[string]any) ([]any, error) {
 		rs = a.intent(msg)
 	case msg["world"] != nil:
 		rs = a.world(msg)
+	case hasKey(msg, "take"):
+		rs, err = a.take(msg)
 	case hasKey(msg, "ports"):
 		rs = a.ports()
 	default:
@@ -1155,7 +1219,7 @@ func anys(rs []Reply) []any {
 // kindOf is the ack's kind for a non-clock line.
 func kindOf(msg map[string]any) string {
 	for _, kn := range [][2]string{{"reset", "reset"}, {"reload", "reload"}, {"add", "add"}, {"verb", "intent"},
-		{"tool", "tool"}, {"world", "world"}, {"ports", "ports"}} {
+		{"tool", "tool"}, {"world", "world"}, {"take", "take"}, {"ports", "ports"}} {
 		if hasKey(msg, kn[0]) {
 			return kn[1]
 		}
