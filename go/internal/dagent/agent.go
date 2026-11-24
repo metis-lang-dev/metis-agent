@@ -1093,7 +1093,21 @@ func orEmpty(v any) any {
 
 func (a *Agent) world(msg map[string]any) []Reply {
 	if a.Host == nil {
-		return []Reply{a.errorReply(msg["id"], "this domain's host takes no world lines")}
+		// a host of its own with a world face (a composition's director's: its lines at its next tick)
+		w, ok := a.Sh.Plugin.(interface{ World([]string) })
+		if g, isG := a.Sh.Plugin.(gatedHost); isG {
+			w, ok = g.Host.(interface{ World([]string) })
+		}
+		if !ok {
+			return []Reply{a.errorReply(msg["id"], "this domain's host takes no world lines")}
+		}
+		var lines []string
+		for _, x := range anyList(msg["world"]) {
+			lines = append(lines, x)
+		}
+		w.World(lines)
+		a.worlds = append(a.worlds, lines)
+		return nil
 	}
 	var lines []string
 	switch w := msg["world"].(type) {
@@ -1314,6 +1328,22 @@ func (a *Agent) Traces() []any {
 	}
 	if t := a.Trace(); t != nil {
 		return []any{*t}
+	}
+	return nil
+}
+
+func anyList(v any) []string {
+	switch w := v.(type) {
+	case []any:
+		var out []string
+		for _, x := range w {
+			out = append(out, fmt.Sprint(x))
+		}
+		return out
+	case []string:
+		return w
+	case string:
+		return []string{w}
 	}
 	return nil
 }

@@ -104,6 +104,9 @@ type AgentHost struct {
 	// LastConsume is set by the domain agent: the consumed atoms of the
 	// fired row OnEvent is called for (py's last_row()[2].consume).
 	LastConsume func() []string
+	// Gate, set by a composition's tick: a command acts only when it allows it (a resource's
+	// holder: gating host); nil, every command acts.
+	Gate func(name string) bool
 }
 
 // NewAgentHost wraps inner; enders/waits nil take py's defaults.
@@ -261,6 +264,9 @@ func (a *AgentHost) Tick(counts map[string]int) ([]string, bool) {
 // OnEvent is the OUTPUT face: the catalog host actuates; a command's
 // payload rides with the event that consumed it.
 func (a *AgentHost) OnEvent(name string, args []string) {
+	if a.Gate != nil && !a.Gate(name) {
+		return
+	}
 	if a.LastConsume != nil {
 		for _, atom := range a.LastConsume() {
 			if len(a.Inflight[atom]) == 0 {
