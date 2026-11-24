@@ -55,7 +55,7 @@ func testMap(t *testing.T) *HomeMap {
 	t.Helper()
 	p := os.Getenv("METIS_HOME_MAP")
 	if p == "" {
-		for _, d := range []string{"../../../../metis-worlds-home/home", "../../../../metis-worlds/home"} {
+		for _, d := range []string{"../../../../../nina-live/catalog", "../../../../metis-worlds-home/home", "../../../../metis-worlds/home"} {
 			if abs, _ := filepath.Abs(filepath.Join(d, "world", "home.map.json")); abs != "" {
 				if _, err := os.Stat(abs); err == nil {
 					p = abs

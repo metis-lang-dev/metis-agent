@@ -15,7 +15,7 @@ import (
 )
 
 func homeWorld(t *testing.T) string {
-	for _, d := range []string{os.Getenv("METIS_HOME_WORLD"), "../../../../metis-worlds-home/home", "../../../../metis-worlds/home"} {
+	for _, d := range []string{os.Getenv("METIS_HOME_WORLD"), "../../../../../nina-live/catalog", "../../../../metis-worlds-home/home", "../../../../metis-worlds/home"} {
 		if d == "" {
 			continue
 		}

@@ -102,7 +102,7 @@ func TestTheGoAgentServesThePackagesGoldens(t *testing.T) {
 
 // homeWorldDir is the home world (metis-worlds `home`): $METIS_HOME_WORLD, else the sibling checkouts'.
 func homeWorldDir(t *testing.T) string {
-	for _, d := range []string{os.Getenv("METIS_HOME_WORLD"), "../../../../metis-worlds-home/home", "../../../../metis-worlds/home"} {
+	for _, d := range []string{os.Getenv("METIS_HOME_WORLD"), "../../../../../nina-live/catalog", "../../../../metis-worlds-home/home", "../../../../metis-worlds/home"} {
 		if d == "" {
 			continue
 		}
