@@ -140,8 +140,17 @@ func (h *HomeSem) Join(pkg, manifest string) error {
 	}
 	h.W.W.Lock()
 	defer h.W.W.Unlock()
-	if err := h.W.B.Join(m); err != nil {
-		return err
+	already := false
+	for _, n := range h.W.B.Members() {
+		already = already || n == pkg
+	}
+	// a member the embedding joined already (its world rebuilt from its log, the members joined at
+	// genesis) is not joined again: a second Join would reset what it has seen, and the replay
+	// would not reach the live board
+	if !already {
+		if err := h.W.B.Join(m); err != nil {
+			return err
+		}
 	}
 	h.mu.Lock()
 	h.joined[pkg] = true
