@@ -230,3 +230,11 @@ func concluded(pred string) bool { return strings.HasPrefix(pred, "advise_") }
 func (u *homeUnit) Running() bool     { return u.running }
 func (u *homeUnit) OK() bool          { return u.ok }
 func (u *homeUnit) Outside() *float64 { return u.outside }
+
+// conclude writes the home's mode or mood into the semantic world (an event set: a Metis conclusion, never a
+// reading); a world that is not the semantic one (the simulated) keeps none.
+func (w *HomeWorld) conclude(name, value, rule string) {
+	if sem, ok := w.Back.(*HomeSem); ok {
+		sem.apply(semhome.Event{At: sem.Now(), Kind: "set", ID: "home", Var: name, Value: value, Member: "scenes", Rule: rule})
+	}
+}

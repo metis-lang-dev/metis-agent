@@ -1251,14 +1251,22 @@ func (v *HomeView) OnEvent(name string, args []string) {
 	v.fired = append(v.fired, firedRule{base, append([]string{}, args...)})
 	switch base {
 	case "scene_set", "arrive":
-		if v.W.Composed {
-			return
-		}
 		scene := "home"
 		if base == "scene_set" && len(args) > 0 {
 			scene = args[0]
 		}
+		// the home's mode into the world (a Metis conclusion, the mode port every package reads: nina-live's
+		// redesign, step 3), whatever routes the wishes
+		v.W.conclude("mode", scene, base)
+		if v.W.Composed {
+			return
+		}
 		v.W.FanOut(scene)
+		return
+	case "mood_set", "mood_change":
+		if len(args) > 0 {
+			v.W.conclude("mood", args[0], base)
+		}
 		return
 	case "ir_send":
 		if len(args) >= 2 {
