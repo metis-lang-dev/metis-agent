@@ -234,7 +234,9 @@ class Tracer:
             cut = {"cut": "reload"} if self.cut else {}   # a new session's state is no row: this checkpoint does not follow from the last
             if self.seqs and not self.cut and self.seg.fh:   # what came between the ticks, before the checkpoint that holds it
                 self.seg.line(self.stamped({"k": self.k, "between": True, "members": self.entries()}))
-            self.seqs, self.cut = {}, False
+            # the checkpoint holds what came before it: its rows (seqs) and the outside lines that brought them (ext; a
+            # between line above has stamped them already); a replay restores the checkpoint, and must not serve them again
+            self.seqs, self.ext, self.cut = {}, [], False
             self.seg.open_segment(self.k, dict(self.header(), **cut), self.checkpoint())
 
     def after(self):
