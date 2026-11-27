@@ -2,6 +2,8 @@ package metishome
 
 import (
 	"encoding/json"
+	"fmt"
+	"sort"
 
 	"github.com/metis-lang-dev/metis-agent/go/internal/dagent"
 	"github.com/metis-lang-dev/metis-agent/go/internal/host"
@@ -35,6 +37,8 @@ type HostSpec struct {
 // hosted adapts a Host to the runtime's: a hosted day of its own, no script, no sensor face.
 type hosted struct {
 	h    Host
+	name string
+	env  *host.MemEnv
 	beat int
 	due  []host.Due
 }
@@ -45,7 +49,40 @@ func (x *hosted) Tick(counts map[string]int) ([]string, bool) {
 	if lines == nil {
 		lines = []string{}
 	}
-	return lines, false
+	return append(lines, x.levels(counts)...), false
+}
+
+// levels: the package's world levels (its manifest's levels: the home's mode and mood, nina-live's redesign
+// step 3), corrected against the program's counts as the home's own hosts correct theirs, so an agent's own host
+// needs to know nothing of the board.
+func (x *hosted) levels(counts map[string]int) []string {
+	if x.env == nil || x.env.Shared == nil {
+		return nil
+	}
+	w, err := x.env.Shared.Home()
+	if err != nil {
+		return nil
+	}
+	sem, ok := w.Back.(*host.HomeSem)
+	if !ok {
+		return nil
+	}
+	la := sem.LevelAtoms(x.name)
+	atoms := make([]string, 0, len(la))
+	for a := range la {
+		atoms = append(atoms, a)
+	}
+	sort.Strings(atoms)
+	var out []string
+	for _, a := range atoms {
+		have := counts[a]
+		if la[a] && have == 0 {
+			out = append(out, "+"+a)
+		} else if !la[a] && have > 0 {
+			out = append(out, fmt.Sprintf("-%s %d", a, have))
+		}
+	}
+	return out
 }
 func (x *hosted) OnEvent(name string, args []string) { x.h.OnEvent(name, args, nil) }
 func (x *hosted) OnPayload(name string, args []string, payload map[string]any) {
@@ -77,7 +114,7 @@ func register(hs map[string]HostSpec) {
 	for name, spec := range hs {
 		spec := spec
 		dagent.Hosts[name] = dagent.HostEntry{
-			New:    func(*host.MemEnv) rt.Host { return &hosted{h: spec.New()} },
+			New:    func(env *host.MemEnv) rt.Host { return &hosted{h: spec.New(), name: name, env: env} },
 			Tables: &host.Tables{Outcomes: spec.Outcomes}, OwnDay: true,
 		}
 	}

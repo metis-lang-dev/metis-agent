@@ -78,11 +78,11 @@ var homeSweeps = map[string][]struct {
 
 var homeReads = map[string][]string{
 	"lights": {"light_lit", "light_dark", "light_ok", "light_missing", "room_lit", "room_unlit",
-		"occupied", "empty", "vacant", "unsensed", "day", "night", "presence"},
+		"occupied", "empty", "vacant", "unsensed", "day", "night", "presence", "home_mode"},
 	"air": {"running", "stopped", "normal_mode", "night_mode", "boost_mode", "heater_on", "heater_off",
 		"winter_on", "winter_off", "unit_ok", "unit_missing", "cold_out", "mild_out", "out_unknown",
-		"power", "outside"},
-	"media":  {"tv_on", "tv_off", "tv_ok", "tv_missing", "ir_ready", "ir_absent"},
+		"power", "outside", "home_mode"},
+	"media":  {"tv_on", "tv_off", "tv_ok", "tv_missing", "ir_ready", "ir_absent", "home_mode"},
 	"scenes": {"someone_home", "nobody_home", "home_unsensed", "day", "night"},
 	"comfort": {"running", "stopped", "heater_on", "heater_off", "cold_room", "comfy_room", "warm_room",
 		"untracked", "humid_room", "fresh_room", "humidity_unknown", "chill", "heat", "damp", "power"},
