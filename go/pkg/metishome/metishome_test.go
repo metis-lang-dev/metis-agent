@@ -2,6 +2,7 @@ package metishome
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -236,4 +237,51 @@ func TestTheComposedHomeRoutesAScene(t *testing.T) {
 		}
 	}
 	t.Logf("goals %v\n%s", goals, joined)
+}
+
+// TestIntentsRouteThroughTheDirector: with RouteIntents, a card's intent arrives at the director as the
+// person's goal kind ask_<pkg> (an instance that declares it: nina-narratives' devices since the redesign's
+// step 4), the director wakes the card and forwards it, and the card answers as before; the director's
+// attention follows the card spoken to.
+func TestIntentsRouteThroughTheDirector(t *testing.T) {
+	t.Setenv("METIS_HOME_HA", "")
+	root := homeWorld(t)
+	if b, err := os.ReadFile(filepath.Join(root, "domains", "composition.yaml")); err != nil || !strings.Contains(string(b), "person:") {
+		t.Skip("the catalog's composition declares no person's goals (person: ask_<pkg>)")
+	}
+	var mu sync.Mutex
+	var arrivals, relays []string
+	s, err := Open(Options{Root: root, Records: "off", Composed: true, RouteIntents: true,
+		OnTick: func(kind string, f map[string]any) {
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case kind == "tick-director" && f["intent"] != nil:
+				arrivals = append(arrivals, fmt.Sprint(f["arrival"]))
+			case kind == "tick-relay" && f["what"] == "intent":
+				relays = append(relays, fmt.Sprint(f["domain"]))
+			case kind == "tick-intent-bypass":
+				relays = append(relays, "bypass:"+fmt.Sprint(f["domain"]))
+			}
+		}})
+	if err != nil {
+		t.Skip(err)
+	}
+	stop := beating(s)
+	defer stop()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	for _, c := range []struct {
+		tool string
+		args map[string]any
+	}{{"home_scenes", map[string]any{"intent": "NIGHT"}}, {"home_media", map[string]any{"intent": "ON", "device": "tv"}}, {"home_media", map[string]any{"intent": "OFF", "device": "tv"}}} {
+		if o := s.Call(ctx, c.tool, c.args); o.Status == "error" {
+			t.Fatalf("%s: %+v", c.tool, o)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if strings.Join(arrivals, " ") != "ask_scenes ask_media ask_media" || strings.Join(relays, " ") != "scenes media media" {
+		t.Fatalf("arrivals %v, relays %v", arrivals, relays)
+	}
 }

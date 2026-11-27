@@ -74,9 +74,12 @@ type Options struct {
 	OnReasoning func(Reasoning) // every reply worth telling (nil: dropped)
 	// Composed: the packages run as the home's composition (Root/domains/composition.yaml, its image built
 	// under Root/domains/build/) under its director, on the tick; OnTick sees the tick's journal rows
-	Composed   bool
-	OnTick     func(kind string, f map[string]any)
-	OnSurprise func(domain string, reply map[string]any) // a surprise, for the records (nil: dropped)
+	Composed bool
+	// RouteIntents: a card's intent enters through the composition's director (ask_<pkg>, when its
+	// instance declares handles(pkg, ask_pkg)) instead of straight into the card (nina-live's redesign)
+	RouteIntents bool
+	OnTick       func(kind string, f map[string]any)
+	OnSurprise   func(domain string, reply map[string]any) // a surprise, for the records (nil: dropped)
 	// Hosts: the Go hosts of the agent's own packages (by name; each also in Packages), beside the
 	// home's
 	Hosts map[string]HostSpec
@@ -181,6 +184,7 @@ func (s *Service) openComposition() error {
 		},
 	})
 	s.tick.AllCards = true // Nina serves every package's card: the director's wake/sleep is its bookkeeping
+	s.tick.RouteIntents = s.o.RouteIntents
 	return nil
 }
 

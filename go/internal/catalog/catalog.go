@@ -281,7 +281,13 @@ func scanDir(root string) (map[string]Manifest, error) {
 	if _, err := os.Stat(base); err != nil {
 		return out, nil
 	}
-	err := filepath.WalkDir(base, func(p string, d fs.DirEntry, err error) error {
+	// a domains that is a link (nina-live's catalog/domains → nina-narratives' devices): its target is
+	// walked (WalkDir does not follow a link, not even its root); the manifests keep the paths under root
+	real, err := filepath.EvalSymlinks(base)
+	if err != nil {
+		return nil, err
+	}
+	err = filepath.WalkDir(real, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -290,6 +296,9 @@ func scanDir(root string) (map[string]Manifest, error) {
 		}
 		if d.IsDir() || d.Name() != "domain.yaml" {
 			return nil
+		}
+		if rel, e := filepath.Rel(real, p); e == nil {
+			p = filepath.Join(base, rel)
 		}
 		m, err := CheckManifest(p)
 		if err != nil {

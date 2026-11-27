@@ -136,6 +136,15 @@ type Tick struct {
 	// AllCards: every card stays served (Nina's five): the director's wake/sleep is journaled, its
 	// sleep filters nothing
 	AllCards bool
+	// RouteIntents: the person's intents enter through the director (nina-live's redesign, channel A,
+	// s-b478fe59): an intent for member d arrives as ask_d (a person's goal kind: the composition's
+	// person:, its instance's handles(d, ask_d)), and the director's forward serves it into d's card.
+	// Its wake and its attention are then the director's; an intent the director does not forward goes
+	// to the card as before, journaled tick-intent-bypass. One intent at a time (the service's lock).
+	RouteIntents bool
+
+	intents   map[string]map[string]any // member → the card message, until the director forwards it
+	intentOut []map[string]any          // the replies of a forwarded intent, for Intent's caller
 
 	lastBeat   map[string]int
 	seen       map[string]seenRows
@@ -556,6 +565,24 @@ func (o tickOps) Instance(d, goal string) {
 	if goal == "" || t.D.Agents[d] == nil {
 		return
 	}
+	if goal == "ask_"+d && t.intents != nil { // a routed intent: into the card it was asked of
+		if m, ok := t.intents[d]; ok {
+			delete(t.intents, d)
+			for _, r := range t.serve(d, m) {
+				if r["kind"] == "trace" {
+					t.sift(d, r)
+					continue
+				}
+				t.intentOut = append(t.intentOut, r)
+			}
+			t.goalTake[d] = t.Beat
+			if t.Dir.Facts.Specialist[d] {
+				t.awaiting[d] = true
+			}
+			t.journal("tick-relay", F{"what": "intent", "domain": d, "id": m["id"], "verb": m["verb"], "stamp": t.Beat})
+			return
+		}
+	}
 	lines := []string{"+" + goal + " 1"}
 	if dh, ok := innerOf(t.D.Agents[t.Dir.Name]).(Deliverer); ok {
 		lines = dh.Deliver(d, goal, t.D.Agents[d].Sh.Counts.Map())
@@ -758,8 +785,29 @@ func (t *Tick) Intent(d, id, verb string, args map[string]any) []map[string]any 
 	for k, v := range args {
 		a[k] = v
 	}
+	msg := map[string]any{"id": id, "verb": verb, "args": a}
+	if t.RouteIntents && t.Dir != nil && t.Dir.Facts.Handles[[2]string{d, "ask_" + d}] {
+		if t.intents == nil {
+			t.intents = map[string]map[string]any{}
+		}
+		t.intents[d] = msg
+		t.intentOut = nil
+		k := len(t.Dir.Log)
+		t.Dir.Arrive("ask_" + d)
+		t.Dir.Step(1)
+		for _, b := range t.Dir.Log[k:] {
+			t.journal("tick-director", F{"director": t.Dir.Name, "arrival": b.Arrival, "effects": b.Effects, "goals": b.Goals, "beat": t.Beat, "intent": verb})
+		}
+		if _, waiting := t.intents[d]; !waiting { // forwarded: its card answered
+			out := t.intentOut
+			t.intentOut = nil
+			return out
+		}
+		delete(t.intents, d)
+		t.journal("tick-intent-bypass", F{"domain": d, "id": id, "verb": verb, "outcome": t.Dir.Outcome})
+	}
 	var out []map[string]any
-	for _, r := range t.serve(d, map[string]any{"id": id, "verb": verb, "args": a}) {
+	for _, r := range t.serve(d, msg) {
 		if r["kind"] == "trace" {
 			t.sift(d, r)
 			continue
