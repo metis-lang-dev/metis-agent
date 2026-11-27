@@ -181,6 +181,7 @@ func (s *Service) openComposition() error {
 				}
 				return
 			}
+			s.worldRelay(r)
 			s.reply(r)
 		},
 		Say: func(text, kind string) {
@@ -255,6 +256,40 @@ func (s *Service) Call(ctx context.Context, tool string, args map[string]any) Ou
 		return o
 	case <-ctx.Done():
 		return Outcome{"pending", "the rules have not decided yet; the outcome will come in REASONING"}
+	}
+}
+
+// worldRelay: the scenes concluded the home's mode or mood into the world (no wish routed any more: nina-live's
+// redesign, step 3), so the packages that read it are reached as a routed wish reached them: a tick-relay goal
+// for each member of the board that reads the port, as the director's forward journaled it.
+func (s *Service) worldRelay(r map[string]any) {
+	if s.o.OnTick == nil {
+		return
+	}
+	if d, _ := r["domain"].(string); d != "scenes" {
+		return
+	}
+	ref, _ := r["ref"].(map[string]any)
+	ev, _ := ref["event"].(string)
+	base, binds, _ := strings.Cut(ev, "[")
+	port := map[string]string{"scene_set": "mode", "arrive": "mode", "mood_set": "mood", "mood_change": "mood"}[base]
+	if port == "" {
+		return
+	}
+	value := "home"
+	if _, v, ok := strings.Cut(strings.TrimSuffix(binds, "]"), "="); ok {
+		value, _, _ = strings.Cut(v, ",")
+	}
+	w, err := s.proc.Shared().Home()
+	if err != nil {
+		return
+	}
+	sem, ok := w.Back.(*host.HomeSem)
+	if !ok {
+		return
+	}
+	for _, m := range sem.Readers(port) {
+		s.o.OnTick("tick-relay", map[string]any{"what": "goal", "domain": m, "goal": fmt.Sprintf("home_%s(%s)", port, value), "via": "world"})
 	}
 }
 

@@ -238,3 +238,18 @@ func (w *HomeWorld) conclude(name, value, rule string) {
 		sem.apply(semhome.Event{At: sem.Now(), Kind: "set", ID: "home", Var: name, Value: value, Member: "scenes", Rule: rule})
 	}
 }
+
+// Readers are the board's members that read PORT (their manifests' beliefs and levels).
+func (h *HomeSem) Readers(port string) []string {
+	h.W.W.Lock()
+	defer h.W.W.Unlock()
+	var out []string
+	for _, m := range h.W.B.Members() {
+		for _, p := range h.W.B.In(m) {
+			if p == port {
+				out = append(out, m)
+			}
+		}
+	}
+	return out
+}
