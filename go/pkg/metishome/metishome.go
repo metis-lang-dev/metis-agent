@@ -75,6 +75,9 @@ type Options struct {
 	// Composed: the packages run as the home's composition (Root/domains/composition.yaml, its image built
 	// under Root/domains/build/) under its director, on the tick; OnTick sees the tick's journal rows
 	Composed bool
+	// OwnClock: the semantic world settles on the runtime's own clock (Service.Settle), not when a member reads
+	// it: the world's tick independent of the members' periods and of the LLMs in the loop
+	OwnClock bool
 	// RouteIntents: a card's intent enters through the composition's director (ask_<pkg>, when its
 	// instance declares handles(pkg, ask_pkg)) instead of straight into the card (nina-live's redesign)
 	RouteIntents bool
@@ -128,6 +131,7 @@ func Open(o Options) (*Service, error) {
 	// the same beats
 	if w, err := s.proc.Shared().Home(); err == nil {
 		if sem, ok := w.Back.(*host.HomeSem); ok {
+			sem.OwnClock = o.OwnClock
 			for _, n := range o.Packages {
 				if err := sem.Join(n, filepath.Join(o.Root, "domains", n, "domain.yaml")); err != nil {
 					return nil, fmt.Errorf("the packages' beliefs: %w", err)
@@ -252,6 +256,23 @@ func (s *Service) Call(ctx context.Context, tool string, args map[string]any) Ou
 	case <-ctx.Done():
 		return Outcome{"pending", "the rules have not decided yet; the outcome will come in REASONING"}
 	}
+}
+
+// Settle is one step of the semantic world's own clock (with OwnClock): its ports settled, read by every member at
+// its next beat. → false when the world is not the semantic world.
+func (s *Service) Settle() bool {
+	w, err := s.proc.Shared().Home()
+	if err != nil {
+		return false
+	}
+	sem, ok := w.Back.(*host.HomeSem)
+	if !ok {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sem.Settle()
+	return true
 }
 
 // Beat is one beat of the rules.

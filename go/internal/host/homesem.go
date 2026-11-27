@@ -40,9 +40,15 @@ type HomeSem struct {
 	Now   func() float64
 	Apply func(semhome.Event) (semhome.Out, error)
 
+	// OwnClock: the runtime settles the world on its own clock (Settle), never a reader: Read reads the last
+	// settle. The world's tick is then its own, independent of the members' periods and of the LLMs in the loop
+	// (nina-live's redesign, step 3: the semantic world on its own tick)
+	OwnClock bool
+
 	mu     sync.Mutex
 	joined map[string]bool
 	beat   semhome.Out // the last settle's outputs (its members' lines)
+	gen    int         // the settles so far
 }
 
 // NewHomeSem is the backend on world w, commanding through ha.
@@ -64,12 +70,29 @@ func (h *HomeSem) apply(ev semhome.Event) semhome.Out {
 
 func (h *HomeSem) Name() string { return "semworld" }
 
-// Read settles the world (the beat's boundary step) and reads the families' state from it.
-func (h *HomeSem) Read() *HomeState {
+// Settle is the world's boundary step: the board's ports quantised and counted, every member's lines.
+func (h *HomeSem) Settle() semhome.Out {
 	out := h.apply(semhome.Event{At: h.Now(), Kind: "settle"})
 	h.mu.Lock()
 	h.beat = out
+	h.gen++
 	h.mu.Unlock()
+	return out
+}
+
+// Gen is the number of settles so far (a reading is the same between two).
+func (h *HomeSem) Gen() int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.gen
+}
+
+// Read reads the families' state from the world: settled first by the reader, as before, unless the runtime
+// keeps the world's own clock (OwnClock: the last settle's state).
+func (h *HomeSem) Read() *HomeState {
+	if !h.OwnClock {
+		h.Settle()
+	}
 	st := h.W.State()
 	s := h.S
 	for k, l := range st.Lights {

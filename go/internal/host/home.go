@@ -817,7 +817,11 @@ func HomeMapPath(root string) string {
 
 // Readings are the readings every package draws from, computed once per beat number.
 func (w *HomeWorld) Readings(beat int) map[string]bool {
-	if w.hasBeat && w.lastBeat == beat {
+	key := beat
+	if sem, ok := w.Back.(*HomeSem); ok && sem.OwnClock { // the world's own settle, not each view's beat count
+		key = sem.Gen()
+	}
+	if w.hasBeat && w.lastBeat == key {
 		return w.lastR
 	}
 	s := w.Back.Read()
@@ -1068,7 +1072,7 @@ func (w *HomeWorld) Readings(beat int) map[string]bool {
 			}
 		}
 	}
-	w.lastBeat, w.hasBeat, w.lastR = beat, true, r
+	w.lastBeat, w.hasBeat, w.lastR = key, true, r
 	return r
 }
 

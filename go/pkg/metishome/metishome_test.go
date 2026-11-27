@@ -285,3 +285,50 @@ func TestIntentsRouteThroughTheDirector(t *testing.T) {
 		t.Fatalf("arrivals %v, relays %v", arrivals, relays)
 	}
 }
+
+// TestTheWorldKeepsItsOwnClock: with OwnClock the rules' beats never settle the world; Settle does, once a call,
+// however many beats run between (nina-live's redesign: the semantic world on its own tick).
+func TestTheWorldKeepsItsOwnClock(t *testing.T) {
+	t.Setenv("METIS_HOME_HA", "")
+	root := homeWorld(t)
+	m, err := semhome.LoadMap(host.HomeMapPath(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := semhome.New(m, semhome.DefaultParams)
+	var mu sync.Mutex
+	settles := 0
+	apply := func(ev semhome.Event) (semhome.Out, error) {
+		if ev.Kind == "settle" {
+			mu.Lock()
+			settles++
+			mu.Unlock()
+		}
+		return w.Apply(ev)
+	}
+	s, err := Open(Options{Root: root, Records: "off", Composed: true, OwnClock: true, Sem: w, Apply: apply, Device: &fakeDevice{}})
+	if err != nil {
+		t.Skip(err)
+	}
+	for i := 0; i < 5; i++ {
+		s.Beat()
+	}
+	mu.Lock()
+	n := settles
+	mu.Unlock()
+	if n != 0 {
+		t.Fatalf("%d settles in 5 beats with the world on its own clock", n)
+	}
+	for i := 0; i < 3; i++ {
+		if !s.Settle() {
+			t.Fatal("no semantic world")
+		}
+		s.Beat()
+		s.Beat()
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if settles != 3 {
+		t.Fatalf("%d settles for 3 calls", settles)
+	}
+}
