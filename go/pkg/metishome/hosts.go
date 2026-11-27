@@ -52,6 +52,23 @@ func (x *hosted) Tick(counts map[string]int) ([]string, bool) {
 	return append(lines, x.levels(counts)...), false
 }
 
+// Weights: the semantic world's ports priced for the package's beliefs (its manifest's beliefs: the home's mode
+// and mood), as the home's own hosts price theirs; without the semantic world, every port flat.
+func (x *hosted) Weights() map[string]rt.WeightFunc {
+	if x.env != nil && x.env.Shared != nil {
+		if w, err := x.env.Shared.Home(); err == nil {
+			if sem, ok := w.Back.(*host.HomeSem); ok {
+				return sem.Weights()
+			}
+		}
+	}
+	flat := map[string]rt.WeightFunc{}
+	for _, p := range []string{"mode", "mood"} {
+		flat[p] = func([]string, rt.Counts) float64 { return 1 }
+	}
+	return flat
+}
+
 // levels: the package's world levels (its manifest's levels: the home's mode and mood, nina-live's redesign
 // step 3), corrected against the program's counts as the home's own hosts correct theirs, so an agent's own host
 // needs to know nothing of the board.
@@ -106,6 +123,7 @@ var (
 	_ dagent.Inner     = (*hosted)(nil)
 	_ dagent.Payloaded = (*hosted)(nil)
 	_ dagent.Namer     = (*hosted)(nil)
+	_ rt.Weighted      = (*hosted)(nil)
 )
 
 // register puts the agent's hosts in the process's registry (by package name; a later Open's
