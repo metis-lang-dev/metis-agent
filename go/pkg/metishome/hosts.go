@@ -106,12 +106,21 @@ func (x *hosted) OnPayload(name string, args []string, payload map[string]any) {
 	x.h.OnEvent(name, args, payload)
 }
 func (x *hosted) Observe(map[string]int) map[string]int { return nil }
-func (x *hosted) Snapshot() (json.RawMessage, error)    { return json.RawMessage(`{}`), nil }
-func (x *hosted) Restore(json.RawMessage) error         { return nil }
-func (x *hosted) Beat() int                             { return x.beat }
-func (x *hosted) Due() []host.Due                       { return append([]host.Due(nil), x.due...) }
-func (x *hosted) SetDue(d []host.Due)                   { x.due = append([]host.Due(nil), d...) }
-func (x *hosted) Replay()                               {}
+
+// Pending: the agent's host has input for its next tick (a world's events: nina-live's cognition host, the
+// redesign's W4), so a member that wakes on change beats then (spec/15 §8.5 rule 1, the dagent's Pender).
+func (x *hosted) Pending() bool {
+	if p, ok := x.h.(interface{ Pending() bool }); ok {
+		return p.Pending()
+	}
+	return false
+}
+func (x *hosted) Snapshot() (json.RawMessage, error) { return json.RawMessage(`{}`), nil }
+func (x *hosted) Restore(json.RawMessage) error      { return nil }
+func (x *hosted) Beat() int                          { return x.beat }
+func (x *hosted) Due() []host.Due                    { return append([]host.Due(nil), x.due...) }
+func (x *hosted) SetDue(d []host.Due)                { x.due = append([]host.Due(nil), d...) }
+func (x *hosted) Replay()                            {}
 func (x *hosted) Name(handle string) (string, bool) {
 	if n, ok := x.h.(Namer); ok {
 		return n.Name(handle)
@@ -123,6 +132,7 @@ var (
 	_ dagent.Inner     = (*hosted)(nil)
 	_ dagent.Payloaded = (*hosted)(nil)
 	_ dagent.Namer     = (*hosted)(nil)
+	_ dagent.Pender    = (*hosted)(nil)
 	_ rt.Weighted      = (*hosted)(nil)
 )
 
