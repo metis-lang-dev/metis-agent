@@ -80,7 +80,8 @@ type intentSpec struct {
 		Verb    any    `yaml:"verb"`
 		Meaning string `yaml:"meaning"`
 	} `yaml:"verbs"`
-	Slots yaml.Node `yaml:"slots"`
+	Slots    yaml.Node `yaml:"slots"`
+	Guidance string    `yaml:"guidance"`
 }
 
 func verbNames(v any) []string {
@@ -140,6 +141,12 @@ func ToolFor(root, pkg string) (Tool, error) {
 		}
 	}
 	slots := &spec.Slots
+	strs := 0 // the string slots: the only one takes the package's names
+	for i := 0; i+1 < len(slots.Content); i += 2 {
+		if slots.Content[i+1].Value == "string" {
+			strs++
+		}
+	}
 	for i := 0; i+1 < len(slots.Content); i += 2 {
 		k := slots.Content[i].Value
 		var v any
@@ -150,13 +157,18 @@ func ToolFor(root, pkg string) (Tool, error) {
 		if err != nil {
 			return Tool{}, fmt.Errorf("%s: %w", pkg, err)
 		}
+		guide := slotGuidance(spec.Guidance, k) // what the package's guidance says of this slot
 		if s["type"] == "string" {
+			// a kind's names are this slot's when they are clearly its own: the slot named after the kind, the
+			// package's only string slot, or its guidance naming them. Not every string slot's: a clock time
+			// described as "one of 'leaving', 'going to bed'" was left out by the model (timers' at and
+			// every, Nina's v0.3.0 acceptance, 2026-11-28)
 			var said []string
 			if k == "room" {
 				said = known["room"]
 			} else {
 				for kind, ns := range known {
-					if kind != "room" {
+					if kind != "room" && (kind == k || strs == 1 || mentionsAny(guide, ns)) {
 						said = append(said, ns...)
 					}
 				}
@@ -169,6 +181,13 @@ func ToolFor(root, pkg string) (Tool, error) {
 				}
 				s["description"] = fmt.Sprintf("the %s as the rules name it: one of %s (use the full name, e.g. '%s', not "+
 					"just the room); another name is passed as said and refused if unknown", k, strings.Join(q, ", "), said[0])
+			}
+		}
+		if guide != "" {
+			if d, _ := s["description"].(string); d != "" {
+				s["description"] = guide + " " + d
+			} else {
+				s["description"] = guide
 			}
 		}
 		props[k] = s
@@ -233,4 +252,34 @@ func mapValue(n *yaml.Node, key string) *yaml.Node {
 		}
 	}
 	return nil
+}
+
+// slotGuidance: the guidance's sentences that name slot k (`k`), joined.
+func slotGuidance(g, k string) string {
+	var out []string
+	for _, sen := range strings.SplitAfter(strings.Join(strings.Fields(g), " "), ". ") {
+		if strings.Contains(sen, "`"+k+"`") {
+			out = append(out, strings.TrimSpace(sen))
+		}
+	}
+	return strings.Join(out, " ")
+}
+
+// mentionsAny: whether text names one of ns, as a word or words (case and punctuation aside).
+func mentionsAny(text string, ns []string) bool {
+	norm := func(x string) string {
+		return " " + strings.Join(strings.Fields(strings.ToLower(strings.Map(func(r rune) rune {
+			if strings.ContainsRune("\"',();:.`", r) {
+				return ' '
+			}
+			return r
+		}, x))), " ") + " "
+	}
+	t := norm(text)
+	for _, n := range ns {
+		if n := norm(n); n != "  " && strings.Contains(t, n) {
+			return true
+		}
+	}
+	return false
 }

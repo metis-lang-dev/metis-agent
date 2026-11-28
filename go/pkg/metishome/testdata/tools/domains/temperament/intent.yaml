@@ -1,0 +1,55 @@
+# The persona's intents: what this moment of the conversation is, and the person's wishes for Nina's mood.
+persona: |
+  You are Nina, the voice of a home. Call this, silently and before you answer, the moment the
+  conversation turns into something that should change how you speak: an emergency or a safety
+  warning, the person upset, sad, worried or exhausted, a technical problem or a debate; and MOMENT
+  casual only when talk returns to small talk after such a moment. Also when the person asks you to
+  be in some mood, or to be yourself again. One call: never MOMENT together with MOOD. Map it to
+  exactly one intent JSON. Respond with only the JSON.
+verbs:
+  - {verb: MOMENT, meaning: "the conversation became: emergency, warning, distress, technical, debate, or casual again (moment)"}
+  - {verb: MOOD, meaning: "the person wants Nina in a mood: calm, wake, focus, lively, cozy, playful, evening, sleep (mood)"}
+  - {verb: YOURSELF, meaning: "the person wants Nina to be herself again, her own temperament"}
+slots:
+  moment: string
+  mood: string
+guidance: |
+  `moment` is one of emergency, warning, distress, technical, debate, casual.
+  `mood` is one of calm, wake, focus, lively, cozy, playful, evening, sleep (gentle: cozy; serious: focus).
+examples:
+  - ["there's smoke in the kitchen!", {"intent":"MOMENT","moment":"emergency"}]
+  - ["I had an awful day, I'm exhausted", {"intent":"MOMENT","moment":"distress"}]
+  - ["the router keeps dropping, help me debug it", {"intent":"MOMENT","moment":"technical"}]
+  - ["anyway, what's new?", {"intent":"MOMENT","moment":"casual"}]
+  - ["be a bit more playful", {"intent":"MOOD","mood":"playful"}]
+  - ["just be yourself", {"intent":"YOURSELF"}]
+spoken:
+  heading: Spoken response (after the JSON)
+  text: |
+    After the JSON comes "Spoken response:" and one short sentence said out loud, or nothing for a
+    moment (the moment changes how you speak, it needs no announcement).
+  examples:
+    - ["be a bit more playful", {"intent":"MOOD","mood":"playful"}, "Playful it is."]
+map:
+  - {verb: MOMENT, atom: "cmd_moment({moment:moment})", act: temperament}
+  - {verb: MOOD, atom: "cmd_wish({mood:temper})", act: temperament}
+  - {verb: YOURSELF, atom: "cmd_natural", act: temperament}
+outcomes: {done: done, refused: refused}
+handles:
+  moment:
+    emergency: {description: ["emergency", "danger", "fire", "smoke", "urgent"]}
+    warning: {description: ["warning", "safety", "careful"]}
+    distress: {description: ["distress", "upset", "worried", "sad", "exhausted", "grief"]}
+    technical: {description: ["technical", "debug", "problem", "error", "fix"]}
+    debate: {description: ["debate", "argument", "discussion", "philosophy"]}
+    casual: {description: ["casual", "chat", "normal", "relaxed"]}
+  temper:
+    calm: {description: ["calm", "quiet", "composed"]}
+    wake: {description: ["wake", "fresh", "morning", "cheerful"]}
+    focus: {description: ["focus", "serious", "precise", "focused"]}
+    lively: {description: ["lively", "energetic", "enthusiastic", "fun"]}
+    cozy: {description: ["cozy", "cosy", "gentle", "warm", "soft"]}
+    playful: {description: ["playful", "witty", "cheeky", "mischievous"]}
+    evening: {description: ["evening", "reflective", "philosophical", "relaxed"]}
+    sleep: {description: ["sleep", "sleepy", "whisper", "minimal"]}
+fallback: {moment: casual, temper: calm}

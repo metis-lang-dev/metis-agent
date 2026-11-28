@@ -1,0 +1,59 @@
+# The timers' intents: a countdown, an alarm, one that comes back, a reminder for when the home changes its mode, cancel, what is set.
+persona: |
+  You are the voice of a flat's assistant. The person is talking to YOU. Map what the person says
+  about a timer or a reminder to exactly one intent JSON. Respond with only the JSON.
+verbs:
+  - {verb: SET, meaning: "a countdown: in some minutes, tell me (minutes, subject)"}
+  - {verb: ALARM, meaning: "an alarm at a clock time: wake me, or tell me, at seven thirty (at, subject)"}
+  - {verb: REPEAT, meaning: "an alarm or a reminder that comes back: every day at seven, on weekdays at 7:30, every 30 minutes (at, every, minutes, subject)"}
+  - {verb: REMIND, meaning: "a reminder for when I leave, go to bed or come back (occasion, subject)"}
+  - {verb: CANCEL, meaning: "cancel the timers, the alarms and the reminders"}
+  - {verb: QUERY, meaning: "which timers, alarms and reminders are set"}
+slots:
+  minutes: number
+  subject: string
+  occasion: string
+  at: string
+  every: string
+guidance: |
+  `minutes` is the countdown in minutes (an hour is 60). `subject` is what it is for, in the
+  person's words ("check the printer"). `occasion` is when the home goes away (leaving), to night
+  (going to bed) or back home (coming back). `at` is an alarm's local clock time, HH:MM in 24 hours
+  ("seven thirty in the morning": 07:30), or YYYY-MM-DDTHH:MM for another day than today or tomorrow.
+  REPEAT is for what the person wants again and again, never once: with a clock time, `at` and `every` (the
+  days: daily, weekdays, weekends, or the days named, "mon,thu"); with a period, `minutes` alone ("every half
+  hour": 30). One alarm tomorrow morning is ALARM.
+examples:
+  - ["remind me in twenty minutes to check the printer", {"intent":"SET","minutes":20,"subject":"check the printer"}]
+  - ["set a timer for five minutes", {"intent":"SET","minutes":5,"subject":"the timer"}]
+  - ["when I leave, remind me to take the keys", {"intent":"REMIND","occasion":"leaving","subject":"take the keys"}]
+  - ["remind me at bedtime to charge the phone", {"intent":"REMIND","occasion":"going to bed","subject":"charge the phone"}]
+  - ["set an alarm for seven thirty tomorrow morning", {"intent":"ALARM","at":"07:30","subject":"the alarm"}]
+  - ["wake me up at six", {"intent":"ALARM","at":"06:00","subject":"wake up"}]
+  - ["wake me up every weekday at seven", {"intent":"REPEAT","at":"07:00","every":"weekdays","subject":"wake up"}]
+  - ["every day at ten at night remind me to take my pills", {"intent":"REPEAT","at":"22:00","every":"daily","subject":"take my pills"}]
+  - ["remind me to stretch every half hour", {"intent":"REPEAT","minutes":30,"subject":"stretch"}]
+  - ["on mondays and thursdays at eight, remind me the bins", {"intent":"REPEAT","at":"08:00","every":"mon,thu","subject":"the bins"}]
+  - ["cancel my timers", {"intent":"CANCEL"}]
+  - ["cancel the alarm", {"intent":"CANCEL"}]
+  - ["what timers do I have", {"intent":"QUERY"}]
+  - ["what alarms do I have", {"intent":"QUERY"}]
+spoken:
+  heading: Spoken response (after the JSON)
+  text: |
+    After the JSON comes "Spoken response:" and one short sentence said out loud.
+  examples:
+    - ["set a timer for five minutes", {"intent":"SET","minutes":5,"subject":"the timer"}, "Five minutes, starting now."]
+map:
+  - {verb: SET, atom: "cmd_timer", act: timers}
+  - {verb: ALARM, atom: "cmd_timer", act: timers}
+  - {verb: REPEAT, atom: "cmd_every", act: timers}
+  - {verb: REMIND, atom: "cmd_remind({occasion:scene})", act: timers}
+  - {verb: CANCEL, atom: "cmd_timers_off", act: timers}
+  - {verb: QUERY, atom: "cmd_timers_query", act: timers}
+outcomes: {done: done, refused: refused, said: done}
+handles:
+  scene:
+    away: {description: ["leaving", "leave", "going out", "away"]}
+    night: {description: ["going to bed", "bedtime", "night", "sleep"]}
+    home: {description: ["coming back", "back home", "home", "arrive"]}

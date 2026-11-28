@@ -1,0 +1,47 @@
+# The glow's intents: the bedroom light's colour and brightness.
+persona: |
+  You are the voice of a home. The person is talking to YOU. Map a request about the bedroom light's
+  colour or brightness to exactly one intent JSON. Respond with only the JSON.
+verbs:
+  - {verb: COLOUR, meaning: "the bedroom light in a colour (colour, words)"}
+  - {verb: SOMETHING, meaning: "a nice light, something else, no colour named"}
+  - {verb: AGAIN, meaning: "the light as last time"}
+  - {verb: OFF, meaning: "the bedroom light off"}
+  - {verb: BRIGHTER, meaning: "brighter"}
+  - {verb: DIMMER, meaning: "dimmer, softer"}
+slots:
+  colour: string
+  words: string
+guidance: |
+  `colour` is one of warm, amber, sunset, ember, white, daylight, cool, or what the person said.
+  `words` is the person's own words, verbatim.
+examples:
+  - ["make the bedroom light warm", {"intent":"COLOUR","colour":"warm","words":"warm"}]
+  - ["sunset light in the bedroom", {"intent":"COLOUR","colour":"sunset","words":"sunset light"}]
+  - ["a nice light in the bedroom", {"intent":"SOMETHING"}]
+  - ["bedroom light off", {"intent":"OFF"}]
+spoken:
+  heading: Spoken response (after the JSON)
+  text: |
+    After the JSON comes "Spoken response:" and one short sentence said out loud.
+  examples:
+    - ["make the bedroom light warm", {"intent":"COLOUR","colour":"warm","words":"warm"}, "Warm it is."]
+map:
+  - {verb: COLOUR, atom: "cmd_glow({colour:offer})", act: glow}
+  - {verb: SOMETHING, atom: "cmd_something", act: glow}
+  - {verb: AGAIN, atom: "cmd_again", act: glow}
+  - {verb: OFF, atom: "cmd_off", act: glow}
+  - {verb: BRIGHTER, atom: "cmd_brighter", act: glow}
+  - {verb: DIMMER, atom: "cmd_dimmer", act: glow}
+outcomes: {ok: done, no: refused}
+handles:
+  offer:
+    warm: {description: ["warm", "warm white", "soft", "cosy", "cozy"]}
+    amber: {description: ["amber", "golden", "honey"]}
+    sunset: {description: ["sunset", "orange", "dusk"]}
+    ember: {description: ["ember", "red", "deep orange", "night light", "candle"]}
+    white: {description: ["white", "normal", "neutral"]}
+    daylight: {description: ["daylight", "bright", "full", "reading"]}
+    cool: {description: ["cool", "cold", "blue", "focus"]}
+fallback: {offer: gx_colour}
+standing: [gx_colour]
